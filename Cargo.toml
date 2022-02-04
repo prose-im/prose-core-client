@@ -16,5 +16,6 @@ name = "prose_core_client"
 
 [dependencies]
 log = "0.4"
+jid = { version = "0.9", default-features = false }
 xmpp-parsers = "0.18"
 tokio-xmpp = { version = "3.1", default-features = false, features = ["tls-native"] }
