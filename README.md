@@ -8,7 +8,7 @@ _Tested at Rust version: `rustc 1.58.1 (db9d1b20b 2022-01-20)`_
 
 ## Architecture
 
-The Prose core client uses the low-level `tokio-xmpp` and `xmpp-parsers` to provide respectively with low-level XMPP protocol and connection management.
+The Prose core client uses the `tokio-xmpp` and `xmpp-parsers` libraries to provide respectively with low-level XMPP protocol and connection management.
 
 It builds up upon this base layer and provides a common and identical interface to the XMPP world to Prose apps. Useful functions this library provides, for instance, are models and store management. This minimizes code reuse or code adaptations in different programming languages (eg. redefining a similar data model in Swift and Java at once).
 
