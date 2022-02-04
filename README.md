@@ -24,6 +24,10 @@ The client library is organized into parts responsible for specific tasks, namel
 
 The Prose core client library is built in Rust. To communicate with its implementers, it exposes FFIs (for Foreign Function Interfaces) in various programming languages.
 
+The supported programming languages are listed below:
+
+* `Swift`
+
 ## License
 
 Licensing information can be found in the [LICENSE.md](./LICENSE.md) document.
