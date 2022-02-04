@@ -26,7 +26,7 @@ The Prose core client library is built in Rust. To communicate with its implemen
 
 The supported programming languages are listed below:
 
-* `Swift`
+* Swift
 
 ## License
 
