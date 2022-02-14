@@ -5,12 +5,6 @@
 
 // -- Modules --
 
+mod database;
 mod models;
 
-// TODO
-// Data Store / Modeling Crates (Pure-Rust required!)
-//   - mdl: https://docs.rs/mdl/latest/mdl/ (perfect fit? has signals for updated data, cool!)
-//   - sled: transactional, key-value based. might need to do the serialization/deserialization ourselves?
-//   - moogle: relational, and maybe too much of a relational-oriented library
-
-// TODO
