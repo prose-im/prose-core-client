@@ -9,19 +9,29 @@ mod messaging;
 
 // -- Imports --
 
+use std::sync::Arc;
+
+use tokio_xmpp::AsyncClient as XMPPClient;
+
+use super::ProseBrokerClient;
 use messaging::ProseBrokerEgressMessaging;
 
 // -- Structures --
 
-#[derive(Default)]
 pub struct ProseBrokerEgress {
-    messaging: ProseBrokerEgressMessaging,
+    client: ProseBrokerClient,
+
+    pub messaging: ProseBrokerEgressMessaging,
 }
 
 // -- Implementations --
 
 impl ProseBrokerEgress {
-    pub fn new() -> Self {
-        ProseBrokerEgress::default()
+    pub fn new(client: ProseBrokerClient) -> Self {
+        ProseBrokerEgress {
+            client: client,
+
+            messaging: ProseBrokerEgressMessaging::default(),
+        }
     }
 }

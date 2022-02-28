@@ -9,15 +9,17 @@ mod account;
 
 // -- Imports --
 
+use std::collections::hash_map::Iter as HashMapIter;
 use std::collections::HashMap;
 use std::str::FromStr;
 
 use jid::BareJid;
 use log;
-use tokio_xmpp;
-use xmpp_parsers;
 
-use account::{ProseClientAccount, ProseClientAccountBuilder, ProseClientAccountBuilderError};
+use account::{
+    ProseClientAccount, ProseClientAccountBuilder, ProseClientAccountBuilderError,
+    ProseClientAccountError,
+};
 
 // -- Structures --
 
@@ -37,6 +39,16 @@ pub struct ProseClient {
 
     pub accounts: HashMap<BareJid, ProseClientAccount>,
     pub origin: ProseClientOrigin,
+}
+
+#[derive(Debug)]
+pub enum ProseClientError {
+    InvalidJID,
+    AccountAlreadyExists,
+    AccountNotFound,
+    AccountError(ProseClientAccountError),
+    AccountBuilderError(ProseClientAccountBuilderError),
+    Unknown,
 }
 
 #[derive(Default)]
@@ -139,46 +151,77 @@ impl ProseClient {
 
     // -- Account management --
 
-    pub fn add(&self, jid: &str, password: &str) -> Result<(), ProseClientAccountBuilderError> {
+    pub fn add(&mut self, jid: &str, password: &str) -> Result<BareJid, ProseClientError> {
         log::trace!("got request to add account to prose client: {}", jid);
 
-        // TODO: give back account reference, or JID?
-        // TODO: return error if account already exists
+        let jid_bare = BareJid::from_str(jid).or(Err(ProseClientError::InvalidJID))?;
 
-        let jid_bare =
-            BareJid::from_str(jid).or(Err(ProseClientAccountBuilderError::InvalidJID))?;
-
-        let account = ProseClientAccountBuilder::new()
-            .credentials(jid_bare, password.to_string(), self.origin)
-            .build()?;
-
-        // TODO: append account to hmap
-        // TODO: store account creds in accounts DB
-
-        if self.bound {
-            log::trace!("will auto-connect account: {}", jid);
-
-            // TODO: if already bound, auto-connect there
+        // Account already exists locally? (cannot add twice)
+        if self.accounts.contains_key(&jid_bare) {
+            return Err(ProseClientError::AccountAlreadyExists);
         }
 
-        Ok(())
+        // Build account and insert in global map of accounts
+        let account = ProseClientAccountBuilder::new()
+            .credentials(jid_bare.clone(), password.to_string(), self.origin)
+            .build()
+            .map_err(|err| ProseClientError::AccountBuilderError(err))?;
+
+        self.accounts.insert(jid_bare.clone(), account);
+
+        // Store account in database
+        // TODO
+
+        if self.bound {
+            log::trace!("will auto-connect account: {} (after add)", jid);
+
+            // Acquire account from local store
+            let mut account = self
+                .accounts
+                .get_mut(&jid_bare)
+                .ok_or(ProseClientError::AccountNotFound)?;
+
+            // Connect to account
+            // Notice: now that the account was added, any connection error are sent over the \
+            //   event broker. This is asynchronous, so the library user needs to bind itself to \
+            //   ingress events.
+            account
+                .connect()
+                .map_err(|err| ProseClientError::AccountError(err))?;
+        }
+
+        Ok(jid_bare)
     }
 
     pub fn remove(&self, jid: &str) -> Result<(), ()> {
         log::trace!("got request to remove account from prose client: {}", jid);
 
-        // TODO
+        if self.bound {
+            log::trace!("will auto-disconnect account: {} (after remove)", jid);
+
+            // TODO: if already bound, auto-disconnect there
+        }
+
         // TODO: pull from DB
+        // TODO: disconnect if bound (call .disconnect())
 
         Err(())
     }
 
-    pub fn update(&self, jid: &str, password: &str) -> Result<(), ()> {
-        log::trace!("got request to update account in prose client: {}", jid);
+    pub fn get<'a>(&'a self, jid: &str) -> Result<&'a ProseClientAccount, ProseClientError> {
+        log::trace!("got request to get account from prose client: {}", jid);
 
-        // TODO
-        // TODO: update in DB
+        let jid_bare = BareJid::from_str(jid).or(Err(ProseClientError::InvalidJID))?;
 
-        Err(())
+        // Acquire account from local accounts store
+        self.accounts
+            .get(&jid_bare)
+            .ok_or(ProseClientError::AccountNotFound)
+    }
+
+    pub fn iter(&self) -> HashMapIter<BareJid, ProseClientAccount> {
+        log::trace!("got request to iterate on all accounts from prose client");
+
+        self.accounts.iter()
     }
 }

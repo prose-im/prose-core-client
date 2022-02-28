@@ -5,15 +5,26 @@
 
 // -- Imports --
 
-use jid::BareJid;
+use std::sync::{Arc, RwLock};
+use std::thread;
+
+use jid::{BareJid, JidParseError};
+use tokio_xmpp::AsyncClient as XMPPClient;
+use xmpp_parsers;
 
 use super::ProseClientOrigin;
 use crate::broker::ProseBroker;
 
 pub struct ProseClientAccount {
     credentials: ProseClientAccountCredentials,
+    states: ProseClientAccountStates,
 
-    pub broker: ProseBroker,
+    pub broker: Option<ProseBroker>,
+}
+
+#[derive(Default)]
+struct ProseClientAccountStates {
+    connected: bool,
 }
 
 #[derive(Default)]
@@ -23,7 +34,6 @@ pub struct ProseClientAccountBuilder {
 
 #[derive(Debug)]
 pub enum ProseClientAccountBuilderError {
-    InvalidJID,
     CredentialsNotSet,
 }
 
@@ -33,9 +43,14 @@ pub struct ProseClientAccountCredentials {
     pub origin: ProseClientOrigin,
 }
 
+#[derive(Debug)]
 pub enum ProseClientAccountError {
+    AlreadyConnected,
+    AlreadyDisconnected,
+    CannotConnect(JidParseError),
     InvalidCredentials,
     DoesNotExist,
+    Unknown,
 }
 
 // -- Implementations --
@@ -69,7 +84,63 @@ impl ProseClientAccountBuilder {
 
         Ok(ProseClientAccount {
             credentials: credentials,
-            broker: ProseBroker::new(),
+            states: ProseClientAccountStates::default(),
+            broker: None,
         })
+    }
+}
+
+impl ProseClientAccount {
+    pub fn connect(&mut self) -> Result<(), ProseClientAccountError> {
+        let jid_string = self.credentials.jid.to_string();
+
+        log::trace!("connect network for account jid: {}", &jid_string);
+
+        // Already connected? Fail.
+        if self.states.connected {
+            return Err(ProseClientAccountError::AlreadyConnected);
+        }
+
+        // Mark as connected (right away)
+        self.states.connected = true;
+
+        // Create XMPP client
+        log::trace!("create client for account jid: {}", &jid_string);
+
+        let mut client = XMPPClient::new(&jid_string, self.credentials.password.to_owned())
+            .map_err(|err| ProseClientAccountError::CannotConnect(err))?;
+
+        client.set_reconnect(true);
+
+        // Assign XMPP client to broker
+        self.broker = Some(ProseBroker::new(Arc::new(RwLock::new(client))));
+
+        Ok(())
+    }
+
+    pub fn disconnect(&self) -> Result<(), ProseClientAccountError> {
+        log::trace!(
+            "disconnect network for account jid: {}",
+            self.credentials.jid
+        );
+
+        // Already disconnected? Fail.
+        if !self.states.connected {
+            return Err(ProseClientAccountError::AlreadyDisconnected);
+        }
+
+        // Stop XMPP client stream
+        // TODO
+
+        // Stop broker thread
+        // TODO
+
+        Ok(())
+    }
+
+    pub fn broker<'a>(&'a self) -> Option<&'a ProseBroker> {
+        log::trace!("acquire broker for account jid: {}", self.credentials.jid);
+
+        self.broker.as_ref()
     }
 }

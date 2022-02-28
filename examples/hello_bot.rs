@@ -5,6 +5,7 @@
 
 extern crate prose_core_client;
 
+use tokio::runtime::Runtime;
 use log::{self, Level, LevelFilter, Metadata, Record, SetLoggerError};
 use prose_core_client::client::{ProseClientBuilder, ProseClientOrigin, ProseClientUnbindReason};
 
@@ -41,7 +42,7 @@ fn main() {
     log::debug!("hello bot starting...");
 
     // Build client
-    let client = ProseClientBuilder::new()
+    let mut client = ProseClientBuilder::new()
         .app(ProseClientOrigin::TestsCLI)
         .build()
         .expect("client built")
@@ -56,7 +57,16 @@ fn main() {
     log::debug!("hello bot has added account");
 
     // Hold on so that account is added and connected
-    // TODO: listen to broker on added account
+    let account = client.get(TEST_JID).expect("account acquired");
+    let broker = account.broker().expect("broker available");
+
+    // Listen for events on account
+    log::debug!("hello bot will listen for events...");
+
+    // TODO: this is just temporary, this should not involve a runtime
+    let runtime = Runtime::new().unwrap();
+
+    runtime.block_on(broker.ingress.listen());
 
     log::debug!("hello bot will send message...");
 
