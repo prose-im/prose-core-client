@@ -66,6 +66,8 @@ fn main() {
     // TODO: this is just temporary, this should not involve a runtime
     let runtime = Runtime::new().unwrap();
 
+    // TODO: register handler to iter on incoming events
+    // TODO: spawn in separate thread please, but block execution there
     runtime.block_on(broker.ingress.listen());
 
     log::debug!("hello bot will send message...");
