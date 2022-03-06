@@ -3,6 +3,10 @@
 // Copyright: 2022, Valerian Saliou <valerian@valeriansaliou.name>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+// -- Modules --
+
+mod messaging;
+
 // -- Imports --
 
 use std::sync::Arc;
@@ -14,11 +18,16 @@ use xmpp_parsers::presence::{Presence, Show as PresenceShow, Type as PresenceTyp
 use xmpp_parsers::{Element, Jid};
 
 use super::ProseBrokerClient;
+use messaging::ProseBrokerIngressEventMessaging;
 
 // -- Structures --
 
 pub struct ProseBrokerIngress {
     client: ProseBrokerClient,
+}
+
+pub enum ProseBrokerIngressEvent {
+    Messaging(ProseBrokerIngressEventMessaging),
 }
 
 // -- Implementations --

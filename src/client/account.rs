@@ -15,6 +15,8 @@ use xmpp_parsers;
 use super::ProseClientOrigin;
 use crate::broker::ProseBroker;
 
+// -- Structures --
+
 pub struct ProseClientAccount {
     credentials: ProseClientAccountCredentials,
     states: ProseClientAccountStates,
