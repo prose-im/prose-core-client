@@ -1,2 +1,4 @@
+.nova/
+
 target
 Cargo.lock
