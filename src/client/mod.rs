@@ -130,7 +130,10 @@ impl ProseClient {
         }
     }
 
-    pub fn unbind(mut self, reason: ProseClientUnbindReason) -> Result<(), ProseClientUnbindError> {
+    pub fn unbind(
+        mut self,
+        _reason: ProseClientUnbindReason,
+    ) -> Result<(), ProseClientUnbindError> {
         if self.bound {
             self.bound = false;
 
