@@ -10,7 +10,6 @@ use std::thread;
 
 use jid::{BareJid, JidParseError};
 use tokio_xmpp::AsyncClient as XMPPClient;
-use xmpp_parsers;
 
 use super::ProseClientOrigin;
 use crate::broker::ProseBroker;
