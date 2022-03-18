@@ -6,7 +6,6 @@
 // -- Imports --
 
 use std::sync::{Arc, RwLock};
-use std::thread;
 
 use jid::{BareJid, JidParseError};
 use tokio_xmpp::AsyncClient as XMPPClient;
@@ -68,9 +67,9 @@ impl ProseClientAccountBuilder {
         origin: ProseClientOrigin,
     ) -> Self {
         self.credentials = Some(ProseClientAccountCredentials {
-            jid: jid,
-            password: password,
-            origin: origin,
+            jid,
+            password,
+            origin,
         });
 
         self
@@ -84,7 +83,7 @@ impl ProseClientAccountBuilder {
         log::trace!("built prose client account with jid: {}", credentials.jid);
 
         Ok(ProseClientAccount {
-            credentials: credentials,
+            credentials,
             states: ProseClientAccountStates::default(),
             broker: None,
         })

@@ -98,7 +98,7 @@ impl ProseClientBuilder {
         Ok(ProseClient {
             bound: false,
             accounts: HashMap::new(),
-            origin: origin,
+            origin,
         })
     }
 }
@@ -179,7 +179,7 @@ impl ProseClient {
             log::trace!("will auto-connect account: {} (after add)", jid);
 
             // Acquire account from local store
-            let mut account = self
+            let account = self
                 .accounts
                 .get_mut(&jid_bare)
                 .ok_or(ProseClientError::AccountNotFound)?;

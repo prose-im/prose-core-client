@@ -15,7 +15,7 @@ pub struct ProseBrokerEgressMessaging;
 // -- Implementations --
 
 impl ProseBrokerEgressMessaging {
-    pub fn send_message(&self, to: BareJid, body: &str) {
+    pub fn send_message(&self, _to: BareJid, _body: &str) {
         // TODO
     }
 }

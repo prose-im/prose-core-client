@@ -9,13 +9,9 @@ mod messaging;
 
 // -- Imports --
 
-use std::sync::Arc;
-
 use futures::stream::StreamExt;
-use tokio_xmpp::AsyncClient as XMPPClient;
 use xmpp_parsers::message::{Body, Message, MessageType};
 use xmpp_parsers::presence::{Presence, Show as PresenceShow, Type as PresenceType};
-use xmpp_parsers::{Element, Jid};
 
 use super::ProseBrokerClient;
 use messaging::ProseBrokerIngressEventMessaging;
@@ -34,7 +30,7 @@ pub enum ProseBrokerIngressEvent {
 
 impl ProseBrokerIngress {
     pub fn new(client: ProseBrokerClient) -> Self {
-        ProseBrokerIngress { client: client }
+        ProseBrokerIngress { client }
     }
 
     pub async fn listen(&self) {

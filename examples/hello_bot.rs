@@ -5,9 +5,9 @@
 
 extern crate prose_core_client;
 
-use tokio::runtime::Runtime;
-use log::{self, Level, LevelFilter, Metadata, Record, SetLoggerError};
+use log::{self, LevelFilter, Metadata, Record, SetLoggerError};
 use prose_core_client::client::{ProseClientBuilder, ProseClientOrigin, ProseClientUnbindReason};
+use tokio::runtime::Runtime;
 
 const TEST_JID: &'static str = "prose@movim.eu";
 const TEST_PASSWORD: &'static str = "prose@movim.eu";
@@ -15,7 +15,7 @@ const TEST_PASSWORD: &'static str = "prose@movim.eu";
 pub struct Logger;
 
 impl log::Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, _metadata: &Metadata) -> bool {
         true
     }
 
@@ -37,7 +37,7 @@ impl Logger {
 
 fn main() {
     // Initialize logger
-    let logger = Logger::init(LevelFilter::Trace);
+    let _logger = Logger::init(LevelFilter::Trace);
 
     log::debug!("hello bot starting...");
 

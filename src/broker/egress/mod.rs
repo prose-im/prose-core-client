@@ -9,10 +9,6 @@ mod messaging;
 
 // -- Imports --
 
-use std::sync::Arc;
-
-use tokio_xmpp::AsyncClient as XMPPClient;
-
 use super::ProseBrokerClient;
 use messaging::ProseBrokerEgressMessaging;
 
@@ -29,7 +25,7 @@ pub struct ProseBrokerEgress {
 impl ProseBrokerEgress {
     pub fn new(client: ProseBrokerClient) -> Self {
         ProseBrokerEgress {
-            client: client,
+            client,
 
             messaging: ProseBrokerEgressMessaging::default(),
         }
