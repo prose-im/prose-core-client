@@ -38,7 +38,7 @@ First off, you need to make sure that `libstrophe` is installed on your system:
 brew install libstrophe
 ```
 
-Then, you can run the `hello_bot` example as follows ([fish shells](https://fishshell.com/)):
+Then, you can run the `hello_bot` example as follows (this is for a [fish shell](https://fishshell.com/)):
 
 ```bash
 set -x RUSTFLAGS "-L /opt/homebrew/Cellar/libstrophe/0.12.0/lib/"
