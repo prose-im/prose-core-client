@@ -23,6 +23,9 @@ jobs:
           components: rustfmt
           override: true
 
+      - name: Install build libraries
+        run: sudo apt-get install libstrophe0
+
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version
 
