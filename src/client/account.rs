@@ -8,7 +8,7 @@
 use std::sync::{Arc, RwLock};
 
 use jid::{BareJid, JidParseError};
-use tokio_xmpp::AsyncClient as XMPPClient;
+use libstrophe::{Connection, Context};
 
 use super::ProseClientOrigin;
 use crate::broker::ProseBroker;
@@ -107,13 +107,12 @@ impl ProseClientAccount {
         // Create XMPP client
         log::trace!("create client for account jid: {}", &jid_string);
 
-        let mut client = XMPPClient::new(&jid_string, self.credentials.password.to_owned())
-            .map_err(|err| ProseClientAccountError::CannotConnect(err))?;
+        let mut connection = Connection::new(Context::new_with_default_logger());
 
-        client.set_reconnect(true);
+        // TODO
 
         // Assign XMPP client to broker
-        self.broker = Some(ProseBroker::new(Arc::new(RwLock::new(client))));
+        // self.broker = Some(ProseBroker::new(Arc::new(RwLock::new(client))));
 
         Ok(())
     }

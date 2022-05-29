@@ -7,7 +7,6 @@ extern crate prose_core_client;
 
 use log::{self, LevelFilter, Metadata, Record, SetLoggerError};
 use prose_core_client::client::{ProseClientBuilder, ProseClientOrigin, ProseClientUnbindReason};
-use tokio::runtime::Runtime;
 
 const TEST_JID: &'static str = "prose@movim.eu";
 const TEST_PASSWORD: &'static str = "prose@movim.eu";
@@ -64,11 +63,11 @@ fn main() {
     log::debug!("hello bot will listen for events...");
 
     // TODO: this is just temporary, this should not involve a runtime
-    let runtime = Runtime::new().unwrap();
+    // TODO
 
     // TODO: register handler to iter on incoming events
     // TODO: spawn in separate thread please, but block execution there
-    runtime.block_on(broker.ingress.listen());
+    // TODO
 
     log::debug!("hello bot will send message...");
 

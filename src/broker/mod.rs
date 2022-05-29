@@ -12,14 +12,12 @@ mod ingress;
 
 use std::sync::{Arc, RwLock};
 
-use tokio_xmpp::AsyncClient as XMPPClient;
-
 use egress::ProseBrokerEgress;
 use ingress::ProseBrokerIngress;
 
 // -- Types --
 
-pub type ProseBrokerClient = Arc<RwLock<XMPPClient>>;
+pub type ProseBrokerClient = Arc<RwLock<()>>;
 
 // -- Structures --
 
