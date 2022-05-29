@@ -6,6 +6,7 @@
 // -- Modules --
 
 mod account;
+mod event;
 
 // -- Imports --
 

@@ -10,7 +10,7 @@ use core::time::Duration;
 use jid::{BareJid, JidParseError};
 use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
 
-use super::ProseClientOrigin;
+use super::{event::ProseClientEvent, ProseClientOrigin};
 use crate::broker::ProseBroker;
 
 // -- Constants --
@@ -109,24 +109,6 @@ impl ProseClientAccount {
         // Mark as connected (right away)
         self.states.connected = true;
 
-        // Create connection handler
-        // TODO: move this somewhere else
-        let handler =
-            move |context: &Context, connection: &mut Connection, event: ConnectionEvent| {
-                if let ConnectionEvent::Connect = event {
-                    log::trace!("context connected");
-
-                    // Send first presence
-                    let presence = Stanza::new_presence();
-
-                    connection.send(&presence);
-                } else {
-                    log::trace!("context disconnected");
-
-                    context.stop();
-                }
-            };
-
         // Create XMPP client
         log::trace!("create client for account jid: {}", &jid_string);
 
@@ -135,7 +117,6 @@ impl ProseClientAccount {
         connection
             .set_flags(ConnectionFlags::MANDATORY_TLS)
             .or(Err(ProseClientAccountError::Unknown))?;
-
         connection.set_keepalive(CLIENT_KEEPALIVE_TIMEOUT, CLIENT_KEEPALIVE_INTERVAL);
 
         connection.set_jid(jid_string);
@@ -143,7 +124,7 @@ impl ProseClientAccount {
 
         // Connect XMPP client
         let context = connection
-            .connect_client(None, None, &handler)
+            .connect_client(None, None, &ProseClientEvent::connection)
             .expect("cannot connect to server");
 
         context.run();
