@@ -5,13 +5,18 @@
 
 // -- Imports --
 
-use std::sync::{Arc, RwLock};
+use core::time::Duration;
 
 use jid::{BareJid, JidParseError};
-use libstrophe::{Connection, Context, Stanza};
+use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
 
 use super::ProseClientOrigin;
 use crate::broker::ProseBroker;
+
+// -- Constants --
+
+const CLIENT_KEEPALIVE_TIMEOUT: Duration = Duration::from_secs(180);
+const CLIENT_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(60);
 
 // -- Structures --
 
@@ -106,31 +111,37 @@ impl ProseClientAccount {
 
         // Create connection handler
         // TODO: move this somewhere else
-        let handler = move |context: &libstrophe::Context,
-                            connection: &mut libstrophe::Connection,
-                            event: libstrophe::ConnectionEvent| {
-            if let libstrophe::ConnectionEvent::Connect = event {
-                log::trace!("context connected");
+        let handler =
+            move |context: &Context, connection: &mut Connection, event: ConnectionEvent| {
+                if let ConnectionEvent::Connect = event {
+                    log::trace!("context connected");
 
-                // Send first presence
-                let presence = Stanza::new_presence();
+                    // Send first presence
+                    let presence = Stanza::new_presence();
 
-                connection.send(&presence);
-            } else {
-                log::trace!("context disconnected");
+                    connection.send(&presence);
+                } else {
+                    log::trace!("context disconnected");
 
-                context.stop();
-            }
-        };
+                    context.stop();
+                }
+            };
 
         // Create XMPP client
         log::trace!("create client for account jid: {}", &jid_string);
 
         let mut connection = Connection::new(Context::new_with_default_logger());
 
+        connection
+            .set_flags(ConnectionFlags::MANDATORY_TLS)
+            .or(Err(ProseClientAccountError::Unknown))?;
+
+        connection.set_keepalive(CLIENT_KEEPALIVE_TIMEOUT, CLIENT_KEEPALIVE_INTERVAL);
+
         connection.set_jid(jid_string);
         connection.set_pass(&self.credentials.password);
 
+        // Connect XMPP client
         let context = connection
             .connect_client(None, None, &handler)
             .expect("cannot connect to server");

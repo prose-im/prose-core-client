@@ -56,6 +56,7 @@ fn main() {
     log::info!("hello bot started");
 
     // Add account
+    // TODO: do not block on this, start a thread or something
     client
         .add(&test_jid, &test_password)
         .expect("account added");
@@ -64,13 +65,10 @@ fn main() {
 
     // Hold on so that account is added and connected
     let account = client.get(&test_jid).expect("account acquired");
-    let broker = account.broker().expect("broker available");
+    let _broker = account.broker().expect("broker available");
 
     // Listen for events on account
     log::debug!("hello bot will listen for events...");
-
-    // TODO: this is just temporary, this should not involve a runtime
-    // TODO
 
     // TODO: register handler to iter on incoming events
     // TODO: spawn in separate thread please, but block execution there
