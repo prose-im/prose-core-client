@@ -32,10 +32,20 @@ The supported programming languages are listed below:
 
 To build and test this library (using any of the provided examples), you can use `cargo run`. You will however need to pass the path to your local `libstrophe` library using `RUSTFLAGS`.
 
-For example, you can run the `hello_bot` example as follows:
+First off, you need to make sure that `libstrophe` is installed on your system:
 
 ```bash
-RUSTFLAGS="-L /opt/homebrew/Cellar/libstrophe/0.12.0/lib/" cargo run --example hello_bot
+brew install libstrophe
+```
+
+Then, you can run the `hello_bot` example as follows ([fish shells](https://fishshell.com/)):
+
+```bash
+set -x RUSTFLAGS "-L /opt/homebrew/Cellar/libstrophe/0.12.0/lib/"
+set -x TEST_JID "your-name@your-domain.com"
+set -x TEST_PASSWORD "<your_secret_password>"
+
+cargo run --example hello_bot
 ```
 
 Where `libstrophe` v0.12.0 was installed via Homebrew on macOS at the provided path.

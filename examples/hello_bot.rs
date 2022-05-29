@@ -5,11 +5,10 @@
 
 extern crate prose_core_client;
 
+use std::env;
+
 use log::{self, LevelFilter, Metadata, Record, SetLoggerError};
 use prose_core_client::client::{ProseClientBuilder, ProseClientOrigin, ProseClientUnbindReason};
-
-const TEST_JID: &'static str = "prose@movim.eu";
-const TEST_PASSWORD: &'static str = "prose@movim.eu";
 
 pub struct Logger;
 
@@ -35,6 +34,12 @@ impl Logger {
 }
 
 fn main() {
+    // Acquire environment variables
+    let (test_jid, test_password) = (
+        env::var("TEST_JID").expect("TEST_JID"),
+        env::var("TEST_PASSWORD").expect("TEST_PASSWORD"),
+    );
+
     // Initialize logger
     let _logger = Logger::init(LevelFilter::Trace);
 
@@ -51,12 +56,14 @@ fn main() {
     log::info!("hello bot started");
 
     // Add account
-    client.add(TEST_JID, TEST_PASSWORD).expect("account added");
+    client
+        .add(&test_jid, &test_password)
+        .expect("account added");
 
     log::debug!("hello bot has added account");
 
     // Hold on so that account is added and connected
-    let account = client.get(TEST_JID).expect("account acquired");
+    let account = client.get(&test_jid).expect("account acquired");
     let broker = account.broker().expect("broker available");
 
     // Listen for events on account

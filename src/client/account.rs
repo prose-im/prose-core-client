@@ -8,7 +8,7 @@
 use std::sync::{Arc, RwLock};
 
 use jid::{BareJid, JidParseError};
-use libstrophe::{Connection, Context};
+use libstrophe::{Connection, Context, Stanza};
 
 use super::ProseClientOrigin;
 use crate::broker::ProseBroker;
@@ -104,12 +104,38 @@ impl ProseClientAccount {
         // Mark as connected (right away)
         self.states.connected = true;
 
+        // Create connection handler
+        // TODO: move this somewhere else
+        let handler = move |context: &libstrophe::Context,
+                            connection: &mut libstrophe::Connection,
+                            event: libstrophe::ConnectionEvent| {
+            if let libstrophe::ConnectionEvent::Connect = event {
+                log::trace!("context connected");
+
+                // Send first presence
+                let presence = Stanza::new_presence();
+
+                connection.send(&presence);
+            } else {
+                log::trace!("context disconnected");
+
+                context.stop();
+            }
+        };
+
         // Create XMPP client
         log::trace!("create client for account jid: {}", &jid_string);
 
         let mut connection = Connection::new(Context::new_with_default_logger());
 
-        // TODO
+        connection.set_jid(jid_string);
+        connection.set_pass(&self.credentials.password);
+
+        let context = connection
+            .connect_client(None, None, &handler)
+            .expect("cannot connect to server");
+
+        context.run();
 
         // Assign XMPP client to broker
         // self.broker = Some(ProseBroker::new(Arc::new(RwLock::new(client))));
