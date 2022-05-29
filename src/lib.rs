@@ -6,6 +6,7 @@
 // -- Modules --
 
 mod broker;
+mod protocol;
 mod store;
 mod types;
 mod utils;

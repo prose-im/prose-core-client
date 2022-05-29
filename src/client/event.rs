@@ -7,6 +7,8 @@
 
 use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
 
+use crate::protocol::namespaces::*;
+
 // -- Structures --
 
 pub struct ProseClientEvent;
@@ -66,7 +68,30 @@ impl ProseClientEvent {
     pub fn stanza_iq(context: &Context, connection: &mut Connection, stanza: &Stanza) -> bool {
         log::trace!("[event] iq from: {}", stanza.from().unwrap_or("--"));
 
-        // TODO
+        // Handle XMLNS from IQ stanza
+        match stanza.ns() {
+            Some(NS_VERSION) => {
+                // TODO: handle NS_VERSION
+            }
+            Some(NS_LAST) => {
+                // TODO: handle NS_LAST
+            }
+            Some(NS_URN_TIME) => {
+                // TODO: handle NS_URN_TIME
+                // TODO: should be contained inside (so the check is invalid)
+            }
+            Some(NS_URN_PING) => {
+                // TODO: handle NS_URN_PING
+                // TODO: should be contained inside (so the check is invalid)
+            }
+            Some(DISCO_INFO) => {
+                // TODO: handle DISCO_INFO
+            }
+            _ => {
+                // TODO: reply unsupported
+                // TODO: only if not error IQ
+            }
+        }
 
         true
     }
