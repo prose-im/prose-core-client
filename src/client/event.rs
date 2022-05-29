@@ -69,27 +69,33 @@ impl ProseClientEvent {
         log::trace!("[event] iq from: {}", stanza.from().unwrap_or("--"));
 
         // Handle XMLNS from IQ stanza
+        // TODO: move to an iterative method using 'get_child_by_ns()', where \
+        //   a pre-defined array is scanned, and scan stops whenever xmlns \
+        //   found, and handler for this xmlns is called.
         match stanza.ns() {
             Some(NS_VERSION) => {
                 // TODO: handle NS_VERSION
+                // TODO: handle from 'query' sub-element
             }
             Some(NS_LAST) => {
                 // TODO: handle NS_LAST
+                // TODO: handle from 'query' sub-element
             }
             Some(NS_URN_TIME) => {
                 // TODO: handle NS_URN_TIME
-                // TODO: should be contained inside (so the check is invalid)
+                // TODO: handle from 'time' sub-element
             }
             Some(NS_URN_PING) => {
                 // TODO: handle NS_URN_PING
-                // TODO: should be contained inside (so the check is invalid)
+                // TODO: handle from 'ping' sub-element
             }
             Some(DISCO_INFO) => {
                 // TODO: handle DISCO_INFO
+                // TODO: handle from 'query' sub-element
             }
             _ => {
-                // TODO: reply unsupported
-                // TODO: only if not error IQ
+                // TODO: handle unsupported
+                // TODO: reply not implemented only if not error IQ
             }
         }
 
