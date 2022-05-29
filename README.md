@@ -50,6 +50,8 @@ cargo run --example hello_bot
 
 Where `libstrophe` v0.12.0 was installed via Homebrew on macOS at the provided path.
 
+**👉 Note that a convenience script is available under [scripts/build_test.sh](./scripts/build_test.sh). You can copy it to `scripts/build_local.sh` and inject your values, which will not get versioned to Git.**
+
 ## License
 
 Licensing information can be found in the [LICENSE.md](./LICENSE.md) document.
