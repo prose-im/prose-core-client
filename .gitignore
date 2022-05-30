@@ -3,4 +3,4 @@
 target
 Cargo.lock
 
-scripts/build_local.sh
+scripts/run_local.sh
