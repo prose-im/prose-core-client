@@ -33,6 +33,7 @@ impl ProseClientEvent {
 
                 // Announce first presence
                 // TODO: this should not be done from here, right?
+                // TODO: set resource + other metas in presence
                 let presence = Stanza::new_presence();
 
                 connection.send(&presence);

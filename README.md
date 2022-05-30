@@ -18,6 +18,7 @@ The client library is organized into parts responsible for specific tasks, namel
 * Sending payloads: `broker/egress`
 * Receiving payloads: `broker/ingress`
 * Persistence: `store`
+* Protocol tools: `protocol`
 * Data types: `types`
 
 _👉 Note that as the state of XMPP in Rust is still pretty immature, we could not find any sufficiently-advanced pure-Rust XMPP client library. Therefore, we opted for the excellent C-based `libstrophe` library. However, depending on a non-Rust binding creates a lot of overhead for the developer, thus we plan to create a pure-Rust port of `libstrophe` in the near future. We aim for a similar API to `libstrophe`, as we like its simplicity for the developer and how lightweight it is._
