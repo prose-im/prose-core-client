@@ -5,4 +5,7 @@
 
 // -- Modules --
 
+pub mod iq;
+pub mod message;
 pub mod namespaces;
+pub mod presence;

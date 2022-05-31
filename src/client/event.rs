@@ -5,9 +5,11 @@
 
 // -- Imports --
 
-use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
+use libstrophe::{Connection, ConnectionEvent, Context, Stanza};
 
-use crate::protocol::namespaces::*;
+use crate::protocol::iq::ProseProtocolIQ;
+use crate::protocol::message::ProseProtocolMessage;
+use crate::protocol::presence::ProseProtocolPresence;
 
 // -- Structures --
 
@@ -53,7 +55,8 @@ impl ProseClientEvent {
     ) -> bool {
         log::trace!("[event] presence from: {}", stanza.from().unwrap_or("--"));
 
-        // TODO
+        // Route stanza to presence handler
+        ProseProtocolPresence::handle(connection, stanza);
 
         true
     }
@@ -61,7 +64,8 @@ impl ProseClientEvent {
     pub fn stanza_message(context: &Context, connection: &mut Connection, stanza: &Stanza) -> bool {
         log::trace!("[event] message from: {}", stanza.from().unwrap_or("--"));
 
-        // TODO
+        // Route stanza to message handler
+        ProseProtocolMessage::handle(connection, stanza);
 
         true
     }
@@ -69,36 +73,8 @@ impl ProseClientEvent {
     pub fn stanza_iq(context: &Context, connection: &mut Connection, stanza: &Stanza) -> bool {
         log::trace!("[event] iq from: {}", stanza.from().unwrap_or("--"));
 
-        // Handle XMLNS from IQ stanza
-        // TODO: move to an iterative method using 'get_child_by_ns()', where \
-        //   a pre-defined array is scanned, and scan stops whenever xmlns \
-        //   found, and handler for this xmlns is called.
-        match stanza.ns() {
-            Some(NS_VERSION) => {
-                // TODO: handle NS_VERSION
-                // TODO: handle from 'query' sub-element
-            }
-            Some(NS_LAST) => {
-                // TODO: handle NS_LAST
-                // TODO: handle from 'query' sub-element
-            }
-            Some(NS_URN_TIME) => {
-                // TODO: handle NS_URN_TIME
-                // TODO: handle from 'time' sub-element
-            }
-            Some(NS_URN_PING) => {
-                // TODO: handle NS_URN_PING
-                // TODO: handle from 'ping' sub-element
-            }
-            Some(DISCO_INFO) => {
-                // TODO: handle DISCO_INFO
-                // TODO: handle from 'query' sub-element
-            }
-            _ => {
-                // TODO: handle unsupported
-                // TODO: reply not implemented only if not error IQ
-            }
-        }
+        // Route stanza to IQ handler
+        ProseProtocolIQ::handle(connection, stanza);
 
         true
     }

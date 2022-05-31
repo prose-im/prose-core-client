@@ -8,7 +8,7 @@
 use core::time::Duration;
 
 use jid::{BareJid, JidParseError};
-use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
+use libstrophe::{Connection, ConnectionFlags, Context};
 
 use super::{event::ProseClientEvent, ProseClientOrigin};
 use crate::broker::ProseBroker;
