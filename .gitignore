@@ -1,4 +1,5 @@
 .nova/
+.target-check/
 
 target
 Cargo.lock
