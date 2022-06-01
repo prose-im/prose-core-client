@@ -5,9 +5,9 @@
 
 // -- Modules --
 
-pub mod builders;
 pub mod iq;
 pub mod message;
 pub mod namespaces;
 pub mod presence;
 pub mod registries;
+pub mod stanza;

@@ -7,7 +7,7 @@
 
 use libstrophe::{Connection, Error, Stanza, StanzaRef};
 
-use super::{builders::ProseProtocolBuilders, namespaces, registries};
+use super::{namespaces, registries, stanza::ProseProtocolStanza};
 use crate::utils::macros::map;
 
 // -- Structures --
@@ -24,14 +24,33 @@ impl ProseProtocolIQ {
         // Notice: consider empty types as 'get'
         match stanza_type {
             Some("get") | None => {
+                let (mut count_unsupported, mut total_children) = (0, 0);
+
                 for child in stanza.children() {
+                    total_children += 1;
+
                     // A child must have a name, drop the invalid ones
                     if let Some(name) = child.name() {
-                        let result = Self::handle_get(connection, name, stanza, &child);
-
-                        if let Err(err) = result {
-                            log::error!("[iq] handle get error: {}", err);
+                        match Self::handle_get(connection, name, stanza, &child) {
+                            Ok(is_unsupported) => {
+                                if is_unsupported == true {
+                                    count_unsupported += 1;
+                                }
+                            }
+                            Err(err) => {
+                                log::error!("[iq] handle get error: {}", err);
+                            }
                         }
+                    } else {
+                        // Consider invalid children as unsupported
+                        count_unsupported += 1;
+                    }
+                }
+
+                // Send unsupported response?
+                if count_unsupported == total_children {
+                    if let Err(err) = Self::handle_get_unsupported(connection, stanza) {
+                        log::error!("[iq] handle get unsupported error: {}", err);
                     }
                 }
             }
@@ -47,9 +66,11 @@ impl ProseProtocolIQ {
         name: &str,
         stanza: &Stanza,
         child: &StanzaRef,
-    ) -> Result<(), Error> {
+    ) -> Result<bool, Error> {
+        let mut is_unsupported = false;
+
         // Handle XMLNS from 'get' type
-        match (name, child.ns()) {
+        let dispatch_result = match (name, child.ns()) {
             ("query", Some(namespaces::NS_VERSION)) => {
                 log::debug!("[iq] got version request");
 
@@ -83,13 +104,27 @@ impl ProseProtocolIQ {
             _ => {
                 log::warn!("[iq] got unsupported request");
 
-                // TODO: handle unsupported
-                // TODO: reply not implemented only if not error IQ
+                // Mark request as unsupported
+                is_unsupported = true;
 
-                // TODO
                 Ok(())
             }
-        }
+        };
+
+        dispatch_result.and(Ok(is_unsupported))
+    }
+
+    fn handle_get_unsupported(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
+        // Reply with unsupported error
+        connection.send(&ProseProtocolStanza::error(
+            stanza,
+            "cancel",
+            "501",
+            "feature-not-implemented",
+            "The feature requested is not implemented by the recipient or server and therefore cannot be processed."
+        )?);
+
+        Ok(())
     }
 
     fn handle_get_version(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
@@ -99,27 +134,27 @@ impl ProseProtocolIQ {
 
         // Reply with version
         // TODO: populate w/ final values
-        connection.send(&ProseProtocolBuilders::stanza_reply(
+        connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+            Some(vec![ProseProtocolStanza::named_ns(
                 "query",
                 Some(namespaces::NS_VERSION),
                 None,
                 Some(vec![
-                    ProseProtocolBuilders::stanza_named(
+                    ProseProtocolStanza::named(
                         "name",
                         None,
-                        Some(vec![ProseProtocolBuilders::stanza_text("Prose")?]),
+                        Some(vec![ProseProtocolStanza::text("Prose")?]),
                     )?,
-                    ProseProtocolBuilders::stanza_named(
+                    ProseProtocolStanza::named(
                         "version",
                         None,
-                        Some(vec![ProseProtocolBuilders::stanza_text("0.0.0")?]),
+                        Some(vec![ProseProtocolStanza::text("0.0.0")?]),
                     )?,
-                    ProseProtocolBuilders::stanza_named(
+                    ProseProtocolStanza::named(
                         "os",
                         None,
-                        Some(vec![ProseProtocolBuilders::stanza_text("macOS 0.0")?]),
+                        Some(vec![ProseProtocolStanza::text("macOS 0.0")?]),
                     )?,
                 ]),
             )?]),
@@ -133,9 +168,9 @@ impl ProseProtocolIQ {
 
         // Reply with version
         // TODO: populate w/ final values
-        connection.send(&ProseProtocolBuilders::stanza_reply(
+        connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+            Some(vec![ProseProtocolStanza::named_ns(
                 "query",
                 Some(namespaces::NS_LAST),
                 Some(map! { "seconds" => "42" }),
@@ -150,14 +185,14 @@ impl ProseProtocolIQ {
         // @ref: https://xmpp.org/extensions/xep-0030.html
 
         // Generate information children
-        let mut children = vec![ProseProtocolBuilders::stanza_named(
+        let mut children = vec![ProseProtocolStanza::named(
             "identity",
             Some(map! { "category" => "client", "type" => "pc", "name" => "Prose" }),
             None,
         )?];
 
         for feature in registries::FEATURES {
-            children.push(ProseProtocolBuilders::stanza_named(
+            children.push(ProseProtocolStanza::named(
                 "feature",
                 Some(map! { "var" => *feature }),
                 None,
@@ -166,9 +201,9 @@ impl ProseProtocolIQ {
 
         // Reply with discovery information
         // TODO: populate w/ final values
-        connection.send(&ProseProtocolBuilders::stanza_reply(
+        connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+            Some(vec![ProseProtocolStanza::named_ns(
                 "query",
                 Some(namespaces::DISCO_INFO),
                 None,
@@ -183,9 +218,9 @@ impl ProseProtocolIQ {
         // @ref: https://xmpp.org/extensions/xep-0030.html
 
         // Reply with discovery items (empty for a client)
-        connection.send(&ProseProtocolBuilders::stanza_reply(
+        connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+            Some(vec![ProseProtocolStanza::named_ns(
                 "query",
                 Some(namespaces::DISCO_ITEMS),
                 None,
@@ -201,24 +236,22 @@ impl ProseProtocolIQ {
 
         // Reply with version
         // TODO: populate w/ final values
-        connection.send(&ProseProtocolBuilders::stanza_reply(
+        connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+            Some(vec![ProseProtocolStanza::named_ns(
                 "time",
                 Some(namespaces::NS_URN_TIME),
                 None,
                 Some(vec![
-                    ProseProtocolBuilders::stanza_named(
+                    ProseProtocolStanza::named(
                         "tzo",
                         None,
-                        Some(vec![ProseProtocolBuilders::stanza_text("-06:00")?]),
+                        Some(vec![ProseProtocolStanza::text("-06:00")?]),
                     )?,
-                    ProseProtocolBuilders::stanza_named(
+                    ProseProtocolStanza::named(
                         "utc",
                         None,
-                        Some(vec![ProseProtocolBuilders::stanza_text(
-                            "2006-12-19T17:58:35Z",
-                        )?]),
+                        Some(vec![ProseProtocolStanza::text("2006-12-19T17:58:35Z")?]),
                     )?,
                 ]),
             )?]),
@@ -230,7 +263,7 @@ impl ProseProtocolIQ {
     fn handle_get_ping(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
         // @ref: https://xmpp.org/extensions/xep-0199.html
 
-        connection.send(&ProseProtocolBuilders::stanza_reply(stanza, None)?);
+        connection.send(&ProseProtocolStanza::result(stanza, None)?);
 
         Ok(())
     }
