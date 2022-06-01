@@ -5,6 +5,7 @@
 
 // -- Modules --
 
+pub mod builders;
 pub mod iq;
 pub mod message;
 pub mod namespaces;

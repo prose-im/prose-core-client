@@ -7,7 +7,7 @@
 
 use libstrophe::{Connection, Error, Stanza, StanzaRef};
 
-use super::namespaces;
+use super::{builders::ProseProtocolBuilders, namespaces};
 
 // -- Structures --
 
@@ -89,69 +89,31 @@ impl ProseProtocolIQ {
     fn handle_get_version(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
         // @ref: https://xmpp.org/extensions/xep-0092.html
 
+        // TODO: build a grand-macro to generate stanzas
+
         // Reply with version
-        let mut response = stanza.reply();
-
-        response.set_stanza_type("result")?;
-
-        response.add_child({
-            let mut query = Stanza::new();
-
-            query.set_name("query")?;
-            query.set_ns(namespaces::NS_VERSION)?;
-
-            // Append response contents
-            // TODO: make all that macros please
-            query.add_child({
-                let mut name = Stanza::new();
-
-                name.set_name("name")?;
-
-                name.add_child({
-                    let mut text = Stanza::new();
-
-                    text.set_text("Prose")?; // TODO: dynamic from caller context
-
-                    text
-                })?;
-
-                name
-            })?;
-            query.add_child({
-                let mut version = Stanza::new();
-
-                version.set_name("version")?;
-
-                version.add_child({
-                    let mut text = Stanza::new();
-
-                    text.set_text("0.0.0")?; // TODO: dynamic from caller context
-
-                    text
-                })?;
-
-                version
-            })?;
-            query.add_child({
-                let mut os = Stanza::new();
-
-                os.set_name("os")?;
-
-                os.add_child({
-                    let mut text = Stanza::new();
-
-                    text.set_text("macOS 0.0")?; // TODO: dynamic from caller context
-
-                    text
-                })?;
-
-                os
-            })?;
-
-            query
-        })?;
-
-        connection.send(&response);
+        // TODO: populate w/ final values
+        connection.send(&ProseProtocolBuilders::stanza_reply(
+            stanza,
+            vec![ProseProtocolBuilders::stanza_named_ns(
+                "query",
+                namespaces::NS_VERSION,
+                vec![
+                    ProseProtocolBuilders::stanza_named(
+                        "name",
+                        vec![ProseProtocolBuilders::stanza_text("Prose")?],
+                    )?,
+                    ProseProtocolBuilders::stanza_named(
+                        "version",
+                        vec![ProseProtocolBuilders::stanza_text("0.0.0")?],
+                    )?,
+                    ProseProtocolBuilders::stanza_named(
+                        "os",
+                        vec![ProseProtocolBuilders::stanza_text("macOS 0.0")?],
+                    )?,
+                ],
+            )?],
+        )?);
 
         Ok(())
     }
