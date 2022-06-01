@@ -8,6 +8,7 @@
 use libstrophe::{Connection, Error, Stanza, StanzaRef};
 
 use super::{builders::ProseProtocolBuilders, namespaces};
+use crate::utils::macros::map;
 
 // -- Structures --
 
@@ -95,33 +96,47 @@ impl ProseProtocolIQ {
         // TODO: populate w/ final values
         connection.send(&ProseProtocolBuilders::stanza_reply(
             stanza,
-            vec![ProseProtocolBuilders::stanza_named_ns(
+            Some(vec![ProseProtocolBuilders::stanza_named_ns(
                 "query",
-                namespaces::NS_VERSION,
-                vec![
+                Some(namespaces::NS_VERSION),
+                None,
+                Some(vec![
                     ProseProtocolBuilders::stanza_named(
                         "name",
-                        vec![ProseProtocolBuilders::stanza_text("Prose")?],
+                        None,
+                        Some(vec![ProseProtocolBuilders::stanza_text("Prose")?]),
                     )?,
                     ProseProtocolBuilders::stanza_named(
                         "version",
-                        vec![ProseProtocolBuilders::stanza_text("0.0.0")?],
+                        None,
+                        Some(vec![ProseProtocolBuilders::stanza_text("0.0.0")?]),
                     )?,
                     ProseProtocolBuilders::stanza_named(
                         "os",
-                        vec![ProseProtocolBuilders::stanza_text("macOS 0.0")?],
+                        None,
+                        Some(vec![ProseProtocolBuilders::stanza_text("macOS 0.0")?]),
                     )?,
-                ],
-            )?],
+                ]),
+            )?]),
         )?);
 
         Ok(())
     }
 
-    fn handle_get_last(_connection: &mut Connection, _stanza: &Stanza) -> Result<(), Error> {
+    fn handle_get_last(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
         // @ref: https://xmpp.org/extensions/xep-0012.html
 
-        // TODO
+        // Reply with version
+        // TODO: populate w/ final values
+        connection.send(&ProseProtocolBuilders::stanza_reply(
+            stanza,
+            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+                "query",
+                Some(namespaces::NS_LAST),
+                Some(map! { "seconds" => "42" }),
+                None,
+            )?]),
+        )?);
 
         Ok(())
     }
@@ -134,18 +149,41 @@ impl ProseProtocolIQ {
         Ok(())
     }
 
-    fn handle_get_time(_connection: &mut Connection, _stanza: &Stanza) -> Result<(), Error> {
+    fn handle_get_time(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
         // @ref: https://xmpp.org/extensions/xep-0202.html
 
-        // TODO
+        // Reply with version
+        // TODO: populate w/ final values
+        connection.send(&ProseProtocolBuilders::stanza_reply(
+            stanza,
+            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+                "time",
+                Some(namespaces::NS_URN_TIME),
+                None,
+                Some(vec![
+                    ProseProtocolBuilders::stanza_named(
+                        "tzo",
+                        None,
+                        Some(vec![ProseProtocolBuilders::stanza_text("-06:00")?]),
+                    )?,
+                    ProseProtocolBuilders::stanza_named(
+                        "utc",
+                        None,
+                        Some(vec![ProseProtocolBuilders::stanza_text(
+                            "2006-12-19T17:58:35Z",
+                        )?]),
+                    )?,
+                ]),
+            )?]),
+        )?);
 
         Ok(())
     }
 
-    fn handle_get_ping(_connection: &mut Connection, _stanza: &Stanza) -> Result<(), Error> {
+    fn handle_get_ping(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
         // @ref: https://xmpp.org/extensions/xep-0199.html
 
-        // TODO
+        connection.send(&ProseProtocolBuilders::stanza_reply(stanza, None)?);
 
         Ok(())
     }
