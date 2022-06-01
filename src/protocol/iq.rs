@@ -7,7 +7,7 @@
 
 use libstrophe::{Connection, Error, Stanza, StanzaRef};
 
-use super::{builders::ProseProtocolBuilders, namespaces};
+use super::{builders::ProseProtocolBuilders, namespaces, registries};
 use crate::utils::macros::map;
 
 // -- Structures --
@@ -64,6 +64,11 @@ impl ProseProtocolIQ {
                 log::debug!("[iq] got discovery information request");
 
                 Self::handle_get_disco_info(connection, stanza)
+            }
+            ("query", Some(namespaces::DISCO_ITEMS)) => {
+                log::debug!("[iq] got discovery items request");
+
+                Self::handle_get_disco_items(connection, stanza)
             }
             ("time", Some(namespaces::NS_URN_TIME)) => {
                 log::debug!("[iq] got local time request");
@@ -141,10 +146,52 @@ impl ProseProtocolIQ {
         Ok(())
     }
 
-    fn handle_get_disco_info(_connection: &mut Connection, _stanza: &Stanza) -> Result<(), Error> {
+    fn handle_get_disco_info(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
         // @ref: https://xmpp.org/extensions/xep-0030.html
 
-        // TODO
+        // Generate information children
+        let mut children = vec![ProseProtocolBuilders::stanza_named(
+            "identity",
+            Some(map! { "category" => "client", "type" => "pc", "name" => "Prose" }),
+            None,
+        )?];
+
+        for feature in registries::FEATURES {
+            children.push(ProseProtocolBuilders::stanza_named(
+                "feature",
+                Some(map! { "var" => *feature }),
+                None,
+            )?);
+        }
+
+        // Reply with discovery information
+        // TODO: populate w/ final values
+        connection.send(&ProseProtocolBuilders::stanza_reply(
+            stanza,
+            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+                "query",
+                Some(namespaces::DISCO_INFO),
+                None,
+                Some(children),
+            )?]),
+        )?);
+
+        Ok(())
+    }
+
+    fn handle_get_disco_items(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
+        // @ref: https://xmpp.org/extensions/xep-0030.html
+
+        // Reply with discovery items (empty for a client)
+        connection.send(&ProseProtocolBuilders::stanza_reply(
+            stanza,
+            Some(vec![ProseProtocolBuilders::stanza_named_ns(
+                "query",
+                Some(namespaces::DISCO_ITEMS),
+                None,
+                None,
+            )?]),
+        )?);
 
         Ok(())
     }

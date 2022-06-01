@@ -10,3 +10,4 @@ pub mod iq;
 pub mod message;
 pub mod namespaces;
 pub mod presence;
+pub mod registries;
