@@ -1,0 +1,3 @@
+[bindings.swift]
+cdylib_name = "ProseCoreClient"
+module_name = "ProseCoreClient"
