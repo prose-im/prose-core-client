@@ -17,6 +17,8 @@ impl ProseProtocolMessage {
     pub fn handle(connection: &mut Connection, stanza: &Stanza) {
         let stanza_type = stanza.stanza_type();
 
+        // TODO: check if personal, or MUC from here (for DMs)
+
         // Handle message type
         // Notice: consider empty types as 'chat'
         // @ref: https://xmpp.org/rfcs/rfc3921.html#stanzas

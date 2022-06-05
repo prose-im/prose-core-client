@@ -10,29 +10,31 @@ mod ingress;
 
 // -- Imports --
 
-use std::sync::{Arc, RwLock};
+use libstrophe::Connection;
 
 use egress::ProseBrokerEgress;
 use ingress::ProseBrokerIngress;
 
-// -- Types --
-
-pub type ProseBrokerClient = Arc<RwLock<()>>;
-
 // -- Structures --
 
-pub struct ProseBroker {
-    pub egress: ProseBrokerEgress,
-    pub ingress: ProseBrokerIngress,
+pub struct ProseBroker<'cl, 'cb, 'cx> {
+    pub egress: ProseBrokerEgress<'cl, 'cb, 'cx>,
+    pub ingress: ProseBrokerIngress<'cl, 'cb, 'cx>,
+}
+
+pub struct ProseBrokerClient<'cb, 'cx> {
+    connection: Connection<'cb, 'cx>,
 }
 
 // -- Implementations --
 
-impl ProseBroker {
-    pub fn new(client: ProseBrokerClient) -> Self {
-        ProseBroker {
-            egress: ProseBrokerEgress::new(client.clone()),
-            ingress: ProseBrokerIngress::new(client.clone()),
+impl<'cl, 'cb, 'cx> ProseBroker<'cl, 'cb, 'cx> {
+    pub fn from_connection(connection: Connection<'cb, 'cx>) -> Self {
+        let client = ProseBrokerClient { connection };
+
+        Self {
+            egress: ProseBrokerEgress::new(&client),
+            ingress: ProseBrokerIngress::new(&client),
         }
     }
 }

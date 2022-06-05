@@ -14,8 +14,8 @@ use messaging::ProseBrokerIngressEventMessaging;
 
 // -- Structures --
 
-pub struct ProseBrokerIngress {
-    client: ProseBrokerClient,
+pub struct ProseBrokerIngress<'cl, 'cb, 'cx> {
+    client: &'cl ProseBrokerClient<'cb, 'cx>,
 }
 
 pub enum ProseBrokerIngressEvent {
@@ -24,9 +24,9 @@ pub enum ProseBrokerIngressEvent {
 
 // -- Implementations --
 
-impl ProseBrokerIngress {
-    pub fn new(client: ProseBrokerClient) -> Self {
-        ProseBrokerIngress { client }
+impl<'cl, 'cb, 'cx> ProseBrokerIngress<'cl, 'cb, 'cx> {
+    pub fn new(client: &'cl ProseBrokerClient<'cb, 'cx>) -> Self {
+        Self { client }
     }
 
     pub async fn listen(&self) {

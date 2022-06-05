@@ -20,11 +20,11 @@ const CLIENT_KEEPALIVE_INTERVAL: Duration = Duration::from_secs(60);
 
 // -- Structures --
 
-pub struct ProseClientAccount {
+pub struct ProseClientAccount<'cl, 'cb, 'cx> {
     credentials: ProseClientAccountCredentials,
     states: ProseClientAccountStates,
 
-    pub broker: Option<ProseBroker>,
+    pub broker: Option<ProseBroker<'cl, 'cb, 'cx>>,
 }
 
 #[derive(Default)]
@@ -80,7 +80,9 @@ impl ProseClientAccountBuilder {
         self
     }
 
-    pub fn build(self) -> Result<ProseClientAccount, ProseClientAccountBuilderError> {
+    pub fn build<'cl, 'cb, 'cx>(
+        self,
+    ) -> Result<ProseClientAccount<'cl, 'cb, 'cx>, ProseClientAccountBuilderError> {
         let credentials = self
             .credentials
             .ok_or(ProseClientAccountBuilderError::CredentialsNotSet)?;
@@ -95,7 +97,7 @@ impl ProseClientAccountBuilder {
     }
 }
 
-impl ProseClientAccount {
+impl<'cl, 'cb, 'cx> ProseClientAccount<'cl, 'cb, 'cx> {
     pub fn connect(&mut self) -> Result<(), ProseClientAccountError> {
         let jid_string = self.credentials.jid.to_string();
 
@@ -112,7 +114,8 @@ impl ProseClientAccount {
         // Create XMPP client
         log::trace!("create client for account jid: {}", &jid_string);
 
-        let mut connection = Connection::new(Context::new_with_default_logger());
+        let context: Context<'cx, 'cb> = Context::new_with_default_logger();
+        let mut connection = Connection::new(context);
 
         connection
             .set_flags(ConnectionFlags::MANDATORY_TLS)
@@ -130,7 +133,9 @@ impl ProseClientAccount {
         context.run();
 
         // Assign XMPP client to broker
-        // self.broker = Some(ProseBroker::new(Arc::new(RwLock::new(client))));
+        let broker = ProseBroker::from_connection(connection);
+
+        self.broker = Some(broker);
 
         Ok(())
     }
@@ -155,7 +160,7 @@ impl ProseClientAccount {
         Ok(())
     }
 
-    pub fn broker<'a>(&'a self) -> Option<&'a ProseBroker> {
+    pub fn broker<'a>(&'a self) -> Option<&'a ProseBroker<'cl, 'cb, 'cx>> {
         log::trace!("acquire broker for account jid: {}", self.credentials.jid);
 
         self.broker.as_ref()

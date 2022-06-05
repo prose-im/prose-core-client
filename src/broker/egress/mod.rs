@@ -14,20 +14,20 @@ use messaging::ProseBrokerEgressMessaging;
 
 // -- Structures --
 
-pub struct ProseBrokerEgress {
-    client: ProseBrokerClient,
+pub struct ProseBrokerEgress<'cl, 'cb, 'cx> {
+    client: &'cl ProseBrokerClient<'cb, 'cx>,
 
-    pub messaging: ProseBrokerEgressMessaging,
+    pub messaging: ProseBrokerEgressMessaging<'cl, 'cb, 'cx>,
 }
 
 // -- Implementations --
 
-impl ProseBrokerEgress {
-    pub fn new(client: ProseBrokerClient) -> Self {
-        ProseBrokerEgress {
+impl<'cl, 'cb, 'cx> ProseBrokerEgress<'cl, 'cb, 'cx> {
+    pub fn new(client: &'cl ProseBrokerClient<'cb, 'cx>) -> Self {
+        Self {
             client,
 
-            messaging: ProseBrokerEgressMessaging::default(),
+            messaging: ProseBrokerEgressMessaging::new(client),
         }
     }
 }

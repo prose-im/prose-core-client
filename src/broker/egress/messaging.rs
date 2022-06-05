@@ -7,14 +7,23 @@
 
 use jid::BareJid;
 
+// -- Imports --
+
+use super::ProseBrokerClient;
+
 // -- Structures --
 
-#[derive(Default)]
-pub struct ProseBrokerEgressMessaging;
+pub struct ProseBrokerEgressMessaging<'cl, 'cb, 'cx> {
+    client: &'cl ProseBrokerClient<'cb, 'cx>,
+}
 
 // -- Implementations --
 
-impl ProseBrokerEgressMessaging {
+impl<'cl, 'cb, 'cx> ProseBrokerEgressMessaging<'cl, 'cb, 'cx> {
+    pub fn new(client: &'cl ProseBrokerClient<'cb, 'cx>) -> Self {
+        Self { client }
+    }
+
     pub fn send_message(&self, _to: BareJid, _body: &str) {
         // TODO
     }

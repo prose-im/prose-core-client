@@ -35,10 +35,10 @@ pub enum ProseClientOrigin {
     ProseAppWeb,
 }
 
-pub struct ProseClient {
+pub struct ProseClient<'cl, 'cb, 'cx> {
     bound: bool,
 
-    pub accounts: HashMap<BareJid, ProseClientAccount>,
+    pub accounts: HashMap<BareJid, ProseClientAccount<'cl, 'cb, 'cx>>,
     pub origin: ProseClientOrigin,
 }
 
@@ -91,7 +91,9 @@ impl ProseClientBuilder {
         self
     }
 
-    pub fn build(self) -> Result<ProseClient, ProseClientBuilderError> {
+    pub fn build<'cl, 'cb, 'cx>(
+        self,
+    ) -> Result<ProseClient<'cl, 'cb, 'cx>, ProseClientBuilderError> {
         let origin = self.origin.ok_or(ProseClientBuilderError::OriginNotSet)?;
 
         log::trace!("built prose client with origin: {:?}", origin);
@@ -104,7 +106,7 @@ impl ProseClientBuilder {
     }
 }
 
-impl ProseClient {
+impl<'cl, 'cb, 'cx> ProseClient<'cl, 'cb, 'cx> {
     // -- Client lifecycle --
 
     pub fn bind(mut self) -> Result<Self, ProseClientBindError> {
@@ -212,7 +214,10 @@ impl ProseClient {
         Err(())
     }
 
-    pub fn get<'a>(&'a self, jid: &str) -> Result<&'a ProseClientAccount, ProseClientError> {
+    pub fn get<'a>(
+        &'a self,
+        jid: &str,
+    ) -> Result<&'a ProseClientAccount<'cl, 'cb, 'cx>, ProseClientError> {
         log::trace!("got request to get account from prose client: {}", jid);
 
         let jid_bare = BareJid::from_str(jid).or(Err(ProseClientError::InvalidJID))?;
@@ -223,7 +228,7 @@ impl ProseClient {
             .ok_or(ProseClientError::AccountNotFound)
     }
 
-    pub fn iter(&self) -> HashMapIter<BareJid, ProseClientAccount> {
+    pub fn iter(&self) -> HashMapIter<BareJid, ProseClientAccount<'cl, 'cb, 'cx>> {
         log::trace!("got request to iterate on all accounts from prose client");
 
         self.accounts.iter()
