@@ -19,9 +19,8 @@ pub struct ProseProtocolStanza;
 // -- Implementations --
 
 impl ProseProtocolStanza {
-    pub fn named_ns<'a>(
+    pub fn named<'a>(
         name: &str,
-        ns: Option<&str>,
         attributes: Option<HashMap<&'a str, &'a str>>,
         children: Option<Vec<Stanza>>,
     ) -> Result<Stanza, Error> {
@@ -29,22 +28,10 @@ impl ProseProtocolStanza {
 
         node.set_name(name)?;
 
-        if let Some(ns) = ns {
-            node.set_ns(ns)?;
-        }
-
         node = Self::attributes(node, attributes)?;
 
         // Append eventual children and return
         Ok(Self::children(node, children)?)
-    }
-
-    pub fn named<'a>(
-        name: &str,
-        attributes: Option<HashMap<&'a str, &'a str>>,
-        children: Option<Vec<Stanza>>,
-    ) -> Result<Stanza, Error> {
-        Self::named_ns(name, None, attributes, children)
     }
 
     pub fn text(text: &str) -> Result<Stanza, Error> {
@@ -107,16 +94,14 @@ impl ProseProtocolStanza {
 
         reply_stanza.set_stanza_type("error")?;
 
-        reply_stanza.add_child(ProseProtocolStanza::named_ns(
+        reply_stanza.add_child(ProseProtocolStanza::named(
             "error",
-            Some(namespaces::NS_CLIENT),
-            Some(map! { "code" => error_code, "type" => error_type }),
+            Some(map! { "xmlns" => namespaces::NS_CLIENT, "code" => error_code, "type" => error_type }),
             Some(vec![
-                ProseProtocolStanza::named_ns(condition, Some(namespaces::NS_STANZAS), None, None)?,
-                ProseProtocolStanza::named_ns(
+                ProseProtocolStanza::named(condition, Some(map! { "xmlns" => namespaces::NS_STANZAS }), None)?,
+                ProseProtocolStanza::named(
                     "text",
-                    Some(namespaces::NS_STANZAS),
-                    None,
+                    Some(map! { "xmlns" => namespaces::NS_STANZAS }),
                     Some(vec![ProseProtocolStanza::text(text)?]),
                 )?,
             ]),

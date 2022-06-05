@@ -149,10 +149,9 @@ impl ProseProtocolIQ {
         // TODO: populate w/ final values
         connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolStanza::named_ns(
+            Some(vec![ProseProtocolStanza::named(
                 "query",
-                Some(namespaces::NS_VERSION),
-                None,
+                Some(map! { "xmlns" => namespaces::NS_VERSION }),
                 Some(vec![
                     ProseProtocolStanza::named(
                         "name",
@@ -183,10 +182,9 @@ impl ProseProtocolIQ {
         // TODO: populate w/ final values
         connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolStanza::named_ns(
+            Some(vec![ProseProtocolStanza::named(
                 "query",
-                Some(namespaces::NS_LAST),
-                Some(map! { "seconds" => "42" }),
+                Some(map! { "xmlns" => namespaces::NS_LAST, "seconds" => "42" }),
                 None,
             )?]),
         )?);
@@ -216,10 +214,9 @@ impl ProseProtocolIQ {
         // TODO: populate w/ final values
         connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolStanza::named_ns(
+            Some(vec![ProseProtocolStanza::named(
                 "query",
-                Some(namespaces::DISCO_INFO),
-                None,
+                Some(map! { "xmlns" => namespaces::DISCO_INFO }),
                 Some(children),
             )?]),
         )?);
@@ -233,10 +230,9 @@ impl ProseProtocolIQ {
         // Reply with discovery items (empty for a client)
         connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolStanza::named_ns(
+            Some(vec![ProseProtocolStanza::named(
                 "query",
-                Some(namespaces::DISCO_ITEMS),
-                None,
+                Some(map! { "xmlns" => namespaces::DISCO_ITEMS }),
                 None,
             )?]),
         )?);
@@ -251,10 +247,9 @@ impl ProseProtocolIQ {
         // TODO: populate w/ final values
         connection.send(&ProseProtocolStanza::result(
             stanza,
-            Some(vec![ProseProtocolStanza::named_ns(
+            Some(vec![ProseProtocolStanza::named(
                 "time",
-                Some(namespaces::NS_URN_TIME),
-                None,
+                Some(map! { "xmlns" => namespaces::NS_URN_TIME }),
                 Some(vec![
                     ProseProtocolStanza::named(
                         "tzo",
