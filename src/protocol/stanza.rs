@@ -37,7 +37,7 @@ impl ProseProtocolStanza {
     pub fn text(text: &str) -> Result<Stanza, Error> {
         let mut node = Stanza::new();
 
-        node.set_text(text);
+        node.set_text(text)?;
 
         Ok(node)
     }
@@ -48,7 +48,7 @@ impl ProseProtocolStanza {
     ) -> Result<Stanza, Error> {
         if let Some(attributes) = attributes {
             for (name, value) in attributes {
-                node.set_attribute(name, value);
+                node.set_attribute(name, value)?;
             }
         }
 

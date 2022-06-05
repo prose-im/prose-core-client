@@ -11,7 +11,7 @@ use jid::{BareJid, JidParseError};
 use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context};
 
 use super::{event::ProseClientEvent, ProseClientOrigin};
-use crate::broker::{ProseBroker, ProseBrokerClient};
+use crate::broker::ProseBroker;
 
 // -- Constants --
 

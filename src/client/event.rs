@@ -56,7 +56,7 @@ impl ProseClientEvent {
     }
 
     pub fn stanza_presence(
-        context: &Context,
+        _context: &Context,
         connection: &mut Connection,
         stanza: &Stanza,
     ) -> bool {
@@ -68,7 +68,11 @@ impl ProseClientEvent {
         true
     }
 
-    pub fn stanza_message(context: &Context, connection: &mut Connection, stanza: &Stanza) -> bool {
+    pub fn stanza_message(
+        _context: &Context,
+        connection: &mut Connection,
+        stanza: &Stanza,
+    ) -> bool {
         log::trace!("[event] message from: {}", stanza.from().unwrap_or("--"));
 
         // Route stanza to message handler
@@ -77,7 +81,7 @@ impl ProseClientEvent {
         true
     }
 
-    pub fn stanza_iq(context: &Context, connection: &mut Connection, stanza: &Stanza) -> bool {
+    pub fn stanza_iq(_context: &Context, connection: &mut Connection, stanza: &Stanza) -> bool {
         log::trace!("[event] iq from: {}", stanza.from().unwrap_or("--"));
 
         // Route stanza to IQ handler

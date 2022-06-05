@@ -14,7 +14,7 @@ pub struct ProseProtocolPresence;
 // -- Implementations --
 
 impl ProseProtocolPresence {
-    pub fn handle(connection: &mut Connection, stanza: &Stanza) {
+    pub fn handle(_connection: &mut Connection, stanza: &Stanza) {
         let stanza_type = stanza.stanza_type();
 
         // TODO: check if personal, or MUC from here
