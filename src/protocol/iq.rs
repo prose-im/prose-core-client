@@ -22,8 +22,12 @@ impl ProseProtocolIQ {
 
         // Handle request type
         // Notice: consider empty types as 'get'
+        // @ref: \
+        //   https://xmpp.org/extensions/xep-0099.html#sect-idm45805812737232
         match stanza_type {
             Some("get") | None => {
+                log::debug!("[iq] got get stanza");
+
                 let (mut count_unsupported, mut total_children) = (0, 0);
 
                 for child in stanza.children() {
@@ -53,6 +57,15 @@ impl ProseProtocolIQ {
                         log::error!("[iq] handle get unsupported error: {}", err);
                     }
                 }
+            }
+            Some("set") => {
+                log::debug!("[iq] got set stanza");
+            }
+            Some("result") => {
+                log::debug!("[iq] got result stanza");
+            }
+            Some("error") => {
+                log::debug!("[iq] got error stanza");
             }
             _ => {
                 // Type not handled

@@ -15,6 +15,31 @@ pub struct ProseProtocolMessage;
 
 impl ProseProtocolMessage {
     pub fn handle(connection: &mut Connection, stanza: &Stanza) {
-        // TODO
+        let stanza_type = stanza.stanza_type();
+
+        // Handle message type
+        // Notice: consider empty types as 'chat'
+        // @ref: https://xmpp.org/rfcs/rfc3921.html#stanzas
+        match stanza_type {
+            Some("chat") | None => {
+                log::debug!("[message] got chat stanza");
+            }
+            Some("groupchat") => {
+                log::debug!("[message] got groupchat stanza");
+            }
+            Some("normal") => {
+                log::debug!("[message] got normal stanza");
+            }
+            Some("headline") => {
+                log::debug!("[message] got headline stanza");
+            }
+            Some("error") => {
+                log::debug!("[message] got error stanza");
+            }
+            _ => {
+                // Type not handled
+                log::warn!("[message] got unhandled type: {:?}", stanza_type);
+            }
+        }
     }
 }
