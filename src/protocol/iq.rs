@@ -24,7 +24,7 @@ impl ProseProtocolIQ {
         // Notice: consider empty types as 'get'
         // @ref: \
         //   https://xmpp.org/extensions/xep-0099.html#sect-idm45805812737232
-        match stanza_type {
+        let result: Result<(), Error> = match stanza_type {
             Some("get") | None => {
                 log::debug!("[iq] got get stanza");
 
@@ -57,20 +57,34 @@ impl ProseProtocolIQ {
                         log::error!("[iq] handle get unsupported error: {}", err);
                     }
                 }
+
+                Ok(())
             }
             Some("set") => {
                 log::debug!("[iq] got set stanza");
+
+                Ok(())
             }
             Some("result") => {
                 log::debug!("[iq] got result stanza");
+
+                Ok(())
             }
             Some("error") => {
                 log::debug!("[iq] got error stanza");
+
+                Ok(())
             }
             _ => {
                 // Type not handled
                 log::warn!("[iq] got unhandled type: {:?}", stanza_type);
+
+                Ok(())
             }
+        };
+
+        if let Err(err) = result {
+            log::error!("[iq] handle error: {}", err);
         }
     }
 
