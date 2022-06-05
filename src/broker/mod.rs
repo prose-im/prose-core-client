@@ -29,12 +29,16 @@ pub struct ProseBrokerClient<'cb, 'cx> {
 // -- Implementations --
 
 impl<'cl, 'cb, 'cx> ProseBroker<'cl, 'cb, 'cx> {
-    pub fn from_connection(connection: Connection<'cb, 'cx>) -> Self {
-        let client = ProseBrokerClient { connection };
-
+    pub fn from_client(client: &'cl ProseBrokerClient<'cb, 'cx>) -> Self {
         Self {
-            egress: ProseBrokerEgress::new(&client),
-            ingress: ProseBrokerIngress::new(&client),
+            egress: ProseBrokerEgress::new(client),
+            ingress: ProseBrokerIngress::new(client),
         }
+    }
+}
+
+impl<'cb, 'cx> ProseBrokerClient<'cb, 'cx> {
+    pub fn from_connection(connection: Connection<'cb, 'cx>) -> Self {
+        Self { connection }
     }
 }

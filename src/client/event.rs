@@ -19,31 +19,38 @@ pub struct ProseClientEvent;
 
 impl ProseClientEvent {
     pub fn connection(context: &Context, connection: &mut Connection, event: ConnectionEvent) {
-        match event {
-            ConnectionEvent::RawConnect => {
-                log::trace!("[event] connected (raw)");
+        if let Some(jid) = connection.jid() {
+            match event {
+                ConnectionEvent::RawConnect => {
+                    log::trace!("[event] connected (raw) -> {}", jid);
 
-                // Nothing done here (as we never use raw connections)
-            }
-            ConnectionEvent::Connect => {
-                log::trace!("[event] connected");
+                    // Nothing done here (as we never use raw connections)
+                }
+                ConnectionEvent::Connect => {
+                    log::trace!("[event] connected -> {}", jid);
 
-                // Bind stanza handlers
-                connection.handler_add(Self::stanza_presence, None, Some("presence"), None);
-                connection.handler_add(Self::stanza_message, None, Some("message"), None);
-                connection.handler_add(Self::stanza_iq, None, Some("iq"), None);
+                    // TODO: register connection to event broker
 
-                // Announce first presence
-                // TODO: this should not be done from here, right?
-                // TODO: set resource + other metas in presence
-                let presence = Stanza::new_presence();
+                    // Bind stanza handlers
+                    connection.handler_add(Self::stanza_presence, None, Some("presence"), None);
+                    connection.handler_add(Self::stanza_message, None, Some("message"), None);
+                    connection.handler_add(Self::stanza_iq, None, Some("iq"), None);
 
-                connection.send(&presence);
-            }
-            ConnectionEvent::Disconnect(err) => {
-                log::trace!("[event] disconnected: {:?}", err);
+                    // Announce first presence
+                    // TODO: this should not be done from here, right?
+                    // TODO: set resource + other metas in presence
+                    let presence = Stanza::new_presence();
 
-                context.stop();
+                    connection.send(&presence);
+                }
+                ConnectionEvent::Disconnect(err) => {
+                    log::trace!("[event] disconnected -> {}: {:?}", jid, err);
+
+                    // TODO: unregister connection from event broker? (or \
+                    //   should we just reconnect forever)
+
+                    context.stop();
+                }
             }
         }
     }
