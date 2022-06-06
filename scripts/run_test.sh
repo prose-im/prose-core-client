@@ -9,4 +9,4 @@ export RUSTFLAGS="-L /path/to/libstrophe/lib/"
 export TEST_JID="your-name@your-domain.com"
 export TEST_PASSWORD="<your_secret_password>"
 
-cargo run --example hello_bot
+cargo run --example hello_bot --target-dir ./.target-run
