@@ -1,30 +1,6 @@
-[package]
-name = "prose-core-client"
-version = "0.1.0"
-description = "Prose core XMPP client manager and protocols."
-readme = "README.md"
-license = "MPL-2.0"
-edition = "2021"
-homepage = "https://github.com/prose-im/prose-core-client"
-repository = "https://github.com/prose-im/prose-core-client.git"
-keywords = ["xmpp", "xmpp-client", "library"]
-categories = ["network-programming"]
-authors = ["Valerian Saliou <valerian@valeriansaliou.name>"]
+[workspace]
 
-[lib]
-crate-type = ["lib", "staticlib"]
-name = "prose_core_client"
-
-[dependencies]
-log = { version = "0.4", features = ["std"] }
-jid = { version = "0.9", default-features = false }
-libstrophe = "0.16"
-serde = { version = "1.0", default-features = false }
-mdl = "1.0"
-uniffi_macros = "0.18"
-uniffi = {version = "0.18", features=["builtin-bindgen"]}
-once_cell = "1.12.0"
-thiserror = "1.0"
-
-[build-dependencies]
-uniffi_build = {version = "0.18", features=["builtin-bindgen"]}
+members = [
+	"prose_core_client",
+	"prose_core_client_ffi",
+]
