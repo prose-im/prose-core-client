@@ -1,9 +1,10 @@
-namespace ProseCoreFFI {
-  [Throws=InitializationError]
-  void prose_initialize(ProseClientOrigin origin);
+namespace ProseCoreClientFFI {};
 
+interface Client {
+  constructor(ProseClientOrigin origin);
+  
   [Throws=LoginError]
-  BareJid prose_connect(string jid, string password);
+  BareJid connect([ByRef] string jid, [ByRef] string password);
 };
 
 enum ProseClientOrigin {
