@@ -22,11 +22,14 @@ pub enum LoginError {
     Unknown,
 }
 
-struct Client {
-    client: Mutex<ProseClient>,
+struct Client<'cl, 'cb> {
+    client: Mutex<ProseClient<'cl, 'cb>>,
 }
 
-impl Client {
+unsafe impl<'cl, 'cb> Send for Client<'cl, 'cb> {}
+unsafe impl<'cl, 'cb> Sync for Client<'cl, 'cb> {}
+
+impl<'cl, 'cb> Client<'cl, 'cb> {
     pub fn new(origin: ProseClientOrigin) -> Self {
         Self {
             client: Mutex::new(
