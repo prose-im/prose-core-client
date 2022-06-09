@@ -1,0 +1,3 @@
+[bindings.swift]
+cdylib_name = "ProseCoreClientFFI"
+module_name = "ProseCoreClientFFI"

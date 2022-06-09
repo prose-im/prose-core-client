@@ -1,0 +1,33 @@
+namespace ProseCoreClientFFI {};
+
+interface Client {
+  constructor(ProseClientOrigin origin);
+  
+  [Throws=LoginError]
+  BareJid connect([ByRef] string jid, [ByRef] string password);
+};
+
+enum ProseClientOrigin {
+  "TestsCLI",
+  "ProseAppMacOS",
+  "ProseAppIOS",
+  "ProseAppAndroid",
+  "ProseAppWindows",
+  "ProseAppLinux",
+  "ProseAppWeb",
+};
+
+[Error]
+enum InitializationError {
+  "AlreadyInitialized"
+};
+
+[Error]
+enum LoginError {
+  "Unknown"
+};
+
+dictionary BareJid {
+  string? node;
+  string domain;
+};
