@@ -37,7 +37,7 @@ impl ProseProtocolMessage {
                 log::debug!("[message] got normal stanza");
 
                 // Alias to 'chat'
-                Self::handle_chat(connection, stanza)
+                Self::handle_normal(connection, stanza)
             }
             Some("headline") => {
                 log::debug!("[message] got headline stanza");
@@ -74,10 +74,9 @@ impl ProseProtocolMessage {
         Ok(())
     }
 
-    fn handle_normal(_connection: &mut Connection, _stanza: &Stanza) -> Result<(), Error> {
-        // TODO
-
-        Ok(())
+    fn handle_normal(connection: &mut Connection, stanza: &Stanza) -> Result<(), Error> {
+        // Alias to 'chat'
+        Self::handle_chat(connection, stanza)
     }
 
     fn handle_headline(_connection: &mut Connection, _stanza: &Stanza) -> Result<(), Error> {
