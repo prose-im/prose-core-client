@@ -1,30 +1,29 @@
 namespace ProseCoreClientFFI {};
 
 interface Client {
-  constructor(ProseClientOrigin origin);
+  constructor();
   
   [Throws=LoginError]
-  BareJid connect([ByRef] string jid, [ByRef] string password);
+  BareJid connect([ByRef] string jid, [ByRef] string password, AccountObserver observer);
+
+  void sendMessage([ByRef] string jid, [ByRef] string body);
 };
 
-enum ProseClientOrigin {
-  "TestsCLI",
-  "ProseAppMacOS",
-  "ProseAppIOS",
-  "ProseAppAndroid",
-  "ProseAppWindows",
-  "ProseAppLinux",
-  "ProseAppWeb",
+callback interface AccountObserver {
+  void didConnect();
+  void didDisconnect();
+  
+  void didReceive(Message message);
 };
 
-[Error]
-enum InitializationError {
-  "AlreadyInitialized"
+dictionary Message {
+  BareJid from;
+  string body;
 };
 
 [Error]
 enum LoginError {
-  "Unknown"
+  "InvalidJID"
 };
 
 dictionary BareJid {

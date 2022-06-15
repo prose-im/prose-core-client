@@ -3,53 +3,62 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-// -- Modules --
+mod account;
 
 use jid::BareJid;
-use std::sync::Mutex;
+use std::{str::FromStr, sync::Arc};
 
-use prose_core_client::client::{ProseClient, ProseClientBuilder, ProseClientOrigin};
+use once_cell::sync::Lazy;
+use std::{collections::HashMap, sync::Mutex};
 
-#[derive(Debug, thiserror::Error)]
-pub enum InitializationError {
-    #[error("ProseClient was initialized already.")]
-    AlreadyInitialized,
+use account::Account;
+
+pub trait AccountObserver: Send + Sync {
+    fn didConnect(&self);
+    fn didDisconnect(&self);
+
+    fn didReceive(&self, message: Message);
+}
+
+static ACCOUNTS: Lazy<Mutex<HashMap<BareJid, Account>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub struct Message {
+    from: BareJid,
+    body: String,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum LoginError {
-    #[error("An unknown error occurred.")]
-    Unknown,
+    #[error("JID is invalid")]
+    InvalidJID,
 }
 
-struct Client<'cl, 'cb> {
-    client: Mutex<ProseClient<'cl, 'cb>>,
-}
+struct Client {}
 
-unsafe impl<'cl, 'cb> Send for Client<'cl, 'cb> {}
-unsafe impl<'cl, 'cb> Sync for Client<'cl, 'cb> {}
-
-impl<'cl, 'cb> Client<'cl, 'cb> {
-    pub fn new(origin: ProseClientOrigin) -> Self {
-        Self {
-            client: Mutex::new(
-                ProseClientBuilder::new()
-                    .app(origin)
-                    .build()
-                    .expect("client built")
-                    .bind()
-                    .expect("client bound"),
-            ),
-        }
+impl Client {
+    pub fn new() -> Self {
+        Client {}
     }
 
-    pub fn connect(&self, jid: &str, password: &str) -> Result<BareJid, LoginError> {
-        // For now we convert these fancy nested errors into an obfuscated mess until we
-        // have a proper error handling system. We'll probably need root-level flat error enums.
-        let mut client = self.client.lock().unwrap();
-        (*client)
-            .add(jid, password)
-            .map_err(|_| LoginError::Unknown)
+    pub fn connect(
+        &self,
+        jid_str: &str,
+        password: &str,
+        observer: Box<dyn AccountObserver>,
+    ) -> Result<BareJid, LoginError> {
+        let jid = BareJid::from_str(jid_str).or(Err(LoginError::InvalidJID))?;
+
+        let account = Account::new(&jid, password, Arc::new(observer));
+        ACCOUNTS.lock().unwrap().insert(jid.clone(), account);
+
+        Ok(jid)
+    }
+
+    pub fn sendMessage(&self, jid_str: &str, body: &str) {
+        let jid = BareJid::from_str(jid_str).expect("Cannot parse JID");
+        let locked_hash_map = ACCOUNTS.lock().unwrap();
+        let account = locked_hash_map.get(&jid).expect("Cannot get account");
+        account.send_message(&jid, body);
     }
 }
 
