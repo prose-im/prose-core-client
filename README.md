@@ -31,6 +31,8 @@ The supported programming languages are listed below:
 
 * Swift
 
+FFIs are built using the `prose_core_client_ffi` library contained in this project.
+
 ## Building & Testing
 
 To build and test this library (using any of the provided examples), you can use `cargo run`. You will however need to pass the path to your local `libstrophe` library using `RUSTFLAGS`.
