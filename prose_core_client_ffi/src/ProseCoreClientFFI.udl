@@ -1,33 +1,57 @@
-namespace ProseCoreClientFFI {};
+namespace ProseCoreClientFFI {
+  void enableLogging();
+};
 
 interface Client {
-  constructor(ProseClientOrigin origin);
+  constructor();
   
   [Throws=LoginError]
-  BareJid connect([ByRef] string jid, [ByRef] string password);
+  BareJid connect([ByRef] string jid, [ByRef] string password, AccountObserver observer);
+
+  void sendMessage([ByRef] string account_jid, [ByRef] string receiver_jid, [ByRef] string body);
+  void loadRoster([ByRef] string account_jid);
 };
 
-enum ProseClientOrigin {
-  "TestsCLI",
-  "ProseAppMacOS",
-  "ProseAppIOS",
-  "ProseAppAndroid",
-  "ProseAppWindows",
-  "ProseAppLinux",
-  "ProseAppWeb",
+callback interface AccountObserver {
+  void didConnect();
+  void didDisconnect();
+  
+  void didReceiveMessage(Message message);
+  void didReceiveRoster(Roster roster);
 };
 
-[Error]
-enum InitializationError {
-  "AlreadyInitialized"
+dictionary Message {
+  BareJid from;
+  string body;
 };
 
 [Error]
 enum LoginError {
-  "Unknown"
+  "InvalidJID"
 };
 
 dictionary BareJid {
   string? node;
   string domain;
+};
+
+dictionary Roster {
+  sequence<RosterGroup> groups;
+};
+
+dictionary RosterGroup {
+  string name;
+  sequence<RosterItem> items;
+};
+
+enum RosterItemSubscription {
+  "None",
+  "To",
+  "From",
+  "Both",
+};
+
+dictionary RosterItem {
+  BareJid jid;
+  RosterItemSubscription subscription;
 };
