@@ -6,6 +6,8 @@
 
 _Tested at Rust version: `rustc 1.60.0 (7737e0b5c 2022-04-04)`_
 
+Copyright 2022, Prose Foundation.
+
 ## Architecture
 
 The Prose core client uses the [libstrophe](http://strophe.im/libstrophe/) library to provide with low-level XMPP protocol and connection management. It is built in C, and wrapped by [a Rust library](https://github.com/twistedfall/libstrophe) as to expose native Rust bindings.
