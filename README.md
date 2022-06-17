@@ -4,7 +4,7 @@
 
 **Prose core XMPP client manager and protocols.**
 
-_Tested at Rust version: `rustc 1.58.1 (db9d1b20b 2022-01-20)`_
+_Tested at Rust version: `rustc 1.60.0 (7737e0b5c 2022-04-04)`_
 
 ## Architecture
 
