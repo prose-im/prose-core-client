@@ -1,6 +1,5 @@
 #[allow(non_snake_case)]
 pub fn enableLogging() {
-    println!("4");
     use log::{LevelFilter, Metadata, Record, SetLoggerError};
 
     pub struct Logger;
