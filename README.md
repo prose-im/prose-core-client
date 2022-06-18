@@ -4,7 +4,7 @@
 
 **Prose core XMPP client manager and protocols.**
 
-Copyright 2022, Prose Foundation.
+Copyright 2022, Prose Foundation - Released under the [Mozilla Public License 2.0](./LICENSE.md).
 
 _Tested at Rust version: `rustc 1.60.0 (7737e0b5c 2022-04-04)`_
 
