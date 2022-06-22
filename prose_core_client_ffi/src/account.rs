@@ -33,18 +33,29 @@ impl Account {
     pub fn new(jid: &BareJid, password: &str, observer: Arc<Box<dyn AccountObserver>>) -> Account {
         let (tx, rx) = channel::<Stanza>();
 
-        let conn_handler = |ctx: &Context, conn: &mut Connection, evt: ConnectionEvent| match evt {
-            ConnectionEvent::Connect => {
-                println!("Connected");
-                let pres = Stanza::new_presence();
-                conn.send(&pres);
-            }
-            ConnectionEvent::Disconnect(err) => {
-                println!("Disconnected, Reason: {:?}", err);
-                ctx.stop();
-            }
-            _ => unimplemented!(),
-        };
+        let conn_observer = observer.clone();
+
+        let conn_handler =
+            move |ctx: &Context, conn: &mut Connection, evt: ConnectionEvent| match evt {
+                ConnectionEvent::Connect => {
+                    conn_observer.didConnect();
+
+                    // After establishing a session, a client SHOULD send initial presence to the server
+                    // in order to signal its availability for communications. As defined herein, the initial
+                    // presence stanza (1) MUST possess no 'to' address (signalling that it is meant to be
+                    // broadcasted by the server on behalf of the client) and (2) MUST possess no 'type' attribute
+                    // (signalling the user's availability). After sending initial presence, an active resource is
+                    // said to be an "available resource".
+                    let pres = Stanza::new_presence();
+                    conn.send(&pres);
+                }
+                ConnectionEvent::Disconnect(err) => {
+                    println!("Disconnected, Reason: {:?}", err);
+                    ctx.stop();
+                    conn_observer.didDisconnect();
+                }
+                _ => unimplemented!(),
+            };
 
         let send_handler = move |_ctx: &Context, conn: &mut Connection| {
             match rx.try_recv() {
