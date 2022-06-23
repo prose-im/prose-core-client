@@ -13,7 +13,7 @@ pub use account_observer::AccountObserver;
 pub use client::Client;
 pub use jid::BareJid;
 pub use logger::enableLogging;
-pub use types::message::Message;
+pub use types::message::{Message, MessageKind};
 pub use types::presence::{Presence, PresenceKind, ShowKind};
 pub use types::roster::{Roster, RosterGroup, RosterItem, RosterItemSubscription};
 

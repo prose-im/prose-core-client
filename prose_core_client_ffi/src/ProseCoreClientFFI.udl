@@ -20,9 +20,21 @@ callback interface AccountObserver {
   void didReceiveRoster(Roster roster);
 };
 
+enum MessageKind {
+  "Chat", 
+  "Error", 
+  "Groupchat", 
+  "Headline", 
+  "Normal",
+};
+
 dictionary Message {
   BareJid from;
-  string body;
+  BareJid? to;
+  string? id;
+  MessageKind? kind;
+  string? body;
+  string? error;
 };
 
 [Error]
