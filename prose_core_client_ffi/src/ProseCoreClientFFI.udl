@@ -55,3 +55,28 @@ dictionary RosterItem {
   BareJid jid;
   RosterItemSubscription subscription;
 };
+
+enum PresenceKind {
+  "Unavailable", 
+  "Subscribe", 
+  "Subscribed", 
+  "Unsubscribe", 
+  "Unsubscribed", 
+  "Probe", 
+  "Error",
+};
+
+enum ShowKind {
+  "Away",
+  "Chat", 
+  "DND",
+  "XA",
+};
+
+dictionary Presence {
+  PresenceKind? kind;
+  BareJid? from;
+  BareJid? to;
+  ShowKind? show;
+  string? status;
+};
