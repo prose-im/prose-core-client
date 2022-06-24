@@ -3,11 +3,11 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::{collections::HashMap, convert::TryFrom};
-
 use jid::BareJid;
 use libstrophe::Stanza;
 use std::str::FromStr;
+use std::{collections::HashMap, convert::TryFrom};
+use strum_macros::{Display, EnumString};
 
 static DEFAULT_GROUP_NAME: &str = "_default_group_";
 
@@ -31,7 +31,8 @@ impl RosterGroup {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum RosterItemSubscription {
     None,
     To,
@@ -43,20 +44,6 @@ pub enum RosterItemSubscription {
 pub struct RosterItem {
     pub jid: BareJid,
     pub subscription: RosterItemSubscription,
-}
-
-impl TryFrom<&str> for RosterItemSubscription {
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
-            "to" => Ok(Self::To),
-            "from" => Ok(Self::From),
-            "both" => Ok(Self::Both),
-            "none" => Ok(Self::None),
-            _ => Err(()),
-        }
-    }
-
-    type Error = ();
 }
 
 impl TryFrom<&Stanza> for Roster {
@@ -77,7 +64,7 @@ impl TryFrom<&Stanza> for Roster {
             let sub = item
                 .get_attribute("subscription")
                 .ok_or(())
-                .and_then(|s| s.try_into());
+                .and_then(|s| s.parse::<RosterItemSubscription>().map_err(|_| ()));
             let item = RosterItem {
                 jid: jid?,
                 subscription: sub?,

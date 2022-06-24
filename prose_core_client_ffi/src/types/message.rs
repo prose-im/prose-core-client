@@ -1,12 +1,14 @@
-use std::{
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
+use std::str::FromStr;
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter, EnumString};
 
 use jid::BareJid;
 use libstrophe::Stanza;
 
-#[derive(Debug, PartialEq)]
+use super::namespace::Namespace;
+
+#[derive(Debug, PartialEq, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum MessageKind {
     /// The message is sent in the context of a one-to-one chat conversation.
     Chat,
@@ -80,33 +82,6 @@ impl TryFrom<&Stanza> for Message {
     }
 
     type Error = ();
-}
-
-impl FromStr for MessageKind {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<MessageKind, Self::Err> {
-        match input {
-            "chat" => Ok(MessageKind::Chat),
-            "error" => Ok(MessageKind::Error),
-            "groupchat" => Ok(MessageKind::Groupchat),
-            "headline" => Ok(MessageKind::Headline),
-            "normal" => Ok(MessageKind::Normal),
-            _ => Err(()),
-        }
-    }
-}
-
-impl Display for MessageKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            MessageKind::Chat => write!(f, "chat"),
-            MessageKind::Error => write!(f, "error"),
-            MessageKind::Groupchat => write!(f, "groupchat"),
-            MessageKind::Headline => write!(f, "headline"),
-            MessageKind::Normal => write!(f, "normal"),
-        }
-    }
 }
 
 #[cfg(test)]

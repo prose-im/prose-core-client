@@ -1,12 +1,11 @@
-use std::{
-    fmt::{self, Display, Formatter},
-    str::FromStr,
-};
+use std::str::FromStr;
+use strum_macros::{Display, EnumString};
 
 use jid::BareJid;
 use libstrophe::Stanza;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum PresenceKind {
     /// Signals that the entity is no longer available for communication.
     Unavailable,
@@ -24,7 +23,8 @@ pub enum PresenceKind {
     Error,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum ShowKind {
     /// The entity or resource is temporarily away.
     Away,
@@ -67,62 +67,6 @@ impl TryFrom<&Stanza> for Presence {
     }
 
     type Error = ();
-}
-
-impl FromStr for PresenceKind {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<PresenceKind, Self::Err> {
-        match input {
-            "unavailable" => Ok(PresenceKind::Unavailable),
-            "subscribe" => Ok(PresenceKind::Subscribe),
-            "subscribed" => Ok(PresenceKind::Subscribed),
-            "unsubscribe" => Ok(PresenceKind::Unsubscribe),
-            "unsubscribed" => Ok(PresenceKind::Unsubscribed),
-            "probe" => Ok(PresenceKind::Probe),
-            "error" => Ok(PresenceKind::Error),
-            _ => Err(()),
-        }
-    }
-}
-
-impl Display for PresenceKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            PresenceKind::Unavailable => write!(f, "unavailable"),
-            PresenceKind::Subscribe => write!(f, "subscribe"),
-            PresenceKind::Subscribed => write!(f, "subscribed"),
-            PresenceKind::Unsubscribe => write!(f, "unsubscribe"),
-            PresenceKind::Unsubscribed => write!(f, "unsubscribed"),
-            PresenceKind::Probe => write!(f, "probe"),
-            PresenceKind::Error => write!(f, "error"),
-        }
-    }
-}
-
-impl FromStr for ShowKind {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<ShowKind, Self::Err> {
-        match input {
-            "away" => Ok(ShowKind::Away),
-            "chat" => Ok(ShowKind::Chat),
-            "dnd" => Ok(ShowKind::DND),
-            "xa" => Ok(ShowKind::XA),
-            _ => Err(()),
-        }
-    }
-}
-
-impl Display for ShowKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            ShowKind::Away => write!(f, "away"),
-            ShowKind::Chat => write!(f, "chat"),
-            ShowKind::DND => write!(f, "dnd"),
-            ShowKind::XA => write!(f, "xa"),
-        }
-    }
 }
 
 #[cfg(test)]
