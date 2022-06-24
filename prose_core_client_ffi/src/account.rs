@@ -5,6 +5,7 @@
 
 use crate::AccountObserver;
 use crate::Message;
+use crate::Presence;
 use crate::Roster;
 use jid::BareJid;
 use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
@@ -90,12 +91,21 @@ impl Account {
             Ok(true)
         });
 
+        let presence_observer = observer.clone();
+
+        let mut presence_handler: ThrowingStanzaHandler = Box::new(move |_, _, stanza| {
+            let presence: Presence = stanza.try_into()?;
+            presence_observer.as_ref().didReceivePresence(presence);
+            Ok(true)
+        });
+
         let stanza_handler: ThrowingStanzaHandler = Box::new(move |ctx, conn, stanza| {
             let name = stanza.name().ok_or(())?;
 
             match name {
                 "message" => message_handler(ctx, conn, stanza),
                 "iq" => result_handler(ctx, conn, stanza),
+                "presence" => presence_handler(ctx, conn, stanza),
                 _ => Ok(true),
             }
         });

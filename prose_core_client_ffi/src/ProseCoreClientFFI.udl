@@ -19,6 +19,7 @@ callback interface AccountObserver {
   
   void didReceiveMessage(Message message);
   void didReceiveRoster(Roster roster);
+  void didReceivePresence(Presence presence);
 };
 
 enum MessageKind {
