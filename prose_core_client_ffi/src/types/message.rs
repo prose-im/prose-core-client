@@ -40,6 +40,8 @@ pub enum ChatState {
     Paused,
 }
 
+type MessageId = String;
+
 #[derive(Debug, PartialEq)]
 pub struct Message {
     pub from: BareJid,
@@ -55,7 +57,7 @@ pub struct Message {
     /// <user@domain> rather than of the form <user@domain/resource>.
     pub to: Option<BareJid>,
 
-    pub id: Option<String>,
+    pub id: Option<MessageId>,
 
     /// The 'type' attribute of a message stanza is RECOMMENDED; if included, it specifies
     /// the conversational context of the message, thus providing a hint regarding
@@ -71,6 +73,9 @@ pub struct Message {
     pub body: Option<String>,
 
     pub chat_state: Option<ChatState>,
+
+    /// If set, the message the same id should be replaced.
+    pub replace: Option<MessageId>,
 
     /// If the message stanza is of type "error", it MUST include an <error/> child.
     pub error: Option<String>,
@@ -95,6 +100,9 @@ impl TryFrom<&Stanza> for Message {
                 .and_then(|s| s.parse::<MessageKind>().ok()),
             body: stanza.get_child_by_name("body").and_then(|n| n.text()),
             chat_state: stanza.try_into().ok(),
+            replace: stanza
+                .get_child_by_name_and_ns("replace", Namespace::LastMessageCorrection.to_string())
+                .and_then(|n| n.get_attribute("id").map(|s| s.to_string())),
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
     }
@@ -141,6 +149,7 @@ mod tests {
                 kind: None,
                 body: None,
                 chat_state: None,
+                replace: None,
                 error: None,
             }
         );
@@ -167,6 +176,34 @@ mod tests {
                 kind: Some(MessageKind::Chat),
                 body: Some("How is it going?".to_string()),
                 chat_state: Some(ChatState::Active),
+                replace: None,
+                error: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_correction_message() {
+        let message = r#"
+      <message from="valerian@prose.org/mobile" to="marc@prose.org/home" id="purplecf8f33c0" type="chat">
+        <body>This is a correction</body>
+        <replace id="message-id-1" xmlns="urn:xmpp:message-correct:0"/>
+      </message>
+      "#;
+
+        let stanza = Stanza::from_str(message);
+        let message = Message::try_from(&stanza).unwrap();
+
+        assert_eq!(
+            message,
+            Message {
+                from: BareJid::from_str("valerian@prose.org").unwrap(),
+                to: Some(BareJid::from_str("marc@prose.org").unwrap()),
+                id: Some("purplecf8f33c0".to_string()),
+                kind: Some(MessageKind::Chat),
+                body: Some("This is a correction".to_string()),
+                chat_state: None,
+                replace: Some("message-id-1".to_string()),
                 error: None,
             }
         );
@@ -192,6 +229,7 @@ mod tests {
                 kind: Some(MessageKind::Chat),
                 body: None,
                 chat_state: Some(ChatState::Paused),
+                replace: None,
                 error: None,
             }
         );
@@ -217,6 +255,7 @@ mod tests {
                 kind: Some(MessageKind::Chat),
                 body: None,
                 chat_state: None,
+                replace: None,
                 error: None,
             }
         );
@@ -242,6 +281,7 @@ mod tests {
                 kind: Some(MessageKind::Error),
                 body: None,
                 chat_state: None,
+                replace: None,
                 error: Some("Something went wrong".to_string()),
             }
         );

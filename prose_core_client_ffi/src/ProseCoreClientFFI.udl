@@ -45,6 +45,7 @@ dictionary Message {
   MessageKind? kind;
   string? body;
   ChatState? chat_state;
+  string? replace;
   string? error;
 };
 
