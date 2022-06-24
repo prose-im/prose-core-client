@@ -29,12 +29,21 @@ enum MessageKind {
   "Normal",
 };
 
+enum ChatState {
+  "Active", 
+  "Composing", 
+  "Gone", 
+  "Inactive", 
+  "Paused",
+};
+
 dictionary Message {
   BareJid from;
   BareJid? to;
   string? id;
   MessageKind? kind;
   string? body;
+  ChatState? chat_state;
   string? error;
 };
 

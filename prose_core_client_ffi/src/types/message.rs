@@ -25,6 +25,21 @@ pub enum MessageKind {
     Normal,
 }
 
+#[derive(Debug, PartialEq, EnumIter, Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum ChatState {
+    /// User is actively participating in the chat session.
+    Active,
+    /// User has not been actively participating in the chat session.
+    Composing,
+    /// User has effectively ended their participation in the chat session.
+    Gone,
+    /// User is composing a message.
+    Inactive,
+    /// User had been composing but now has stopped.
+    Paused,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Message {
     pub from: BareJid,
@@ -55,6 +70,8 @@ pub struct Message {
     /// distinct language value. The <body/> element MUST NOT contain mixed content.
     pub body: Option<String>,
 
+    pub chat_state: Option<ChatState>,
+
     /// If the message stanza is of type "error", it MUST include an <error/> child.
     pub error: Option<String>,
 }
@@ -77,10 +94,26 @@ impl TryFrom<&Stanza> for Message {
                 .or_else(|| stanza.get_child_by_name("type").and_then(|n| n.text()))
                 .and_then(|s| s.parse::<MessageKind>().ok()),
             body: stanza.get_child_by_name("body").and_then(|n| n.text()),
+            chat_state: stanza.try_into().ok(),
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
     }
 
+    type Error = ();
+}
+
+impl TryFrom<&Stanza> for ChatState {
+    fn try_from(stanza: &Stanza) -> Result<Self, Self::Error> {
+        for state in ChatState::iter() {
+            if stanza
+                .get_child_by_name_and_ns(state.to_string(), Namespace::ChatStates.to_string())
+                .is_some()
+            {
+                return Ok(state);
+            }
+        }
+        Err(())
+    }
     type Error = ();
 }
 
@@ -92,11 +125,11 @@ mod tests {
 
     #[test]
     fn test_deserialize_empty_message() {
-        let presence = r#"
+        let message = r#"
         <message from="valerian@prose.org"/>
         "#;
 
-        let stanza = Stanza::from_str(presence);
+        let stanza = Stanza::from_str(message);
         let message = Message::try_from(&stanza).unwrap();
 
         assert_eq!(
@@ -107,6 +140,7 @@ mod tests {
                 id: None,
                 kind: None,
                 body: None,
+                chat_state: None,
                 error: None,
             }
         );
@@ -114,13 +148,14 @@ mod tests {
 
     #[test]
     fn test_deserialize_full_message() {
-        let presence = r#"
+        let message = r#"
       <message from="valerian@prose.org/mobile" to="marc@prose.org/home" id="purplecf8f33c0" type="chat">
         <body>How is it going?</body>
+        <active xmlns="http://jabber.org/protocol/chatstates"/>
       </message>
       "#;
 
-        let stanza = Stanza::from_str(presence);
+        let stanza = Stanza::from_str(message);
         let message = Message::try_from(&stanza).unwrap();
 
         assert_eq!(
@@ -131,6 +166,57 @@ mod tests {
                 id: Some("purplecf8f33c0".to_string()),
                 kind: Some(MessageKind::Chat),
                 body: Some("How is it going?".to_string()),
+                chat_state: Some(ChatState::Active),
+                error: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserializes_chat_state_message() {
+        let message = r#"
+      <message from="valerian@prose.org/mobile" to="marc@prose.org/home" id="purplecf8f33c0" type="chat">
+        <paused xmlns="http://jabber.org/protocol/chatstates"/>
+      </message>
+      "#;
+
+        let stanza = Stanza::from_str(message);
+        let message = Message::try_from(&stanza).unwrap();
+
+        assert_eq!(
+            message,
+            Message {
+                from: BareJid::from_str("valerian@prose.org").unwrap(),
+                to: Some(BareJid::from_str("marc@prose.org").unwrap()),
+                id: Some("purplecf8f33c0".to_string()),
+                kind: Some(MessageKind::Chat),
+                body: None,
+                chat_state: Some(ChatState::Paused),
+                error: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_ignores_chat_state_with_wrong_namespace() {
+        let message = r#"
+      <message from="valerian@prose.org/mobile" type="chat">
+        <paused xmlns="something"/>
+      </message>
+      "#;
+
+        let stanza = Stanza::from_str(message);
+        let message = Message::try_from(&stanza).unwrap();
+
+        assert_eq!(
+            message,
+            Message {
+                from: BareJid::from_str("valerian@prose.org").unwrap(),
+                to: None,
+                id: None,
+                kind: Some(MessageKind::Chat),
+                body: None,
+                chat_state: None,
                 error: None,
             }
         );
@@ -138,13 +224,13 @@ mod tests {
 
     #[test]
     fn test_deserialize_error_message() {
-        let presence = r#"
+        let message = r#"
     <message from="valerian@prose.org/mobile" type="error">
       <error>Something went wrong</error>
     </message>
     "#;
 
-        let stanza = Stanza::from_str(presence);
+        let stanza = Stanza::from_str(message);
         let message = Message::try_from(&stanza).unwrap();
 
         assert_eq!(
@@ -155,6 +241,7 @@ mod tests {
                 id: None,
                 kind: Some(MessageKind::Error),
                 body: None,
+                chat_state: None,
                 error: Some("Something went wrong".to_string()),
             }
         );
