@@ -138,4 +138,9 @@ impl Account {
         iq_stanza.add_child(query).unwrap();
         self.message_channel.send(iq_stanza).unwrap();
     }
+
+    pub fn send_xml_payload(&self, xml_str: &str) {
+        let stanza = Stanza::from_str(xml_str);
+        self.message_channel.send(stanza).unwrap();
+    }
 }

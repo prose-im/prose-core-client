@@ -10,6 +10,7 @@ interface Client {
 
   void sendMessage([ByRef] string account_jid, [ByRef] string receiver_jid, [ByRef] string body);
   void loadRoster([ByRef] string account_jid);
+  void sendXMLPayload([ByRef] string account_jid, [ByRef] string xml_string);
 };
 
 callback interface AccountObserver {

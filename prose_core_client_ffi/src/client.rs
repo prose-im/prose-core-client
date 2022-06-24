@@ -48,6 +48,12 @@ impl Client {
             account.load_roster();
         });
     }
+
+    pub fn sendXMLPayload(&self, account_jid_str: &str, xml_str: &str) {
+        with_account(account_jid_str, |account| {
+            account.send_xml_payload(xml_str);
+        });
+    }
 }
 
 fn with_account<T, F>(account_jid_str: &str, handler: F) -> T
