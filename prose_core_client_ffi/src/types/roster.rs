@@ -9,7 +9,7 @@ use std::str::FromStr;
 use std::{collections::HashMap, convert::TryFrom};
 use strum_macros::{Display, EnumString};
 
-static DEFAULT_GROUP_NAME: &str = "_default_group_";
+const DEFAULT_GROUP_NAME: &str = "_default_group_";
 
 #[derive(Debug, PartialEq)]
 pub struct Roster {

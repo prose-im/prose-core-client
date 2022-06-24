@@ -1,12 +1,12 @@
-use strum_macros::{Display, EnumString};
+#[non_exhaustive]
+pub struct Namespace;
 
-/// https://xmpp.org/registrar/namespaces.html
-#[derive(Debug, Display, EnumString)]
-pub enum Namespace {
+#[allow(non_upper_case_globals)]
+impl Namespace {
     /// XEP-0085: Chat State Notifications
-    #[strum(serialize = "http://jabber.org/protocol/chatstates")]
-    ChatStates,
+    pub const ChatStates: &'static str = "http://jabber.org/protocol/chatstates";
     /// XEP-0308: Last Message Correction
-    #[strum(serialize = "urn:xmpp:message-correct:0")]
-    LastMessageCorrection,
+    pub const LastMessageCorrection: &'static str = "urn:xmpp:message-correct:0";
+    /// RFC 6121: XMPP IM
+    pub const Roster: &'static str = "jabber:iq:roster";
 }

@@ -101,7 +101,7 @@ impl TryFrom<&Stanza> for Message {
             body: stanza.get_child_by_name("body").and_then(|n| n.text()),
             chat_state: stanza.try_into().ok(),
             replace: stanza
-                .get_child_by_name_and_ns("replace", Namespace::LastMessageCorrection.to_string())
+                .get_child_by_name_and_ns("replace", Namespace::LastMessageCorrection)
                 .and_then(|n| n.get_attribute("id").map(|s| s.to_string())),
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
@@ -114,7 +114,7 @@ impl TryFrom<&Stanza> for ChatState {
     fn try_from(stanza: &Stanza) -> Result<Self, Self::Error> {
         for state in ChatState::iter() {
             if stanza
-                .get_child_by_name_and_ns(state.to_string(), Namespace::ChatStates.to_string())
+                .get_child_by_name_and_ns(state.to_string(), Namespace::ChatStates)
                 .is_some()
             {
                 return Ok(state);

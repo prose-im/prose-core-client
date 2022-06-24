@@ -3,6 +3,7 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::types::namespace::Namespace;
 use crate::AccountObserver;
 use crate::Message;
 use crate::Presence;
@@ -82,7 +83,7 @@ impl Account {
             let ns = query.ns().ok_or(())?;
 
             match ns {
-                "jabber:iq:roster" => {
+                Namespace::Roster => {
                     let roster: Roster = stanza.try_into()?;
                     result_observer.didReceiveRoster(roster);
                 }
