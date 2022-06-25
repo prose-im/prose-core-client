@@ -5,11 +5,14 @@
 
 use crate::types::namespace::Namespace;
 use crate::AccountObserver;
+use crate::ChatState;
 use crate::Message;
 use crate::Presence;
 use crate::Roster;
+use crate::ShowKind;
 use jid::BareJid;
 use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
+use std::mem::replace;
 use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -151,10 +154,72 @@ impl Account {
         })
     }
 
-    pub fn send_message(&self, jid: &BareJid, body: &str) {
-        let mut stanza = Stanza::new_message(Some("chat"), None, Some(&jid.to_string()));
+    pub fn send_message(&self, id: &str, to: &BareJid, body: &str, chat_state: Option<ChatState>) {
+        let mut stanza = Stanza::new_message(Some("chat"), Some(id), Some(&to.to_string()));
         stanza.set_body(&body.to_string()).unwrap();
+
+        if let Some(chat_state) = chat_state {
+            let mut chat_state_node = Stanza::new();
+            chat_state_node.set_name(chat_state.to_string()).unwrap();
+            chat_state_node.set_ns(Namespace::ChatStates).unwrap();
+            stanza.add_child(chat_state_node).unwrap();
+        }
+
         self.message_channel.send(stanza).unwrap();
+    }
+
+    pub fn update_message(&self, id: &str, new_id: &str, to: &BareJid, body: &str) {
+        let mut stanza = Stanza::new_message(None, Some(new_id), Some(&to.to_string()));
+        stanza.set_body(&body.to_string()).unwrap();
+
+        let mut replace_node = Stanza::new();
+        replace_node.set_name("replace").unwrap();
+        replace_node.set_id(id).unwrap();
+        replace_node
+            .set_ns(Namespace::LastMessageCorrection)
+            .unwrap();
+        stanza.add_child(replace_node).unwrap();
+
+        self.message_channel.send(stanza).unwrap();
+    }
+
+    pub fn send_chat_state(&self, to: &BareJid, chat_state: ChatState) {
+        let mut stanza = Stanza::new_message(Some("chat"), None, Some(&to.to_string()));
+
+        let mut chat_state_node = Stanza::new();
+        chat_state_node.set_name(chat_state.to_string()).unwrap();
+        chat_state_node.set_ns(Namespace::ChatStates).unwrap();
+        stanza.add_child(chat_state_node).unwrap();
+
+        self.message_channel.send(stanza).unwrap();
+    }
+
+    pub fn send_presence(&self, show: Option<ShowKind>, status: Option<&str>) {
+        let mut presence_stanza = Stanza::new_presence();
+
+        if let Some(show) = show {
+            let mut show_node = Stanza::new();
+            show_node.set_name("show").unwrap();
+
+            let mut text_node = Stanza::new();
+            text_node.set_text(show.to_string()).unwrap();
+            show_node.add_child(text_node).unwrap();
+
+            presence_stanza.add_child(show_node).unwrap();
+        }
+
+        if let Some(status) = status {
+            let mut status_node = Stanza::new();
+            status_node.set_name("status").unwrap();
+
+            let mut text_node = Stanza::new();
+            text_node.set_text(status).unwrap();
+            status_node.add_child(text_node).unwrap();
+
+            presence_stanza.add_child(status_node).unwrap();
+        }
+
+        self.message_channel.send(presence_stanza).unwrap();
     }
 
     pub fn load_roster(&self) {

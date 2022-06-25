@@ -3,7 +3,7 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::ConnectionError;
+use crate::{ChatState, ConnectionError, ShowKind};
 
 use super::account::Account;
 use super::account_observer::AccountObserver;
@@ -39,9 +39,27 @@ impl Client {
         Ok(())
     }
 
-    pub fn sendMessage(&self, receiver_jid: &BareJid, body: &str) {
+    pub fn sendMessage(&self, id: &str, to: &BareJid, body: &str, chat_state: Option<ChatState>) {
         with_account(&self.jid, |account| {
-            account.send_message(&receiver_jid, body);
+            account.send_message(id, to, body, chat_state);
+        });
+    }
+
+    pub fn updateMessage(&self, id: &str, new_id: &str, to: &BareJid, body: &str) {
+        with_account(&self.jid, |account| {
+            account.update_message(id, new_id, to, body);
+        });
+    }
+
+    pub fn sendChatState(&self, to: &BareJid, chat_state: ChatState) {
+        with_account(&self.jid, |account| {
+            account.send_chat_state(to, chat_state);
+        });
+    }
+
+    pub fn sendPresence(&self, show: Option<ShowKind>, status: &Option<String>) {
+        with_account(&self.jid, |account| {
+            account.send_presence(show, status.as_deref());
         });
     }
 

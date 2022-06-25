@@ -15,7 +15,10 @@ interface Client {
   [Throws=ConnectionError]  
   void connect([ByRef] string password, AccountObserver observer);
 
-  void sendMessage([ByRef] BareJid receiver_jid, [ByRef] string body);
+  void sendMessage([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, ChatState? chat_state);
+  void updateMessage([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
+  void sendChatState([ByRef] BareJid to, ChatState chat_state);
+  void sendPresence(ShowKind? show, [ByRef] string? status);
   void loadRoster();
   void sendXMLPayload([ByRef] string xml_string);
 };
