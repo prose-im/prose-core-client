@@ -14,6 +14,7 @@ use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
+use strum_macros::Display;
 
 type ThrowingStanzaHandler =
     Box<dyn FnMut(&Context, &mut Connection, &Stanza) -> Result<bool, ()> + Send>;
@@ -26,13 +27,22 @@ fn to_stanza_handler(mut handler: ThrowingStanzaHandler) -> StanzaHandler {
     })
 }
 
+#[derive(Debug, thiserror::Error, Display)]
+pub enum ConnectionError {
+    Err { description: String },
+}
+
 pub struct Account {
     message_channel: Sender<Stanza>,
     _thread: JoinHandle<()>,
 }
 
 impl Account {
-    pub fn new(jid: &BareJid, password: &str, observer: Arc<Box<dyn AccountObserver>>) -> Account {
+    pub fn new(
+        jid: &BareJid,
+        password: &str,
+        observer: Arc<Box<dyn AccountObserver>>,
+    ) -> Result<Account, ConnectionError> {
         let (tx, rx) = channel::<Stanza>();
 
         let conn_observer = observer.clone();
@@ -124,15 +134,21 @@ impl Account {
         conn.set_pass(password);
         conn.set_flags(ConnectionFlags::TRUST_TLS).unwrap();
 
-        let ctx = conn
-            .connect_client(None, None, conn_handler)
-            .expect("Cannot connect to XMPP server");
-        let thread = Some(thread::Builder::new().spawn(move || ctx.run()).unwrap());
+        let ctx =
+            conn.connect_client(None, None, conn_handler)
+                .map_err(|e| ConnectionError::Err {
+                    description: e.error.to_string(),
+                })?;
+        let thread = thread::Builder::new()
+            .spawn(move || ctx.run())
+            .map_err(|e| ConnectionError::Err {
+                description: e.to_string(),
+            })?;
 
-        Account {
+        Ok(Account {
             message_channel: tx,
-            _thread: thread.unwrap(),
-        }
+            _thread: thread,
+        })
     }
 
     pub fn send_message(&self, jid: &BareJid, body: &str) {

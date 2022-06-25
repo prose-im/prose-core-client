@@ -1,16 +1,23 @@
 namespace ProseCoreClientFFI {
   void enableLogging();
+
+  [Throws=JidParseError]
+  BareJid parseJID([ByRef] string jid);
+
+  string formatJID([ByRef] BareJid jid);
 };
 
 interface Client {
-  constructor();
-  
-  [Throws=LoginError]
-  BareJid connect([ByRef] string jid, [ByRef] string password, AccountObserver observer);
+  constructor(BareJid jid);
 
-  void sendMessage([ByRef] string account_jid, [ByRef] string receiver_jid, [ByRef] string body);
-  void loadRoster([ByRef] string account_jid);
-  void sendXMLPayload([ByRef] string account_jid, [ByRef] string xml_string);
+  BareJid jid();
+
+  [Throws=ConnectionError]  
+  void connect([ByRef] string password, AccountObserver observer);
+
+  void sendMessage([ByRef] BareJid receiver_jid, [ByRef] string body);
+  void loadRoster();
+  void sendXMLPayload([ByRef] string xml_string);
 };
 
 callback interface AccountObserver {
@@ -20,6 +27,19 @@ callback interface AccountObserver {
   void didReceiveMessage(Message message);
   void didReceiveRoster(Roster roster);
   void didReceivePresence(Presence presence);
+};
+
+[Error]
+interface ConnectionError {
+  Err(string description);
+};
+
+[Error]
+enum JidParseError {
+  "NoDomain",
+  "NoResource",
+  "EmptyNode",
+  "EmptyResource",
 };
 
 enum MessageKind {
@@ -47,11 +67,6 @@ dictionary Message {
   ChatState? chat_state;
   string? replace;
   string? error;
-};
-
-[Error]
-enum LoginError {
-  "InvalidJID"
 };
 
 dictionary BareJid {
