@@ -29,7 +29,7 @@ jobs:
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version
 
-      - name: Cache build artifacts
+      - name: Cache build context
         id: cache-cargo
         uses: actions/cache@v2
         with:
