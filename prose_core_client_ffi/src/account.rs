@@ -12,7 +12,6 @@ use crate::Roster;
 use crate::ShowKind;
 use jid::BareJid;
 use libstrophe::{Connection, ConnectionEvent, ConnectionFlags, Context, Stanza};
-use std::mem::replace;
 use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -97,8 +96,10 @@ impl Account {
 
             match ns {
                 Namespace::Roster => {
-                    let roster: Roster = stanza.try_into()?;
-                    result_observer.didReceiveRoster(roster);
+                    if stanza.get_attribute("type") == Some("result") {
+                        let roster: Roster = stanza.try_into()?;
+                        result_observer.didReceiveRoster(roster);
+                    }
                 }
                 _ => (),
             }
