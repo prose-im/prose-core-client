@@ -5,4 +5,8 @@
 
 fn main() {
     uniffi_build::generate_scaffolding("./src/ProseCoreClientFFI.udl").unwrap();
+
+    println!("cargo:rustc-link-lib=dylib=strophe");
+    println!("cargo:rustc-link-lib=dylib=xml2");
+    println!("cargo:rustc-link-lib=dylib=expat");
 }

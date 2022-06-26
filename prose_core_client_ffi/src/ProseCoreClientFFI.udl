@@ -1,15 +1,26 @@
 namespace ProseCoreClientFFI {
   void enableLogging();
+
+  [Throws=JidParseError]
+  BareJid parseJID([ByRef] string jid);
+
+  string formatJID([ByRef] BareJid jid);
 };
 
 interface Client {
-  constructor();
-  
-  [Throws=LoginError]
-  BareJid connect([ByRef] string jid, [ByRef] string password, AccountObserver observer);
+  constructor(BareJid jid);
 
-  void sendMessage([ByRef] string account_jid, [ByRef] string receiver_jid, [ByRef] string body);
-  void loadRoster([ByRef] string account_jid);
+  BareJid jid();
+
+  [Throws=ConnectionError]  
+  void connect([ByRef] string password, AccountObserver observer);
+
+  void sendMessage([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, ChatState? chat_state);
+  void updateMessage([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
+  void sendChatState([ByRef] BareJid to, ChatState chat_state);
+  void sendPresence(ShowKind? show, [ByRef] string? status);
+  void loadRoster();
+  void sendXMLPayload([ByRef] string xml_string);
 };
 
 callback interface AccountObserver {
@@ -18,16 +29,47 @@ callback interface AccountObserver {
   
   void didReceiveMessage(Message message);
   void didReceiveRoster(Roster roster);
+  void didReceivePresence(Presence presence);
+};
+
+[Error]
+interface ConnectionError {
+  Err(string description);
+};
+
+[Error]
+enum JidParseError {
+  "NoDomain",
+  "NoResource",
+  "EmptyNode",
+  "EmptyResource",
+};
+
+enum MessageKind {
+  "Chat", 
+  "Error", 
+  "Groupchat", 
+  "Headline", 
+  "Normal",
+};
+
+enum ChatState {
+  "Active", 
+  "Composing", 
+  "Gone", 
+  "Inactive", 
+  "Paused",
 };
 
 dictionary Message {
   BareJid from;
-  string body;
-};
-
-[Error]
-enum LoginError {
-  "InvalidJID"
+  BareJid? to;
+  string? id;
+  MessageKind? kind;
+  string? body;
+  ChatState? chat_state;
+  string? replace;
+  string? error;
 };
 
 dictionary BareJid {
@@ -54,4 +96,29 @@ enum RosterItemSubscription {
 dictionary RosterItem {
   BareJid jid;
   RosterItemSubscription subscription;
+};
+
+enum PresenceKind {
+  "Unavailable", 
+  "Subscribe", 
+  "Subscribed", 
+  "Unsubscribe", 
+  "Unsubscribed", 
+  "Probe", 
+  "Error",
+};
+
+enum ShowKind {
+  "Away",
+  "Chat", 
+  "DND",
+  "XA",
+};
+
+dictionary Presence {
+  PresenceKind? kind;
+  BareJid? from;
+  BareJid? to;
+  ShowKind? show;
+  string? status;
 };
