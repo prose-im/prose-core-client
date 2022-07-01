@@ -1,9 +1,9 @@
+use crate::error::{Error, StanzaParseError};
+use jid::BareJid;
+use libstrophe::Stanza;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
-
-use jid::BareJid;
-use libstrophe::Stanza;
 
 use super::namespace::Namespace;
 
@@ -82,13 +82,14 @@ pub struct Message {
 }
 
 impl TryFrom<&Stanza> for Message {
+    type Error = Error;
+
     fn try_from(stanza: &Stanza) -> Result<Self, Self::Error> {
         Ok(Message {
             from: stanza
                 .from()
-                .map(BareJid::from_str)
-                .ok_or(())?
-                .map_err(|_| ())?,
+                .ok_or(StanzaParseError::missing_attribute("from", stanza))
+                .and_then(|str| BareJid::from_str(str).map_err(Into::into))?,
             to: stanza
                 .get_attribute("to")
                 .and_then(|s| BareJid::from_str(s).ok()),
@@ -106,11 +107,11 @@ impl TryFrom<&Stanza> for Message {
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
     }
-
-    type Error = ();
 }
 
 impl TryFrom<&Stanza> for ChatState {
+    type Error = ();
+
     fn try_from(stanza: &Stanza) -> Result<Self, Self::Error> {
         for state in ChatState::iter() {
             if stanza
@@ -122,7 +123,6 @@ impl TryFrom<&Stanza> for ChatState {
         }
         Err(())
     }
-    type Error = ();
 }
 
 #[cfg(test)]

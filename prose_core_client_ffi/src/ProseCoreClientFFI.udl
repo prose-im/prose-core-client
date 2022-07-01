@@ -1,7 +1,7 @@
 namespace ProseCoreClientFFI {
   void enableLogging();
 
-  [Throws=JidParseError]
+  [Throws=ProseError]
   BareJid parseJID([ByRef] string jid);
 
   string formatJID([ByRef] BareJid jid);
@@ -12,14 +12,25 @@ interface Client {
 
   BareJid jid();
 
-  [Throws=ConnectionError]  
+  [Throws=ProseError]
   void connect([ByRef] string password, AccountObserver observer);
 
+  [Throws=ProseError]
   void sendMessage([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, ChatState? chat_state);
+
+  [Throws=ProseError]
   void updateMessage([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
+
+  [Throws=ProseError]
   void sendChatState([ByRef] BareJid to, ChatState chat_state);
+
+  [Throws=ProseError]
   void sendPresence(ShowKind? show, [ByRef] string? status);
+
+  [Throws=ProseError]
   void loadRoster();
+
+  [Throws=ProseError]
   void sendXMLPayload([ByRef] string xml_string);
 };
 
@@ -33,16 +44,40 @@ callback interface AccountObserver {
 };
 
 [Error]
-interface ConnectionError {
-  Err(string description);
-};
-
-[Error]
 enum JidParseError {
   "NoDomain",
   "NoResource",
   "EmptyNode",
   "EmptyResource",
+};
+
+[Error]
+enum LibStropheError {
+  "MemoryError",
+  "InvalidOperation",
+  "InternalError",
+};
+
+[Error]
+interface StanzaParseError {
+  MissingAttribute(string attribute);
+  MissingChildNode(string node);
+  ParseError(string error);
+  JidParseError(JidParseError error);
+};
+
+[Error]
+interface ProseError {
+  JidParseError(JidParseError error);
+  StropheError(LibStropheError error);
+  ConnectClientError(LibStropheError error);
+  ConnectionError(string error);
+  BorrowMutError(string error);
+  PoisonError(string error);
+  StanzaParseError(StanzaParseError error);
+  SendError(string error);
+  IOError(string error);
+  ToTextError(string error);
 };
 
 enum MessageKind {

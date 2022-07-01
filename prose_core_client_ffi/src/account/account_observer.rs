@@ -5,7 +5,7 @@
 
 use crate::{Presence, Roster};
 
-use super::types::message::Message;
+use crate::Message;
 
 #[allow(non_snake_case)]
 pub trait AccountObserver: Send + Sync {
