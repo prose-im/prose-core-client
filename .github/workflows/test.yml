@@ -43,7 +43,7 @@ jobs:
         run: cargo build
 
       - name: Test code
-        run: cargo test
+        run: cargo test --features="test-helpers"
 
       - name: Check code style
         run: cargo fmt -- --check
