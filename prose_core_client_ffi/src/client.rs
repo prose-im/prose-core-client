@@ -72,6 +72,51 @@ impl Client {
         with_account(&self.jid, |account| account.roster.load_roster())
     }
 
+    pub fn add_user(
+        &self,
+        jid: &BareJid,
+        nickname: &Option<String>,
+        groups: &Vec<String>,
+    ) -> Result<()> {
+        with_account(&self.jid, |account| {
+            account.roster.add_user(jid, nickname.as_deref(), groups)
+        })
+    }
+
+    pub fn remove_user_and_unsubscribe_from_presence(&self, jid: &BareJid) -> Result<()> {
+        with_account(&self.jid, |account| {
+            account
+                .roster
+                .remove_user_and_unsubscribe_from_presence(jid)
+        })
+    }
+
+    pub fn subscribe_to_user_presence(&self, jid: &BareJid) -> Result<()> {
+        with_account(&self.jid, |account| {
+            account.roster.subscribe_to_user_presence(jid)
+        })
+    }
+
+    pub fn unsubscribe_from_user_presence(&self, jid: &BareJid) -> Result<()> {
+        with_account(&self.jid, |account| {
+            account.roster.unsubscribe_from_user_presence(jid)
+        })
+    }
+
+    pub fn grant_presence_permission_to_user(&self, jid: &BareJid) -> Result<()> {
+        with_account(&self.jid, |account| {
+            account.roster.grant_presence_permission_to_user(jid)
+        })
+    }
+
+    pub fn revoke_or_reject_presence_permission_from_user(&self, jid: &BareJid) -> Result<()> {
+        with_account(&self.jid, |account| {
+            account
+                .roster
+                .revoke_or_reject_presence_permission_from_user(jid)
+        })
+    }
+
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {
         with_account(&self.jid, |account| account.debug.send_xml_payload(xml_str))
     }

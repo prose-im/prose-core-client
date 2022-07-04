@@ -5,6 +5,7 @@
 
 use crate::{Presence, Roster};
 
+use jid::BareJid;
 #[cfg(feature = "test-helpers")]
 use std::sync::{Arc, Mutex};
 
@@ -18,6 +19,7 @@ pub trait AccountObserver: Send + Sync {
     fn did_receive_message(&self, message: Message);
     fn did_receive_roster(&self, roster: Roster);
     fn did_receive_presence(&self, presence: Presence);
+    fn did_receive_presence_subscription_request(&self, from: BareJid);
 }
 
 #[cfg(feature = "test-helpers")]
@@ -37,6 +39,11 @@ impl<'mock> AccountObserver for Arc<Mutex<AccountObserverMock<'mock>>> {
     }
     fn did_receive_presence(&self, presence: Presence) {
         self.lock().unwrap().did_receive_presence(presence);
+    }
+    fn did_receive_presence_subscription_request(&self, from: BareJid) {
+        self.lock()
+            .unwrap()
+            .did_receive_presence_subscription_request(from);
     }
 }
 

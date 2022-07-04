@@ -1,12 +1,46 @@
 use crate::account::IDProvider;
 use crate::{
-    AccountObserver, ConnectionEvent, ConnectionHandler, Message, Presence, Result, Roster,
-    StanzaHandler, XMPPConnection, XMPPSender,
+    Account, AccountObserverMock, ConnectionEvent, ConnectionHandler, Result, StanzaHandler,
+    XMPPConnection, XMPPSender,
 };
 use libstrophe::Stanza;
 use std::cell::{Cell, RefCell};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
+impl Account {
+    pub fn connected() -> (
+        Self,
+        Rc<RefCell<HandlerBucket>>,
+        Rc<StanzaBucket>,
+        Arc<Mutex<AccountObserverMock<'static>>>,
+    ) {
+        let handlers = HandlerBucket::new();
+        let stanzas = StanzaBucket::new();
+        let observer = Arc::new(Mutex::new(AccountObserverMock::new()));
+
+        let account = Account::new(
+            MockConnection::new(handlers.clone(), stanzas.clone()),
+            MockIDProvider::new(),
+            Box::new(observer.clone()),
+        )
+        .unwrap();
+
+        observer
+            .lock()
+            .unwrap()
+            .expect_did_connect()
+            .times(1)
+            .returns(());
+
+        handlers.send_connection_event(ConnectionEvent::Connect);
+
+        stanzas.clear();
+
+        (account, handlers, stanzas, observer)
+    }
+}
 
 pub struct HandlerBucket {
     connection_handler: Option<ConnectionHandler>,
@@ -111,22 +145,6 @@ impl XMPPSender for MockSender {
     }
 }
 unsafe impl Send for MockSender {}
-
-pub struct MockAccountObserver {}
-
-impl MockAccountObserver {
-    pub fn new() -> Box<Self> {
-        Box::new(MockAccountObserver {})
-    }
-}
-
-impl AccountObserver for MockAccountObserver {
-    fn did_connect(&self) {}
-    fn did_disconnect(&self) {}
-    fn did_receive_message(&self, _message: Message) {}
-    fn did_receive_roster(&self, _roster: Roster) {}
-    fn did_receive_presence(&self, _presence: Presence) {}
-}
 
 pub struct MockIDProvider {
     last_id: Rc<Cell<u64>>,

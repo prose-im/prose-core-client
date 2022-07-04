@@ -31,6 +31,24 @@ interface Client {
   void load_roster();
 
   [Throws=ProseError]
+  void add_user([ByRef] BareJid jid, [ByRef] string? nickname, [ByRef] sequence<string> groups);
+
+  [Throws=ProseError]
+  void remove_user_and_unsubscribe_from_presence([ByRef] BareJid jid);
+
+  [Throws=ProseError]
+  void subscribe_to_user_presence([ByRef] BareJid jid);
+
+  [Throws=ProseError]
+  void unsubscribe_from_user_presence([ByRef] BareJid jid);
+
+  [Throws=ProseError]
+  void grant_presence_permission_to_user([ByRef] BareJid jid);
+
+  [Throws=ProseError]
+  void revoke_or_reject_presence_permission_from_user([ByRef] BareJid jid);
+
+  [Throws=ProseError]
   void send_xml_payload([ByRef] string xml_string);
 };
 
@@ -41,6 +59,7 @@ callback interface AccountObserver {
   void did_receive_message(Message message);
   void did_receive_roster(Roster roster);
   void did_receive_presence(Presence presence);
+  void did_receive_presence_subscription_request(BareJid from);
 };
 
 [Error]

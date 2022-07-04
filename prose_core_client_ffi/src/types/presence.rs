@@ -45,6 +45,24 @@ pub struct Presence {
     pub status: Option<String>,
 }
 
+impl Presence {
+    pub fn new(
+        kind: Option<PresenceKind>,
+        from: Option<BareJid>,
+        to: Option<BareJid>,
+        show: Option<ShowKind>,
+        status: Option<String>,
+    ) -> Self {
+        Presence {
+            kind,
+            from,
+            to,
+            show,
+            status,
+        }
+    }
+}
+
 impl TryFrom<&Stanza> for Presence {
     type Error = Error;
 
