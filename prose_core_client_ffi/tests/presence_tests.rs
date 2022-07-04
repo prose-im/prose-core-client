@@ -1,4 +1,4 @@
-use prose_core_client_ffi::test_helpers::mocks::MockIDProvider;
+use prose_core_client_ffi::test_helpers::mocks::{HandlerBucketExt, MockIDProvider};
 use prose_core_client_ffi::{
     test_helpers::mocks::{HandlerBucket, MockAccountObserver, MockConnection, StanzaBucket},
     Account, ConnectionEvent, Result,
@@ -14,9 +14,7 @@ fn test_sends_empty_presence_on_connect() -> Result<()> {
         MockAccountObserver::new(),
     );
 
-    handlers
-        .borrow_mut()
-        .send_connection_event(ConnectionEvent::Connect);
+    handlers.send_connection_event(ConnectionEvent::Connect);
 
     assert_eq!(stanzas.stanzas.borrow().len(), 1);
     assert_eq!(

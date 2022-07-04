@@ -15,19 +15,20 @@ crate-type = ["staticlib", "rlib"]
 name = "prose_core_client_ffi"
 
 [dependencies]
-jid = { version = "0.9", default-features = false }
+jid = {version = "0.9", default-features = false}
 uniffi_macros = "0.18"
 uniffi = {version = "0.18", features=["builtin-bindgen"]}
 thiserror = "1.0"
 once_cell = "1.12.0"
 libstrophe = "0.16"
-log = { version = "0.4", features = ["std"] }
+log = {version = "0.4", features = ["std"]}
 strum = "0.24"
 strum_macros = "0.24"
 uuid = {version = "1.1.2", features=["v4", "fast-rng", "macro-diagnostics"]}
+mockiato = {version = "0.9.5", optional = true}
 
 [build-dependencies]
 uniffi_build = {version = "0.18", features=["builtin-bindgen"]}
 
 [features]
-test-helpers = []
+test-helpers = ["mockiato"]

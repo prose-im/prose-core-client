@@ -67,6 +67,7 @@ impl TryFrom<&Stanza> for Roster {
                 .ok_or(StanzaParseError::missing_attribute("jid", stanza))?;
             let sub = item
                 .get_attribute("subscription")
+                .or(Some(&RosterItemSubscription::None.to_string()))
                 .ok_or(StanzaParseError::missing_attribute("subscription", stanza))
                 .and_then(|s| s.parse::<RosterItemSubscription>().map_err(Into::into));
             let item = RosterItem {
@@ -149,6 +150,45 @@ mod tests {
                             subscription: RosterItemSubscription::Both
                         }
                     ]
+                }]
+            }
+        );
+    }
+
+    #[test]
+    fn test_empty_roster() {
+        let roster = r#"
+        <iq id='bv1bs71f' to='juliet@example.com/chamber' type='result'>
+            <query xmlns='jabber:iq:roster' ver='ver9'/>
+        </iq>
+        "#;
+
+        let stanza = Stanza::from_str(roster);
+        let roster = Roster::try_from(&stanza).unwrap();
+
+        assert_eq!(roster, Roster { groups: vec![] });
+    }
+
+    #[test]
+    fn test_missing_subscription_attribute() {
+        let roster = r#"
+        <iq type="result">
+            <query xmlns='jabber:iq:roster' ver='ver7'><item jid="a@prose.org"/></query>
+        </iq>
+        "#;
+
+        let stanza = Stanza::from_str(roster);
+        let roster = Roster::try_from(&stanza).unwrap();
+
+        assert_eq!(
+            roster,
+            Roster {
+                groups: vec![RosterGroup {
+                    name: DEFAULT_GROUP_NAME.to_string(),
+                    items: vec![RosterItem {
+                        jid: BareJid::from_str("a@prose.org").unwrap(),
+                        subscription: RosterItemSubscription::None
+                    }]
                 }]
             }
         );

@@ -28,6 +28,9 @@ pub use connection::{
     ConnectionEvent, ConnectionHandler, StanzaHandler, XMPPConnection, XMPPSender,
 };
 
+#[cfg(feature = "test-helpers")]
+pub use account::AccountObserverMock;
+
 pub fn parse_jid(jid_str: &str) -> Result<BareJid, JidParseError> {
     jid_str.parse::<BareJid>()
 }

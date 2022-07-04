@@ -5,6 +5,9 @@ pub use account::Account;
 pub use account_observer::AccountObserver;
 use uuid::Uuid;
 
+#[cfg(feature = "test-helpers")]
+pub use account_observer::AccountObserverMock;
+
 pub trait IDProvider: Send + Sync {
     fn new_id(&self) -> String;
 }

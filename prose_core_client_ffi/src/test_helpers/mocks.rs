@@ -4,7 +4,8 @@ use crate::{
     StanzaHandler, XMPPConnection, XMPPSender,
 };
 use libstrophe::Stanza;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 pub struct HandlerBucket {
@@ -19,22 +20,32 @@ impl HandlerBucket {
             stanza_handler: None,
         }))
     }
+}
 
-    pub fn send_connection_event(&mut self, event: ConnectionEvent) {
-        let handler = self
+pub trait HandlerBucketExt {
+    fn send_connection_event(&self, event: ConnectionEvent);
+    fn send_stanza_str(&self, stanza_str: &str);
+}
+
+impl HandlerBucketExt for Rc<RefCell<HandlerBucket>> {
+    fn send_connection_event(&self, event: ConnectionEvent) {
+        let mut bucket = self.deref().borrow_mut();
+        let handler = bucket
+            .deref_mut()
             .connection_handler
             .as_mut()
             .expect("Connection Handler not set.");
         handler(&event);
     }
 
-    pub fn send_stanza_str(&mut self, stanza_str: &str) {
-        let handler = self
+    fn send_stanza_str(&self, stanza_str: &str) {
+        let mut bucket = self.deref().borrow_mut();
+        let handler = bucket
+            .deref_mut()
             .stanza_handler
             .as_mut()
             .expect("Stanza Handler not set.");
-        let stanza = Stanza::from_str(stanza_str);
-        handler(&stanza);
+        handler(&Stanza::from_str(stanza_str));
     }
 }
 
@@ -47,6 +58,10 @@ impl StanzaBucket {
         Rc::new(StanzaBucket {
             stanzas: RefCell::new(vec![]),
         })
+    }
+
+    pub fn clear(&self) {
+        self.stanzas.borrow_mut().clear();
     }
 }
 
@@ -75,11 +90,13 @@ impl XMPPConnection for MockConnection {
     }
 
     fn set_connection_handler(&mut self, handler: ConnectionHandler) {
-        self.handler_bucket.borrow_mut().connection_handler = Some(handler);
+        let mut bucket = self.handler_bucket.deref().borrow_mut();
+        bucket.connection_handler = Some(handler);
     }
 
     fn set_stanza_handler(&mut self, handler: StanzaHandler) {
-        self.handler_bucket.borrow_mut().stanza_handler = Some(handler);
+        let mut bucket = self.handler_bucket.deref().borrow_mut();
+        bucket.stanza_handler = Some(handler);
     }
 }
 
