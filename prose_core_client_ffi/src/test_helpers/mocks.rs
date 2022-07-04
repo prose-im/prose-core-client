@@ -1,3 +1,4 @@
+use crate::account::IDProvider;
 use crate::{
     AccountObserver, ConnectionEvent, ConnectionHandler, Message, Presence, Result, Roster,
     StanzaHandler, XMPPConnection, XMPPSender,
@@ -109,4 +110,25 @@ impl AccountObserver for MockAccountObserver {
     fn did_receive_roster(&self, _roster: Roster) {}
     fn did_receive_presence(&self, _presence: Presence) {}
 }
+
+pub struct MockIDProvider {
+    last_id: Rc<Cell<u64>>,
 }
+
+impl MockIDProvider {
+    pub fn new() -> Box<Self> {
+        Box::new(MockIDProvider {
+            last_id: Rc::new(Cell::new(0)),
+        })
+    }
+}
+
+impl IDProvider for MockIDProvider {
+    fn new_id(&self) -> String {
+        self.last_id.set(self.last_id.get() + 1);
+        format!("id_{}", self.last_id.get())
+    }
+}
+
+unsafe impl Send for MockIDProvider {}
+unsafe impl Sync for MockIDProvider {}

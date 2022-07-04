@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use super::error::Result;
-use crate::account::{Account, AccountObserver};
+use crate::account::{Account, AccountObserver, UUIDProvider};
 use crate::connection::LibstropheConnection;
 use crate::{ChatState, ShowKind};
 
@@ -29,7 +29,11 @@ impl Client {
 
     pub fn connect(&self, password: &str, observer: Box<dyn AccountObserver>) -> Result<()> {
         let connection = LibstropheConnection::new(&self.jid, password);
-        let account = Account::new(Box::new(connection), observer)?;
+        let account = Account::new(
+            Box::new(connection),
+            Box::new(UUIDProvider::new()),
+            observer,
+        )?;
         ACCOUNTS.lock()?.insert(self.jid.clone(), account);
         Ok(())
     }

@@ -1,4 +1,4 @@
-use crate::account::AccountObserver;
+use crate::account::{AccountObserver, IDProvider};
 use crate::connection::{ConnectionEvent, XMPPConnection, XMPPSender};
 use crate::error::Result;
 use crate::extensions::{Chat, Debug, Presence, Roster};
@@ -17,12 +17,14 @@ pub struct Account {
 impl Account {
     pub fn new(
         connection: Box<dyn XMPPConnection>,
+        id_provider: Box<dyn IDProvider>,
         observer: Box<dyn AccountObserver>,
     ) -> Result<Account> {
         let mut connection = connection;
 
         let ctx = Arc::new(XMPPExtensionContext::new(
             Box::new(PlaceholderSender { sender: None }),
+            id_provider,
             observer,
         ));
 

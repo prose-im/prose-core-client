@@ -5,7 +5,6 @@ use crate::types;
 use crate::types::namespace::Namespace;
 use libstrophe::Stanza;
 use std::sync::{Arc, Mutex};
-use uuid::Uuid;
 
 pub struct Roster {
     ctx: Arc<XMPPExtensionContext>,
@@ -36,15 +35,15 @@ impl XMPPExtension for Roster {
 
 impl Roster {
     pub fn load_roster(&self) -> Result<()> {
-        let mut query = Stanza::new();
-        query.set_name("query")?;
-        query.set_ns(Namespace::Roster)?;
-
-        let id = Uuid::new_v4().to_string();
-
-        let mut iq_stanza = Stanza::new_iq(Some("get"), Some(&id));
-        iq_stanza.add_child(query)?;
-
+        let mut iq_stanza = Stanza::new_iq(Some("get"), Some(&self.ctx.generate_id()));
+        iq_stanza.add_child(Stanza::new_query(Namespace::Roster)?)?;
         self.ctx.send_stanza(iq_stanza)
     }
+
+    // pub fn add_user(&self, nickname: Option<&str>, groups: &[&str]) -> Result<()> {
+    //     let id = Uuid::new_v4().to_string();
+    //     let mut iq_stanza = Stanza::new_iq(Some("set"), Some(&id));
+    //     let query = Stanza::new_query(Namespace::Roster)?;
+    //
+    // }
 }

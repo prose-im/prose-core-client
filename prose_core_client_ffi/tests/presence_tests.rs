@@ -1,3 +1,4 @@
+use prose_core_client_ffi::test_helpers::mocks::MockIDProvider;
 use prose_core_client_ffi::{
     test_helpers::mocks::{HandlerBucket, MockAccountObserver, MockConnection, StanzaBucket},
     Account, ConnectionEvent, Result,
@@ -9,6 +10,7 @@ fn test_sends_empty_presence_on_connect() -> Result<()> {
     let stanzas = StanzaBucket::new();
     let _account = Account::new(
         MockConnection::new(handlers.clone(), stanzas.clone()),
+        MockIDProvider::new(),
         MockAccountObserver::new(),
     );
 

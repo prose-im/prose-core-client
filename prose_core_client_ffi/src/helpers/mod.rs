@@ -1,3 +1,4 @@
+use crate::error::Result;
 use libstrophe::Stanza;
 
 pub(crate) trait StanzaExt {
@@ -5,6 +6,7 @@ pub(crate) trait StanzaExt {
     /// any of it's immediate children (this allows you do handle specific <iq/> stanzas based on
     /// the <query/> child namespace.
     fn has_namespace(&self, ns: &str) -> bool;
+    fn new_query(ns: &str) -> Result<Stanza>;
 }
 
 impl StanzaExt for Stanza {
@@ -18,5 +20,12 @@ impl StanzaExt for Stanza {
             }
         }
         false
+    }
+
+    fn new_query(ns: &str) -> Result<Self> {
+        let mut query = Stanza::new();
+        query.set_name("query")?;
+        query.set_ns(ns)?;
+        return Ok(query);
     }
 }
