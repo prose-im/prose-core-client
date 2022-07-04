@@ -18,7 +18,6 @@ pub struct Client {
     jid: BareJid,
 }
 
-#[allow(non_snake_case)]
 impl Client {
     pub fn new(jid: BareJid) -> Self {
         Client { jid }
@@ -35,7 +34,7 @@ impl Client {
         Ok(())
     }
 
-    pub fn sendMessage(
+    pub fn send_message(
         &self,
         id: &str,
         to: &BareJid,
@@ -47,29 +46,29 @@ impl Client {
         })
     }
 
-    pub fn updateMessage(&self, id: &str, new_id: &str, to: &BareJid, body: &str) -> Result<()> {
+    pub fn update_message(&self, id: &str, new_id: &str, to: &BareJid, body: &str) -> Result<()> {
         with_account(&self.jid, |account| {
             account.chat.update_message(id, new_id, to, body)
         })
     }
 
-    pub fn sendChatState(&self, to: &BareJid, chat_state: ChatState) -> Result<()> {
+    pub fn send_chat_state(&self, to: &BareJid, chat_state: ChatState) -> Result<()> {
         with_account(&self.jid, |account| {
             account.chat.send_chat_state(to, chat_state)
         })
     }
 
-    pub fn sendPresence(&self, show: Option<ShowKind>, status: &Option<String>) -> Result<()> {
+    pub fn send_presence(&self, show: Option<ShowKind>, status: &Option<String>) -> Result<()> {
         with_account(&self.jid, |account| {
             account.presence.send_presence(show, status.as_deref())
         })
     }
 
-    pub fn loadRoster(&self) -> Result<()> {
+    pub fn load_roster(&self) -> Result<()> {
         with_account(&self.jid, |account| account.roster.load_roster())
     }
 
-    pub fn sendXMLPayload(&self, xml_str: &str) -> Result<()> {
+    pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {
         with_account(&self.jid, |account| account.debug.send_xml_payload(xml_str))
     }
 }

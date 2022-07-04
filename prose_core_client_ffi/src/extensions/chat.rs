@@ -19,7 +19,7 @@ impl Chat {
 impl XMPPExtension for Chat {
     fn handle_message_stanza(&self, stanza: &Stanza) -> Result<()> {
         let message: Message = stanza.try_into()?;
-        self.ctx.observer.didReceiveMessage(message);
+        self.ctx.observer.did_receive_message(message);
         Ok(())
     }
 }

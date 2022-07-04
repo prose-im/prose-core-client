@@ -55,11 +55,11 @@ impl Account {
         connection.set_connection_handler(Box::new(move |event: &ConnectionEvent| match event {
             ConnectionEvent::Connect => {
                 for_each(&ec, |e| e.handle_connect());
-                ctxc.observer.didConnect();
+                ctxc.observer.did_connect();
             }
             ConnectionEvent::Disconnect(_) => {
                 for_each(&ec, |e| e.handle_disconnect());
-                ctxc.observer.didDisconnect();
+                ctxc.observer.did_disconnect();
             }
         }));
 

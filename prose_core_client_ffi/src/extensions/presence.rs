@@ -27,7 +27,7 @@ impl XMPPExtension for Presence {
 
     fn handle_presence_stanza(&self, stanza: &Stanza) -> Result<()> {
         let presence: types::presence::Presence = stanza.try_into()?;
-        self.ctx.observer.didReceivePresence(presence);
+        self.ctx.observer.did_receive_presence(presence);
         Ok(())
     }
 }

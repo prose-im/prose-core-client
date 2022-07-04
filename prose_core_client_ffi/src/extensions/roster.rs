@@ -29,7 +29,7 @@ impl XMPPExtension for Roster {
         let updated_roster: types::roster::Roster = stanza.try_into()?;
         let mut roster = self.roster.lock()?;
         *roster = updated_roster;
-        self.ctx.observer.didReceiveRoster(roster.clone());
+        self.ctx.observer.did_receive_roster(roster.clone());
         Ok(())
     }
 }

@@ -102,11 +102,11 @@ impl MockAccountObserver {
     }
 }
 
-#[allow(non_snake_case)]
 impl AccountObserver for MockAccountObserver {
-    fn didConnect(&self) {}
-    fn didDisconnect(&self) {}
-    fn didReceiveMessage(&self, _message: Message) {}
-    fn didReceiveRoster(&self, _roster: Roster) {}
-    fn didReceivePresence(&self, _presence: Presence) {}
+    fn did_connect(&self) {}
+    fn did_disconnect(&self) {}
+    fn did_receive_message(&self, _message: Message) {}
+    fn did_receive_roster(&self, _roster: Roster) {}
+    fn did_receive_presence(&self, _presence: Presence) {}
+}
 }

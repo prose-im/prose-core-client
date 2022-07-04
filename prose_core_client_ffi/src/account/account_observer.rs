@@ -7,12 +7,11 @@ use crate::{Presence, Roster};
 
 use crate::Message;
 
-#[allow(non_snake_case)]
 pub trait AccountObserver: Send + Sync {
-    fn didConnect(&self);
-    fn didDisconnect(&self);
+    fn did_connect(&self);
+    fn did_disconnect(&self);
 
-    fn didReceiveMessage(&self, message: Message);
-    fn didReceiveRoster(&self, roster: Roster);
-    fn didReceivePresence(&self, presence: Presence);
+    fn did_receive_message(&self, message: Message);
+    fn did_receive_roster(&self, roster: Roster);
+    fn did_receive_presence(&self, presence: Presence);
 }

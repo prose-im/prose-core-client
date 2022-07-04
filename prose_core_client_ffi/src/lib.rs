@@ -19,7 +19,7 @@ pub use client::Client;
 pub use error::{Error as ProseError, Result, StanzaParseError};
 pub use jid::{BareJid, JidParseError};
 pub use libstrophe::Error as LibStropheError;
-pub use logger::enableLogging;
+pub use logger::enable_logging;
 pub use types::message::{ChatState, Message, MessageKind};
 pub use types::presence::{Presence, PresenceKind, ShowKind};
 pub use types::roster::{Roster, RosterGroup, RosterItem, RosterItemSubscription};
@@ -28,13 +28,11 @@ pub use connection::{
     ConnectionEvent, ConnectionHandler, StanzaHandler, XMPPConnection, XMPPSender,
 };
 
-#[allow(non_snake_case)]
-pub fn parseJID(jid_str: &str) -> Result<BareJid, JidParseError> {
+pub fn parse_jid(jid_str: &str) -> Result<BareJid, JidParseError> {
     jid_str.parse::<BareJid>()
 }
 
-#[allow(non_snake_case)]
-pub fn formatJID(jid: &BareJid) -> String {
+pub fn format_jid(jid: &BareJid) -> String {
     jid.to_string()
 }
 

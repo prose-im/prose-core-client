@@ -1,10 +1,10 @@
 namespace ProseCoreClientFFI {
-  void enableLogging();
+  void enable_logging();
 
   [Throws=ProseError]
-  BareJid parseJID([ByRef] string jid);
+  BareJid parse_jid([ByRef] string jid);
 
-  string formatJID([ByRef] BareJid jid);
+  string format_jid([ByRef] BareJid jid);
 };
 
 interface Client {
@@ -16,31 +16,31 @@ interface Client {
   void connect([ByRef] string password, AccountObserver observer);
 
   [Throws=ProseError]
-  void sendMessage([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, ChatState? chat_state);
+  void send_message([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, ChatState? chat_state);
 
   [Throws=ProseError]
-  void updateMessage([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
+  void update_message([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
 
   [Throws=ProseError]
-  void sendChatState([ByRef] BareJid to, ChatState chat_state);
+  void send_chat_state([ByRef] BareJid to, ChatState chat_state);
 
   [Throws=ProseError]
-  void sendPresence(ShowKind? show, [ByRef] string? status);
+  void send_presence(ShowKind? show, [ByRef] string? status);
 
   [Throws=ProseError]
-  void loadRoster();
+  void load_roster();
 
   [Throws=ProseError]
-  void sendXMLPayload([ByRef] string xml_string);
+  void send_xml_payload([ByRef] string xml_string);
 };
 
 callback interface AccountObserver {
-  void didConnect();
-  void didDisconnect();
+  void did_connect();
+  void did_disconnect();
   
-  void didReceiveMessage(Message message);
-  void didReceiveRoster(Roster roster);
-  void didReceivePresence(Presence presence);
+  void did_receive_message(Message message);
+  void did_receive_roster(Roster roster);
+  void did_receive_presence(Presence presence);
 };
 
 [Error]
