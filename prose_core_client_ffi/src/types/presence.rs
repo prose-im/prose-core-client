@@ -1,8 +1,8 @@
-use std::str::FromStr;
-use strum_macros::{Display, EnumString};
-
+use crate::error::Error;
 use jid::BareJid;
 use libstrophe::Stanza;
+use std::str::FromStr;
+use strum_macros::{Display, EnumString};
 
 #[derive(Debug, PartialEq, Display, EnumString)]
 #[strum(serialize_all = "lowercase")]
@@ -46,6 +46,8 @@ pub struct Presence {
 }
 
 impl TryFrom<&Stanza> for Presence {
+    type Error = Error;
+
     fn try_from(stanza: &Stanza) -> Result<Self, Self::Error> {
         Ok(Presence {
             kind: stanza
@@ -65,8 +67,6 @@ impl TryFrom<&Stanza> for Presence {
             status: stanza.get_child_by_name("status").and_then(|n| n.text()),
         })
     }
-
-    type Error = ();
 }
 
 #[cfg(test)]

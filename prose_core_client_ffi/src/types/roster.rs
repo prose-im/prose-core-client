@@ -3,6 +3,7 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::error::{Error, StanzaParseError};
 use jid::BareJid;
 use libstrophe::Stanza;
 use std::str::FromStr;
@@ -11,12 +12,12 @@ use strum_macros::{Display, EnumString};
 
 const DEFAULT_GROUP_NAME: &str = "_default_group_";
 
-#[derive(Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct Roster {
     pub groups: Vec<RosterGroup>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RosterGroup {
     pub name: String,
     pub items: Vec<RosterItem>,
@@ -25,13 +26,13 @@ pub struct RosterGroup {
 impl RosterGroup {
     fn new(name: String) -> Self {
         RosterGroup {
-            name: name,
+            name,
             items: Vec::new(),
         }
     }
 }
 
-#[derive(Debug, PartialEq, Display, EnumString)]
+#[derive(Debug, PartialEq, Display, EnumString, Clone)]
 #[strum(serialize_all = "lowercase")]
 pub enum RosterItemSubscription {
     None,
@@ -40,15 +41,19 @@ pub enum RosterItemSubscription {
     Both,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct RosterItem {
     pub jid: BareJid,
     pub subscription: RosterItemSubscription,
 }
 
 impl TryFrom<&Stanza> for Roster {
+    type Error = Error;
+
     fn try_from(stanza: &Stanza) -> Result<Self, Self::Error> {
-        let query = stanza.get_child_by_name("query").ok_or(())?;
+        let query = stanza
+            .get_child_by_name("query")
+            .ok_or(StanzaParseError::missing_child_node("query", stanza))?;
         let mut groups: HashMap<String, RosterGroup> = HashMap::new();
 
         for item in query.children() {
@@ -59,12 +64,11 @@ impl TryFrom<&Stanza> for Roster {
             let jid = item
                 .get_attribute("jid")
                 .map(BareJid::from_str)
-                .ok_or(())?
-                .map_err(|_| ());
+                .ok_or(StanzaParseError::missing_attribute("jid", stanza))?;
             let sub = item
                 .get_attribute("subscription")
-                .ok_or(())
-                .and_then(|s| s.parse::<RosterItemSubscription>().map_err(|_| ()));
+                .ok_or(StanzaParseError::missing_attribute("subscription", stanza))
+                .and_then(|s| s.parse::<RosterItemSubscription>().map_err(Into::into));
             let item = RosterItem {
                 jid: jid?,
                 subscription: sub?,
@@ -80,8 +84,6 @@ impl TryFrom<&Stanza> for Roster {
             groups: groups.into_values().collect(),
         })
     }
-
-    type Error = ();
 }
 
 #[cfg(test)]

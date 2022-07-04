@@ -2,21 +2,31 @@
 //
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
-
 mod account;
-mod account_observer;
 mod client;
+mod connection;
+mod error;
+mod extensions;
+mod helpers;
 mod logger;
 mod types;
 
-pub use account::ConnectionError;
-pub use account_observer::AccountObserver;
+#[cfg(feature = "test-helpers")]
+pub mod test_helpers;
+
+pub use account::{Account, AccountObserver};
 pub use client::Client;
+pub use error::{Error as ProseError, Result, StanzaParseError};
 pub use jid::{BareJid, JidParseError};
+pub use libstrophe::Error as LibStropheError;
 pub use logger::enableLogging;
 pub use types::message::{ChatState, Message, MessageKind};
 pub use types::presence::{Presence, PresenceKind, ShowKind};
 pub use types::roster::{Roster, RosterGroup, RosterItem, RosterItemSubscription};
+
+pub use connection::{
+    ConnectionEvent, ConnectionHandler, StanzaHandler, XMPPConnection, XMPPSender,
+};
 
 #[allow(non_snake_case)]
 pub fn parseJID(jid_str: &str) -> Result<BareJid, JidParseError> {
