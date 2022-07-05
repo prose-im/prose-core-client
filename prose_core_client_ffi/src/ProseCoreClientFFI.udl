@@ -7,25 +7,25 @@ namespace ProseCoreClientFFI {
   string format_jid([ByRef] BareJid jid);
 };
 
-interface Client {
+interface XMPPClient {
   constructor(BareJid jid);
 
   BareJid jid();
 
   [Throws=ProseError]
-  void connect([ByRef] string password, AccountObserver observer);
+  void connect([ByRef] string password, XMPPAccountObserver observer);
 
   [Throws=ProseError]
-  void send_message([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, ChatState? chat_state);
+  void send_message([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, XMPPChatState? chat_state);
 
   [Throws=ProseError]
   void update_message([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
 
   [Throws=ProseError]
-  void send_chat_state([ByRef] BareJid to, ChatState chat_state);
+  void send_chat_state([ByRef] BareJid to, XMPPChatState chat_state);
 
   [Throws=ProseError]
-  void send_presence(ShowKind? show, [ByRef] string? status);
+  void send_presence(XMPPShowKind? show, [ByRef] string? status);
 
   [Throws=ProseError]
   void load_roster();
@@ -52,13 +52,13 @@ interface Client {
   void send_xml_payload([ByRef] string xml_string);
 };
 
-callback interface AccountObserver {
+callback interface XMPPAccountObserver {
   void did_connect();
   void did_disconnect();
   
-  void did_receive_message(Message message);
-  void did_receive_roster(Roster roster);
-  void did_receive_presence(Presence presence);
+  void did_receive_message(XMPPMessage message);
+  void did_receive_roster(XMPPRoster roster);
+  void did_receive_presence(XMPPPresence presence);
   void did_receive_presence_subscription_request(BareJid from);
 };
 
@@ -99,7 +99,7 @@ interface ProseError {
   ToTextError(string error);
 };
 
-enum MessageKind {
+enum XMPPMessageKind {
   "Chat", 
   "Error", 
   "Groupchat", 
@@ -107,7 +107,7 @@ enum MessageKind {
   "Normal",
 };
 
-enum ChatState {
+enum XMPPChatState {
   "Active", 
   "Composing", 
   "Gone", 
@@ -115,13 +115,13 @@ enum ChatState {
   "Paused",
 };
 
-dictionary Message {
+dictionary XMPPMessage {
   BareJid from;
   BareJid? to;
   string? id;
-  MessageKind? kind;
+  XMPPMessageKind? kind;
   string? body;
-  ChatState? chat_state;
+  XMPPChatState? chat_state;
   string? replace;
   string? error;
 };
@@ -131,28 +131,28 @@ dictionary BareJid {
   string domain;
 };
 
-dictionary Roster {
-  sequence<RosterGroup> groups;
+dictionary XMPPRoster {
+  sequence<XMPPRosterGroup> groups;
 };
 
-dictionary RosterGroup {
+dictionary XMPPRosterGroup {
   string name;
-  sequence<RosterItem> items;
+  sequence<XMPPRosterItem> items;
 };
 
-enum RosterItemSubscription {
+enum XMPPRosterItemSubscription {
   "None",
   "To",
   "From",
   "Both",
 };
 
-dictionary RosterItem {
+dictionary XMPPRosterItem {
   BareJid jid;
-  RosterItemSubscription subscription;
+  XMPPRosterItemSubscription subscription;
 };
 
-enum PresenceKind {
+enum XMPPPresenceKind {
   "Unavailable", 
   "Subscribe", 
   "Subscribed", 
@@ -162,17 +162,17 @@ enum PresenceKind {
   "Error",
 };
 
-enum ShowKind {
+enum XMPPShowKind {
   "Away",
   "Chat", 
   "DND",
   "XA",
 };
 
-dictionary Presence {
-  PresenceKind? kind;
+dictionary XMPPPresence {
+  XMPPPresenceKind? kind;
   BareJid? from;
   BareJid? to;
-  ShowKind? show;
+  XMPPShowKind? show;
   string? status;
 };

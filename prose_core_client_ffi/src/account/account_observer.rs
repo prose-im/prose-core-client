@@ -3,13 +3,12 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::{Presence, Roster};
-
+use crate::types::message::Message;
+use crate::types::presence::Presence;
+use crate::types::roster::Roster;
 use jid::BareJid;
 #[cfg(feature = "test-helpers")]
 use std::sync::{Arc, Mutex};
-
-use crate::Message;
 
 #[cfg_attr(feature = "test-helpers", mockiato::mockable)]
 pub trait AccountObserver: Send + Sync {

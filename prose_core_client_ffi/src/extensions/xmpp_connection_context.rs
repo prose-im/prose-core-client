@@ -1,7 +1,7 @@
+use crate::account::AccountObserver;
 use crate::account::IDProvider;
 use crate::connection::XMPPSender;
 use crate::error::Result;
-use crate::AccountObserver;
 use libstrophe::Stanza;
 use std::sync::Mutex;
 

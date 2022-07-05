@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
+use crate::types::message::{ChatState, Message};
 use crate::types::namespace::Namespace;
-use crate::{ChatState, Message};
 use jid::BareJid;
 use libstrophe::Stanza;
 use std::sync::Arc;

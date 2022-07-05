@@ -6,8 +6,8 @@
 use super::error::Result;
 use crate::account::{Account, AccountObserver, UUIDProvider};
 use crate::connection::LibstropheConnection;
-use crate::{ChatState, ShowKind};
-
+use crate::types::message::ChatState;
+use crate::types::presence::ShowKind;
 use jid::BareJid;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};

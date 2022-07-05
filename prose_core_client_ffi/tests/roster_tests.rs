@@ -1,8 +1,8 @@
 use jid::BareJid;
 use prose_core_client_ffi::test_helpers::mocks::HandlerBucketExt;
 use prose_core_client_ffi::{
-    Account, Presence, PresenceKind, Result, Roster, RosterGroup, RosterItem,
-    RosterItemSubscription,
+    Account, Result, XMPPPresence, XMPPPresenceKind, XMPPRoster, XMPPRosterGroup, XMPPRosterItem,
+    XMPPRosterItemSubscription,
 };
 use std::str::FromStr;
 
@@ -17,12 +17,12 @@ fn test_loads_roster() -> Result<()> {
         r#"<iq id="id_1" type="get"><query xmlns="jabber:iq:roster"/></iq>"#.to_string()
     );
 
-    let expected_roster = Roster {
-        groups: vec![RosterGroup {
+    let expected_roster = XMPPRoster {
+        groups: vec![XMPPRosterGroup {
             name: "_default_group_".to_string(),
-            items: vec![RosterItem {
+            items: vec![XMPPRosterItem {
                 jid: BareJid::from_str("a@prose.org").unwrap(),
-                subscription: RosterItemSubscription::None,
+                subscription: XMPPRosterItemSubscription::None,
             }],
         }],
     };
@@ -155,8 +155,8 @@ fn test_receives_subscription_request() -> Result<()> {
         .lock()
         .unwrap()
         .expect_did_receive_presence(|arg| {
-            arg.partial_eq(Presence::new(
-                Some(PresenceKind::Subscribe),
+            arg.partial_eq(XMPPPresence::new(
+                Some(XMPPPresenceKind::Subscribe),
                 Some(BareJid::from_str("a@prose.org").unwrap()),
                 None,
                 None,

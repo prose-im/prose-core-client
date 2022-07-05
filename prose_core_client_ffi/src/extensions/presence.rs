@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
-use crate::{types, ShowKind};
+use crate::types;
+use crate::types::presence::ShowKind;
 use libstrophe::Stanza;
 use std::sync::Arc;
 

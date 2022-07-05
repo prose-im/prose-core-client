@@ -14,22 +14,29 @@ mod types;
 #[cfg(feature = "test-helpers")]
 pub mod test_helpers;
 
-pub use account::{Account, AccountObserver};
-pub use client::Client;
+pub use account::AccountObserver as XMPPAccountObserver;
+pub use client::Client as XMPPClient;
 pub use error::{Error as ProseError, Result, StanzaParseError};
 pub use jid::{BareJid, JidParseError};
 pub use libstrophe::Error as LibStropheError;
 pub use logger::enable_logging;
-pub use types::message::{ChatState, Message, MessageKind};
-pub use types::presence::{Presence, PresenceKind, ShowKind};
-pub use types::roster::{Roster, RosterGroup, RosterItem, RosterItemSubscription};
+pub use types::message::{
+    ChatState as XMPPChatState, Message as XMPPMessage, MessageKind as XMPPMessageKind,
+};
+pub use types::presence::{
+    Presence as XMPPPresence, PresenceKind as XMPPPresenceKind, ShowKind as XMPPShowKind,
+};
+pub use types::roster::{
+    Roster as XMPPRoster, RosterGroup as XMPPRosterGroup, RosterItem as XMPPRosterItem,
+    RosterItemSubscription as XMPPRosterItemSubscription,
+};
 
 pub use connection::{
     ConnectionEvent, ConnectionHandler, StanzaHandler, XMPPConnection, XMPPSender,
 };
 
 #[cfg(feature = "test-helpers")]
-pub use account::AccountObserverMock;
+pub use account::{Account, AccountObserverMock};
 
 pub fn parse_jid(jid_str: &str) -> Result<BareJid, JidParseError> {
     jid_str.parse::<BareJid>()

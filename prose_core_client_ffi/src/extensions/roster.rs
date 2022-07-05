@@ -1,8 +1,9 @@
 use crate::error::Result;
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
 use crate::helpers::StanzaExt;
+use crate::types;
 use crate::types::namespace::Namespace;
-use crate::{types, PresenceKind};
+use crate::types::presence::PresenceKind;
 use jid::BareJid;
 use libstrophe::Stanza;
 use std::sync::{Arc, Mutex};
