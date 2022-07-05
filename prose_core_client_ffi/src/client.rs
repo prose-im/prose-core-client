@@ -45,31 +45,23 @@ impl Client {
         body: &str,
         chat_state: Option<ChatState>,
     ) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.chat.send_message(id, to, body, chat_state)
-        })
+        self.with_account(|account| account.chat.send_message(id, to, body, chat_state))
     }
 
     pub fn update_message(&self, id: &str, new_id: &str, to: &BareJid, body: &str) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.chat.update_message(id, new_id, to, body)
-        })
+        self.with_account(|account| account.chat.update_message(id, new_id, to, body))
     }
 
     pub fn send_chat_state(&self, to: &BareJid, chat_state: ChatState) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.chat.send_chat_state(to, chat_state)
-        })
+        self.with_account(|account| account.chat.send_chat_state(to, chat_state))
     }
 
     pub fn send_presence(&self, show: Option<ShowKind>, status: &Option<String>) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.presence.send_presence(show, status.as_deref())
-        })
+        self.with_account(|account| account.presence.send_presence(show, status.as_deref()))
     }
 
     pub fn load_roster(&self) -> Result<()> {
-        with_account(&self.jid, |account| account.roster.load_roster())
+        self.with_account(|account| account.roster.load_roster())
     }
 
     pub fn add_user(
@@ -78,13 +70,11 @@ impl Client {
         nickname: &Option<String>,
         groups: &Vec<String>,
     ) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.roster.add_user(jid, nickname.as_deref(), groups)
-        })
+        self.with_account(|account| account.roster.add_user(jid, nickname.as_deref(), groups))
     }
 
     pub fn remove_user_and_unsubscribe_from_presence(&self, jid: &BareJid) -> Result<()> {
-        with_account(&self.jid, |account| {
+        self.with_account(|account| {
             account
                 .roster
                 .remove_user_and_unsubscribe_from_presence(jid)
@@ -92,25 +82,19 @@ impl Client {
     }
 
     pub fn subscribe_to_user_presence(&self, jid: &BareJid) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.roster.subscribe_to_user_presence(jid)
-        })
+        self.with_account(|account| account.roster.subscribe_to_user_presence(jid))
     }
 
     pub fn unsubscribe_from_user_presence(&self, jid: &BareJid) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.roster.unsubscribe_from_user_presence(jid)
-        })
+        self.with_account(|account| account.roster.unsubscribe_from_user_presence(jid))
     }
 
     pub fn grant_presence_permission_to_user(&self, jid: &BareJid) -> Result<()> {
-        with_account(&self.jid, |account| {
-            account.roster.grant_presence_permission_to_user(jid)
-        })
+        self.with_account(|account| account.roster.grant_presence_permission_to_user(jid))
     }
 
     pub fn revoke_or_reject_presence_permission_from_user(&self, jid: &BareJid) -> Result<()> {
-        with_account(&self.jid, |account| {
+        self.with_account(|account| {
             account
                 .roster
                 .revoke_or_reject_presence_permission_from_user(jid)
@@ -118,17 +102,16 @@ impl Client {
     }
 
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {
-        with_account(&self.jid, |account| account.debug.send_xml_payload(xml_str))
+        self.with_account(|account| account.debug.send_xml_payload(xml_str))
     }
 }
 
-fn with_account<T>(
-    account_jid: &BareJid,
-    handler: impl FnOnce(&mut Account) -> Result<T>,
-) -> Result<T> {
-    let mut locked_hash_map = ACCOUNTS.lock()?;
-    let account = locked_hash_map
-        .get_mut(&account_jid)
-        .expect("Cannot get account. Did you call Client.connect()?");
-    handler(account)
+impl Client {
+    fn with_account<T>(&self, handler: impl FnOnce(&mut Account) -> Result<T>) -> Result<T> {
+        let mut locked_hash_map = ACCOUNTS.lock()?;
+        let account = locked_hash_map
+            .get_mut(&self.jid)
+            .expect("Cannot get account. Did you call Client.connect()?");
+        handler(account)
+    }
 }
