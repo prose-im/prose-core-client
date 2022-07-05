@@ -1,7 +1,7 @@
 use crate::account::{AccountObserver, IDProvider};
 use crate::connection::{ConnectionEvent, XMPPConnection, XMPPSender};
 use crate::error::Result;
-use crate::extensions::{Chat, Debug, Presence, Roster};
+use crate::extensions::{Chat, Debug, Presence, Roster, MAM};
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
 use libstrophe::Stanza;
 use std::sync::Arc;
@@ -11,6 +11,7 @@ pub struct Account {
     pub roster: Arc<Roster>,
     pub chat: Arc<Chat>,
     pub presence: Arc<Presence>,
+    pub mam: Arc<MAM>,
     pub debug: Arc<Debug>,
 }
 
@@ -31,12 +32,14 @@ impl Account {
         let roster = Arc::new(Roster::new(ctx.clone()));
         let chat = Arc::new(Chat::new(ctx.clone()));
         let presence = Arc::new(Presence::new(ctx.clone()));
+        let mam = Arc::new(MAM::new(ctx.clone()));
         let debug = Arc::new(Debug::new(ctx.clone()));
 
         let extensions: Vec<Arc<dyn XMPPExtension>> = vec![
             roster.clone(),
             chat.clone(),
             presence.clone(),
+            mam.clone(),
             debug.clone(),
         ];
 
@@ -87,6 +90,7 @@ impl Account {
             roster,
             chat,
             presence,
+            mam,
             debug,
         })
     }

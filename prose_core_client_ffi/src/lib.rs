@@ -20,6 +20,9 @@ pub use error::{Error as ProseError, Result, StanzaParseError};
 pub use jid::{BareJid, JidParseError};
 pub use libstrophe::Error as LibStropheError;
 pub use logger::enable_logging;
+pub use types::mam::{
+    DefaultBehavior as XMPPMAMDefaultBehavior, MAMPreferences as XMPPMAMPreferences,
+};
 pub use types::message::{
     ChatState as XMPPChatState, Message as XMPPMessage, MessageKind as XMPPMessageKind,
 };

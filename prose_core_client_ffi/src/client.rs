@@ -8,6 +8,7 @@ use crate::account::{Account, AccountObserver, UUIDProvider};
 use crate::connection::LibstropheConnection;
 use crate::types::message::ChatState;
 use crate::types::presence::ShowKind;
+use crate::XMPPMAMPreferences;
 use jid::BareJid;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
@@ -99,6 +100,14 @@ impl Client {
                 .roster
                 .revoke_or_reject_presence_permission_from_user(jid)
         })
+    }
+
+    pub fn load_archiving_preferences(&self) -> Result<()> {
+        self.with_account(|account| account.mam.load_archiving_preferences())
+    }
+
+    pub fn set_archiving_preferences(&self, preferences: &XMPPMAMPreferences) -> Result<()> {
+        self.with_account(|account| account.mam.set_archiving_preferences(preferences))
     }
 
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {

@@ -71,11 +71,7 @@ impl Roster {
         for group in groups {
             let mut group_node = Stanza::new();
             group_node.set_name("group")?;
-
-            let mut text_node = Stanza::new();
-            text_node.set_text(group)?;
-            group_node.add_child(text_node)?;
-
+            group_node.add_child(Stanza::new_text_node(group)?)?;
             item.add_child(group_node)?;
         }
 

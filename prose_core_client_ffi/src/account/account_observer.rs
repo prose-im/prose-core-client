@@ -3,6 +3,7 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::types::mam::MAMPreferences;
 use crate::types::message::Message;
 use crate::types::presence::Presence;
 use crate::types::roster::Roster;
@@ -19,6 +20,7 @@ pub trait AccountObserver: Send + Sync {
     fn did_receive_roster(&self, roster: Roster);
     fn did_receive_presence(&self, presence: Presence);
     fn did_receive_presence_subscription_request(&self, from: BareJid);
+    fn did_receive_archiving_preferences(&self, preferences: MAMPreferences);
 }
 
 #[cfg(feature = "test-helpers")]
@@ -43,6 +45,11 @@ impl<'mock> AccountObserver for Arc<Mutex<AccountObserverMock<'mock>>> {
         self.lock()
             .unwrap()
             .did_receive_presence_subscription_request(from);
+    }
+    fn did_receive_archiving_preferences(&self, preferences: MAMPreferences) {
+        self.lock()
+            .unwrap()
+            .did_receive_archiving_preferences(preferences);
     }
 }
 

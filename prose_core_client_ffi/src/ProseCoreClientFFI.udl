@@ -49,6 +49,11 @@ interface XMPPClient {
   void revoke_or_reject_presence_permission_from_user([ByRef] BareJid jid);
 
   [Throws=ProseError]
+  void load_archiving_preferences();
+
+  [Throws=ProseError]
+  void set_archiving_preferences([ByRef] XMPPMAMPreferences preferences);
+  [Throws=ProseError]
   void send_xml_payload([ByRef] string xml_string);
 };
 
@@ -60,6 +65,7 @@ callback interface XMPPAccountObserver {
   void did_receive_roster(XMPPRoster roster);
   void did_receive_presence(XMPPPresence presence);
   void did_receive_presence_subscription_request(BareJid from);
+  void did_receive_archiving_preferences(XMPPMAMPreferences preferences);
 };
 
 [Error]
@@ -81,6 +87,7 @@ enum LibStropheError {
 interface StanzaParseError {
   MissingAttribute(string attribute);
   MissingChildNode(string node);
+  MissingText(string node);
   ParseError(string error);
   JidParseError(JidParseError error);
 };
@@ -175,4 +182,16 @@ dictionary XMPPPresence {
   BareJid? to;
   XMPPShowKind? show;
   string? status;
+};
+
+enum XMPPMAMDefaultBehavior {
+  "Always",
+  "Never",
+  "Roster",
+};
+
+dictionary XMPPMAMPreferences {
+  XMPPMAMDefaultBehavior default_behavior;
+  sequence<BareJid> always_archive;
+  sequence<BareJid> never_archive;
 };

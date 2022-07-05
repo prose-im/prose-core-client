@@ -26,6 +26,7 @@ pub enum Error {
 pub enum StanzaParseError {
     MissingAttribute { attribute: String },
     MissingChildNode { node: String },
+    MissingText { node: String },
     ParseError { error: String },
     JidParseError { error: JidParseError },
 }
@@ -115,6 +116,13 @@ impl StanzaParseError {
     pub fn missing_child_node(node_name: &str, _stanza: &Stanza) -> Self {
         // TODO: Derive a string for debugging from stanza
         StanzaParseError::MissingChildNode {
+            node: node_name.to_string(),
+        }
+    }
+
+    pub fn missing_text(node_name: &str, _stanza: &Stanza) -> Self {
+        // TODO: Derive a string for debugging from stanza
+        StanzaParseError::MissingText {
             node: node_name.to_string(),
         }
     }
