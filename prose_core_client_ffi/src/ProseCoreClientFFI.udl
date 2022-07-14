@@ -53,6 +53,10 @@ interface XMPPClient {
 
   [Throws=ProseError]
   void set_archiving_preferences([ByRef] XMPPMAMPreferences preferences);
+
+  [Throws=ProseError]
+  void load_messages_in_chat([ByRef] string request_id, [ByRef] BareJid jid, [ByRef] string? before);
+
   [Throws=ProseError]
   void send_xml_payload([ByRef] string xml_string);
 };
@@ -66,6 +70,12 @@ callback interface XMPPAccountObserver {
   void did_receive_presence(XMPPPresence presence);
   void did_receive_presence_subscription_request(BareJid from);
   void did_receive_archiving_preferences(XMPPMAMPreferences preferences);
+  void did_receive_messages_in_chat(
+    string request_id,
+    BareJid jid,
+    sequence<XMPPForwardedMessage> messages,
+    boolean is_complete
+  );
 };
 
 [Error]
@@ -104,6 +114,7 @@ interface ProseError {
   SendError(string error);
   IOError(string error);
   ToTextError(string error);
+  ChronoParseError(string error);
 };
 
 enum XMPPMessageKind {
@@ -131,6 +142,16 @@ dictionary XMPPMessage {
   XMPPChatState? chat_state;
   string? replace;
   string? error;
+};
+
+dictionary XMPPDelay {
+  i64 stamp;
+  BareJid? from;
+};
+
+dictionary XMPPForwardedMessage {
+  XMPPDelay? delay;
+  XMPPMessage message;
 };
 
 dictionary BareJid {

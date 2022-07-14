@@ -20,6 +20,7 @@ pub enum Error {
     SendError { error: String },
     IOError { error: String },
     ToTextError { error: String },
+    ChronoParseError { error: String },
 }
 
 #[derive(Debug, thiserror::Error, Display)]
@@ -100,6 +101,14 @@ impl<'t, 's> From<ConnectionError<'t, 's>> for Error {
 impl From<ToTextError> for Error {
     fn from(error: ToTextError) -> Self {
         Error::ToTextError {
+            error: error.to_string(),
+        }
+    }
+}
+
+impl From<chrono::ParseError> for Error {
+    fn from(error: chrono::ParseError) -> Self {
+        Error::ChronoParseError {
             error: error.to_string(),
         }
     }

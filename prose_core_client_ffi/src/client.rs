@@ -110,6 +110,19 @@ impl Client {
         self.with_account(|account| account.mam.set_archiving_preferences(preferences))
     }
 
+    pub fn load_messages_in_chat(
+        &self,
+        request_id: &str,
+        jid: &BareJid,
+        before: &Option<String>,
+    ) -> Result<()> {
+        self.with_account(|account| {
+            account
+                .mam
+                .load_messages_in_chat(request_id, jid, before.as_deref())
+        })
+    }
+
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {
         self.with_account(|account| account.debug.send_xml_payload(xml_str))
     }

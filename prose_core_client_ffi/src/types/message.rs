@@ -81,6 +81,27 @@ pub struct Message {
     pub error: Option<String>,
 }
 
+impl Message {
+    pub fn new_chat_message(
+        from: BareJid,
+        to: BareJid,
+        id: Option<MessageId>,
+        body: impl Into<String>,
+        chat_state: Option<ChatState>,
+    ) -> Self {
+        Message {
+            from,
+            to: Some(to),
+            id,
+            kind: Some(MessageKind::Chat),
+            body: Some(body.into()),
+            chat_state,
+            replace: None,
+            error: None,
+        }
+    }
+}
+
 impl TryFrom<&Stanza> for Message {
     type Error = Error;
 

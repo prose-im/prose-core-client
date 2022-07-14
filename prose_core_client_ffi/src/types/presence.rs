@@ -89,9 +89,8 @@ impl TryFrom<&Stanza> for Presence {
 
 #[cfg(test)]
 mod tests {
-    use libstrophe::Stanza;
-
     use super::*;
+    use libstrophe::Stanza;
 
     #[test]
     fn test_deserialize_empty_presence() {

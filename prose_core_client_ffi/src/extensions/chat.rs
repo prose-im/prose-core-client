@@ -18,6 +18,10 @@ impl Chat {
 
 impl XMPPExtension for Chat {
     fn handle_message_stanza(&self, stanza: &Stanza) -> Result<()> {
+        // Ignore MAM messages.
+        if stanza.get_child_by_name("result").is_some() {
+            return Ok(());
+        }
         let message: Message = stanza.try_into()?;
         self.ctx.observer.did_receive_message(message);
         Ok(())

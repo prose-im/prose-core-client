@@ -50,7 +50,7 @@ impl XMPPExtension for Roster {
 impl Roster {
     pub fn load_roster(&self) -> Result<()> {
         let mut iq_stanza = Stanza::new_iq(Some("get"), Some(&self.ctx.generate_id()));
-        iq_stanza.add_child(Stanza::new_query(Namespace::Roster)?)?;
+        iq_stanza.add_child(Stanza::new_query(Namespace::Roster, None)?)?;
         self.ctx.send_stanza(iq_stanza)
     }
 
@@ -75,7 +75,7 @@ impl Roster {
             item.add_child(group_node)?;
         }
 
-        let mut query = Stanza::new_query(Namespace::Roster)?;
+        let mut query = Stanza::new_query(Namespace::Roster, None)?;
         query.add_child(item)?;
 
         let mut iq_stanza = Stanza::new_iq(Some("set"), Some(&self.ctx.generate_id()));
@@ -89,7 +89,7 @@ impl Roster {
         item.set_attribute("jid", &jid.to_string())?;
         item.set_attribute("subscription", "remove")?;
 
-        let mut query = Stanza::new_query(Namespace::Roster)?;
+        let mut query = Stanza::new_query(Namespace::Roster, None)?;
         query.add_child(item)?;
 
         let mut iq_stanza = Stanza::new_iq(Some("set"), Some(&self.ctx.generate_id()));

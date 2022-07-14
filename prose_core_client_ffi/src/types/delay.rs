@@ -4,15 +4,17 @@ use jid::BareJid;
 use libstrophe::Stanza;
 use std::str::FromStr;
 
+// https://xmpp.org/extensions/xep-0203.html
+
 #[derive(Debug, PartialEq)]
 pub struct Delay {
     /// The time when the XML stanza was originally sent. The format MUST adhere to the dateTime
     /// format specified in XEP-0082 and MUST be expressed in UTC.
-    stamp: i64,
+    pub stamp: i64,
 
     /// The Jabber ID of the entity that originally sent the XML stanza or that delayed the
     /// delivery of the stanza (e.g., the address of a multi-user chat room).
-    from: Option<BareJid>,
+    pub from: Option<BareJid>,
 }
 
 impl Delay {
@@ -25,18 +27,18 @@ impl TryFrom<&Stanza> for Delay {
     type Error = Error;
 
     fn try_from(stanza: &Stanza) -> std::result::Result<Self, Self::Error> {
-        Ok(Delay {
-            stamp: stanza
+        Ok(Delay::new(
+            stanza
                 .get_attribute("stamp")
                 .ok_or(Error::StanzaParseError {
                     error: StanzaParseError::missing_attribute("stamp", stanza),
                 })
                 .and_then(|s| DateTime::parse_from_rfc3339(s).map_err(Into::into))
                 .map(|t| t.timestamp())?,
-            from: stanza
+            stanza
                 .get_attribute("from")
                 .and_then(|s| BareJid::from_str(s).ok()),
-        })
+        ))
     }
 }
 

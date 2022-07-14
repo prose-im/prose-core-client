@@ -20,6 +20,8 @@ pub use error::{Error as ProseError, Result, StanzaParseError};
 pub use jid::{BareJid, JidParseError};
 pub use libstrophe::Error as LibStropheError;
 pub use logger::enable_logging;
+pub use types::delay::Delay as XMPPDelay;
+pub use types::forwarded_message::ForwardedMessage as XMPPForwardedMessage;
 pub use types::mam::{
     DefaultBehavior as XMPPMAMDefaultBehavior, MAMPreferences as XMPPMAMPreferences,
 };
