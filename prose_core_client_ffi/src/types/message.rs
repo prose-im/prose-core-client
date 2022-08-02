@@ -99,6 +99,11 @@ pub struct Message {
     /// If set, the message the same id should be replaced.
     pub replace: Option<MessageId>,
 
+    /// When a user chooses to react to a message with a certain emoji, the client sends
+    /// a <message> stanza containing a <reactions> element. The chosen emoji is included in
+    /// a <reaction> element within the <reactions> element.
+    pub reactions: Option<Vec<String>>,
+
     /// If the message stanza is of type "error", it MUST include an <error/> child.
     pub error: Option<String>,
 }
@@ -119,6 +124,7 @@ impl Message {
             body: Some(body.into()),
             chat_state,
             replace: None,
+            reactions: None,
             error: None,
         }
     }
@@ -147,6 +153,18 @@ impl TryFrom<&Stanza> for Message {
             replace: stanza
                 .get_child_by_name_and_ns("replace", Namespace::LastMessageCorrection)
                 .and_then(|n| n.get_attribute("id").map(|s| s.into())),
+            reactions: stanza
+                .get_child_by_name_and_ns("reactions", Namespace::Reactions)
+                .and_then(|n| {
+                    n.children()
+                        .filter_map(|c| {
+                            if c.name() != Some("reaction") {
+                                return None;
+                            }
+                            return c.get_first_child().map(|c| c.text());
+                        })
+                        .collect()
+                }),
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
     }
@@ -193,6 +211,7 @@ mod tests {
                 body: None,
                 chat_state: None,
                 replace: None,
+                reactions: None,
                 error: None,
             }
         );
@@ -220,6 +239,7 @@ mod tests {
                 body: Some("How is it going?".to_string()),
                 chat_state: Some(ChatState::Active),
                 replace: None,
+                reactions: None,
                 error: None,
             }
         );
@@ -247,13 +267,14 @@ mod tests {
                 body: Some("This is a correction".to_string()),
                 chat_state: None,
                 replace: Some("message-id-1".into()),
+                reactions: None,
                 error: None,
             }
         );
     }
 
     #[test]
-    fn test_deserializes_chat_state_message() {
+    fn test_deserialize_chat_state_message() {
         let message = r#"
       <message from="valerian@prose.org/mobile" to="marc@prose.org/home" id="purplecf8f33c0" type="chat">
         <paused xmlns="http://jabber.org/protocol/chatstates"/>
@@ -273,6 +294,7 @@ mod tests {
                 body: None,
                 chat_state: Some(ChatState::Paused),
                 replace: None,
+                reactions: None,
                 error: None,
             }
         );
@@ -299,6 +321,7 @@ mod tests {
                 body: None,
                 chat_state: None,
                 replace: None,
+                reactions: None,
                 error: None,
             }
         );
@@ -325,7 +348,39 @@ mod tests {
                 body: None,
                 chat_state: None,
                 replace: None,
+                reactions: None,
                 error: Some("Something went wrong".to_string()),
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_reactions() {
+        let message = r#"
+        <message id="C03F2967-82BB-42AC-9486-7D25398A0D93" xmlns="jabber:client" to="a@prose.org" type="chat" from="b@prose.org">
+            <reactions id="381c37e0-8e05-42c0-beb6-fdb5fa6263ec" xmlns="urn:xmpp:reactions:0">
+                <reaction>🥲</reaction>
+                <reaction>:-)</reaction>
+                <some_other_node>Should be ignored</some_other_node>
+            </reactions>
+        </message>
+        "#;
+
+        let stanza = Stanza::from_str(message);
+        let message = Message::try_from(&stanza).unwrap();
+
+        assert_eq!(
+            message,
+            Message {
+                from: BareJid::from_str("b@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
+                id: Some("C03F2967-82BB-42AC-9486-7D25398A0D93".into()),
+                kind: Some(MessageKind::Chat),
+                body: None,
+                chat_state: None,
+                replace: None,
+                reactions: Some(vec!["🥲", ":-)"].iter().map(|s| s.to_string()).collect()),
+                error: None,
             }
         );
     }

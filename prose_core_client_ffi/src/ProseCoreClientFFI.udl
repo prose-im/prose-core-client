@@ -61,6 +61,9 @@ interface XMPPClient {
   void load_messages_in_chat([ByRef] string request_id, [ByRef] BareJid jid, [ByRef] string? before);
 
   [Throws=ProseError]
+  void send_reactions(MessageId id, [ByRef] BareJid to, [ByRef] sequence<string> reactions);
+
+  [Throws=ProseError]
   void send_xml_payload([ByRef] string xml_string);
 };
 
@@ -144,6 +147,7 @@ dictionary XMPPMessage {
   string? body;
   XMPPChatState? chat_state;
   MessageId? replace;
+  sequence<string>? reactions;
   string? error;
 };
 

@@ -23,4 +23,6 @@ impl Namespace {
     pub const StanzaID: &'static str = "urn:xmpp:sid:0";
     /// XEP-0059: Result Set Management
     pub const RSM: &'static str = "http://jabber.org/protocol/rsm";
+    /// XEP-0444: Message Reactions
+    pub const Reactions: &'static str = "urn:xmpp:reactions:0";
 }

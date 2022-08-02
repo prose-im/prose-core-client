@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
+use crate::helpers::StanzaExt;
 use crate::types::message::{ChatState, Message, MessageId};
 use crate::types::namespace::Namespace;
 use jid::BareJid;
@@ -76,6 +77,34 @@ impl Chat {
         chat_state_node.set_name(chat_state.to_string())?;
         chat_state_node.set_ns(Namespace::ChatStates)?;
         stanza.add_child(chat_state_node)?;
+
+        self.ctx.send_stanza(stanza)
+    }
+
+    pub fn send_reactions(
+        &self,
+        id: MessageId,
+        to: &BareJid,
+        reactions: &[impl AsRef<str>],
+    ) -> Result<()> {
+        let mut stanza = Stanza::new_message(
+            Some("chat"),
+            Some(&self.ctx.generate_id()),
+            Some(&to.to_string()),
+        );
+
+        let mut reactions_node = Stanza::new();
+        reactions_node.set_name("reactions")?;
+        reactions_node.set_id(id.as_ref())?;
+        reactions_node.set_ns(Namespace::Reactions)?;
+
+        for reaction in reactions {
+            let mut reaction_node = Stanza::new();
+            reaction_node.set_name("reaction")?;
+            reaction_node.add_child(Stanza::new_text_node(reaction)?)?;
+            reactions_node.add_child(reaction_node)?;
+        }
+        stanza.add_child(reactions_node)?;
 
         self.ctx.send_stanza(stanza)
     }

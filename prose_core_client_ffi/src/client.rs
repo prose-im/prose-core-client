@@ -129,6 +129,15 @@ impl Client {
         })
     }
 
+    pub fn send_reactions(
+        &self,
+        id: MessageId,
+        to: &BareJid,
+        reactions: &Vec<String>,
+    ) -> Result<()> {
+        self.with_account(|account| account.chat.send_reactions(id, to, reactions))
+    }
+
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {
         self.with_account(|account| account.debug.send_xml_payload(xml_str))
     }

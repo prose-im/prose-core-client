@@ -70,6 +70,7 @@ mod tests {
                     body: Some("yo!".to_string()),
                     chat_state: None,
                     replace: None,
+                    reactions: None,
                     error: None,
                 },
                 Some(Delay::new(1657182928, None))
@@ -101,6 +102,7 @@ mod tests {
                     body: Some("yo!".to_string()),
                     chat_state: None,
                     replace: None,
+                    reactions: None,
                     error: None,
                 },
                 None
