@@ -71,10 +71,10 @@ callback interface XMPPAccountObserver {
   void did_receive_presence_subscription_request(BareJid from);
   void did_receive_archiving_preferences(XMPPMAMPreferences preferences);
   void did_receive_messages_in_chat(
-    string request_id,
+    string requestId,
     BareJid jid,
     sequence<XMPPForwardedMessage> messages,
-    boolean is_complete
+    boolean isComplete
   );
 };
 
