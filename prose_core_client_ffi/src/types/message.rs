@@ -1,6 +1,8 @@
 use crate::error::{Error, StanzaParseError};
+use crate::types::message_fastening::MessageFastening;
 use jid::BareJid;
 use libstrophe::Stanza;
+use std::ops::Deref;
 use std::str::FromStr;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter, EnumString};
@@ -104,6 +106,9 @@ pub struct Message {
     /// a <reaction> element within the <reactions> element.
     pub reactions: Option<Vec<String>>,
 
+    /// A payload attached to another message.
+    pub fastening: Option<MessageFastening>,
+
     /// If the message stanza is of type "error", it MUST include an <error/> child.
     pub error: Option<String>,
 }
@@ -125,6 +130,7 @@ impl Message {
             chat_state,
             replace: None,
             reactions: None,
+            fastening: None,
             error: None,
         }
     }
@@ -165,6 +171,9 @@ impl TryFrom<&Stanza> for Message {
                         })
                         .collect()
                 }),
+            fastening: stanza
+                .get_child_by_name_and_ns("apply-to", Namespace::Fasten)
+                .and_then(|n| MessageFastening::try_from(n.deref()).ok()),
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
     }
@@ -212,6 +221,7 @@ mod tests {
                 chat_state: None,
                 replace: None,
                 reactions: None,
+                fastening: None,
                 error: None,
             }
         );
@@ -240,6 +250,7 @@ mod tests {
                 chat_state: Some(ChatState::Active),
                 replace: None,
                 reactions: None,
+                fastening: None,
                 error: None,
             }
         );
@@ -268,6 +279,7 @@ mod tests {
                 chat_state: None,
                 replace: Some("message-id-1".into()),
                 reactions: None,
+                fastening: None,
                 error: None,
             }
         );
@@ -295,6 +307,7 @@ mod tests {
                 chat_state: Some(ChatState::Paused),
                 replace: None,
                 reactions: None,
+                fastening: None,
                 error: None,
             }
         );
@@ -322,6 +335,7 @@ mod tests {
                 chat_state: None,
                 replace: None,
                 reactions: None,
+                fastening: None,
                 error: None,
             }
         );
@@ -349,6 +363,7 @@ mod tests {
                 chat_state: None,
                 replace: None,
                 reactions: None,
+                fastening: None,
                 error: Some("Something went wrong".to_string()),
             }
         );
@@ -380,6 +395,37 @@ mod tests {
                 chat_state: None,
                 replace: None,
                 reactions: Some(vec!["🥲", ":-)"].iter().map(|s| s.to_string()).collect()),
+                fastening: None,
+                error: None,
+            }
+        );
+    }
+
+    #[test]
+    fn test_deserialize_fastening() {
+        let message = r#"
+        <message type="chat" to="a@prose.org" id="retract-message-1" from="b@prose.org">
+            <apply-to id="origin-id-1" xmlns="urn:xmpp:fasten:0">
+               <retract xmlns="urn:xmpp:message-retract:0"/>
+            </apply-to>
+        </message>
+        "#;
+
+        let stanza = Stanza::from_str(message);
+        let message = Message::try_from(&stanza).unwrap();
+
+        assert_eq!(
+            message,
+            Message {
+                from: BareJid::from_str("b@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
+                id: Some("retract-message-1".into()),
+                kind: Some(MessageKind::Chat),
+                body: None,
+                chat_state: None,
+                replace: None,
+                reactions: None,
+                fastening: Some(MessageFastening::new("origin-id-1".into(), true)),
                 error: None,
             }
         );

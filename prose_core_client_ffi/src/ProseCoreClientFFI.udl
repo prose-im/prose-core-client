@@ -64,6 +64,9 @@ interface XMPPClient {
   void send_reactions(MessageId id, [ByRef] BareJid to, [ByRef] sequence<string> reactions);
 
   [Throws=ProseError]
+  void retract_message(MessageId id, [ByRef] BareJid to);
+
+  [Throws=ProseError]
   void send_xml_payload([ByRef] string xml_string);
 };
 
@@ -139,6 +142,11 @@ enum XMPPChatState {
   "Paused",
 };
 
+dictionary XMPPMessageFastening {
+  MessageId id;
+  boolean retract;
+};
+
 dictionary XMPPMessage {
   BareJid from;
   BareJid? to;
@@ -148,6 +156,7 @@ dictionary XMPPMessage {
   XMPPChatState? chat_state;
   MessageId? replace;
   sequence<string>? reactions;
+  XMPPMessageFastening? fastening;
   string? error;
 };
 

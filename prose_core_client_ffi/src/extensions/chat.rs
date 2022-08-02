@@ -108,4 +108,35 @@ impl Chat {
 
         self.ctx.send_stanza(stanza)
     }
+
+    pub fn retract_message(&self, id: MessageId, to: &BareJid) -> Result<()> {
+        let mut retraction_node = Stanza::new();
+        retraction_node.set_name("retract")?;
+        retraction_node.set_ns(Namespace::Retract)?;
+
+        let mut fastening_node = Stanza::new();
+        fastening_node.set_name("apply-to")?;
+        fastening_node.set_id(id)?;
+        fastening_node.set_ns(Namespace::Fasten)?;
+        fastening_node.add_child(retraction_node)?;
+
+        let mut fallback_node = Stanza::new();
+        fallback_node.set_name("fallback")?;
+        fallback_node.set_ns(Namespace::Fallback)?;
+
+        let mut body_node = Stanza::new();
+        body_node.set_name("body")?;
+        body_node.add_child(Stanza::new_text_node("This person attempted to retract a previous message, but it's unsupported by your client.")?)?;
+
+        let mut stanza = Stanza::new_message(
+            Some("chat"),
+            Some(&self.ctx.generate_id()),
+            Some(&to.to_string()),
+        );
+        stanza.add_child(fastening_node)?;
+        stanza.add_child(fallback_node)?;
+        stanza.add_child(body_node)?;
+
+        self.ctx.send_stanza(stanza)
+    }
 }

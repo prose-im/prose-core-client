@@ -138,6 +138,10 @@ impl Client {
         self.with_account(|account| account.chat.send_reactions(id, to, reactions))
     }
 
+    pub fn retract_message(&self, id: MessageId, to: &BareJid) -> Result<()> {
+        self.with_account(|account| account.chat.retract_message(id, to))
+    }
+
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {
         self.with_account(|account| account.debug.send_xml_payload(xml_str))
     }

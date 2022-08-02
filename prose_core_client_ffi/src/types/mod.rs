@@ -7,6 +7,7 @@ pub mod delay;
 pub mod forwarded_message;
 pub mod mam;
 pub mod message;
+pub mod message_fastening;
 pub mod namespace;
 pub mod presence;
 pub mod roster;

@@ -71,6 +71,7 @@ mod tests {
                     chat_state: None,
                     replace: None,
                     reactions: None,
+                    fastening: None,
                     error: None,
                 },
                 Some(Delay::new(1657182928, None))
@@ -103,6 +104,7 @@ mod tests {
                     chat_state: None,
                     replace: None,
                     reactions: None,
+                    fastening: None,
                     error: None,
                 },
                 None

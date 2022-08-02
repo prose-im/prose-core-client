@@ -25,4 +25,10 @@ impl Namespace {
     pub const RSM: &'static str = "http://jabber.org/protocol/rsm";
     /// XEP-0444: Message Reactions
     pub const Reactions: &'static str = "urn:xmpp:reactions:0";
+    /// XEP-0422: Message Fastening
+    pub const Fasten: &'static str = "urn:xmpp:fasten:0";
+    /// XEP-0424: Message Retraction
+    pub const Retract: &'static str = "urn:xmpp:message-retract:0";
+    /// XEP-0428: Fallback Indication
+    pub const Fallback: &'static str = "urn:xmpp:fallback:0";
 }
