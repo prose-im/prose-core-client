@@ -40,7 +40,29 @@ pub enum ChatState {
     Paused,
 }
 
-type MessageId = String;
+#[derive(Debug, PartialEq)]
+pub struct MessageId(String);
+
+impl<T> From<T> for MessageId
+where
+    T: Into<String>,
+{
+    fn from(s: T) -> MessageId {
+        MessageId(s.into())
+    }
+}
+
+impl AsRef<str> for MessageId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl MessageId {
+    pub fn inner(self) -> String {
+        self.0
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct Message {
@@ -114,7 +136,7 @@ impl TryFrom<&Stanza> for Message {
             to: stanza
                 .get_attribute("to")
                 .and_then(|s| BareJid::from_str(s).ok()),
-            id: stanza.get_attribute("id").map(|s| s.to_string()),
+            id: stanza.get_attribute("id").map(|s| s.into()),
             kind: stanza
                 .get_attribute("type")
                 .map(|s| s.to_string())
@@ -124,7 +146,7 @@ impl TryFrom<&Stanza> for Message {
             chat_state: stanza.try_into().ok(),
             replace: stanza
                 .get_child_by_name_and_ns("replace", Namespace::LastMessageCorrection)
-                .and_then(|n| n.get_attribute("id").map(|s| s.to_string())),
+                .and_then(|n| n.get_attribute("id").map(|s| s.into())),
             error: stanza.get_child_by_name("error").and_then(|n| n.text()),
         })
     }
@@ -193,7 +215,7 @@ mod tests {
             Message {
                 from: BareJid::from_str("valerian@prose.org").unwrap(),
                 to: Some(BareJid::from_str("marc@prose.org").unwrap()),
-                id: Some("purplecf8f33c0".to_string()),
+                id: Some("purplecf8f33c0".into()),
                 kind: Some(MessageKind::Chat),
                 body: Some("How is it going?".to_string()),
                 chat_state: Some(ChatState::Active),
@@ -220,11 +242,11 @@ mod tests {
             Message {
                 from: BareJid::from_str("valerian@prose.org").unwrap(),
                 to: Some(BareJid::from_str("marc@prose.org").unwrap()),
-                id: Some("purplecf8f33c0".to_string()),
+                id: Some("purplecf8f33c0".into()),
                 kind: Some(MessageKind::Chat),
                 body: Some("This is a correction".to_string()),
                 chat_state: None,
-                replace: Some("message-id-1".to_string()),
+                replace: Some("message-id-1".into()),
                 error: None,
             }
         );
@@ -246,7 +268,7 @@ mod tests {
             Message {
                 from: BareJid::from_str("valerian@prose.org").unwrap(),
                 to: Some(BareJid::from_str("marc@prose.org").unwrap()),
-                id: Some("purplecf8f33c0".to_string()),
+                id: Some("purplecf8f33c0".into()),
                 kind: Some(MessageKind::Chat),
                 body: None,
                 chat_state: Some(ChatState::Paused),

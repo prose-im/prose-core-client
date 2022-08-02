@@ -8,7 +8,7 @@ use crate::account::{Account, AccountObserver, UUIDProvider};
 use crate::connection::LibstropheConnection;
 use crate::types::message::ChatState;
 use crate::types::presence::ShowKind;
-use crate::XMPPMAMPreferences;
+use crate::{MessageId, XMPPMAMPreferences};
 use jid::BareJid;
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
@@ -41,7 +41,7 @@ impl Client {
 
     pub fn send_message(
         &self,
-        id: &str,
+        id: MessageId,
         to: &BareJid,
         body: &str,
         chat_state: Option<ChatState>,
@@ -49,7 +49,13 @@ impl Client {
         self.with_account(|account| account.chat.send_message(id, to, body, chat_state))
     }
 
-    pub fn update_message(&self, id: &str, new_id: &str, to: &BareJid, body: &str) -> Result<()> {
+    pub fn update_message(
+        &self,
+        id: MessageId,
+        new_id: MessageId,
+        to: &BareJid,
+        body: &str,
+    ) -> Result<()> {
         self.with_account(|account| account.chat.update_message(id, new_id, to, body))
     }
 

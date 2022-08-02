@@ -65,7 +65,7 @@ mod tests {
                 Message {
                     from: BareJid::from_str("cram@prose.org/mb").unwrap(),
                     to: Some(BareJid::from_str("marc@prose.org").unwrap()),
-                    id: Some("purple29a25424".to_string()),
+                    id: Some("purple29a25424".into()),
                     kind: Some(MessageKind::Chat),
                     body: Some("yo!".to_string()),
                     chat_state: None,
@@ -96,7 +96,7 @@ mod tests {
                 Message {
                     from: BareJid::from_str("cram@prose.org/mb").unwrap(),
                     to: Some(BareJid::from_str("marc@prose.org").unwrap()),
-                    id: Some("purple29a25424".to_string()),
+                    id: Some("purple29a25424".into()),
                     kind: Some(MessageKind::Chat),
                     body: Some("yo!".to_string()),
                     chat_state: None,

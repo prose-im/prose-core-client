@@ -40,6 +40,7 @@ pub use connection::{
     ConnectionEvent, ConnectionHandler, StanzaHandler, XMPPConnection, XMPPSender,
 };
 
+use crate::types::message::MessageId;
 #[cfg(feature = "test-helpers")]
 pub use account::{Account, AccountObserverMock};
 
@@ -49,6 +50,18 @@ pub fn parse_jid(jid_str: &str) -> Result<BareJid, JidParseError> {
 
 pub fn format_jid(jid: &BareJid) -> String {
     jid.to_string()
+}
+
+impl UniffiCustomTypeConverter for MessageId {
+    type Builtin = String;
+
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(val.into())
+    }
+
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.inner()
+    }
 }
 
 uniffi_macros::include_scaffolding!("ProseCoreClientFFI");

@@ -7,6 +7,9 @@ namespace ProseCoreClientFFI {
   string format_jid([ByRef] BareJid jid);
 };
 
+[Custom]
+typedef string MessageId;
+
 interface XMPPClient {
   constructor(BareJid jid);
 
@@ -16,10 +19,10 @@ interface XMPPClient {
   void connect([ByRef] string password, XMPPAccountObserver observer);
 
   [Throws=ProseError]
-  void send_message([ByRef] string id, [ByRef] BareJid to, [ByRef] string body, XMPPChatState? chat_state);
+  void send_message(MessageId id, [ByRef] BareJid to, [ByRef] string body, XMPPChatState? chat_state);
 
   [Throws=ProseError]
-  void update_message([ByRef] string id, [ByRef] string new_id, [ByRef] BareJid to, [ByRef] string body);
+  void update_message(MessageId id, MessageId new_id, [ByRef] BareJid to, [ByRef] string body);
 
   [Throws=ProseError]
   void send_chat_state([ByRef] BareJid to, XMPPChatState chat_state);
@@ -136,11 +139,11 @@ enum XMPPChatState {
 dictionary XMPPMessage {
   BareJid from;
   BareJid? to;
-  string? id;
+  MessageId? id;
   XMPPMessageKind? kind;
   string? body;
   XMPPChatState? chat_state;
-  string? replace;
+  MessageId? replace;
   string? error;
 };
 

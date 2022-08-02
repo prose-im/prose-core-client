@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
-use crate::types::message::{ChatState, Message};
+use crate::types::message::{ChatState, Message, MessageId};
 use crate::types::namespace::Namespace;
 use jid::BareJid;
 use libstrophe::Stanza;
@@ -31,12 +31,13 @@ impl XMPPExtension for Chat {
 impl Chat {
     pub fn send_message(
         &self,
-        id: &str,
+        id: MessageId,
         to: &BareJid,
         body: &str,
         chat_state: Option<ChatState>,
     ) -> Result<()> {
-        let mut stanza = Stanza::new_message(Some("chat"), Some(id), Some(&to.to_string()));
+        let mut stanza =
+            Stanza::new_message(Some("chat"), Some(id.as_ref()), Some(&to.to_string()));
         stanza.set_body(&body.to_string())?;
 
         if let Some(chat_state) = chat_state {
@@ -49,8 +50,14 @@ impl Chat {
         self.ctx.send_stanza(stanza)
     }
 
-    pub fn update_message(&self, id: &str, new_id: &str, to: &BareJid, body: &str) -> Result<()> {
-        let mut stanza = Stanza::new_message(None, Some(new_id), Some(&to.to_string()));
+    pub fn update_message(
+        &self,
+        id: MessageId,
+        new_id: MessageId,
+        to: &BareJid,
+        body: &str,
+    ) -> Result<()> {
+        let mut stanza = Stanza::new_message(None, Some(new_id.as_ref()), Some(&to.to_string()));
         stanza.set_body(&body.to_string())?;
 
         let mut replace_node = Stanza::new();
