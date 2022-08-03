@@ -58,7 +58,7 @@ interface XMPPClient {
   void set_archiving_preferences([ByRef] XMPPMAMPreferences preferences);
 
   [Throws=ProseError]
-  void load_messages_in_chat([ByRef] string request_id, [ByRef] BareJid jid, [ByRef] string? before);
+  void load_messages_in_chat([ByRef] string request_id, [ByRef] BareJid jid, MessageId? before);
 
   [Throws=ProseError]
   void send_reactions(MessageId id, [ByRef] BareJid to, [ByRef] sequence<string> reactions);

@@ -120,13 +120,9 @@ impl Client {
         &self,
         request_id: &str,
         jid: &BareJid,
-        before: &Option<String>,
+        before: Option<MessageId>,
     ) -> Result<()> {
-        self.with_account(|account| {
-            account
-                .mam
-                .load_messages_in_chat(request_id, jid, before.as_deref())
-        })
+        self.with_account(|account| account.mam.load_messages_in_chat(request_id, jid, before))
     }
 
     pub fn send_reactions(

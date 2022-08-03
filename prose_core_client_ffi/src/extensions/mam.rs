@@ -4,6 +4,7 @@ use crate::helpers::StanzaExt;
 use crate::types::forwarded_message::ForwardedMessage;
 use crate::types::mam::{Fin, MAMPreferences, Preferences};
 use crate::types::namespace::Namespace;
+use crate::MessageId;
 use jid::BareJid;
 use libstrophe::Stanza;
 use std::collections::HashMap;
@@ -116,7 +117,7 @@ impl MAM {
         &self,
         request_id: &str,
         jid: &BareJid,
-        before: Option<&str>,
+        before: Option<MessageId>,
     ) -> Result<()> {
         let query_id = self.ctx.generate_id();
 

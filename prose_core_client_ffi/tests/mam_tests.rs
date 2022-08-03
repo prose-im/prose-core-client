@@ -212,7 +212,7 @@ fn test_loads_messages_before() -> Result<()> {
     account.mam.load_messages_in_chat(
         "my-request",
         &BareJid::from_str("b@prose.org").unwrap(),
-        Some("09af3-cc343-b409f"),
+        Some("09af3-cc343-b409f".into()),
     )?;
 
     assert_eq!(
