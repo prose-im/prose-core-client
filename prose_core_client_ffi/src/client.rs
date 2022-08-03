@@ -71,7 +71,7 @@ impl Client {
         self.with_account(|account| account.roster.load_roster())
     }
 
-    pub fn add_user(
+    pub fn add_user_to_roster(
         &self,
         jid: &BareJid,
         nickname: &Option<String>,

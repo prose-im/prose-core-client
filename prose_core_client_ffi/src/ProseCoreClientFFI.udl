@@ -34,7 +34,7 @@ interface XMPPClient {
   void load_roster();
 
   [Throws=ProseError]
-  void add_user([ByRef] BareJid jid, [ByRef] string? nickname, [ByRef] sequence<string> groups);
+  void add_user_to_roster([ByRef] BareJid jid, [ByRef] string? nickname, [ByRef] sequence<string> groups);
 
   [Throws=ProseError]
   void remove_user_and_unsubscribe_from_presence([ByRef] BareJid jid);
