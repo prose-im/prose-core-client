@@ -8,6 +8,7 @@ pub mod forwarded_message;
 pub mod mam;
 pub mod message;
 pub mod message_fastening;
+pub mod message_reactions;
 pub mod namespace;
 pub mod presence;
 pub mod roster;

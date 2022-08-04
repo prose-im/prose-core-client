@@ -142,6 +142,11 @@ enum XMPPChatState {
   "Paused",
 };
 
+dictionary XMPPMessageReactions {
+  MessageId id;
+  sequence<string> reactions;
+};
+
 dictionary XMPPMessageFastening {
   MessageId id;
   boolean retract;
@@ -155,7 +160,7 @@ dictionary XMPPMessage {
   string? body;
   XMPPChatState? chat_state;
   MessageId? replace;
-  sequence<string>? reactions;
+  XMPPMessageReactions? reactions;
   XMPPMessageFastening? fastening;
   string? error;
 };

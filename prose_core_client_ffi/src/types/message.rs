@@ -1,5 +1,6 @@
 use crate::error::{Error, StanzaParseError};
 use crate::types::message_fastening::MessageFastening;
+use crate::types::message_reactions::MessageReactions;
 use jid::BareJid;
 use libstrophe::Stanza;
 use std::ops::Deref;
@@ -104,7 +105,7 @@ pub struct Message {
     /// When a user chooses to react to a message with a certain emoji, the client sends
     /// a <message> stanza containing a <reactions> element. The chosen emoji is included in
     /// a <reaction> element within the <reactions> element.
-    pub reactions: Option<Vec<String>>,
+    pub reactions: Option<MessageReactions>,
 
     /// A payload attached to another message.
     pub fastening: Option<MessageFastening>,
@@ -161,16 +162,7 @@ impl TryFrom<&Stanza> for Message {
                 .and_then(|n| n.get_attribute("id").map(|s| s.into())),
             reactions: stanza
                 .get_child_by_name_and_ns("reactions", Namespace::Reactions)
-                .and_then(|n| {
-                    n.children()
-                        .filter_map(|c| {
-                            if c.name() != Some("reaction") {
-                                return None;
-                            }
-                            return c.get_first_child().map(|c| c.text());
-                        })
-                        .collect()
-                }),
+                .and_then(|n| MessageReactions::try_from(n.deref()).ok()),
             fastening: stanza
                 .get_child_by_name_and_ns("apply-to", Namespace::Fasten)
                 .and_then(|n| MessageFastening::try_from(n.deref()).ok()),
@@ -394,7 +386,10 @@ mod tests {
                 body: None,
                 chat_state: None,
                 replace: None,
-                reactions: Some(vec!["🥲", ":-)"].iter().map(|s| s.to_string()).collect()),
+                reactions: Some(MessageReactions::new(
+                    "381c37e0-8e05-42c0-beb6-fdb5fa6263ec".into(),
+                    vec!["🥲", ":-)"].iter().map(|s| s.to_string()).collect()
+                )),
                 fastening: None,
                 error: None,
             }

@@ -29,6 +29,7 @@ pub use types::message::{
     ChatState as XMPPChatState, Message as XMPPMessage, MessageKind as XMPPMessageKind,
 };
 pub use types::message_fastening::MessageFastening as XMPPMessageFastening;
+pub use types::message_reactions::MessageReactions as XMPPMessageReactions;
 pub use types::presence::{
     Presence as XMPPPresence, PresenceKind as XMPPPresenceKind, ShowKind as XMPPShowKind,
 };
