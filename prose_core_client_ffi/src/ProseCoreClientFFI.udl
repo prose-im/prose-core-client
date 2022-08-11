@@ -11,9 +11,9 @@ namespace ProseCoreClientFFI {
 typedef string MessageId;
 
 interface XMPPClient {
-  constructor(BareJid jid);
+  constructor(FullJid jid);
 
-  BareJid jid();
+  FullJid jid();
 
   [Throws=ProseError]
   void connect([ByRef] string password, XMPPAccountObserver observer);
@@ -75,6 +75,8 @@ callback interface XMPPAccountObserver {
   void did_disconnect();
   
   void did_receive_message(XMPPMessage message);
+  void did_receive_message_carbon(XMPPForwardedMessage message);
+  void did_receive_sent_message_carbon(XMPPForwardedMessage message);
   void did_receive_roster(XMPPRoster roster);
   void did_receive_presence(XMPPPresence presence);
   void did_receive_presence_subscription_request(BareJid from);
@@ -178,6 +180,12 @@ dictionary XMPPForwardedMessage {
 dictionary BareJid {
   string? node;
   string domain;
+};
+
+dictionary FullJid {
+  string? node;
+  string domain;
+  string resource;
 };
 
 dictionary XMPPRoster {

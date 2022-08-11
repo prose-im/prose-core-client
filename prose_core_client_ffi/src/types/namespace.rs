@@ -31,4 +31,6 @@ impl Namespace {
     pub const Retract: &'static str = "urn:xmpp:message-retract:0";
     /// XEP-0428: Fallback Indication
     pub const Fallback: &'static str = "urn:xmpp:fallback:0";
+    /// XEP-0280: Message Carbons
+    pub const MessageCarbons: &'static str = "urn:xmpp:carbons:2";
 }

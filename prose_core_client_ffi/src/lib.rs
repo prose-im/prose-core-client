@@ -17,7 +17,7 @@ pub mod test_helpers;
 pub use account::AccountObserver as XMPPAccountObserver;
 pub use client::Client as XMPPClient;
 pub use error::{Error as ProseError, Result, StanzaParseError};
-pub use jid::{BareJid, JidParseError};
+pub use jid::{BareJid, FullJid, Jid, JidParseError};
 pub use libstrophe::Error as LibStropheError;
 pub use logger::enable_logging;
 pub use types::delay::Delay as XMPPDelay;

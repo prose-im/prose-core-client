@@ -3,10 +3,12 @@ use crate::{
     Account, AccountObserverMock, ConnectionEvent, ConnectionHandler, Result, StanzaHandler,
     XMPPConnection, XMPPSender,
 };
+use jid::FullJid;
 use libstrophe::Stanza;
 use std::cell::{Cell, RefCell};
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 
 impl Account {
@@ -20,9 +22,12 @@ impl Account {
         let stanzas = StanzaBucket::new();
         let observer = Arc::new(Mutex::new(AccountObserverMock::new()));
 
+        // We start our MockIDProvider with a negative value to compensate for requests that
+        // happen immediately after the connection was established.
         let account = Account::new(
+            &FullJid::from_str("test@prose.org/ci").unwrap(),
             MockConnection::new(handlers.clone(), stanzas.clone()),
-            MockIDProvider::new(),
+            MockIDProvider::new(-1),
             Box::new(observer.clone()),
         )
         .unwrap();
@@ -97,6 +102,10 @@ impl StanzaBucket {
     pub fn clear(&self) {
         self.stanzas.borrow_mut().clear();
     }
+
+    pub fn stanza_at_index(&self, index: usize) -> Stanza {
+        self.stanzas.borrow()[index].clone()
+    }
 }
 
 pub struct MockConnection {
@@ -147,13 +156,13 @@ impl XMPPSender for MockSender {
 unsafe impl Send for MockSender {}
 
 pub struct MockIDProvider {
-    last_id: Rc<Cell<u64>>,
+    last_id: Rc<Cell<i64>>,
 }
 
 impl MockIDProvider {
-    pub fn new() -> Box<Self> {
+    pub fn new(start_index: i64) -> Box<Self> {
         Box::new(MockIDProvider {
-            last_id: Rc::new(Cell::new(0)),
+            last_id: Rc::new(Cell::new(start_index)),
         })
     }
 }

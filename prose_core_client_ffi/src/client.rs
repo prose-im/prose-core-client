@@ -9,28 +9,29 @@ use crate::connection::LibstropheConnection;
 use crate::types::message::ChatState;
 use crate::types::presence::ShowKind;
 use crate::{MessageId, XMPPMAMPreferences};
-use jid::BareJid;
+use jid::{BareJid, FullJid};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
 
-static ACCOUNTS: Lazy<Mutex<HashMap<BareJid, Account>>> = Lazy::new(|| Mutex::new(HashMap::new()));
+static ACCOUNTS: Lazy<Mutex<HashMap<FullJid, Account>>> = Lazy::new(|| Mutex::new(HashMap::new()));
 
 pub struct Client {
-    jid: BareJid,
+    jid: FullJid,
 }
 
 impl Client {
-    pub fn new(jid: BareJid) -> Self {
+    pub fn new(jid: FullJid) -> Self {
         Client { jid }
     }
 
-    pub fn jid(&self) -> BareJid {
+    pub fn jid(&self) -> FullJid {
         self.jid.clone()
     }
 
     pub fn connect(&self, password: &str, observer: Box<dyn AccountObserver>) -> Result<()> {
         let connection = LibstropheConnection::new(&self.jid, password);
         let account = Account::new(
+            &self.jid,
             Box::new(connection),
             Box::new(UUIDProvider::new()),
             observer,

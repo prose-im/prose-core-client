@@ -1,10 +1,12 @@
 use crate::error::Result;
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
 use crate::helpers::StanzaExt;
+use crate::types::forwarded_message::ForwardedMessage;
 use crate::types::message::{ChatState, Message, MessageId};
 use crate::types::namespace::Namespace;
 use jid::BareJid;
 use libstrophe::Stanza;
+use std::ops::Deref;
 use std::sync::Arc;
 
 pub struct Chat {
@@ -18,11 +20,36 @@ impl Chat {
 }
 
 impl XMPPExtension for Chat {
+    fn handle_connect(&self) -> Result<()> {
+        // Enable message carbons on startup.
+        self.set_message_carbons_enabled(true)
+    }
+
     fn handle_message_stanza(&self, stanza: &Stanza) -> Result<()> {
         // Ignore MAM messages.
         if stanza.get_child_by_name("result").is_some() {
             return Ok(());
         }
+
+        if let Some(received_node) =
+            stanza.get_child_by_name_and_ns("received", Namespace::MessageCarbons)
+        {
+            let forward_node =
+                received_node.get_required_child_by_name_and_ns("forwarded", Namespace::Forward)?;
+            let message: ForwardedMessage = forward_node.deref().try_into()?;
+            self.ctx.observer.did_receive_message_carbon(message);
+            return Ok(());
+        }
+
+        if let Some(sent_node) = stanza.get_child_by_name_and_ns("sent", Namespace::MessageCarbons)
+        {
+            let forward_node =
+                sent_node.get_required_child_by_name_and_ns("forwarded", Namespace::Forward)?;
+            let message: ForwardedMessage = forward_node.deref().try_into()?;
+            self.ctx.observer.did_receive_sent_message_carbon(message);
+            return Ok(());
+        }
+
         let message: Message = stanza.try_into()?;
         self.ctx.observer.did_receive_message(message);
         Ok(())
@@ -136,6 +163,22 @@ impl Chat {
         stanza.add_child(fastening_node)?;
         stanza.add_child(fallback_node)?;
         stanza.add_child(body_node)?;
+
+        self.ctx.send_stanza(stanza)
+    }
+
+    pub fn set_message_carbons_enabled(&self, enabled: bool) -> Result<()> {
+        let mut toggle_node = Stanza::new();
+        if enabled {
+            toggle_node.set_name("enable")?;
+        } else {
+            toggle_node.set_name("disable")?;
+        }
+        toggle_node.set_ns(Namespace::MessageCarbons)?;
+
+        let mut stanza = Stanza::new_iq(Some("set"), Some(&self.ctx.generate_id()));
+        stanza.set_attribute("from", self.ctx.jid.to_string())?;
+        stanza.add_child(toggle_node)?;
 
         self.ctx.send_stanza(stanza)
     }

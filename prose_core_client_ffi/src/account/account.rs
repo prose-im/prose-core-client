@@ -3,6 +3,7 @@ use crate::connection::{ConnectionEvent, XMPPConnection, XMPPSender};
 use crate::error::Result;
 use crate::extensions::{Chat, Debug, Presence, Roster, MAM};
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
+use jid::FullJid;
 use libstrophe::Stanza;
 use std::sync::Arc;
 
@@ -17,6 +18,7 @@ pub struct Account {
 
 impl Account {
     pub fn new(
+        jid: &FullJid,
         connection: Box<dyn XMPPConnection>,
         id_provider: Box<dyn IDProvider>,
         observer: Box<dyn AccountObserver>,
@@ -24,6 +26,7 @@ impl Account {
         let mut connection = connection;
 
         let ctx = Arc::new(XMPPExtensionContext::new(
+            jid.clone(),
             Box::new(PlaceholderSender { sender: None }),
             id_provider,
             observer,
@@ -36,9 +39,9 @@ impl Account {
         let debug = Arc::new(Debug::new(ctx.clone()));
 
         let extensions: Vec<Arc<dyn XMPPExtension>> = vec![
+            presence.clone(),
             roster.clone(),
             chat.clone(),
-            presence.clone(),
             mam.clone(),
             debug.clone(),
         ];
@@ -87,9 +90,9 @@ impl Account {
 
         Ok(Account {
             _ctx: ctx,
+            presence,
             roster,
             chat,
-            presence,
             mam,
             debug,
         })

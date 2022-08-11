@@ -1,5 +1,6 @@
 use crate::error::Result;
-use libstrophe::Stanza;
+use crate::error::{Error, StanzaParseError};
+use libstrophe::{Stanza, StanzaRef};
 
 pub(crate) trait StanzaExt {
     /// The ns filter matches the namespace ('xmlns' attribute) of either the top level stanza or
@@ -14,6 +15,12 @@ pub(crate) trait StanzaExt {
         value: impl AsRef<str>,
         kind: Option<&str>,
     ) -> Result<Stanza>;
+
+    fn get_required_child_by_name_and_ns(
+        &self,
+        name: impl AsRef<str>,
+        ns: impl AsRef<str>,
+    ) -> Result<StanzaRef, Error>;
 }
 
 impl StanzaExt for Stanza {
@@ -63,5 +70,16 @@ impl StanzaExt for Stanza {
         value_node.add_child(Stanza::new_text_node(value)?)?;
         field.add_child(value_node)?;
         Ok(field)
+    }
+
+    fn get_required_child_by_name_and_ns(
+        &self,
+        name: impl AsRef<str>,
+        ns: impl AsRef<str>,
+    ) -> Result<StanzaRef, Error> {
+        match self.get_child_by_name_and_ns(&name, ns) {
+            None => Err(StanzaParseError::missing_child_node(name.as_ref(), self).into()),
+            Some(node) => Ok(node),
+        }
     }
 }

@@ -2,10 +2,12 @@ use crate::account::AccountObserver;
 use crate::account::IDProvider;
 use crate::connection::XMPPSender;
 use crate::error::Result;
+use jid::FullJid;
 use libstrophe::Stanza;
 use std::sync::Mutex;
 
 pub struct XMPPExtensionContext {
+    pub jid: FullJid,
     sender: Mutex<Box<dyn XMPPSender>>,
     id_provider: Box<dyn IDProvider>,
     pub observer: Box<dyn AccountObserver>,
@@ -13,11 +15,13 @@ pub struct XMPPExtensionContext {
 
 impl XMPPExtensionContext {
     pub fn new(
+        jid: FullJid,
         sender: Box<dyn XMPPSender>,
         id_provider: Box<dyn IDProvider>,
         observer: Box<dyn AccountObserver>,
     ) -> Self {
         XMPPExtensionContext {
+            jid,
             sender: Mutex::new(sender),
             id_provider,
             observer,

@@ -18,6 +18,8 @@ pub trait AccountObserver: Send + Sync {
     fn did_disconnect(&self);
 
     fn did_receive_message(&self, message: Message);
+    fn did_receive_message_carbon(&self, message: ForwardedMessage);
+    fn did_receive_sent_message_carbon(&self, message: ForwardedMessage);
     fn did_receive_roster(&self, roster: Roster);
     fn did_receive_presence(&self, presence: Presence);
     fn did_receive_presence_subscription_request(&self, from: BareJid);
@@ -42,6 +44,14 @@ impl<'mock> AccountObserver for Arc<Mutex<AccountObserverMock<'mock>>> {
 
     fn did_receive_message(&self, message: Message) {
         self.lock().unwrap().did_receive_message(message);
+    }
+    fn did_receive_message_carbon(&self, message: ForwardedMessage) {
+        self.lock().unwrap().did_receive_message_carbon(message);
+    }
+    fn did_receive_sent_message_carbon(&self, message: ForwardedMessage) {
+        self.lock()
+            .unwrap()
+            .did_receive_sent_message_carbon(message);
     }
     fn did_receive_roster(&self, roster: Roster) {
         self.lock().unwrap().did_receive_roster(roster);

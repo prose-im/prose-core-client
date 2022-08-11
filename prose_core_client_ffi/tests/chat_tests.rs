@@ -1,6 +1,7 @@
 use jid::BareJid;
+use prose_core_client_ffi::test_helpers::mocks::HandlerBucketExt;
 use prose_core_client_ffi::test_helpers::StrExt;
-use prose_core_client_ffi::{Account, Result};
+use prose_core_client_ffi::{Account, Result, XMPPForwardedMessage, XMPPMessage};
 use std::str::FromStr;
 
 #[test]
@@ -50,6 +51,84 @@ fn test_retracts_message() -> Result<()> {
         </message>
         "#
             .to_xml_result_string()
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_receives_message_carbons() -> Result<()> {
+    let (_, handlers, _, observer) = Account::connected();
+
+    let expected_message = XMPPForwardedMessage::new(
+        XMPPMessage::new_chat_message(
+            BareJid::from_str("a@prose.org").unwrap(),
+            BareJid::from_str("test@prose.org").unwrap(),
+            None,
+            "My Message",
+            None,
+        ),
+        None,
+    );
+
+    observer
+        .lock()
+        .unwrap()
+        .expect_did_receive_message_carbon(|arg| arg.partial_eq(expected_message))
+        .times(1)
+        .returns(());
+
+    handlers.send_stanza_str(
+        r#"
+        <message to="test@prose.org/ci" type="chat" from="test@prose.org">
+            <received xmlns="urn:xmpp:carbons:2">
+                <forwarded xmlns="urn:xmpp:forward:0">
+                    <message xmlns="jabber:client" to="test@prose.org/void" type="chat" from="a@prose.org/adium">
+                        <body>My Message</body>
+                    </message>
+                </forwarded>
+            </received>
+        </message>
+  "#,
+    );
+
+    Ok(())
+}
+
+#[test]
+fn test_receives_sent_message_carbons() -> Result<()> {
+    let (_, handlers, _, observer) = Account::connected();
+
+    let expected_message = XMPPForwardedMessage::new(
+        XMPPMessage::new_chat_message(
+            BareJid::from_str("test@prose.org").unwrap(),
+            BareJid::from_str("a@prose.org").unwrap(),
+            None,
+            "My Message",
+            None,
+        ),
+        None,
+    );
+
+    observer
+        .lock()
+        .unwrap()
+        .expect_did_receive_sent_message_carbon(|arg| arg.partial_eq(expected_message))
+        .times(1)
+        .returns(());
+
+    handlers.send_stanza_str(
+        r#"
+        <message to="test@prose.org/ci" type="chat" from="test@prose.org">
+            <sent xmlns="urn:xmpp:carbons:2">
+                <forwarded xmlns="urn:xmpp:forward:0">
+                    <message xmlns="jabber:client" to="a@prose.org/adium" type="chat" from="test@prose.org/void">
+                        <body>My Message</body>
+                    </message>
+                </forwarded>
+            </sent>
+        </message>
+  "#,
     );
 
     Ok(())

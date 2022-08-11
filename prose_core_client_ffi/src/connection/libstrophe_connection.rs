@@ -1,7 +1,7 @@
 use crate::connection::xmpp_connection::{ConnectionEvent, ConnectionHandler, XMPPSender};
 use crate::connection::{StanzaHandler, XMPPConnection};
 use crate::error::Result;
-use jid::BareJid;
+use jid::FullJid;
 use libstrophe::{Connection, ConnectionFlags, Context, Logger, Stanza};
 use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::thread::{self, JoinHandle};
@@ -14,7 +14,7 @@ pub(crate) struct LibstropheConnection {
 }
 
 impl LibstropheConnection {
-    pub(crate) fn new(jid: &BareJid, password: &str) -> LibstropheConnection {
+    pub(crate) fn new(jid: &FullJid, password: &str) -> LibstropheConnection {
         let logger = Logger::default();
 
         let mut connection = Connection::new(Context::new(logger));
