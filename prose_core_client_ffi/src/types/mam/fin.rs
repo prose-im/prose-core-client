@@ -1,12 +1,13 @@
 use crate::error::{Error, StanzaParseError};
 use crate::types::namespace::Namespace;
+use crate::MessageId;
 use libstrophe::Stanza;
 
 #[derive(Debug, PartialEq)]
 pub struct Fin {
     pub query_id: Option<String>,
-    pub first_message_id: String,
-    pub last_message_id: String,
+    pub first_message_id: Option<MessageId>,
+    pub last_message_id: Option<MessageId>,
     pub complete: bool,
     pub count: Option<i64>,
 }
@@ -14,8 +15,8 @@ pub struct Fin {
 impl Fin {
     pub fn new(
         query_id: Option<&str>,
-        first_message_id: impl Into<String>,
-        last_message_id: impl Into<String>,
+        first_message_id: Option<MessageId>,
+        last_message_id: Option<MessageId>,
         complete: bool,
         count: Option<i64>,
     ) -> Self {
@@ -44,15 +45,11 @@ impl TryFrom<&Stanza> for Fin {
             set_node
                 .get_child_by_name("first")
                 .and_then(|n| n.text())
-                .ok_or(Error::StanzaParseError {
-                    error: StanzaParseError::missing_child_node("first", stanza),
-                })?,
+                .map(|t| t.into()),
             set_node
                 .get_child_by_name("last")
                 .and_then(|n| n.text())
-                .ok_or(Error::StanzaParseError {
-                    error: StanzaParseError::missing_child_node("last", stanza),
-                })?,
+                .map(|t| t.into()),
             stanza
                 .get_attribute("complete")
                 .and_then(|s| Some(s == "true"))
@@ -87,7 +84,13 @@ mod tests {
 
         assert_eq!(
             fin,
-            Fin::new(None, "23452-4534-1", "390-2342-22", true, Some(16))
+            Fin::new(
+                None,
+                Some("23452-4534-1".into()),
+                Some("390-2342-22".into()),
+                true,
+                Some(16)
+            )
         );
     }
 
@@ -109,8 +112,8 @@ mod tests {
             fin,
             Fin::new(
                 Some("my-query-id"),
-                "23452-4534-1",
-                "390-2342-22",
+                Some("23452-4534-1".into()),
+                Some("390-2342-22".into()),
                 false,
                 None
             )

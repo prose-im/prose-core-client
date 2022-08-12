@@ -229,10 +229,55 @@ fn test_loads_messages_before() -> Result<()> {
                         <value>09af3-cc343-b409f</value>
                     </field>
                 </x>
+#[test]
+fn test_handles_empty_result_set() -> Result<()> {
+    let (account, handlers, stanzas, observer) = Account::connected();
+
+    account.mam.load_messages_in_chat(
+        "my-request",
+        &BareJid::from_str("b@prose.org").unwrap(),
+        None,
+    )?;
+
+    assert_eq!(
+        stanzas.stanzas.borrow().first().unwrap().to_text()?,
+        r#"
+        <iq id="my-request" type="set">
+            <query queryid="id_1" xmlns="urn:xmpp:mam:2">
+                <x xmlns="jabber:x:data" type="submit">
+                    <field type="hidden" var="FORM_TYPE">
+                        <value>urn:xmpp:mam:2</value>
+                    </field>
+                    <field var="with"><value>b@prose.org</value></field>
+                </x>
                 <flip-page/>
             </query>
         </iq>"#
             .to_xml_result_string()
+    );
+
+    observer
+        .lock()
+        .unwrap()
+        .expect_did_receive_messages_in_chat(
+            |arg| arg.partial_eq("my-request"),
+            |arg| arg.partial_eq(BareJid::from_str("b@prose.org").unwrap()),
+            |arg| arg.partial_eq::<Vec<XMPPForwardedMessage>>(vec![]),
+            |arg| arg.partial_eq(true),
+        )
+        .times(1)
+        .returns(());
+
+    handlers.send_stanza_str(
+        r#"
+        <iq to="test@prose.org" type="result">
+            <fin queryid="id_1" xmlns="urn:xmpp:mam:2" complete="true">
+                <set xmlns="http://jabber.org/protocol/rsm">
+                    <count>0</count>
+                </set>
+            </fin>
+        </iq>
+  "#,
     );
 
     Ok(())
