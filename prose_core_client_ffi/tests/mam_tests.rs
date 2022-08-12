@@ -88,7 +88,7 @@ fn test_loads_messages() -> Result<()> {
                     </field>
                     <field var="with"><value>b@prose.org</value></field>
                 </x>
-                <flip-page/>
+                <set xmlns="http://jabber.org/protocol/rsm"><before/></set>
             </query>
         </iq>"#
             .to_xml_result_string()
@@ -229,6 +229,14 @@ fn test_loads_messages_before() -> Result<()> {
                         <value>09af3-cc343-b409f</value>
                     </field>
                 </x>
+            </query>
+        </iq>"#
+            .to_xml_result_string()
+    );
+
+    Ok(())
+}
+
 #[test]
 fn test_handles_empty_result_set() -> Result<()> {
     let (account, handlers, stanzas, observer) = Account::connected();
@@ -250,7 +258,7 @@ fn test_handles_empty_result_set() -> Result<()> {
                     </field>
                     <field var="with"><value>b@prose.org</value></field>
                 </x>
-                <flip-page/>
+                <set xmlns="http://jabber.org/protocol/rsm"><before/></set>
             </query>
         </iq>"#
             .to_xml_result_string()

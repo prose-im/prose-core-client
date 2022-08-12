@@ -132,16 +132,26 @@ impl MAM {
         )?)?;
         x.add_child(Stanza::new_form_field("with", jid.to_string(), None)?)?;
 
-        if let Some(before) = before {
+        if let Some(before) = &before {
             x.add_child(Stanza::new_form_field("before-id", before, None)?)?;
         }
 
-        let mut flip = Stanza::new();
-        flip.set_name("flip-page")?;
-
         let mut query = Stanza::new_query(Namespace::MAM2, Some(&query_id))?;
         query.add_child(x)?;
-        query.add_child(flip)?;
+
+        // If no message id is set, we'll load the last page.
+        // See: https://xmpp.org/extensions/xep-0313.html#sect-idm46520034792112
+        if before.is_none() {
+            let mut before = Stanza::new();
+            before.set_name("before")?;
+
+            let mut set = Stanza::new();
+            set.set_name("set")?;
+            set.set_ns(Namespace::RSM)?;
+
+            set.add_child(before)?;
+            query.add_child(set)?;
+        }
 
         let mut iq = Stanza::new_iq(Some("set"), Some(&request_id));
         iq.add_child(query)?;
