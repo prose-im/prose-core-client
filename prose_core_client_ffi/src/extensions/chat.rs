@@ -34,6 +34,11 @@ impl XMPPExtension for Chat {
         if let Some(received_node) =
             stanza.get_child_by_name_and_ns("received", Namespace::MessageCarbons)
         {
+            // Ignore messages from invalid senders.
+            if stanza.from() != Some(&BareJid::from(self.ctx.jid.clone()).to_string()) {
+                return Ok(());
+            }
+
             let forward_node =
                 received_node.get_required_child_by_name_and_ns("forwarded", Namespace::Forward)?;
             let message: ForwardedMessage = forward_node.deref().try_into()?;
@@ -43,6 +48,11 @@ impl XMPPExtension for Chat {
 
         if let Some(sent_node) = stanza.get_child_by_name_and_ns("sent", Namespace::MessageCarbons)
         {
+            // Ignore messages from invalid senders.
+            if stanza.from() != Some(&BareJid::from(self.ctx.jid.clone()).to_string()) {
+                return Ok(());
+            }
+
             let forward_node =
                 sent_node.get_required_child_by_name_and_ns("forwarded", Namespace::Forward)?;
             let message: ForwardedMessage = forward_node.deref().try_into()?;

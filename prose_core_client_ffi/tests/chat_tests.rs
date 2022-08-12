@@ -133,3 +133,76 @@ fn test_receives_sent_message_carbons() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn test_ignores_message_carbons_from_invalid_sender() -> Result<()> {
+    let (_, handlers, _, _observer) = Account::connected();
+
+    /* From XEP-0280…
+    The security model assumed by this document is that all of the resources for a single user are
+    in the same trust boundary.
+
+    - Any forwarded copies received by a Carbons-enabled client MUST be from that user's bare JID;
+    - any copies that do not meet this requirement MUST be ignored.
+    */
+
+    handlers.send_stanza_str(
+        r#"
+        <message to="test@prose.org/ci" type="chat" from="test@prose.org/non_bare_jid">
+            <sent xmlns="urn:xmpp:carbons:2">
+                <forwarded xmlns="urn:xmpp:forward:0">
+                    <message xmlns="jabber:client" to="a@prose.org/adium" type="chat" from="test@prose.org/void">
+                        <body>My Message</body>
+                    </message>
+                </forwarded>
+            </sent>
+        </message>
+  "#,
+    );
+
+    handlers.send_stanza_str(
+        r#"
+        <message to="test@prose.org/ci" type="chat" from="mallory@evil.example">
+            <sent xmlns="urn:xmpp:carbons:2">
+                <forwarded xmlns="urn:xmpp:forward:0">
+                    <message xmlns="jabber:client" to="a@prose.org/adium" type="chat" from="test@prose.org/void">
+                        <body>My Message</body>
+                    </message>
+                </forwarded>
+            </sent>
+        </message>
+  "#,
+    );
+
+    handlers.send_stanza_str(
+        r#"
+        <message to="test@prose.org/ci" type="chat" from="test@prose.org/non_bare_jid">
+            <received xmlns="urn:xmpp:carbons:2">
+                <forwarded xmlns="urn:xmpp:forward:0">
+                    <message xmlns="jabber:client" to="test@prose.org/void" type="chat" from="a@prose.org/adium">
+                        <body>My Message</body>
+                    </message>
+                </forwarded>
+            </received>
+        </message>
+  "#,
+    );
+
+    handlers.send_stanza_str(
+        r#"
+        <message to="test@prose.org/ci" type="chat" from="mallory@evil.example">
+            <received xmlns="urn:xmpp:carbons:2">
+                <forwarded xmlns="urn:xmpp:forward:0">
+                    <message xmlns="jabber:client" to="test@prose.org/void" type="chat" from="a@prose.org/adium">
+                        <body>My Message</body>
+                    </message>
+                </forwarded>
+            </received>
+        </message>
+  "#,
+    );
+
+    // Our Mockiato observer would panic if any of the callback methods were called.
+
+    Ok(())
+}
