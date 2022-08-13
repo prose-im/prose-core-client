@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2022, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use jid::JidParseError;
 use libstrophe::{ConnectClientError, ConnectionError, Stanza, ToTextError};
 use std::cell::BorrowMutError;

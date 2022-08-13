@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2022, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use crate::error::{Error, StanzaParseError};
 use crate::types::message_fastening::MessageFastening;
 use crate::types::message_reactions::MessageReactions;
