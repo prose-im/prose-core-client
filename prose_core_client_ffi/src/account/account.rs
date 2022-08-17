@@ -63,18 +63,22 @@ impl Account {
             }
         }
 
-        let ec = extensions.clone();
-        let ctxc = ctx.clone();
-        connection.set_connection_handler(Box::new(move |event: &ConnectionEvent| match event {
-            ConnectionEvent::Connect => {
-                for_each(&ec, |e| e.handle_connect());
-                ctxc.observer.did_connect();
-            }
-            ConnectionEvent::Disconnect(_) => {
-                for_each(&ec, |e| e.handle_disconnect());
-                ctxc.observer.did_disconnect();
-            }
-        }));
+        {
+            let extensions = extensions.clone();
+            let ctx = ctx.clone();
+            connection.set_connection_handler(Box::new(
+                move |event: &ConnectionEvent| match event {
+                    ConnectionEvent::Connect => {
+                        for_each(&extensions, |e| e.handle_connect());
+                        ctx.observer.did_connect();
+                    }
+                    ConnectionEvent::Disconnect(_) => {
+                        for_each(&extensions, |e| e.handle_disconnect());
+                        ctx.observer.did_disconnect();
+                    }
+                },
+            ));
+        }
 
         connection.set_stanza_handler(Box::new(move |stanza: &Stanza| {
             let name = match stanza.name() {
