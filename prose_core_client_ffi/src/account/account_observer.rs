@@ -7,6 +7,8 @@ use crate::types::forwarded_message::ForwardedMessage;
 use crate::types::mam::MAMPreferences;
 use crate::types::message::Message;
 use crate::types::presence::Presence;
+use crate::types::profile::avatar_data::AvatarData;
+use crate::types::profile::avatar_metadata::AvatarMetadataInfo;
 use crate::types::roster::Roster;
 use jid::BareJid;
 #[cfg(feature = "test-helpers")]
@@ -31,6 +33,15 @@ pub trait AccountObserver: Send + Sync {
         messages: Vec<ForwardedMessage>,
         is_complete: bool,
     );
+    fn did_load_avatar_metadata(
+        &self,
+        request_id: String,
+        jid: BareJid,
+        metadata: Vec<AvatarMetadataInfo>,
+    );
+    fn did_load_avatar_image(&self, request_id: String, jid: BareJid, image: Option<AvatarData>);
+    fn did_set_avatar_image(&self, request_id: String);
+    fn did_receive_updated_avatar_metadata(&self, jid: BareJid, metadata: Vec<AvatarMetadataInfo>);
 }
 
 #[cfg(feature = "test-helpers")]
@@ -79,6 +90,33 @@ impl<'mock> AccountObserver for Arc<Mutex<AccountObserverMock<'mock>>> {
         self.lock()
             .unwrap()
             .did_receive_messages_in_chat(request_id, jid, messages, is_complete);
+    }
+
+    fn did_load_avatar_metadata(
+        &self,
+        request_id: String,
+        jid: BareJid,
+        metadata: Vec<AvatarMetadataInfo>,
+    ) {
+        self.lock()
+            .unwrap()
+            .did_load_avatar_metadata(request_id, jid, metadata);
+    }
+
+    fn did_load_avatar_image(&self, request_id: String, jid: BareJid, image: Option<AvatarData>) {
+        self.lock()
+            .unwrap()
+            .did_load_avatar_image(request_id, jid, image);
+    }
+
+    fn did_set_avatar_image(&self, request_id: String) {
+        self.lock().unwrap().did_set_avatar_image(request_id);
+    }
+
+    fn did_receive_updated_avatar_metadata(&self, jid: BareJid, metadata: Vec<AvatarMetadataInfo>) {
+        self.lock()
+            .unwrap()
+            .did_receive_updated_avatar_metadata(jid, metadata);
     }
 }
 

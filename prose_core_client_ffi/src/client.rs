@@ -8,7 +8,7 @@ use crate::account::{Account, AccountObserver, UUIDProvider};
 use crate::connection::LibstropheConnection;
 use crate::types::message::ChatState;
 use crate::types::presence::ShowKind;
-use crate::{MessageId, XMPPMAMPreferences};
+use crate::{MessageId, XMPPImage, XMPPMAMPreferences};
 use jid::{BareJid, FullJid};
 use once_cell::sync::Lazy;
 use std::{collections::HashMap, sync::Mutex};
@@ -137,6 +137,31 @@ impl Client {
 
     pub fn retract_message(&self, id: MessageId, to: &BareJid) -> Result<()> {
         self.with_account(|account| account.chat.retract_message(id, to))
+    }
+
+    pub fn set_avatar_image(&self, request_id: &str, image: XMPPImage) -> Result<()> {
+        self.with_account(|account| account.profile.set_avatar_image(request_id, image))
+    }
+
+    pub fn load_avatar_image(
+        &self,
+        request_id: &str,
+        from: &BareJid,
+        image_id: &str,
+    ) -> Result<()> {
+        self.with_account(|account| {
+            account
+                .profile
+                .load_avatar_image(request_id, from, image_id)
+        })
+    }
+
+    pub fn load_latest_avatar_metadata(&self, request_id: &str, from: &BareJid) -> Result<()> {
+        self.with_account(|account| {
+            account
+                .profile
+                .load_latest_avatar_metadata(request_id, from)
+        })
     }
 
     pub fn send_xml_payload(&self, xml_str: &str) -> Result<()> {

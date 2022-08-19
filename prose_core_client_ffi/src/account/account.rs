@@ -6,10 +6,14 @@
 use crate::account::{AccountObserver, IDProvider};
 use crate::connection::{ConnectionEvent, XMPPConnection, XMPPSender};
 use crate::error::Result;
-use crate::extensions::{Chat, Debug, Presence, Roster, MAM};
+use crate::extensions::{Chat, Debug, Presence, Profile, Roster, MAM};
 use crate::extensions::{XMPPExtension, XMPPExtensionContext};
-use jid::FullJid;
+use crate::helpers::StanzaExt;
+use crate::types::namespace::Namespace;
+use jid::{BareJid, FullJid};
 use libstrophe::Stanza;
+use std::ops::Deref;
+use std::str::FromStr;
 use std::sync::Arc;
 
 pub struct Account {
@@ -18,6 +22,7 @@ pub struct Account {
     pub chat: Arc<Chat>,
     pub presence: Arc<Presence>,
     pub mam: Arc<MAM>,
+    pub profile: Arc<Profile>,
     pub debug: Arc<Debug>,
 }
 
@@ -41,6 +46,7 @@ impl Account {
         let chat = Arc::new(Chat::new(ctx.clone()));
         let presence = Arc::new(Presence::new(ctx.clone()));
         let mam = Arc::new(MAM::new(ctx.clone()));
+        let profile = Arc::new(Profile::new(ctx.clone()));
         let debug = Arc::new(Debug::new(ctx.clone()));
 
         let extensions: Vec<Arc<dyn XMPPExtension>> = vec![
@@ -48,6 +54,7 @@ impl Account {
             roster.clone(),
             chat.clone(),
             mam.clone(),
+            profile.clone(),
             debug.clone(),
         ];
 
@@ -80,19 +87,73 @@ impl Account {
             ));
         }
 
-        connection.set_stanza_handler(Box::new(move |stanza: &Stanza| {
-            let name = match stanza.name() {
-                Some(name) => name,
-                None => return,
-            };
+        {
+            let ctx = ctx.clone();
+            connection.set_stanza_handler(Box::new(move |stanza: &Stanza| {
+                let name = match stanza.name() {
+                    Some(name) => name,
+                    None => return,
+                };
 
-            match name {
-                "presence" => for_each(&extensions, |e| e.handle_presence_stanza(stanza)),
-                "message" => for_each(&extensions, |e| e.handle_message_stanza(stanza)),
-                "iq" => for_each(&extensions, |e| e.handle_iq_stanza(stanza)),
-                _ => (),
-            }
-        }));
+                match name {
+                    "presence" => for_each(&extensions, |e| e.handle_presence_stanza(stanza)),
+                    "message" => {
+                        if let Some(event) =
+                            stanza.get_child_by_name_and_ns("event", Namespace::PubSubEvent)
+                        {
+                            let from = match stanza.from().and_then(|a| BareJid::from_str(a).ok()) {
+                                Some(from) => from,
+                                None => {
+                                    log::error!("Missing sender in pubsub event.");
+                                    return;
+                                }
+                            };
+
+                            let items = match event.get_child_by_name("items") {
+                                Some(items) => items,
+                                None => {
+                                    log::error!("Missing items node in pubsub event.");
+                                    return;
+                                }
+                            };
+
+                            let node = match items.get_attribute("node") {
+                                Some(node) => node,
+                                None => {
+                                    log::error!("Missing node attribute in pubsub event.");
+                                    return;
+                                }
+                            };
+
+                            for_each(&extensions, |e| {
+                                e.handle_pubsub_event(&from, node, items.deref())
+                            });
+
+                            return;
+                        }
+
+                        for_each(&extensions, |e| e.handle_message_stanza(stanza))
+                    }
+                    "iq" => {
+                        for_each(&extensions, |e| e.handle_iq_stanza(stanza));
+
+                        if stanza.get_attribute("type") != Some("result") {
+                            return;
+                        }
+
+                        let (id, payload) = match (stanza.id(), stanza.get_first_non_text_child()) {
+                            (Some(id), Some(payload)) => (id, payload),
+                            (_, _) => return,
+                        };
+
+                        if let Some(err) = ctx.handle_iq_result(id, payload.deref()).err() {
+                            log::error!("{:?}", err);
+                        }
+                    }
+                    _ => (),
+                }
+            }));
+        }
 
         let sender = connection.connect()?;
         ctx.replace_sender(sender)?;
@@ -103,6 +164,7 @@ impl Account {
             roster,
             chat,
             mam,
+            profile,
             debug,
         })
     }

@@ -38,4 +38,12 @@ impl Namespace {
     pub const Fallback: &'static str = "urn:xmpp:fallback:0";
     /// XEP-0280: Message Carbons
     pub const MessageCarbons: &'static str = "urn:xmpp:carbons:2";
+    /// XEP-0060: Publish-Subscribe
+    pub const PubSub: &'static str = "http://jabber.org/protocol/pubsub";
+    /// XEP-0060: Publish-Subscribe
+    pub const PubSubEvent: &'static str = "http://jabber.org/protocol/pubsub#event";
+    /// XEP-0084: User Avatars
+    pub const AvatarData: &'static str = "urn:xmpp:avatar:data";
+    /// XEP-0084: User Avatars
+    pub const AvatarMetadata: &'static str = "urn:xmpp:avatar:metadata";
 }

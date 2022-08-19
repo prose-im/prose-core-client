@@ -11,5 +11,7 @@ pub mod message_fastening;
 pub mod message_reactions;
 pub mod namespace;
 pub mod presence;
+pub mod profile;
+pub mod pubsub;
 pub mod roster;
 pub mod stanza_id;

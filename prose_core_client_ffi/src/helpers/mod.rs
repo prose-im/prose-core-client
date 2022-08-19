@@ -3,8 +3,9 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::error::Result;
-use crate::error::{Error, StanzaParseError};
+use crate::error::{Error, Result, StanzaParseError};
+use crate::types::namespace::Namespace;
+use crate::ProseError::StropheError;
 use libstrophe::{Stanza, StanzaRef};
 
 pub(crate) trait StanzaExt {
@@ -15,17 +16,24 @@ pub(crate) trait StanzaExt {
 
     fn new_query(ns: impl AsRef<str>, query_id: Option<&str>) -> Result<Stanza>;
     fn new_text_node(text: impl AsRef<str>) -> Result<Stanza>;
+    fn new_with_name(name: impl AsRef<str>, namespace: Option<&str>) -> Result<Stanza>;
+    fn new_pubsub() -> Result<Stanza>;
     fn new_form_field(
         var: impl AsRef<str>,
         value: impl AsRef<str>,
         kind: Option<&str>,
     ) -> Result<Stanza>;
 
+    fn set_node(&mut self, node: impl AsRef<str>) -> Result<()>;
+
     fn get_required_child_by_name_and_ns(
         &self,
         name: impl AsRef<str>,
         ns: impl AsRef<str>,
     ) -> Result<StanzaRef, Error>;
+    fn get_required_attribute(&self, name: impl AsRef<str>) -> Result<&str, Error>;
+
+    fn get_first_non_text_child(&self) -> Option<StanzaRef>;
 }
 
 impl StanzaExt for Stanza {
@@ -57,6 +65,19 @@ impl StanzaExt for Stanza {
         Ok(text_node)
     }
 
+    fn new_with_name(name: impl AsRef<str>, namespace: Option<&str>) -> Result<Stanza> {
+        let mut node = Stanza::new();
+        node.set_name(name)?;
+        if let Some(namespace) = namespace {
+            node.set_ns(namespace)?;
+        }
+        Ok(node)
+    }
+
+    fn new_pubsub() -> Result<Stanza> {
+        Stanza::new_with_name("pubsub", Some(Namespace::PubSub))
+    }
+
     fn new_form_field(
         var: impl AsRef<str>,
         value: impl AsRef<str>,
@@ -77,6 +98,11 @@ impl StanzaExt for Stanza {
         Ok(field)
     }
 
+    fn set_node(&mut self, node: impl AsRef<str>) -> Result<()> {
+        self.set_attribute("node", node)
+            .map_err(|err| StropheError { error: err })
+    }
+
     fn get_required_child_by_name_and_ns(
         &self,
         name: impl AsRef<str>,
@@ -86,5 +112,16 @@ impl StanzaExt for Stanza {
             None => Err(StanzaParseError::missing_child_node(name.as_ref(), self).into()),
             Some(node) => Ok(node),
         }
+    }
+
+    fn get_required_attribute(&self, name: impl AsRef<str>) -> Result<&str, Error> {
+        match self.get_attribute(&name) {
+            None => Err(StanzaParseError::missing_attribute(name.as_ref(), self).into()),
+            Some(attrib) => Ok(attrib),
+        }
+    }
+
+    fn get_first_non_text_child(&self) -> Option<StanzaRef> {
+        self.children().filter(|n| !n.is_text()).next()
     }
 }

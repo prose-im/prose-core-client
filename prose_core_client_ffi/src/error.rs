@@ -3,6 +3,7 @@
 // Copyright: 2022, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use base64::DecodeError;
 use jid::JidParseError;
 use libstrophe::{ConnectClientError, ConnectionError, Stanza, ToTextError};
 use std::cell::BorrowMutError;
@@ -35,6 +36,7 @@ pub enum StanzaParseError {
     MissingText { node: String },
     ParseError { error: String },
     JidParseError { error: JidParseError },
+    DecodeError { error: String },
 }
 
 pub type Result<T, E = Error> = StdResult<T, E>;
@@ -153,5 +155,13 @@ impl From<ParseError> for StanzaParseError {
 impl From<JidParseError> for StanzaParseError {
     fn from(error: JidParseError) -> Self {
         StanzaParseError::JidParseError { error }
+    }
+}
+
+impl From<DecodeError> for StanzaParseError {
+    fn from(error: DecodeError) -> Self {
+        StanzaParseError::DecodeError {
+            error: error.to_string(),
+        }
     }
 }

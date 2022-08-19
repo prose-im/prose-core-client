@@ -67,6 +67,15 @@ interface XMPPClient {
   void retract_message(MessageId id, [ByRef] BareJid to);
 
   [Throws=ProseError]
+  void set_avatar_image([ByRef] string request_id, XMPPImage image);
+
+  [Throws=ProseError]
+  void load_latest_avatar_metadata([ByRef] string request_id, [ByRef] BareJid from);
+
+  [Throws=ProseError]
+  void load_avatar_image([ByRef] string request_id, [ByRef] BareJid from, [ByRef] string image_id);
+
+  [Throws=ProseError]
   void send_xml_payload([ByRef] string xml_string);
 };
 
@@ -87,6 +96,10 @@ callback interface XMPPAccountObserver {
     sequence<XMPPForwardedMessage> messages,
     boolean isComplete
   );
+  void did_load_avatar_image(string requestId, BareJid jid, XMPPAvatarData? image);
+  void did_load_avatar_metadata(string requestId, BareJid jid, sequence<XMPPAvatarMetadataInfo> metadata);
+  void did_set_avatar_image(string requestId);
+  void did_receive_updated_avatar_metadata(BareJid jid, sequence<XMPPAvatarMetadataInfo> metadata);
 };
 
 [Error]
@@ -111,6 +124,7 @@ interface StanzaParseError {
   MissingText(string node);
   ParseError(string error);
   JidParseError(JidParseError error);
+  DecodeError(string error);
 };
 
 [Error]
@@ -175,6 +189,27 @@ dictionary XMPPDelay {
 dictionary XMPPForwardedMessage {
   XMPPDelay? delay;
   XMPPMessage message;
+};
+
+dictionary XMPPImage {
+  sequence<u8> data;
+  string mime_type;
+  u32 width;
+  u32 height;
+};
+
+dictionary XMPPAvatarData {
+  sequence<u8> data;
+  string sha1;
+};
+
+dictionary XMPPAvatarMetadataInfo {
+  string id;
+  string? url;
+  u32? bytes;
+  u32? width;
+  u32? height;
+  string? mime_type;
 };
 
 dictionary BareJid {

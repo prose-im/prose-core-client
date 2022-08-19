@@ -27,6 +27,8 @@ strum_macros = "0.24"
 uuid = {version = "1.1", features=["v4", "fast-rng", "macro-diagnostics"]}
 chrono = "0.4"
 mockiato = {version = "0.9", optional = true}
+base64 = "0.13.0"
+sha1 = "0.10.0"
 
 [build-dependencies]
 uniffi_build = {version = "0.18", features=["builtin-bindgen"]}

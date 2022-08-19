@@ -34,6 +34,9 @@ pub use types::message_reactions::MessageReactions as XMPPMessageReactions;
 pub use types::presence::{
     Presence as XMPPPresence, PresenceKind as XMPPPresenceKind, ShowKind as XMPPShowKind,
 };
+pub use types::profile::avatar_data::AvatarData as XMPPAvatarData;
+pub use types::profile::avatar_metadata::AvatarMetadataInfo as XMPPAvatarMetadataInfo;
+pub use types::profile::image_file::Image as XMPPImage;
 pub use types::roster::{
     Roster as XMPPRoster, RosterGroup as XMPPRosterGroup, RosterItem as XMPPRosterItem,
     RosterItemSubscription as XMPPRosterItemSubscription,
