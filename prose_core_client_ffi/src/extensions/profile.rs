@@ -124,7 +124,15 @@ impl Profile {
             Get,
             Some(&from.to_string()),
             pubsub,
-            Box::new(move |payload| {
+            Box::new(move |result| {
+                let payload = match result {
+                    Ok(payload) => payload,
+                    Err(_) => {
+                        ctx.observer.did_load_avatar_image(request_id, from, None);
+                        return Ok(());
+                    }
+                };
+
                 let items_node = match payload.get_child_by_name("items") {
                     Some(node) => node,
                     None => return Ok(()),
@@ -162,7 +170,16 @@ impl Profile {
             Get,
             Some(&from.to_string()),
             pubsub,
-            Box::new(move |payload| {
+            Box::new(move |result| {
+                let payload = match result {
+                    Ok(payload) => payload,
+                    Err(_) => {
+                        ctx.observer
+                            .did_load_avatar_metadata(request_id, from, vec![]);
+                        return Ok(());
+                    }
+                };
+
                 let items_node = match payload.get_child_by_name("items") {
                     Some(node) => node,
                     None => return Ok(()),

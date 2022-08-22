@@ -8,12 +8,12 @@ use crate::account::IDProvider;
 use crate::connection::XMPPSender;
 use crate::error::Result;
 use jid::FullJid;
-use libstrophe::Stanza;
+use libstrophe::{Stanza, StanzaRef};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use strum_macros::{Display, EnumString};
 
-pub type IQResultHandler = Box<dyn FnOnce(&Stanza) -> Result<()> + Send>;
+pub type IQResultHandler = Box<dyn FnOnce(Result<StanzaRef, StanzaRef>) -> Result<()> + Send>;
 
 pub struct XMPPExtensionContext {
     pub jid: FullJid,
@@ -81,13 +81,13 @@ impl XMPPExtensionContext {
         Ok(())
     }
 
-    pub fn handle_iq_result(&self, id: &str, payload: &Stanza) -> Result<()> {
+    pub fn handle_iq_result(&self, id: &str, payload: Result<StanzaRef, StanzaRef>) -> Result<()> {
         let mut result_handlers = self.iq_result_handlers.lock()?;
         let handler = result_handlers.remove(id);
         drop(result_handlers);
 
         if let Some(handler) = handler {
-            handler(&payload)?;
+            handler(payload)?;
         }
 
         Ok(())

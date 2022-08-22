@@ -11,7 +11,7 @@ use crate::extensions::{XMPPExtension, XMPPExtensionContext};
 use crate::helpers::StanzaExt;
 use crate::types::namespace::Namespace;
 use jid::{BareJid, FullJid};
-use libstrophe::Stanza;
+use libstrophe::{Stanza, StanzaRef};
 use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -137,16 +137,29 @@ impl Account {
                     "iq" => {
                         for_each(&extensions, |e| e.handle_iq_stanza(stanza));
 
-                        if stanza.get_attribute("type") != Some("result") {
-                            return;
-                        }
+                        let payload: Option<StanzaRef>;
+                        let is_error: bool;
 
-                        let (id, payload) = match (stanza.id(), stanza.get_first_non_text_child()) {
+                        match stanza.get_attribute("type") {
+                            Some("result") => {
+                                payload = stanza.get_first_non_text_child();
+                                is_error = false
+                            }
+                            Some("error") => {
+                                payload = stanza.get_child_by_name("error");
+                                is_error = true
+                            }
+                            _ => return,
+                        };
+
+                        let (id, payload) = match (stanza.id(), payload) {
                             (Some(id), Some(payload)) => (id, payload),
                             (_, _) => return,
                         };
 
-                        if let Some(err) = ctx.handle_iq_result(id, payload.deref()).err() {
+                        let result = if is_error { Err(payload) } else { Ok(payload) };
+
+                        if let Some(err) = ctx.handle_iq_result(id, result).err() {
                             log::error!("{:?}", err);
                         }
                     }

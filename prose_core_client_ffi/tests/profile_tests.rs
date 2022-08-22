@@ -146,6 +146,35 @@ fn test_load_latest_metadata() -> Result<()> {
 }
 
 #[test]
+fn test_load_latest_metadata_with_failure() -> Result<()> {
+    let (account, handlers, stanzas, observer) = Account::connected();
+
+    account
+        .profile
+        .load_latest_avatar_metadata("my-request", &BareJid::from_str("a@prose.org").unwrap())?;
+
+    observer
+        .lock()
+        .unwrap()
+        .expect_did_load_avatar_metadata(
+            |arg| arg.partial_eq("my-request"),
+            |arg| arg.partial_eq(BareJid::from_str("a@prose.org").unwrap()),
+            |arg| arg.partial_eq::<Vec<XMPPAvatarMetadataInfo>>(Vec::new()),
+        )
+        .times(1)
+        .returns(());
+
+    handlers.send_stanza_str(
+        r#"
+        <iq id="id_1" type="error" to="test@prose.org/ci" from="a@prose.org">
+            <error type="cancel"><item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/></error>
+        </iq>"#,
+    );
+
+    Ok(())
+}
+
+#[test]
 fn test_loads_image() -> Result<()> {
     let (account, handlers, stanzas, observer) = Account::connected();
 
