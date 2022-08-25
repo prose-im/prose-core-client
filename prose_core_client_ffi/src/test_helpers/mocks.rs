@@ -32,7 +32,7 @@ impl Account {
         let account = Account::new(
             &FullJid::from_str("test@prose.org/ci").unwrap(),
             MockConnection::new(handlers.clone(), stanzas.clone()),
-            MockIDProvider::new(-1),
+            MockIDProvider::new(-2),
             Box::new(observer.clone()),
         )
         .unwrap();

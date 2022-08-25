@@ -37,7 +37,7 @@ fn test_sends_empty_presence_on_connect() -> Result<()> {
     assert_eq!(
         stanzas.stanza_at_index(2).to_text()?,
         r#"
-        <iq type="set">
+        <iq id="id_2" type="set">
             <pubsub xmlns="http://jabber.org/protocol/pubsub">
                 <subscribe jid="test@prose.org/ci" node="urn:xmpp:avatar:metadata"/>
             </pubsub>

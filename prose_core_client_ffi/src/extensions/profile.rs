@@ -33,6 +33,7 @@ impl XMPPExtension for Profile {
         pubsub.add_child(subscribe)?;
 
         let mut iq = Stanza::new_iq(Some("set"), None);
+        iq.set_id(self.ctx.generate_id())?;
         iq.add_child(pubsub)?;
 
         self.ctx.send_stanza(iq)
