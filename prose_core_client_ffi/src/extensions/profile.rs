@@ -90,9 +90,9 @@ impl Profile {
                 ctx.send_iq(
                     Set,
                     None,
-                    image.node_for_publishing_metadata(sha1)?,
+                    image.node_for_publishing_metadata(&sha1)?,
                     Box::new(move |_| {
-                        inner_ctx.observer.did_set_avatar_image(request_id);
+                        inner_ctx.observer.did_set_avatar_image(request_id, sha1);
                         Ok(())
                     }),
                 )

@@ -40,7 +40,7 @@ pub trait AccountObserver: Send + Sync {
         metadata: Vec<AvatarMetadataInfo>,
     );
     fn did_load_avatar_image(&self, request_id: String, jid: BareJid, image: Option<AvatarData>);
-    fn did_set_avatar_image(&self, request_id: String);
+    fn did_set_avatar_image(&self, request_id: String, image_id: String);
     fn did_receive_updated_avatar_metadata(&self, jid: BareJid, metadata: Vec<AvatarMetadataInfo>);
 }
 
@@ -109,8 +109,10 @@ impl<'mock> AccountObserver for Arc<Mutex<AccountObserverMock<'mock>>> {
             .did_load_avatar_image(request_id, jid, image);
     }
 
-    fn did_set_avatar_image(&self, request_id: String) {
-        self.lock().unwrap().did_set_avatar_image(request_id);
+    fn did_set_avatar_image(&self, request_id: String, image_id: String) {
+        self.lock()
+            .unwrap()
+            .did_set_avatar_image(request_id, image_id);
     }
 
     fn did_receive_updated_avatar_metadata(&self, jid: BareJid, metadata: Vec<AvatarMetadataInfo>) {

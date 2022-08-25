@@ -98,7 +98,7 @@ callback interface XMPPAccountObserver {
   );
   void did_load_avatar_image(string requestId, BareJid jid, XMPPAvatarData? image);
   void did_load_avatar_metadata(string requestId, BareJid jid, sequence<XMPPAvatarMetadataInfo> metadata);
-  void did_set_avatar_image(string requestId);
+  void did_set_avatar_image(string requestId, string imageId);
   void did_receive_updated_avatar_metadata(BareJid jid, sequence<XMPPAvatarMetadataInfo> metadata);
 };
 

@@ -68,7 +68,10 @@ fn test_sets_avatar_image() -> Result<()> {
     observer
         .lock()
         .unwrap()
-        .expect_did_set_avatar_image(|arg| arg.partial_eq("my_request"))
+        .expect_did_set_avatar_image(
+            |arg| arg.partial_eq("my_request"),
+            |arg| arg.partial_eq("c1fc608fe89995e52457da8364672061af949a94"),
+        )
         .times(1)
         .returns(());
 
@@ -147,7 +150,7 @@ fn test_load_latest_metadata() -> Result<()> {
 
 #[test]
 fn test_load_latest_metadata_with_failure() -> Result<()> {
-    let (account, handlers, stanzas, observer) = Account::connected();
+    let (account, handlers, _, observer) = Account::connected();
 
     account
         .profile
