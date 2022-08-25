@@ -26,7 +26,7 @@ impl XMPPExtension for Profile {
     fn handle_connect(&self) -> Result<()> {
         // Subscribe to avatar changes
         let mut subscribe = Stanza::new_with_name("subscribe", None)?;
-        subscribe.set_node(Namespace::AvatarData)?;
+        subscribe.set_node(Namespace::AvatarMetadata)?;
         subscribe.set_attribute("jid", self.ctx.jid.to_string())?;
 
         let mut pubsub = Stanza::new_pubsub()?;

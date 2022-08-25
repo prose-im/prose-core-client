@@ -39,7 +39,7 @@ fn test_sends_empty_presence_on_connect() -> Result<()> {
         r#"
         <iq type="set">
             <pubsub xmlns="http://jabber.org/protocol/pubsub">
-                <subscribe jid="test@prose.org/ci" node="urn:xmpp:avatar:data"/>
+                <subscribe jid="test@prose.org/ci" node="urn:xmpp:avatar:metadata"/>
             </pubsub>
         </iq>
         "#
