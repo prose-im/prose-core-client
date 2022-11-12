@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+         xmlns="http://usefulinc.com/ns/doap#"
+         xmlns:xmpp="https://linkmauve.fr/ns/xmpp-doap#"
+         xmlns:schema="https://schema.org/">
+  <Project>
+    <name>Prose</name>
+    <short-name>prose</short-name>
+
+    <created>2020-06-16</created>
+
+    <shortdesc>All of your workplace communication lives here</shortdesc>
+    <description xml:lang="en">
+      Prose is an app for all of your team chats, calls and files.
+      All of your workplace communication lives here.
+      Confidently discuss private business with military-grade encryption.
+      Host Prose on your premises, or use our cloud service. You choose.
+      Use native lightweight apps for all your communication. Mobile and Desktop.
+    </description>
+
+    <homepage rdf:resource="https://prose.org/"/>
+    <download-page rdf:resource="https://prose.org/downloads/"/>
+    <schema:documentation rdf:resource="https://docs.prose.org/"/>
+    <bug-database rdf:resource="https://github.com/prose-im/prose-core-client/issues"/>
+    <category rdf:resource="https://linkmauve.fr/ns/xmpp-doap#category-client"/>
+
+    <schema:logo rdf:resource="https://files.prose.org/public/images/logo.png"/>
+
+    <programming-language>Rust</programming-language>
+    <os>Browser</os>
+    <os>macOS</os>
+    <os>iOS</os>
+    <os>Android</os>
+    <os>Linux</os>
+    <os>Windows</os>
+
+    <repository>
+      <GitRepository>
+        <browse rdf:resource="https://github.com/prose-im/prose-core-client"/>
+        <location rdf:resource="https://github.com/prose-im/prose-core-client.git"/>
+      </GitRepository>
+    </repository>
+
+    <implements rdf:resource="https://www.rfc-editor.org/info/rfc6120"/>
+    <implements rdf:resource="https://www.rfc-editor.org/info/rfc6121"/>
+    <implements rdf:resource="https://www.rfc-editor.org/info/rfc6122"/>
+    <implements rdf:resource="https://www.rfc-editor.org/info/rfc7590"/>
+  </Project>
+</rdf:RDF>
