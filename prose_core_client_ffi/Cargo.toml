@@ -35,3 +35,28 @@ uniffi_build = {version = "0.18", features=["builtin-bindgen"]}
 
 [features]
 test-helpers = ["mockiato"]
+
+[[test]]
+name = "chat"
+path = "tests/chat.rs"
+required-features = ["test-helpers"]
+
+[[test]]
+name = "mam"
+path = "tests/mam.rs"
+required-features = ["test-helpers"]
+
+[[test]]
+name = "profile"
+path = "tests/profile.rs"
+required-features = ["test-helpers"]
+
+[[test]]
+name = "roster"
+path = "tests/roster.rs"
+required-features = ["test-helpers"]
+
+[[test]]
+name = "startup"
+path = "tests/startup.rs"
+required-features = ["test-helpers"]
