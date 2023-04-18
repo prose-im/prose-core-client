@@ -1,0 +1,4 @@
+[typescript.type_mappings]
+"DateTime" = "Date"
+"PathBuf" = "string"
+"Url" = "string"

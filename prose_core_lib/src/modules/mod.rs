@@ -1,0 +1,20 @@
+pub use caps::{Caps, CapsDelegate};
+pub use chat::{Chat, ChatDelegate, ReceivedMessage};
+pub(crate) use connection::Connection;
+pub use context::Context;
+pub(crate) use context::PendingRequest;
+pub use mam::{ArchivedMessage, Fin, MAM};
+pub use module::Module;
+pub use profile::{Profile, ProfileDelegate};
+pub use request_future::RequestError;
+pub use roster::Roster;
+
+pub mod caps;
+mod chat;
+mod connection;
+mod context;
+mod mam;
+mod module;
+pub mod profile;
+mod request_future;
+pub mod roster;

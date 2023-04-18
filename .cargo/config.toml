@@ -1,2 +1,5 @@
 [target.aarch64-apple-darwin]
     rustflags = ["-L", "/opt/homebrew/Cellar/libstrophe/0.12.2/lib/"]
+
+[target.x86_64-apple-darwin]
+    rustflags = ["-L", "/usr/local/Cellar/libstrophe/0.12.2/lib/"]

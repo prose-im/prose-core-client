@@ -1,6 +1,14 @@
-// prose-core-client
-//
-// Copyright: 2022, Valerian Saliou <valerian@valeriansaliou.name>
-// License: Mozilla Public License v2.0 (MPL v2.0)
+// pub use message::Message;
+pub use avatar_metadata::AvatarMetadata;
+pub use capabilities::{Capabilities, Feature};
+pub use message_like::MessageLike;
+pub use page::Page;
+pub use prose_core_domain::*;
+pub use roster_item::RosterItem;
 
-// TODO
+mod avatar_metadata;
+mod capabilities;
+mod error;
+pub mod message_like;
+mod page;
+mod roster_item;

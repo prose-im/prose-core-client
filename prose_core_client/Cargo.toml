@@ -15,8 +15,41 @@ authors = ["Valerian Saliou <valerian@valeriansaliou.name>"]
 name = "prose_core_client"
 
 [dependencies]
-log = { version = "0.4", features = ["std"] }
-jid = { version = "0.9", default-features = false }
-libstrophe = "0.16"
-serde = { version = "1.0", default-features = false }
-mdl = "1.0"
+anyhow = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+either = "1.8"
+image = "0.24.5"
+indexmap = "1.9"
+itertools = { workspace = true }
+jid = { workspace = true }
+microtype = { workspace = true }
+once_cell = { workspace = true }
+prose_core_domain = { path = "../prose_core_domain" }
+prose_core_lib = { path = "../prose_core_lib" }
+prose_macros = { path = "../prose_macros" }
+rusqlite = { version = "0.28.0", features = ["chrono", "url", "trace"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0"
+sha1 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "sync"] }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+dialoguer = "0.10.3"
+dotenvy = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros", "io-util", "io-std"] }
+tracing-oslog = "0.1.2"
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features=["build"] }
+
+[[example]]
+name = "cli"
+path = "examples/cli.rs"

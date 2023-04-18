@@ -1,0 +1,45 @@
+[package]
+name = "prose_core_lib"
+version = "0.1.0"
+description = "Prose core XMPP library."
+license = "MPL-2.0"
+edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client"
+repository = "https://github.com/prose-im/prose-core-client.git"
+keywords = ["xmpp", "xmpp-client", "library"]
+categories = ["network-programming"]
+authors = ["Marc Bauer <mb@nesium.com>"]
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+name = "prose_core_lib"
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = "0.1.66"
+base64 = { workspace = true }
+chrono = { workspace = true }
+jid = { workspace = true }
+libstrophe = "0.17.0"
+once_cell = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+spin_sleep = "1.1.1"
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros", "io-util", "io-std"] }
+tracing-oslog = "0.1.2"
+tracing-subscriber = { workspace = true }
+
+[[example]]
+name = "bot"
+path = "examples/bot.rs"
+
+[[example]]
+name = "multiple_connections"
+path = "examples/multiple_connections.rs"
