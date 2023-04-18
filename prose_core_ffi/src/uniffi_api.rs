@@ -9,7 +9,7 @@ pub use prose_core_client::types::{
     UserProfile,
 };
 use prose_core_client::types::{DateTime as ChronoDateTime, Page, Utc};
-pub use prose_core_client::{ClientDelegate, ClientEvent};
+pub use prose_core_client::{AccountBookmark, AccountBookmarksClient, ClientDelegate, ClientEvent};
 pub use prose_core_lib::{modules::roster::Subscription, ConnectionError, ConnectionEvent};
 
 pub use crate::{client::*, logger::*, ClientError};

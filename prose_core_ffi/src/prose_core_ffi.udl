@@ -24,6 +24,19 @@ callback interface ClientDelegate {
     void handle_event(ClientEvent event);
 };
 
+interface AccountBookmarksClient {
+    constructor(PathBuf bookmarks_path);
+
+    [Throws=ClientError]
+    sequence<AccountBookmark> load_bookmarks();
+    [Throws=ClientError]
+    void add_bookmark([ByRef] BareJid jid, boolean select_bookmark);
+    [Throws=ClientError]
+    void remove_bookmark([ByRef] BareJid jid);
+    [Throws=ClientError]
+    void select_bookmark([ByRef] BareJid jid);
+};
+
 enum LogLevel {
     "Trace",
     "Debug",
@@ -144,4 +157,9 @@ dictionary Message {
     boolean is_edited;
     boolean is_delivered;
     sequence<Reaction> reactions;
+};
+
+dictionary AccountBookmark {
+    BareJid jid;
+    boolean is_selected;
 };
