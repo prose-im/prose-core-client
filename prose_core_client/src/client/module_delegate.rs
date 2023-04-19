@@ -4,7 +4,7 @@ use chrono::Utc;
 use jid::{BareJid, Jid};
 use once_cell::sync::Lazy;
 use tokio::runtime::{Builder, Runtime};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use prose_core_lib::modules::caps::DiscoveryInfo;
 use prose_core_lib::modules::profile::avatar::Metadata;
