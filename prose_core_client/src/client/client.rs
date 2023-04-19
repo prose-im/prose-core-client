@@ -14,6 +14,7 @@ use tracing::{debug, info, instrument};
 use prose_core_domain::{Contact, Emoji, Message, MessageId};
 use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::modules::{ArchivedMessage, Caps, Chat, Fin, Profile, Roster, MAM};
+use prose_core_lib::stanza::message::ChatState;
 use prose_core_lib::stanza::{message, Namespace};
 use prose_core_lib::{Connection, ConnectionError, ConnectionEvent};
 
@@ -21,7 +22,7 @@ use crate::cache::{
     AvatarCache, DataCache, IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
 };
 use crate::client::{ClientContext, ClientEvent, ModuleDelegate, XMPPClient};
-use crate::domain_ext::{ChatState, MessageExt};
+use crate::domain_ext::MessageExt;
 use crate::types::{
     AvatarMetadata, Capabilities, Feature, MessageLike, Page, RosterItem, UserProfile,
 };
@@ -53,6 +54,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 Feature::new(Namespace::AvatarData, false),
                 Feature::new(Namespace::AvatarMetadata, false),
                 Feature::new(Namespace::AvatarMetadata, true),
+                Feature::new(Namespace::ChatStates, false),
                 Feature::new(Namespace::Ping, false),
                 Feature::new(Namespace::PubSub, false),
                 Feature::new(Namespace::PubSub, true),
@@ -536,15 +538,39 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     #[instrument]
-    pub async fn send_chat_state(
+    pub async fn set_user_is_composing(
         &self,
         conversation: impl Into<Jid> + Debug,
-        chat_state: prose_core_domain::ChatState,
+        is_composing: bool,
     ) -> anyhow::Result<()> {
         self.ctx
-            .send_chat_state(conversation, ChatState(chat_state).into())
+            .send_chat_state(
+                conversation,
+                if is_composing {
+                    ChatState::Composing
+                } else {
+                    ChatState::Paused
+                },
+            )
             .await?;
         Ok(())
+    }
+
+    #[instrument]
+    pub async fn load_composing_users(
+        &self,
+        conversation: &BareJid,
+    ) -> anyhow::Result<Vec<BareJid>> {
+        // We currently do not support multi-user chats. So either our conversation partner is
+        // typing or they are not.
+        let conversation_partner_is_composing =
+            self.ctx.data_cache.load_chat_state(conversation)? == Some(ChatState::Composing);
+
+        if conversation_partner_is_composing {
+            Ok(vec![conversation.clone()])
+        } else {
+            Ok(vec![])
+        }
     }
 
     #[instrument]

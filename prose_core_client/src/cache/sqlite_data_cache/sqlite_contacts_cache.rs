@@ -6,6 +6,7 @@ use rusqlite::{params, OptionalExtension};
 use prose_core_domain::Contact;
 use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::modules::roster;
+use prose_core_lib::stanza::message::ChatState;
 use prose_core_lib::stanza::presence;
 
 use crate::cache::sqlite_data_cache::FromStrSql;
@@ -115,7 +116,7 @@ impl ContactsCache for SQLiteCache {
 
         let mut stmt = conn.prepare(
             r#"
-            SELECT full_name, nickname, org, title, email, tel, url, locality, country, updated_at 
+            SELECT full_name, nickname, org, title, email, tel, url, locality, country 
                 FROM user_profile 
                 WHERE jid = ? AND updated_at >= ?
            "#,
@@ -218,6 +219,43 @@ impl ContactsCache for SQLiteCache {
             status
         ])?;
         Ok(())
+    }
+
+    fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> anyhow::Result<()> {
+        let conn = &*self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "INSERT OR REPLACE INTO chat_states (jid, state, updated_at) VALUES (?, ?, ?)",
+        )?;
+        stmt.execute(params![
+            &jid.to_string(),
+            &chat_state.to_string(),
+            Utc::now()
+        ])?;
+        Ok(())
+    }
+    fn load_chat_state(&self, jid: &BareJid) -> anyhow::Result<Option<ChatState>> {
+        let conn = &*self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT state, updated_at FROM chat_states WHERE jid = ?")?;
+        let row = stmt
+            .query_row([&jid.to_string()], |row| {
+                Ok((
+                    row.get::<_, FromStrSql<ChatState>>(0)?.0,
+                    row.get::<_, DateTime<Utc>>(1)?,
+                ))
+            })
+            .optional()?;
+
+        let Some(row) = row else {
+            return Ok(None)
+        };
+
+        // If the chat state was composing but is older than 30 seconds we consider the actual state
+        // to be 'active' (i.e. not currently typing).
+        if row.0 == ChatState::Composing && Utc::now() - row.1 > Duration::seconds(30) {
+            return Ok(Some(ChatState::Active));
+        }
+
+        Ok(Some(row.0))
     }
 
     fn load_contacts(&self) -> anyhow::Result<Vec<(Contact, Option<ImageId>)>> {

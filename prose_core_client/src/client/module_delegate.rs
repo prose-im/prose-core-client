@@ -10,9 +10,9 @@ use prose_core_lib::modules::caps::DiscoveryInfo;
 use prose_core_lib::modules::profile::avatar::Metadata;
 use prose_core_lib::modules::profile::VCard;
 use prose_core_lib::modules::{CapsDelegate, ChatDelegate, ProfileDelegate, ReceivedMessage};
-use prose_core_lib::stanza::message::chat_marker;
+use prose_core_lib::stanza::message::{chat_marker, ChatState};
 use prose_core_lib::stanza::presence::Caps;
-use prose_core_lib::stanza::{Message, Presence};
+use prose_core_lib::stanza::{Message, Presence, StanzaBase};
 
 use crate::cache::{AvatarCache, DataCache};
 use crate::client::ClientContext;
@@ -129,29 +129,75 @@ impl<D: DataCache, A: AvatarCache> ChatDelegate for ModuleDelegate<D, A> {
             message,
             timestamp: Utc::now(),
         };
-        let message = match MessageLike::try_from(timestamped_message) {
-            Ok(message) => message,
+
+        struct ChatStateEvent {
+            state: ChatState,
+            from: BareJid,
+        }
+
+        let mut chat_state: Option<ChatStateEvent> = None;
+
+        if let ReceivedMessage::Message(message) = timestamped_message.message {
+            if let (Some(state), Some(from), Some(to)) =
+                (message.chat_state(), message.from(), message.to())
+            {
+                chat_state = Some(ChatStateEvent {
+                    state,
+                    from: BareJid::from(from),
+                });
+            }
+        }
+
+        let parsed_message = match MessageLike::try_from(timestamped_message) {
+            Ok(message) => Some(message),
             Err(err) => {
                 error!("Failed to parse received message: {}", err);
-                return;
+                None
             }
         };
+
+        if parsed_message.is_none() && chat_state.is_none() {
+            // Nothing to do…
+            return;
+        }
 
         let ctx = self.ctx.clone();
 
         RUNTIME.spawn(async move {
-            debug!("Caching received message…");
-            match ctx.data_cache.insert_messages([&message]) {
-                Err(err) => error!("Failed to cache received message {}", err),
-                Ok(_) => (),
-            };
+            if let Some(ref message) = parsed_message {
+                debug!("Caching received message…");
+                match ctx.data_cache.insert_messages([message]) {
+                    Err(err) => error!("Failed to cache received message {}", err),
+                    Ok(_) => (),
+                };
 
-            let conversation = if message_is_carbon {
-                &message.to
-            } else {
-                &message.from
+                let conversation = if message_is_carbon {
+                    &message.to
+                } else {
+                    &message.from
+                };
+                ctx.send_event_for_message(conversation, &message);
+            }
+
+            if let Some(chat_state) = chat_state {
+                match ctx
+                    .data_cache
+                    .insert_chat_state(&chat_state.from, &chat_state.state)
+                {
+                    Err(err) => error!(
+                        "Failed to save chat state {} for {}. {}",
+                        chat_state.state, chat_state.from, err
+                    ),
+                    Ok(_) => (),
+                };
+                ctx.send_event(ClientEvent::ComposingUsersChanged {
+                    conversation: chat_state.from,
+                })
+            }
+
+            let Some(message) = parsed_message else {
+                return;
             };
-            ctx.send_event_for_message(conversation, &message);
 
             // Don't send delivery receipts for carbons or anything other than a regular message.
             if message_is_carbon || !message.payload.is_message() {

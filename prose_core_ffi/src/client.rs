@@ -7,8 +7,7 @@ use prose_core_client::{Client as ProseClient, ClientDelegate, FsAvatarCache, SQ
 use prose_core_lib::ConnectionError;
 
 use crate::{
-    BareJid, ChatState, ClientError, Contact, Emoji, FullJid, Message, MessageId, MessagesPage,
-    UserProfile,
+    BareJid, ClientError, Contact, Emoji, FullJid, Message, MessageId, MessagesPage, UserProfile,
 };
 
 pub struct Client {
@@ -149,14 +148,22 @@ impl Client {
         Ok(())
     }
 
-    pub async fn send_chat_state(
+    pub async fn set_user_is_composing(
         &self,
         conversation: BareJid,
-        chat_state: ChatState,
+        is_composing: bool,
     ) -> Result<(), ClientError> {
         self.client
-            .send_chat_state(conversation, chat_state)
+            .set_user_is_composing(conversation, is_composing)
             .await?;
         Ok(())
+    }
+
+    pub async fn load_composing_users(
+        &self,
+        conversation: BareJid,
+    ) -> Result<Vec<BareJid>, ClientError> {
+        let users = self.client.load_composing_users(&conversation).await?;
+        Ok(users)
     }
 }

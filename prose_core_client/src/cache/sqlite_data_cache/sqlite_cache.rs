@@ -26,6 +26,7 @@ impl SQLiteCache {
         }));
         Self::run_migrations(&mut conn)?;
         Self::create_temporary_presence_table(&conn)?;
+        Self::create_temporary_chat_state_table(&conn)?;
 
         Ok(SQLiteCache {
             conn: Mutex::new(conn),
@@ -60,6 +61,19 @@ impl SQLiteCache {
                 "type" TEXT, 
                 "show" TEXT, 
                 "status" TEXT
+            );"#,
+            [],
+        )?;
+        Ok(())
+    }
+
+    fn create_temporary_chat_state_table(conn: &Connection) -> anyhow::Result<()> {
+        conn.execute(
+            r#"
+            CREATE TEMPORARY TABLE "chat_states" (
+                "jid" TEXT PRIMARY KEY NOT NULL,
+                "state" TEXT NOT NULL, 
+                "updated_at" DATETIME NOT NULL
             );"#,
             [],
         )?;

@@ -8,6 +8,7 @@ use tracing::info;
 use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::modules::{ArchivedMessage, Caps, Chat, Fin, Profile, Roster, MAM};
 use prose_core_lib::stanza::message;
+use prose_core_lib::stanza::message::ChatState;
 use prose_core_lib::ConnectedClient;
 use prose_macros::with_xmpp_client;
 
@@ -229,7 +230,7 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
         body: impl AsRef<str>,
     ) -> anyhow::Result<()> {
         xmpp.chat
-            .send_message(&xmpp.client.context(), to, body, None)
+            .send_message(&xmpp.client.context(), to, body, Some(ChatState::Active))
     }
 
     #[with_xmpp_client]

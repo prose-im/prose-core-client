@@ -2,6 +2,7 @@ use jid::BareJid;
 
 use prose_core_domain::Contact;
 use prose_core_lib::modules::profile::avatar::ImageId;
+use prose_core_lib::stanza::message::ChatState;
 use prose_core_lib::stanza::{message, presence};
 
 use crate::types::{AvatarMetadata, MessageLike, Page, RosterItem, UserProfile};
@@ -32,6 +33,9 @@ pub trait ContactsCache {
         show: Option<presence::Show>,
         status: Option<String>,
     ) -> anyhow::Result<()>;
+
+    fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> anyhow::Result<()>;
+    fn load_chat_state(&self, jid: &BareJid) -> anyhow::Result<Option<ChatState>>;
 
     fn load_contacts(&self) -> anyhow::Result<Vec<(Contact, Option<ImageId>)>>;
 }

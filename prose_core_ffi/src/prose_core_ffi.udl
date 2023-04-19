@@ -51,6 +51,7 @@ callback interface Logger {
 
 [Enum]
 interface ClientEvent {
+    ComposingUsersChanged(BareJid conversation);
     ConnectionStatusChanged(ConnectionEvent event);
     ContactChanged(BareJid jid);
     MessagesAppended(BareJid conversation, sequence<MessageId> message_ids);
@@ -100,14 +101,6 @@ enum Availability {
     "Unavailable",
     "DoNotDisturb",
     "Away",
-};
-
-enum ChatState {
-    "Active",
-    "Composing",
-    "Gone",
-    "Inactive",
-    "Paused",
 };
 
 dictionary Contact {

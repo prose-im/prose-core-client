@@ -9,6 +9,9 @@ use prose_core_lib::stanza::{message, ForwardedMessage, Message, StanzaBase};
 
 use crate::types::error::StanzaParseError;
 
+/// A type that describes permanent messages, i.e. messages that need to be replayed to restore
+/// the complete history of a conversation. Note that ephemeral messages like chat states are
+/// handled differently.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MessageLike {
     pub id: message::Id,

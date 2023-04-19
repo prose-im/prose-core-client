@@ -25,16 +25,6 @@ pub enum Availability {
 }
 
 #[typeshare]
-#[derive(Debug, Display)]
-pub enum ChatState {
-    Active,
-    Composing,
-    Gone,
-    Inactive,
-    Paused,
-}
-
-#[typeshare]
 #[derive(Debug)]
 pub struct Contact {
     pub jid: BareJid,

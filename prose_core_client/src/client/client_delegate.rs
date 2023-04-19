@@ -4,6 +4,9 @@ use prose_core_domain::MessageId;
 use prose_core_lib::ConnectionEvent;
 
 pub enum ClientEvent {
+    /// A user in `conversation` started or stopped typing.
+    ComposingUsersChanged { conversation: BareJid },
+
     /// The status of the connection has changed.
     ConnectionStatusChanged { event: ConnectionEvent },
 
