@@ -631,6 +631,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
+    pub async fn save_draft(
+        &self,
+        conversation: &BareJid,
+        text: Option<&str>,
+    ) -> anyhow::Result<()> {
+        self.ctx.data_cache.save_draft(conversation, text)
+    }
+
+    pub async fn load_draft(&self, conversation: &BareJid) -> anyhow::Result<Option<String>> {
+        self.ctx.data_cache.load_draft(conversation)
+    }
+
     #[instrument]
     // Signature is incomplete. send_presence(&self, show: Option<ShowKind>, status: &Option<String>)
     pub fn send_presence(&self) -> anyhow::Result<()> {

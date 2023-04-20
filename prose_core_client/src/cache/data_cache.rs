@@ -95,4 +95,7 @@ pub trait MessageCache {
         conversation: &BareJid,
         message_id: &message::Id,
     ) -> anyhow::Result<Option<message::StanzaId>>;
+
+    fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> anyhow::Result<()>;
+    fn load_draft(&self, conversation: &BareJid) -> anyhow::Result<Option<String>>;
 }

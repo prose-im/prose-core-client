@@ -273,6 +273,20 @@ impl MessageCache for SQLiteCache {
         )?;
         Ok(stanza_id)
     }
+
+    fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> anyhow::Result<()> {
+        let conn = &*self.conn.lock().unwrap();
+        let mut stmt =
+            conn.prepare("INSERT OR REPLACE INTO `drafts` (`jid`, `text`) VALUES (?, ?)")?;
+        stmt.execute(params![conversation.to_string(), text])?;
+        Ok(())
+    }
+
+    fn load_draft(&self, conversation: &BareJid) -> anyhow::Result<Option<String>> {
+        let conn = &*self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT `text` FROM `drafts` WHERE `jid` = ?")?;
+        Ok(stmt.query_row(params![conversation.to_string()], |row| Ok(row.get(0)?))?)
+    }
 }
 
 impl TryFrom<&rusqlite::Row<'_>> for MessageLike {

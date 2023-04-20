@@ -166,4 +166,20 @@ impl Client {
         let users = self.client.load_composing_users(&conversation).await?;
         Ok(users)
     }
+
+    pub async fn save_draft(
+        &self,
+        conversation: BareJid,
+        text: Option<String>,
+    ) -> Result<(), ClientError> {
+        self.client
+            .save_draft(&conversation, text.as_deref())
+            .await?;
+        Ok(())
+    }
+
+    pub async fn load_draft(&self, conversation: BareJid) -> Result<Option<String>, ClientError> {
+        let text = self.client.load_draft(&conversation).await?;
+        Ok(text)
+    }
 }
