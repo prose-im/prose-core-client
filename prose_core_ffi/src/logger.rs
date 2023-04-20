@@ -72,29 +72,29 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
     fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).expect("Encountered invalid span");
-
-        let metadata = span.metadata();
-        let mut attributes = AttributeMap::default();
-        let mut attr_visitor = FieldVisitor::new(&mut attributes);
-        attrs.record(&mut attr_visitor);
-
-        let name = {
-            let function_name = [metadata.target(), metadata.name()].join("::");
-            let full_name = format!(
-                "{}({})",
-                function_name,
-                attributes
-                    .into_iter()
-                    .map(|(k, v)| format!("{}: {}", k, v))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            println!("+++ {}", full_name);
-        };
-
-        let mut extensions = span.extensions_mut();
-        extensions.insert(Activity::new());
+        // let span = ctx.span(id).expect("Encountered invalid span");
+        //
+        // let metadata = span.metadata();
+        // let mut attributes = AttributeMap::default();
+        // let mut attr_visitor = FieldVisitor::new(&mut attributes);
+        // attrs.record(&mut attr_visitor);
+        //
+        // let name = {
+        //     let function_name = [metadata.target(), metadata.name()].join("::");
+        //     let full_name = format!(
+        //         "{}({})",
+        //         function_name,
+        //         attributes
+        //             .into_iter()
+        //             .map(|(k, v)| format!("{}: {}", k, v))
+        //             .collect::<Vec<_>>()
+        //             .join(", ")
+        //     );
+        //     println!("+++ {}", full_name);
+        // };
+        //
+        // let mut extensions = span.extensions_mut();
+        // extensions.insert(Activity::new());
     }
 
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
@@ -123,44 +123,44 @@ where
     }
 
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).expect("Encountered invalid span");
-        let metadata = span.metadata();
-        let function_name = [metadata.target(), metadata.name()].join("::");
-        println!("+++ On enter: {}", function_name);
-
-        let mut extensions = span.extensions_mut();
-        let mut activity = extensions
-            .get_mut::<Activity>()
-            .expect("Span didn't contain Activity");
-        activity.start_time = Instant::now();
+        // let span = ctx.span(id).expect("Encountered invalid span");
+        // let metadata = span.metadata();
+        // let function_name = [metadata.target(), metadata.name()].join("::");
+        // println!("+++ On enter: {}", function_name);
+        //
+        // let mut extensions = span.extensions_mut();
+        // let mut activity = extensions
+        //     .get_mut::<Activity>()
+        //     .expect("Span didn't contain Activity");
+        // activity.start_time = Instant::now();
     }
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
-        let span = ctx.span(id).expect("Encountered invalid span");
-        let metadata = span.metadata();
-        let function_name = [metadata.target(), metadata.name()].join("::");
-
-        let extensions = span.extensions();
-        let activity = extensions
-            .get::<Activity>()
-            .expect("Span didn't contain Activity");
-        println!(
-            "+++ On exit: {} after {:.2?}",
-            function_name,
-            activity.start_time.elapsed()
-        );
+        // let span = ctx.span(id).expect("Encountered invalid span");
+        // let metadata = span.metadata();
+        // let function_name = [metadata.target(), metadata.name()].join("::");
+        //
+        // let extensions = span.extensions();
+        // let activity = extensions
+        //     .get::<Activity>()
+        //     .expect("Span didn't contain Activity");
+        // println!(
+        //     "+++ On exit: {} after {:.2?}",
+        //     function_name,
+        //     activity.start_time.elapsed()
+        // );
     }
 
     fn on_close(&self, id: Id, ctx: Context<'_, S>) {
-        let span = ctx.span(&id).expect("Encountered invalid span");
-        let metadata = span.metadata();
-        let function_name = [metadata.target(), metadata.name()].join("::");
-        println!("+++ On close: {}", function_name);
-
-        let mut extensions = span.extensions_mut();
-        extensions
-            .remove::<Activity>()
-            .expect("Span didn't contain Activity");
+        // let span = ctx.span(&id).expect("Encountered invalid span");
+        // let metadata = span.metadata();
+        // let function_name = [metadata.target(), metadata.name()].join("::");
+        // println!("+++ On close: {}", function_name);
+        //
+        // let mut extensions = span.extensions_mut();
+        // extensions
+        //     .remove::<Activity>()
+        //     .expect("Span didn't contain Activity");
     }
 }
 
