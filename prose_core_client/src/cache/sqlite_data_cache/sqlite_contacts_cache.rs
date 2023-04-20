@@ -5,7 +5,6 @@ use rusqlite::{params, OptionalExtension};
 
 use prose_core_domain::Contact;
 use prose_core_lib::modules::profile::avatar::ImageId;
-use prose_core_lib::modules::roster;
 use prose_core_lib::stanza::message::ChatState;
 use prose_core_lib::stanza::presence;
 
@@ -60,30 +59,6 @@ impl ContactsCache for SQLiteCache {
         }
         trx.commit()?;
         Ok(())
-    }
-
-    fn load_roster_items(&self) -> anyhow::Result<Option<Vec<RosterItem>>> {
-        if !self.has_valid_roster_items()? {
-            return Ok(None);
-        }
-
-        let conn = &*self.conn.lock().unwrap();
-
-        let mut stmt = conn.prepare("SELECT jid, subscription, groups FROM roster_item")?;
-        let items = stmt
-            .query_map([], |row| {
-                Ok(RosterItem {
-                    jid: row.get::<_, FromStrSql<BareJid>>(0)?.0,
-                    subscription: row.get::<_, FromStrSql<roster::Subscription>>(1)?.0,
-                    groups: row
-                        .get::<_, String>(2)?
-                        .split(",")
-                        .map(Into::into)
-                        .collect(),
-                })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Some(items))
     }
 
     fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> anyhow::Result<()> {

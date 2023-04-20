@@ -12,7 +12,7 @@ use url::Url;
 use uuid::Uuid;
 
 use prose_core_client::types::Address;
-use prose_core_client::{FsAvatarCache, SQLiteCache};
+use prose_core_client::{CachePolicy, FsAvatarCache, SQLiteCache};
 use prose_core_domain::{Contact, Message, MessageId};
 
 use crate::utilities::{enable_debug_logging, load_credentials, load_dot_env};
@@ -177,20 +177,6 @@ fn prompt_opt_string(prompt: impl Into<String>, default: Option<String>) -> Opti
         .0
 }
 
-async fn load_roster(client: &Client) -> anyhow::Result<()> {
-    println!("Loading roster…");
-    let items = client.load_roster().await?;
-    for item in items {
-        println!(
-            "{} - {} ({})",
-            item.jid,
-            item.subscription,
-            item.groups.join(", ")
-        )
-    }
-    Ok(())
-}
-
 struct ContactEnvelope(Contact);
 
 impl Display for ContactEnvelope {
@@ -201,7 +187,7 @@ impl Display for ContactEnvelope {
 
 async fn select_contact(client: &Client) -> anyhow::Result<BareJid> {
     let items = client
-        .load_contacts()
+        .load_contacts(CachePolicy::default())
         .await?
         .into_iter()
         .map(ContactEnvelope)
@@ -219,7 +205,10 @@ async fn select_contact(client: &Client) -> anyhow::Result<BareJid> {
 
 async fn load_avatar(client: &Client, jid: &BareJid) -> anyhow::Result<()> {
     println!("Loading avatar for {}…", jid);
-    match client.load_avatar(jid.clone()).await? {
+    match client
+        .load_avatar(jid.clone(), CachePolicy::default())
+        .await?
+    {
         Some(path) => println!("Saved avatar image to {:?}.", path),
         None => println!("{} has not set an avatar.", jid),
     }
@@ -248,7 +237,9 @@ async fn save_avatar(client: &Client) -> anyhow::Result<()> {
 
 async fn load_user_profile(client: &Client, jid: &BareJid) -> anyhow::Result<()> {
     println!("Loading profile for {}…", jid);
-    let profile = client.load_profile(jid.clone()).await?;
+    let profile = client
+        .load_profile(jid.clone(), CachePolicy::default())
+        .await?;
     println!(
         r#"
     Full Name: {}
@@ -276,7 +267,11 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> anyhow::Result<()>
 
 async fn update_user_profile(client: &Client, jid: BareJid) -> anyhow::Result<()> {
     println!("Loading current profile…");
-    let mut profile = client.load_profile(jid).await.ok().unwrap_or_default();
+    let mut profile = client
+        .load_profile(jid, CachePolicy::default())
+        .await
+        .ok()
+        .unwrap_or_default();
 
     profile.full_name = prompt_opt_string("Full name", profile.full_name);
     profile.nickname = prompt_opt_string("Nickname", profile.nickname);
@@ -304,7 +299,7 @@ async fn update_user_profile(client: &Client, jid: BareJid) -> anyhow::Result<()
 }
 
 async fn load_contacts(client: &Client) -> anyhow::Result<()> {
-    let contacts = client.load_contacts().await?;
+    let contacts = client.load_contacts(CachePolicy::default()).await?;
 
     for contact in contacts {
         println!(
@@ -374,8 +369,6 @@ fn format_opt<T: Display>(value: Option<T>) -> String {
 
 #[derive(EnumIter, Display, Clone)]
 enum Selection {
-    #[strum(serialize = "Load roster")]
-    LoadRoster,
     #[strum(serialize = "Load profile")]
     LoadUserProfile,
     #[strum(serialize = "Update profile")]
@@ -411,7 +404,6 @@ async fn main() -> anyhow::Result<()> {
         println!();
 
         match select_command() {
-            Selection::LoadRoster => load_roster(&client).await?,
             Selection::LoadUserProfile => {
                 let jid = prompt_bare_jid(&jid);
                 load_user_profile(&client, &jid).await?;

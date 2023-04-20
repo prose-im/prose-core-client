@@ -1,6 +1,6 @@
 pub use bookmarks::{AccountBookmark, AccountBookmarksClient};
 pub use cache::{FsAvatarCache, SQLiteCache};
-pub use client::{Client, ClientDelegate, ClientEvent};
+pub use client::{CachePolicy, Client, ClientDelegate, ClientEvent};
 
 mod bookmarks;
 mod cache;

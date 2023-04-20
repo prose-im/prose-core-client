@@ -13,7 +13,7 @@ use prose_core_lib::ConnectedClient;
 use prose_macros::with_xmpp_client;
 
 use crate::cache::{AvatarCache, DataCache, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS};
-use crate::client::ClientError;
+use crate::client::{CachePolicy, ClientError};
 use crate::domain_ext::UserProfile;
 use crate::types::message_like::Payload;
 use crate::types::{AvatarMetadata, Capabilities, MessageLike, RosterItem};
@@ -76,13 +76,20 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
         &self,
         from: &BareJid,
         metadata: &AvatarMetadata,
+        cache_policy: CachePolicy,
     ) -> anyhow::Result<Option<PathBuf>> {
-        if let Some(cached_image) = self
-            .avatar_cache
-            .cached_avatar_image_url(&from, &metadata.checksum)
-        {
-            info!("Found cached image for {}", from);
-            return Ok(Some(cached_image));
+        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
+            if let Some(cached_image) = self
+                .avatar_cache
+                .cached_avatar_image_url(&from, &metadata.checksum)
+            {
+                info!("Found cached image for {}", from);
+                return Ok(Some(cached_image));
+            }
+        }
+
+        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+            return Ok(None);
         }
 
         let Some(base64_image_data) = self.load_avatar_image(&from, &metadata.checksum).await? else {
@@ -94,20 +101,6 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
         self.avatar_cache
             .cache_avatar_image(&from, img, &metadata)
             .map(Some)
-    }
-
-    pub async fn load_and_cache_roster(&self) -> anyhow::Result<Vec<RosterItem>> {
-        if let Some(roster_items) = self.data_cache.load_roster_items()? {
-            info!("Found cached roster items");
-            return Ok(roster_items);
-        }
-
-        let roster_items = self.load_roster().await?;
-        self.data_cache
-            .insert_roster_items(roster_items.as_slice())
-            .ok();
-
-        Ok(roster_items)
     }
 }
 

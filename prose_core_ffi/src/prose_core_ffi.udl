@@ -49,6 +49,12 @@ callback interface Logger {
     void log(LogLevel level, string message);
 };
 
+enum CachePolicy {
+    "ReturnCacheDataElseLoad",
+    "ReturnCacheDataDontLoad",
+    "ReloadIgnoringCacheData"
+};
+
 [Enum]
 interface ClientEvent {
     ComposingUsersChanged(BareJid conversation);

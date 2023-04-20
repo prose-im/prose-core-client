@@ -21,11 +21,9 @@ use prose_core_lib::{Connection, ConnectionError, ConnectionEvent};
 use crate::cache::{
     AvatarCache, DataCache, IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
 };
-use crate::client::{ClientContext, ClientEvent, ModuleDelegate, XMPPClient};
+use crate::client::{CachePolicy, ClientContext, ClientEvent, ModuleDelegate, XMPPClient};
 use crate::domain_ext::MessageExt;
-use crate::types::{
-    AvatarMetadata, Capabilities, Feature, MessageLike, Page, RosterItem, UserProfile,
-};
+use crate::types::{AvatarMetadata, Capabilities, Feature, MessageLike, Page, UserProfile};
 use crate::{domain_ext, ClientDelegate};
 
 #[derive(Debug, thiserror::Error, Display)]
@@ -159,20 +157,22 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     #[instrument]
-    pub async fn load_roster(&self) -> anyhow::Result<Vec<RosterItem>> {
-        self.ctx.load_and_cache_roster().await
-    }
-
-    #[instrument]
     pub async fn load_profile(
         &self,
         from: impl Into<BareJid> + Debug,
+        cache_policy: CachePolicy,
     ) -> anyhow::Result<UserProfile> {
         let from = from.into();
 
-        if let Some(cached_profile) = self.ctx.data_cache.load_user_profile(&from)? {
-            info!("Found cached profile for {}", from);
-            return Ok(cached_profile);
+        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
+            if let Some(cached_profile) = self.ctx.data_cache.load_user_profile(&from)? {
+                info!("Found cached profile for {}", from);
+                return Ok(cached_profile);
+            }
+        }
+
+        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+            return Ok(UserProfile::default());
         }
 
         let Some(profile) = self.ctx.load_vcard(&from).await? else {
@@ -198,30 +198,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn load_avatar(
         &self,
         from: impl Into<Jid> + Debug,
+        cache_policy: CachePolicy,
     ) -> anyhow::Result<Option<PathBuf>> {
         let jid = BareJid::from(from.into());
 
-        let metadata = match self.ctx.data_cache.load_avatar_metadata(&jid)? {
-            Some(md) => {
-                info!("Found cached metadata for {}", jid);
-                Ok::<_, anyhow::Error>(Some(md))
-            }
-            None => {
-                let Some(metadata) = self.ctx.load_latest_avatar_metadata(&jid).await? else {
-                    return Ok(None)
-                };
-                self.ctx
-                    .data_cache
-                    .insert_avatar_metadata(&jid, &metadata)?;
-                Ok(Some(metadata))
-            }
-        }?;
-
-        let Some(metadata) = metadata else {
+        let Some(metadata) = self.load_avatar_metadata(&jid, cache_policy).await? else {
             return Ok(None)
         };
 
-        self.ctx.load_and_cache_avatar_image(&jid, &metadata).await
+        self.ctx
+            .load_and_cache_avatar_image(&jid, &metadata, cache_policy)
+            .await
     }
 
     #[instrument]
@@ -277,9 +264,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     #[instrument]
-    pub async fn load_contacts(&self) -> anyhow::Result<Vec<Contact>> {
-        if !self.ctx.data_cache.has_valid_roster_items()? {
-            self.ctx.load_and_cache_roster().await?;
+    pub async fn load_contacts(&self, cache_policy: CachePolicy) -> anyhow::Result<Vec<Contact>> {
+        if cache_policy == CachePolicy::ReloadIgnoringCacheData
+            || !self.ctx.data_cache.has_valid_roster_items()?
+        {
+            if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+                return Ok(vec![]);
+            }
+
+            let roster_items = self.ctx.load_roster().await?;
+            self.ctx
+                .data_cache
+                .insert_roster_items(roster_items.as_slice())
+                .ok();
         }
 
         let contacts: Vec<(Contact, Option<ImageId>)> = self.ctx.data_cache.load_contacts()?;
@@ -695,5 +692,30 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .await?
             .pop()
             .ok_or(anyhow::format_err!("No message with id {}", ids[0]))
+    }
+
+    #[instrument]
+    async fn load_avatar_metadata(
+        &self,
+        from: &BareJid,
+        cache_policy: CachePolicy,
+    ) -> anyhow::Result<Option<AvatarMetadata>> {
+        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
+            if let Some(metadata) = self.ctx.data_cache.load_avatar_metadata(from)? {
+                return Ok(Some(metadata));
+            }
+        }
+
+        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+            return Ok(None);
+        }
+
+        let Some(metadata) = self.ctx.load_latest_avatar_metadata(from).await? else {
+            return Ok(None)
+        };
+        self.ctx
+            .data_cache
+            .insert_avatar_metadata(from, &metadata)?;
+        Ok(Some(metadata))
     }
 }

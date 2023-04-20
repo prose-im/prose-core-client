@@ -19,7 +19,7 @@ use crate::client::ClientContext;
 use crate::domain_ext::UserProfile;
 use crate::types::message_like::TimestampedMessage;
 use crate::types::MessageLike;
-use crate::ClientEvent;
+use crate::{CachePolicy, ClientEvent};
 
 pub static RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     Builder::new_multi_thread()
@@ -95,7 +95,10 @@ impl<D: DataCache, A: AvatarCache> ProfileDelegate for ModuleDelegate<D, A> {
                 Err(err) => error!("Failed to cache avatar metadata {}", err),
             }
 
-            match ctx.load_and_cache_avatar_image(&from, &metadata).await {
+            match ctx
+                .load_and_cache_avatar_image(&from, &metadata, CachePolicy::ReloadIgnoringCacheData)
+                .await
+            {
                 Ok(path) => {
                     debug!("Finished downloading and caching image to {:?}", path);
                     ctx.send_event(ClientEvent::ContactChanged { jid: from });

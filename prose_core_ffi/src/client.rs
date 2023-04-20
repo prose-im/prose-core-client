@@ -3,7 +3,9 @@ use std::path::{Path, PathBuf};
 
 use tracing::info;
 
-use prose_core_client::{Client as ProseClient, ClientDelegate, FsAvatarCache, SQLiteCache};
+use prose_core_client::{
+    CachePolicy, Client as ProseClient, ClientDelegate, FsAvatarCache, SQLiteCache,
+};
 use prose_core_lib::ConnectionError;
 
 use crate::{
@@ -53,13 +55,20 @@ impl Client {
         Ok(())
     }
 
-    pub async fn load_contacts(&self) -> Result<Vec<Contact>, ClientError> {
-        let items = self.client.load_contacts().await?;
+    pub async fn load_contacts(
+        &self,
+        cache_policy: CachePolicy,
+    ) -> Result<Vec<Contact>, ClientError> {
+        let items = self.client.load_contacts(cache_policy).await?;
         Ok(items)
     }
 
-    pub async fn load_profile(&self, from: BareJid) -> Result<UserProfile, ClientError> {
-        let profile = self.client.load_profile(from).await?;
+    pub async fn load_profile(
+        &self,
+        from: BareJid,
+        cache_policy: CachePolicy,
+    ) -> Result<UserProfile, ClientError> {
+        let profile = self.client.load_profile(from, cache_policy).await?;
         Ok(profile)
     }
 
@@ -68,8 +77,12 @@ impl Client {
         Ok(profile)
     }
 
-    pub async fn load_avatar(&self, from: BareJid) -> Result<Option<PathBuf>, ClientError> {
-        let path = self.client.load_avatar(from).await?;
+    pub async fn load_avatar(
+        &self,
+        from: BareJid,
+        cache_policy: CachePolicy,
+    ) -> Result<Option<PathBuf>, ClientError> {
+        let path = self.client.load_avatar(from, cache_policy).await?;
         Ok(path)
     }
 

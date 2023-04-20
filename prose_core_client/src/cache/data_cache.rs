@@ -14,7 +14,6 @@ pub trait DataCache: ContactsCache + MessageCache + Send + Sync {
 pub trait ContactsCache {
     fn has_valid_roster_items(&self) -> anyhow::Result<bool>;
     fn insert_roster_items(&self, items: &[RosterItem]) -> anyhow::Result<()>;
-    fn load_roster_items(&self) -> anyhow::Result<Option<Vec<RosterItem>>>;
 
     fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> anyhow::Result<()>;
     fn load_user_profile(&self, jid: &BareJid) -> anyhow::Result<Option<UserProfile>>;
