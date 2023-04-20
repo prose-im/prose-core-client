@@ -268,13 +268,15 @@ impl ContactsCache for SQLiteCache {
                 user_profile.full_name, 
                 user_profile.nickname, 
                 avatar_metadata.checksum, 
+                COUNT(presence.jid) AS presence_count,
                 presence.type, 
                 presence.show, 
                 presence.status
             FROM roster_item
             LEFT JOIN user_profile ON roster_item.jid = user_profile.jid
             LEFT JOIN avatar_metadata ON roster_item.jid = avatar_metadata.jid
-            LEFT JOIN presence ON roster_item.jid = presence.jid;
+            LEFT JOIN presence ON roster_item.jid = presence.jid
+            GROUP BY roster_item.jid;
             "#,
         )?;
 
@@ -289,19 +291,25 @@ impl ContactsCache for SQLiteCache {
                 let full_name: Option<String> = row.get(2)?;
                 let nickname: Option<String> = row.get(3)?;
                 let checksum: Option<ImageId> = row.get::<_, Option<String>>(4)?.map(Into::into);
+                let presence_count: u32 = row.get(5)?;
                 let presence_kind: Option<presence::Kind> =
-                    row.get::<_, Option<FromStrSql<_>>>(5)?.map(|o| o.0);
-                let presence_show: Option<presence::Show> =
                     row.get::<_, Option<FromStrSql<_>>>(6)?.map(|o| o.0);
-                let status: Option<String> = row.get(7)?;
+                let presence_show: Option<presence::Show> =
+                    row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
+                let status: Option<String> = row.get(8)?;
+
+                let availability = if presence_count > 0 {
+                    Availability::from((presence_kind, presence_show)).into_inner()
+                } else {
+                    prose_core_domain::Availability::Unavailable
+                };
 
                 Ok((
                     Contact {
                         jid: jid.clone(),
                         name: full_name.or(nickname).unwrap_or(jid.to_string()),
                         avatar: None,
-                        availability: Availability::from((presence_kind, presence_show))
-                            .into_inner(),
+                        availability,
                         status,
                         groups,
                     },
@@ -311,5 +319,99 @@ impl ContactsCache for SQLiteCache {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(contacts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use rusqlite::Connection;
+
+    use prose_core_domain::Availability;
+    use prose_core_lib::modules::roster::Subscription;
+    use prose_core_lib::stanza::presence::Show;
+
+    use super::*;
+
+    #[test]
+    fn test_presence() -> anyhow::Result<()> {
+        let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
+        let jid_a = BareJid::from_str("a@prose.org").unwrap();
+        let jid_b = BareJid::from_str("b@prose.org").unwrap();
+
+        cache.insert_roster_items(&[
+            RosterItem {
+                jid: jid_a.clone(),
+                subscription: Subscription::Both,
+                groups: vec![],
+            },
+            RosterItem {
+                jid: jid_b.clone(),
+                subscription: Subscription::Both,
+                groups: vec![],
+            },
+        ])?;
+
+        // If we didn't receive a presence yet the contact should be considered unavailable.
+        // If we did however receive an empty presence the contact should be considered
+        // available, because of https://datatracker.ietf.org/doc/html/rfc6121#section-4.7.1
+        cache.insert_presence(&jid_b, None, None, None)?;
+
+        assert_eq!(
+            cache
+                .load_contacts()?
+                .into_iter()
+                .map(|c| c.0)
+                .collect::<Vec<_>>(),
+            vec![
+                Contact {
+                    jid: jid_a.clone(),
+                    name: jid_a.to_string(),
+                    avatar: None,
+                    availability: Availability::Unavailable,
+                    status: None,
+                    groups: vec![String::from("")],
+                },
+                Contact {
+                    jid: jid_b.clone(),
+                    name: jid_b.to_string(),
+                    avatar: None,
+                    availability: Availability::Available,
+                    status: None,
+                    groups: vec![String::from("")],
+                }
+            ]
+        );
+
+        // And for good measure insert some non-empty values
+        cache.insert_presence(&jid_a, None, Some(Show::DND), Some(String::from("AFK!")))?;
+        assert_eq!(
+            cache
+                .load_contacts()?
+                .into_iter()
+                .map(|c| c.0)
+                .collect::<Vec<_>>(),
+            vec![
+                Contact {
+                    jid: jid_a.clone(),
+                    name: jid_a.to_string(),
+                    avatar: None,
+                    availability: Availability::DoNotDisturb,
+                    status: Some(String::from("AFK!")),
+                    groups: vec![String::from("")],
+                },
+                Contact {
+                    jid: jid_b.clone(),
+                    name: jid_b.to_string(),
+                    avatar: None,
+                    availability: Availability::Available,
+                    status: None,
+                    groups: vec![String::from("")],
+                }
+            ]
+        );
+
+        Ok(())
     }
 }

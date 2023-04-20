@@ -16,7 +16,7 @@ mod ext;
 mod jid;
 
 #[typeshare]
-#[derive(Debug, Display)]
+#[derive(Debug, Display, PartialEq)]
 pub enum Availability {
     Available,
     Unavailable,
@@ -25,7 +25,7 @@ pub enum Availability {
 }
 
 #[typeshare]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Contact {
     pub jid: BareJid,
     pub name: String,
@@ -36,14 +36,14 @@ pub struct Contact {
 }
 
 #[typeshare]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Address {
     pub locality: Option<String>,
     pub country: Option<String>,
 }
 
 #[typeshare]
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct UserProfile {
     pub full_name: Option<String>,
     pub nickname: Option<String>,
