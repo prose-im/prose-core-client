@@ -1,300 +1,24 @@
-use std::fmt::{Debug, Formatter};
-use std::io::Cursor;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Instant;
+use std::fmt::Debug;
 
-use image::GenericImageView;
-use jid::{BareJid, FullJid, Jid};
+use jid::{BareJid, Jid};
 use microtype::Microtype;
-use strum_macros::Display;
-use tokio::sync::RwLock;
 use tracing::{debug, info, instrument};
 
-use prose_core_domain::{Contact, Emoji, Message, MessageId};
-use prose_core_lib::modules::profile::avatar::ImageId;
-use prose_core_lib::modules::{ArchivedMessage, Caps, Chat, Fin, Profile, Roster, MAM};
+use prose_core_domain::{Emoji, Message, MessageId};
+use prose_core_lib::modules::{ArchivedMessage, Fin};
+use prose_core_lib::stanza::message;
 use prose_core_lib::stanza::message::ChatState;
-use prose_core_lib::stanza::{message, Namespace};
-use prose_core_lib::{Connection, ConnectionError, ConnectionEvent};
 
-use crate::cache::{
-    AvatarCache, DataCache, IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
-};
-use crate::client::{CachePolicy, ClientContext, ClientEvent, ModuleDelegate, XMPPClient};
+use crate::cache::{AvatarCache, DataCache};
+use crate::client::ClientError;
 use crate::domain_ext::MessageExt;
-use crate::types::{AvatarMetadata, Capabilities, Feature, MessageLike, Page, UserProfile};
-use crate::{domain_ext, ClientDelegate};
+use crate::types::{MessageLike, Page};
 
-#[derive(Debug, thiserror::Error, Display)]
-pub enum ClientError {
-    NotConnected,
-}
-
-pub struct Client<D: DataCache + 'static, A: AvatarCache + 'static> {
-    ctx: Arc<ClientContext<D, A>>,
-}
-
-impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Client")
-    }
-}
+use super::Client;
 
 const MESSAGE_PAGE_SIZE: u32 = 50;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub fn new(data_cache: D, avatar_cache: A, delegate: Option<Box<dyn ClientDelegate>>) -> Self {
-        let capabilities = Capabilities::new(
-            "Prose",
-            "https://www.prose.org",
-            vec![
-                Feature::new(Namespace::AvatarData, false),
-                Feature::new(Namespace::AvatarMetadata, false),
-                Feature::new(Namespace::AvatarMetadata, true),
-                Feature::new(Namespace::ChatStates, false),
-                Feature::new(Namespace::Ping, false),
-                Feature::new(Namespace::PubSub, false),
-                Feature::new(Namespace::PubSub, true),
-                Feature::new(Namespace::Receipts, false),
-                Feature::new(Namespace::VCard, false),
-                Feature::new(Namespace::VCard, true),
-            ],
-        );
-
-        let ctx = ClientContext {
-            capabilities,
-            xmpp: RwLock::new(None),
-            delegate: delegate.map(Arc::new),
-            data_cache,
-            avatar_cache,
-        };
-
-        Client { ctx: Arc::new(ctx) }
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    #[instrument(skip(password))]
-    pub async fn connect(
-        &self,
-        jid: &FullJid,
-        password: impl Into<String> + Debug,
-    ) -> anyhow::Result<(), ConnectionError> {
-        if let Some(xmpp) = self.ctx.xmpp.write().await.take() {
-            xmpp.client.disconnect();
-        }
-
-        let module_delegate = Arc::new(ModuleDelegate::new(self.ctx.clone()));
-
-        let chat = Arc::new(Chat::new(Some(module_delegate.clone())));
-        let roster = Arc::new(Roster::new());
-        let mam = Arc::new(MAM::new());
-        let profile = Arc::new(Profile::new(Some(module_delegate.clone())));
-        let caps = Arc::new(Caps::new(Some(module_delegate)));
-
-        let connection_handler: Box<dyn FnMut(&dyn Connection, &ConnectionEvent) + Send> =
-            match &self.ctx.delegate {
-                Some(delegate) => {
-                    let delegate = delegate.clone();
-                    Box::new(move |_, event| {
-                        delegate.handle_event(ClientEvent::ConnectionStatusChanged {
-                            event: event.clone(),
-                        })
-                    })
-                }
-                None => Box::new(|_, _| {}),
-            };
-
-        let connected_client = prose_core_lib::Client::new()
-            .register_module(chat.clone())
-            .register_module(roster.clone())
-            .register_module(mam.clone())
-            .register_module(profile.clone())
-            .register_module(caps.clone())
-            .set_connection_handler(connection_handler)
-            .connect(jid, password)
-            .await?;
-
-        chat.set_message_carbons_enabled(&connected_client.context(), true)
-            .map_err(|err| ConnectionError::Generic {
-                msg: err.to_string(),
-            })?;
-
-        caps.publish_capabilities(&connected_client.context(), (&self.ctx.capabilities).into())
-            .map_err(|err| ConnectionError::Generic {
-                msg: err.to_string(),
-            })?;
-
-        let xmpp = XMPPClient {
-            jid: BareJid::from(jid.clone()),
-            client: connected_client,
-            roster,
-            profile,
-            chat,
-            mam,
-            caps,
-        };
-
-        *self.ctx.xmpp.write().await = Some(xmpp);
-        Ok(())
-    }
-
-    pub async fn disconnect(&self) {
-        if let Some(xmpp) = self.ctx.xmpp.write().await.take() {
-            xmpp.client.disconnect();
-        }
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub async fn delete_cached_data(&self) -> anyhow::Result<()> {
-        self.ctx.data_cache.delete_all()?;
-        self.ctx.avatar_cache.delete_all_cached_images()?;
-        Ok(())
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    #[instrument]
-    pub async fn load_profile(
-        &self,
-        from: impl Into<BareJid> + Debug,
-        cache_policy: CachePolicy,
-    ) -> anyhow::Result<UserProfile> {
-        let from = from.into();
-
-        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
-            if let Some(cached_profile) = self.ctx.data_cache.load_user_profile(&from)? {
-                info!("Found cached profile for {}", from);
-                return Ok(cached_profile);
-            }
-        }
-
-        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
-            return Ok(UserProfile::default());
-        }
-
-        let Some(profile) = self.ctx.load_vcard(&from).await? else {
-            return Ok(UserProfile::default())
-        };
-
-        self.ctx.data_cache.insert_user_profile(&from, &profile)?;
-        Ok(profile.into_inner())
-    }
-
-    #[instrument]
-    pub async fn save_profile(&self, profile: UserProfile) -> anyhow::Result<()> {
-        let profile: domain_ext::UserProfile = profile.into();
-        let jid = self.ctx.set_vcard(&profile).await?;
-        self.ctx.publish_vcard(&profile).await?;
-
-        self.ctx.data_cache.insert_user_profile(&jid, &profile)?;
-
-        Ok(())
-    }
-
-    #[instrument]
-    pub async fn load_avatar(
-        &self,
-        from: impl Into<Jid> + Debug,
-        cache_policy: CachePolicy,
-    ) -> anyhow::Result<Option<PathBuf>> {
-        let jid = BareJid::from(from.into());
-
-        let Some(metadata) = self.load_avatar_metadata(&jid, cache_policy).await? else {
-            return Ok(None)
-        };
-
-        self.ctx
-            .load_and_cache_avatar_image(&jid, &metadata, cache_policy)
-            .await
-    }
-
-    #[instrument]
-    pub async fn save_avatar(&self, image_path: &Path) -> anyhow::Result<PathBuf> {
-        let now = Instant::now();
-        info!("Opening & resizing image at {:?}…", image_path);
-
-        let img =
-            image::open(image_path)?.thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);
-        info!(
-            "Opening image & resizing finished after {:.2?}",
-            now.elapsed()
-        );
-
-        let mut image_data = Vec::new();
-        img.write_to(&mut Cursor::new(&mut image_data), IMAGE_OUTPUT_FORMAT)?;
-
-        let metadata = AvatarMetadata::new(
-            IMAGE_OUTPUT_MIME_TYPE,
-            AvatarMetadata::generate_sha1_checksum(&image_data).into(),
-            img.dimensions().0,
-            img.dimensions().1,
-        );
-
-        info!("Uploading avatar…");
-        self.ctx
-            .set_avatar_image(&metadata.checksum, &image_data)
-            .await?;
-
-        info!("Uploading avatar metadata…");
-        let jid = self
-            .ctx
-            .set_avatar_metadata(
-                image_data.len(),
-                &metadata.checksum,
-                metadata.width,
-                metadata.height,
-            )
-            .await?;
-
-        info!("Caching avatar metadata");
-        self.ctx
-            .data_cache
-            .insert_avatar_metadata(&jid, &metadata)?;
-
-        info!("Caching image locally…");
-        let path = self
-            .ctx
-            .avatar_cache
-            .cache_avatar_image(&jid, img, &metadata)?;
-
-        Ok(path)
-    }
-
-    #[instrument]
-    pub async fn load_contacts(&self, cache_policy: CachePolicy) -> anyhow::Result<Vec<Contact>> {
-        if cache_policy == CachePolicy::ReloadIgnoringCacheData
-            || !self.ctx.data_cache.has_valid_roster_items()?
-        {
-            if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
-                return Ok(vec![]);
-            }
-
-            let roster_items = self.ctx.load_roster().await?;
-            self.ctx
-                .data_cache
-                .insert_roster_items(roster_items.as_slice())
-                .ok();
-        }
-
-        let contacts: Vec<(Contact, Option<ImageId>)> = self.ctx.data_cache.load_contacts()?;
-
-        Ok(contacts
-            .into_iter()
-            .map(|(mut contact, image_id)| {
-                if let Some(image_id) = image_id {
-                    contact.avatar = self
-                        .ctx
-                        .avatar_cache
-                        .cached_avatar_image_url(&contact.jid, &image_id)
-                }
-                contact
-            })
-            .collect())
-    }
-
     #[instrument]
     pub async fn load_latest_messages(
         &self,
@@ -439,8 +163,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         // We couldn't find any older messages but we need to have the one matching the id at least.
         // So we'll fetch that to translate the MessageId into a StanzaId for the server.
         let Some(stanza_id) = self.ctx.data_cache.load_stanza_id(from, &before)? else {
-            return Err(anyhow::format_err!("Could not determine stanza_id for message with id {}", before));
-        };
+      return Err(anyhow::format_err!("Could not determine stanza_id for message with id {}", before));
+    };
 
         info!("Loading messages for conversation {}…", from);
         let (messages, fin): (Vec<ArchivedMessage>, Fin) = self
@@ -449,11 +173,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .await?;
 
         let Some(first_message) = messages.first() else {
-            return Ok(Page {
-                items: vec![],
-                is_complete: true
-            })
-        };
+      return Ok(Page {
+        items: vec![],
+        is_complete: true
+      })
+    };
 
         let oldest_message_id: Option<message::Id> = if fin.is_complete() {
             first_message.message.message().and_then(|m| m.id())
@@ -639,16 +363,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn load_draft(&self, conversation: &BareJid) -> anyhow::Result<Option<String>> {
         self.ctx.data_cache.load_draft(conversation)
     }
-
-    #[instrument]
-    // Signature is incomplete. send_presence(&self, show: Option<ShowKind>, status: &Option<String>)
-    pub fn send_presence(&self) -> anyhow::Result<()> {
-        todo!()
-    }
-
-    pub async fn query_server_features(&self) -> anyhow::Result<()> {
-        self.ctx.query_server_features().await
-    }
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
@@ -692,30 +406,5 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .await?
             .pop()
             .ok_or(anyhow::format_err!("No message with id {}", ids[0]))
-    }
-
-    #[instrument]
-    async fn load_avatar_metadata(
-        &self,
-        from: &BareJid,
-        cache_policy: CachePolicy,
-    ) -> anyhow::Result<Option<AvatarMetadata>> {
-        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
-            if let Some(metadata) = self.ctx.data_cache.load_avatar_metadata(from)? {
-                return Ok(Some(metadata));
-            }
-        }
-
-        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
-            return Ok(None);
-        }
-
-        let Some(metadata) = self.ctx.load_latest_avatar_metadata(from).await? else {
-            return Ok(None)
-        };
-        self.ctx
-            .data_cache
-            .insert_avatar_metadata(from, &metadata)?;
-        Ok(Some(metadata))
     }
 }
