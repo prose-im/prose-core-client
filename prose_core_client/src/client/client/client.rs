@@ -6,15 +6,13 @@ use strum_macros::Display;
 use tokio::sync::RwLock;
 use tracing::instrument;
 
-use prose_core_domain::Contact;
-use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::modules::{Caps, Chat, Profile, Roster, MAM};
 use prose_core_lib::stanza::Namespace;
 use prose_core_lib::{Connection, ConnectionError, ConnectionEvent};
 
 use crate::cache::{AvatarCache, DataCache};
-use crate::client::{CachePolicy, ClientContext, ClientEvent, ModuleDelegate, XMPPClient};
-use crate::types::{Capabilities, Feature};
+use crate::client::{ClientContext, ClientEvent, ModuleDelegate, XMPPClient};
+use crate::types::{AccountSettings, Capabilities, Feature};
 use crate::ClientDelegate;
 
 #[derive(Debug, thiserror::Error, Display)]
@@ -145,44 +143,20 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    #[instrument]
-    pub async fn load_contacts(&self, cache_policy: CachePolicy) -> anyhow::Result<Vec<Contact>> {
-        if cache_policy == CachePolicy::ReloadIgnoringCacheData
-            || !self.ctx.data_cache.has_valid_roster_items()?
-        {
-            if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
-                return Ok(vec![]);
-            }
-
-            let roster_items = self.ctx.load_roster().await?;
-            self.ctx
-                .data_cache
-                .insert_roster_items(roster_items.as_slice())
-                .ok();
-        }
-
-        let contacts: Vec<(Contact, Option<ImageId>)> = self.ctx.data_cache.load_contacts()?;
-
-        Ok(contacts
-            .into_iter()
-            .map(|(mut contact, image_id)| {
-                if let Some(image_id) = image_id {
-                    contact.avatar = self
-                        .ctx
-                        .avatar_cache
-                        .cached_avatar_image_url(&contact.jid, &image_id)
-                }
-                contact
-            })
-            .collect())
+    pub async fn load_account_settings(&self) -> anyhow::Result<AccountSettings> {
+        Ok(self
+            .ctx
+            .data_cache
+            .load_account_settings()?
+            .unwrap_or_default())
     }
 
-    #[instrument]
-    // Signature is incomplete. send_presence(&self, show: Option<ShowKind>, status: &Option<String>)
-    pub fn send_presence(&self) -> anyhow::Result<()> {
-        todo!()
+    pub async fn save_account_settings(&self, settings: &AccountSettings) -> anyhow::Result<()> {
+        self.ctx.data_cache.save_account_settings(settings)
     }
+}
 
+impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn query_server_features(&self) -> anyhow::Result<()> {
         self.ctx.query_server_features().await
     }

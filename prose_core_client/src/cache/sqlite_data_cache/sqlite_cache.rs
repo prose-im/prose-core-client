@@ -5,10 +5,13 @@
 use std::path::Path;
 use std::sync::Mutex;
 
+use jid::BareJid;
+use rusqlite::types::FromSqlError;
 use rusqlite::{params, Connection, OptionalExtension};
 use tracing::{debug, info};
 
 use crate::cache::data_cache::DataCache;
+use crate::types::AccountSettings;
 
 pub struct SQLiteCache {
     pub(super) conn: Mutex<Connection>,
@@ -47,6 +50,30 @@ impl DataCache for SQLiteCache {
         "#,
         )?;
         Ok(())
+    }
+
+    fn save_account_settings(&self, settings: &AccountSettings) -> anyhow::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("INSERT OR REPLACE INTO kv VALUES (?, ?)")?;
+        stmt.execute(params![
+            "account_settings",
+            serde_json::to_string(settings)?
+        ])?;
+        Ok(())
+    }
+
+    fn load_account_settings(&self) -> anyhow::Result<Option<AccountSettings>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT `value` FROM kv WHERE `key` = ?")?;
+        let settings = stmt
+            .query_row(params!["account_settings"], |row| {
+                Ok(
+                    serde_json::from_str::<AccountSettings>(&row.get::<_, String>(0)?)
+                        .map_err(|_| FromSqlError::InvalidType)?,
+                )
+            })
+            .optional()?;
+        Ok(settings)
     }
 }
 
@@ -141,6 +168,31 @@ impl SQLiteCache {
             params!["version", version],
         )?;
         trx.commit()?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::str::FromStr;
+
+    use prose_core_domain::Availability;
+
+    use super::*;
+
+    #[test]
+    fn test_save_and_load_account_settings() -> anyhow::Result<()> {
+        let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
+
+        assert_eq!(cache.load_account_settings()?, None);
+
+        let settings = AccountSettings {
+            availability: Availability::Away,
+        };
+
+        cache.save_account_settings(&settings)?;
+        assert_eq!(cache.load_account_settings()?, Some(settings));
+
         Ok(())
     }
 }

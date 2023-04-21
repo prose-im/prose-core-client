@@ -7,8 +7,8 @@ use tracing::info;
 
 use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::modules::{ArchivedMessage, Caps, Chat, Fin, Profile, Roster, MAM};
-use prose_core_lib::stanza::message;
 use prose_core_lib::stanza::message::ChatState;
+use prose_core_lib::stanza::{message, presence};
 use prose_core_lib::ConnectedClient;
 use prose_macros::with_xmpp_client;
 
@@ -271,6 +271,17 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
     pub async fn query_server_features(xmpp: &XMPPClient) -> anyhow::Result<()> {
         xmpp.caps
             .query_server_features(&xmpp.client.context())
+            .await
+    }
+
+    #[with_xmpp_client]
+    pub async fn send_presence(
+        xmpp: &XMPPClient,
+        show: Option<presence::Show>,
+        status: Option<&str>,
+    ) -> anyhow::Result<()> {
+        xmpp.profile
+            .send_presence(&xmpp.client.context(), show, status)
             .await
     }
 }

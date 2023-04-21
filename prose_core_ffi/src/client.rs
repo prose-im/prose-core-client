@@ -3,13 +3,15 @@ use std::path::{Path, PathBuf};
 
 use tracing::info;
 
+use prose_core_client::types::AccountSettings;
 use prose_core_client::{
     CachePolicy, Client as ProseClient, ClientDelegate, FsAvatarCache, SQLiteCache,
 };
 use prose_core_lib::ConnectionError;
 
 use crate::{
-    BareJid, ClientError, Contact, Emoji, FullJid, Message, MessageId, MessagesPage, UserProfile,
+    Availability, BareJid, ClientError, Contact, Emoji, FullJid, Message, MessageId, MessagesPage,
+    UserProfile,
 };
 
 pub struct Client {
@@ -194,5 +196,29 @@ impl Client {
     pub async fn load_draft(&self, conversation: BareJid) -> Result<Option<String>, ClientError> {
         let text = self.client.load_draft(&conversation).await?;
         Ok(text)
+    }
+
+    pub async fn set_availability(
+        &self,
+        availability: Availability,
+        status: Option<String>,
+    ) -> Result<(), ClientError> {
+        self.client
+            .set_availability(availability, status.as_deref())
+            .await?;
+        Ok(())
+    }
+
+    pub async fn load_account_settings(&self) -> Result<AccountSettings, ClientError> {
+        let settings = self.client.load_account_settings().await?;
+        Ok(settings)
+    }
+
+    pub async fn save_account_settings(
+        &self,
+        settings: AccountSettings,
+    ) -> Result<(), ClientError> {
+        self.client.save_account_settings(&settings).await?;
+        Ok(())
     }
 }

@@ -8,7 +8,7 @@ use crate::modules::profile::VCard;
 use crate::modules::Module;
 use crate::stanza::iq::Kind::{Get, Set};
 use crate::stanza::pubsub::{Event, Item, Items, Publish};
-use crate::stanza::{Namespace, Presence, PubSub, Stanza, StanzaBase, IQ};
+use crate::stanza::{presence, Namespace, Presence, PubSub, Stanza, StanzaBase, IQ};
 
 use super::super::Context;
 
@@ -29,6 +29,19 @@ impl Profile {
 }
 
 impl Module for Profile {
+    fn handle_presence_stanza(&self, _ctx: &Context, stanza: &Presence) -> anyhow::Result<()> {
+        let Some(handler) = &self.delegate else {
+            return Ok(())
+        };
+
+        let Some(from) = stanza.from() else {
+            return Ok(())
+        };
+
+        handler.presence_did_change(&from, stanza);
+        Ok(())
+    }
+
     fn handle_pubsub_event(
         &self,
         _ctx: &Context,
@@ -67,19 +80,6 @@ impl Module for Profile {
             }
             _ => (),
         }
-        Ok(())
-    }
-
-    fn handle_presence_stanza(&self, _ctx: &Context, stanza: &Presence) -> anyhow::Result<()> {
-        let Some(handler) = &self.delegate else {
-            return Ok(())
-        };
-
-        let Some(from) = stanza.from() else {
-            return Ok(())
-        };
-
-        handler.presence_did_change(&from, stanza);
         Ok(())
     }
 }
@@ -212,6 +212,25 @@ impl Profile {
             ),
         );
         ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
+    pub async fn send_presence(
+        &self,
+        ctx: &Context<'_>,
+        show: Option<presence::Show>,
+        status: Option<&str>,
+    ) -> anyhow::Result<()> {
+        let mut presence = Presence::new();
+
+        if let Some(show) = show {
+            presence = presence.set_show(show);
+        }
+        if let Some(status) = status {
+            presence = presence.set_status(status);
+        }
+
+        ctx.send_stanza(presence);
         Ok(())
     }
 }

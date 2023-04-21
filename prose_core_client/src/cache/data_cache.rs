@@ -5,10 +5,13 @@ use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::stanza::message::ChatState;
 use prose_core_lib::stanza::{message, presence};
 
-use crate::types::{AvatarMetadata, MessageLike, Page, RosterItem, UserProfile};
+use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page, RosterItem, UserProfile};
 
 pub trait DataCache: ContactsCache + MessageCache + Send + Sync {
     fn delete_all(&self) -> anyhow::Result<()>;
+
+    fn save_account_settings(&self, settings: &AccountSettings) -> anyhow::Result<()>;
+    fn load_account_settings(&self) -> anyhow::Result<Option<AccountSettings>>;
 }
 
 pub trait ContactsCache {

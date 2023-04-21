@@ -4,6 +4,7 @@ pub use chrono::{DateTime, Utc};
 #[cfg(not(feature = "typescript"))]
 use jid::BareJid;
 use microtype::microtype;
+use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 use typeshare::typeshare;
 pub use url::Url;
@@ -16,7 +17,7 @@ mod ext;
 mod jid;
 
 #[typeshare]
-#[derive(Debug, Display, PartialEq)]
+#[derive(Debug, Display, PartialEq, Serialize, Deserialize)]
 pub enum Availability {
     Available,
     Unavailable,

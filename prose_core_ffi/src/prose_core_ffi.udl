@@ -162,3 +162,7 @@ dictionary AccountBookmark {
     BareJid jid;
     boolean is_selected;
 };
+
+dictionary AccountSettings {
+    Availability availability;
+};

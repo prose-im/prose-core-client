@@ -5,7 +5,8 @@ use chrono::NaiveDateTime;
 pub use jid::{BareJid, FullJid, JidParseError};
 
 pub use prose_core_client::types::{
-    Address, Availability, Contact, Emoji, Message, MessageId, Reaction, StanzaId, Url, UserProfile,
+    AccountSettings, Address, Availability, Contact, Emoji, Message, MessageId, Reaction, StanzaId,
+    Url, UserProfile,
 };
 use prose_core_client::types::{DateTime as ChronoDateTime, Page, Utc};
 pub use prose_core_client::{
@@ -121,9 +122,9 @@ pub fn format_jid(jid: BareJid) -> String {
 
 pub mod uniffi_types {
     pub use crate::{
-        client::Client, Availability, BareJid, CachePolicy, ClientError, ConnectionError, Contact,
-        Emoji, FullJid, JidParseError, Message, MessageId, MessagesPage, PathBuf, StanzaId, Url,
-        UserProfile,
+        client::Client, AccountSettings, Availability, BareJid, CachePolicy, ClientError,
+        ConnectionError, Contact, Emoji, FullJid, JidParseError, Message, MessageId, MessagesPage,
+        PathBuf, StanzaId, Url, UserProfile,
     };
 }
 
