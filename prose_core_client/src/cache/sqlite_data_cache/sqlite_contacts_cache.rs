@@ -30,7 +30,7 @@ impl ContactsCache for SQLiteCache {
             return Ok(false)
         };
 
-        Ok(Utc::now() - last_update <= Duration::minutes(60))
+        Ok(Utc::now() - last_update <= Duration::days(10))
     }
 
     fn insert_roster_items(&self, items: &[RosterItem]) -> anyhow::Result<()> {
@@ -97,7 +97,7 @@ impl ContactsCache for SQLiteCache {
            "#,
         )?;
 
-        let cache_max_age = Utc::now() - Duration::minutes(60);
+        let cache_max_age = Utc::now() - Duration::days(10);
 
         let profile = stmt
             .query_row(params![jid.to_string(), cache_max_age], |row| {
