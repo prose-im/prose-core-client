@@ -17,6 +17,10 @@ impl<'a> VCard<'a> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.first_child().is_none()
+    }
+
     pub fn full_name(&self) -> Option<String> {
         self.child_by_name("fn")?.child_by_name("text")?.text()
     }

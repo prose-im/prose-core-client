@@ -20,26 +20,26 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         &self,
         from: impl Into<BareJid> + Debug,
         cache_policy: CachePolicy,
-    ) -> anyhow::Result<UserProfile> {
+    ) -> anyhow::Result<Option<UserProfile>> {
         let from = from.into();
 
         if cache_policy != CachePolicy::ReloadIgnoringCacheData {
             if let Some(cached_profile) = self.ctx.data_cache.load_user_profile(&from)? {
                 info!("Found cached profile for {}", from);
-                return Ok(cached_profile);
+                return Ok(Some(cached_profile));
             }
         }
 
         if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
-            return Ok(UserProfile::default());
+            return Ok(None);
         }
 
         let Some(profile) = self.ctx.load_vcard(&from).await? else {
-          return Ok(UserProfile::default())
+          return Ok(None)
         };
 
         self.ctx.data_cache.insert_user_profile(&from, &profile)?;
-        Ok(profile.into_inner())
+        Ok(Some(profile.into_inner()))
     }
 
     #[instrument]

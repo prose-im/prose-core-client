@@ -69,7 +69,7 @@ impl Client {
         &self,
         from: BareJid,
         cache_policy: CachePolicy,
-    ) -> Result<UserProfile, ClientError> {
+    ) -> Result<Option<UserProfile>, ClientError> {
         let profile = self.client.load_profile(from, cache_policy).await?;
         Ok(profile)
     }

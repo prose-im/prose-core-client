@@ -119,10 +119,20 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
         xmpp: &XMPPClient,
         from: &BareJid,
     ) -> anyhow::Result<Option<UserProfile>> {
-        xmpp.profile
+        let vcard = xmpp
+            .profile
             .load_vcard(&xmpp.client.context(), from.clone())
-            .await
-            .and_then(|vcard| vcard.as_ref().map(TryInto::try_into).transpose())
+            .await?;
+
+        let Some(vcard) = vcard else {
+            return Ok(None)
+        };
+
+        if vcard.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(Some(UserProfile::try_from(&vcard)?))
     }
 
     #[with_xmpp_client]

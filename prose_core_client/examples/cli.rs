@@ -240,6 +240,12 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> anyhow::Result<()>
     let profile = client
         .load_profile(jid.clone(), CachePolicy::default())
         .await?;
+
+    let Some(profile) = profile else {
+        println!("No profile set for {}", jid);
+        return Ok(())
+    };
+
     println!(
         r#"
     Full Name: {}
@@ -269,8 +275,7 @@ async fn update_user_profile(client: &Client, jid: BareJid) -> anyhow::Result<()
     println!("Loading current profile…");
     let mut profile = client
         .load_profile(jid, CachePolicy::default())
-        .await
-        .ok()
+        .await?
         .unwrap_or_default();
 
     profile.full_name = prompt_opt_string("Full name", profile.full_name);
