@@ -378,6 +378,8 @@ enum Selection {
     LoadUserProfile,
     #[strum(serialize = "Update profile")]
     UpdateUserProfile,
+    #[strum(serialize = "Delete profile")]
+    DeleteUserProfile,
     #[strum(serialize = "Load avatar")]
     LoadUserAvatar,
     #[strum(serialize = "Save avatar")]
@@ -415,6 +417,9 @@ async fn main() -> anyhow::Result<()> {
             }
             Selection::UpdateUserProfile => {
                 update_user_profile(&client, jid.clone()).await?;
+            }
+            Selection::DeleteUserProfile => {
+                client.delete_profile().await?;
             }
             Selection::LoadUserAvatar => {
                 let jid = prompt_bare_jid(&jid);

@@ -20,6 +20,7 @@ pub trait ContactsCache {
 
     fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> anyhow::Result<()>;
     fn load_user_profile(&self, jid: &BareJid) -> anyhow::Result<Option<UserProfile>>;
+    fn delete_user_profile(&self, jid: &BareJid) -> anyhow::Result<()>;
 
     fn insert_avatar_metadata(
         &self,

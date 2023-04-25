@@ -125,6 +125,15 @@ impl ContactsCache for SQLiteCache {
         Ok(profile)
     }
 
+    fn delete_user_profile(&self, jid: &BareJid) -> anyhow::Result<()> {
+        let conn = &*self.conn.lock().unwrap();
+        conn.execute(
+            "DELETE FROM user_profile WHERE jid = ?",
+            params![jid.to_string()],
+        )?;
+        Ok(())
+    }
+
     fn insert_avatar_metadata(
         &self,
         jid: &BareJid,

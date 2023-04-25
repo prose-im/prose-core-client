@@ -28,6 +28,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
+    pub async fn delete_profile(&self) -> anyhow::Result<()> {
+        self.ctx.unpublish_vcard().await?;
+        let jid = self.ctx.delete_vcard().await?;
+        self.ctx.data_cache.delete_user_profile(&jid)?;
+        Ok(())
+    }
+
     #[instrument]
     pub async fn save_avatar(&self, image_path: &Path) -> anyhow::Result<PathBuf> {
         let now = Instant::now();

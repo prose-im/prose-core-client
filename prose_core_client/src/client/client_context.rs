@@ -144,10 +144,21 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
     }
 
     #[with_xmpp_client]
+    pub async fn delete_vcard(xmpp: &XMPPClient) -> anyhow::Result<BareJid> {
+        xmpp.profile.delete_vcard(&xmpp.client.context()).await?;
+        Ok(xmpp.jid.clone())
+    }
+
+    #[with_xmpp_client]
     pub async fn publish_vcard(xmpp: &XMPPClient, profile: &UserProfile) -> anyhow::Result<()> {
         xmpp.profile
             .publish_vcard(&xmpp.client.context(), profile.try_into()?)
             .await
+    }
+
+    #[with_xmpp_client]
+    pub async fn unpublish_vcard(xmpp: &XMPPClient) -> anyhow::Result<()> {
+        xmpp.profile.unpublish_vcard(&xmpp.client.context()).await
     }
 
     #[with_xmpp_client]

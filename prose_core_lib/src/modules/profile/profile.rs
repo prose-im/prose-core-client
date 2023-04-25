@@ -7,7 +7,7 @@ use crate::modules::profile::types::avatar::{Info, Metadata};
 use crate::modules::profile::VCard;
 use crate::modules::Module;
 use crate::stanza::iq::Kind::{Get, Set};
-use crate::stanza::pubsub::{Event, Item, Items, Publish};
+use crate::stanza::pubsub::{Event, Item, Items, Publish, Retract};
 use crate::stanza::{presence, Namespace, Presence, PubSub, Stanza, StanzaBase, IQ};
 
 use super::super::Context;
@@ -113,12 +113,34 @@ impl Profile {
         Ok(())
     }
 
+    pub async fn delete_vcard(&self, ctx: &Context<'_>) -> anyhow::Result<()> {
+        ctx.send_iq(
+            IQ::new(Set, ctx.generate_id())
+                .add_child(VCard::new())
+                .set_to(BareJid::from(ctx.jid.clone())),
+        )
+        .await?;
+        Ok(())
+    }
+
     pub async fn publish_vcard(&self, ctx: &Context<'_>, vcard: VCard<'_>) -> anyhow::Result<()> {
         let iq = IQ::new(Set, ctx.generate_id()).add_child(
             PubSub::new().set_publish(
                 Publish::new()
                     .set_node(Namespace::VCard.to_string())
                     .set_item(Item::new(BareJid::from(ctx.jid.clone())).add_child(vcard)),
+            ),
+        );
+        ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
+    pub async fn unpublish_vcard(&self, ctx: &Context<'_>) -> anyhow::Result<()> {
+        let iq = IQ::new(Set, ctx.generate_id()).add_child(
+            PubSub::new().set_retract(
+                Retract::new()
+                    .set_node(Namespace::VCard.to_string())
+                    .set_item(Item::new(BareJid::from(ctx.jid.clone()))),
             ),
         );
         ctx.send_iq(iq).await?;

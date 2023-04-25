@@ -79,6 +79,11 @@ impl Client {
         Ok(profile)
     }
 
+    pub async fn delete_profile(&self) -> Result<(), ClientError> {
+        self.client.delete_profile().await?;
+        Ok(())
+    }
+
     pub async fn load_avatar(
         &self,
         from: BareJid,

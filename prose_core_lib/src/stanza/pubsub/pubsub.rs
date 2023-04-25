@@ -1,7 +1,7 @@
 use crate::helpers::stanza_base_macro::stanza_base;
 use crate::helpers::StanzaCow;
 use crate::stanza::pubsub::subscribe::Subscribe;
-use crate::stanza::pubsub::{Items, Publish};
+use crate::stanza::pubsub::{Items, Publish, Retract};
 use crate::stanza::Namespace;
 
 pub struct PubSub<'a> {
@@ -41,6 +41,14 @@ impl<'a> PubSub<'a> {
 
     pub fn set_subscribe(self, subscribe: Subscribe) -> Self {
         self.add_child(subscribe)
+    }
+
+    pub fn retract(&self) -> Option<Retract> {
+        self.child_by_name("retract").map(Into::into)
+    }
+
+    pub fn set_retract(self, retract: Retract) -> Self {
+        self.add_child(retract)
     }
 }
 
