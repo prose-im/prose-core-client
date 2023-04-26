@@ -34,11 +34,6 @@ impl Module for Profile {
             return Ok(())
         };
 
-        // Ignore presence stanza with capabilities as these seem to not reflect the user's status
-        if stanza.caps().is_some() {
-            return Ok(());
-        }
-
         let Some(from) = stanza.from() else {
             return Ok(())
         };

@@ -2,11 +2,11 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use jid::{BareJid, FullJid};
-use prose_core_domain::Availability;
 use strum_macros::Display;
 use tokio::sync::RwLock;
 use tracing::instrument;
 
+use prose_core_domain::Availability;
 use prose_core_lib::modules::{Caps, Chat, Profile, Roster, MAM};
 use prose_core_lib::stanza::{presence, Namespace};
 use prose_core_lib::{Connection, ConnectionError, ConnectionEvent};
@@ -106,6 +106,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .connect(jid, password)
             .await?;
 
+        // Send caps before the configured availability since that would otherwise override it
+        caps.publish_capabilities(&connected_client.context(), (&self.ctx.capabilities).into())
+            .map_err(|err| ConnectionError::Generic {
+                msg: err.to_string(),
+            })?;
+
         let show: presence::Show = crate::domain_ext::Availability::from(availability)
             .try_into()
             .map_err(|err: anyhow::Error| ConnectionError::Generic {
@@ -119,11 +125,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             })?;
 
         chat.set_message_carbons_enabled(&connected_client.context(), true)
-            .map_err(|err| ConnectionError::Generic {
-                msg: err.to_string(),
-            })?;
-
-        caps.publish_capabilities(&connected_client.context(), (&self.ctx.capabilities).into())
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
