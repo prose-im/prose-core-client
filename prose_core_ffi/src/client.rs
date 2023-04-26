@@ -47,8 +47,15 @@ impl Client {
         self.jid.clone()
     }
 
-    pub async fn connect(&self, password: String) -> Result<(), ConnectionError> {
-        self.client.connect(&self.jid, password).await?;
+    pub async fn connect(
+        &self,
+        password: String,
+        availability: Availability,
+        status: Option<String>,
+    ) -> Result<(), ConnectionError> {
+        self.client
+            .connect(&self.jid, password, availability, status.as_deref())
+            .await?;
         Ok(())
     }
 

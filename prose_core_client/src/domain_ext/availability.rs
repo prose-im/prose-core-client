@@ -25,3 +25,20 @@ impl From<(Option<presence::Kind>, Option<presence::Show>)> for Availability {
         })
     }
 }
+
+impl TryFrom<Availability> for presence::Show {
+    type Error = anyhow::Error;
+
+    fn try_from(value: Availability) -> Result<Self, Self::Error> {
+        use prose_core_domain::Availability;
+
+        match value.0 {
+            Availability::Available => Ok(presence::Show::Chat),
+            Availability::Unavailable => Err(anyhow::format_err!(
+                "You cannot set yourself to Unavailable. Choose 'Away' instead."
+            )),
+            Availability::DoNotDisturb => Ok(presence::Show::DND),
+            Availability::Away => Ok(presence::Show::Away),
+        }
+    }
+}

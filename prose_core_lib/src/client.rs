@@ -78,7 +78,6 @@ impl Client {
             let id_provider = id_provider.clone();
             let time_provider = time_provider.clone();
             let pending_request_futures = pending_request_futures.clone();
-            let conn_module = conn_module.clone();
 
             config.connection_handler = Box::new(move |conn, event| {
                 let result: anyhow::Result<()> = {
@@ -93,10 +92,7 @@ impl Client {
                                 &**time_provider,
                                 &pending_request_futures,
                             );
-
-                            conn_module
-                                .send_initial_presence(&ctx)
-                                .and_then(|_| modules.handle_connect(&ctx))
+                            modules.handle_connect(&ctx)
                         }
                         ConnectionEvent::Disconnect { .. } => modules.handle_disconnect(),
                     }

@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use prose_core_client::types::Address;
 use prose_core_client::{CachePolicy, FsAvatarCache, SQLiteCache};
-use prose_core_domain::{Contact, Message, MessageId};
+use prose_core_domain::{Availability, Contact, Message, MessageId};
 
 use crate::utilities::{enable_debug_logging, load_credentials, load_dot_env};
 
@@ -61,7 +61,9 @@ async fn configure_client() -> anyhow::Result<(BareJid, Client)> {
     let client = Client::new(data_cache, image_cache, None);
 
     println!("Connecting to server…");
-    client.connect(&account_jid, account_password).await?;
+    client
+        .connect(&account_jid, account_password, Availability::Away, None)
+        .await?;
     println!("Connected.");
 
     Ok((account_jid.into(), client))

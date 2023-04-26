@@ -3,10 +3,9 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use image::GenericImageView;
-use tracing::{info, instrument, warn};
+use tracing::{info, instrument};
 
 use prose_core_domain::{Availability, UserProfile};
-use prose_core_lib::stanza::presence;
 
 use crate::cache::{
     AvatarCache, DataCache, IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
@@ -93,15 +92,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         availability: Availability,
         status: Option<&str>,
     ) -> anyhow::Result<()> {
-        let kind = match availability {
-            Availability::Available => presence::Show::Chat,
-            Availability::Unavailable => {
-                warn!("You cannot set yourself to Unavailable. Choose 'Away' instead.");
-                return Ok(());
-            }
-            Availability::DoNotDisturb => presence::Show::DND,
-            Availability::Away => presence::Show::Away,
-        };
-        self.ctx.send_presence(Some(kind), status).await
+        let availability = crate::domain_ext::Availability::from(availability);
+        self.ctx
+            .send_presence(Some(availability.try_into()?), status)
+            .await
     }
 }

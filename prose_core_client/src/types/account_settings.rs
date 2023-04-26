@@ -1,4 +1,3 @@
-use jid::BareJid;
 use serde::{Deserialize, Serialize};
 
 use prose_core_domain::Availability;

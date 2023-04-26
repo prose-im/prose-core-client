@@ -2,12 +2,13 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use jid::{BareJid, FullJid};
+use prose_core_domain::Availability;
 use strum_macros::Display;
 use tokio::sync::RwLock;
 use tracing::instrument;
 
 use prose_core_lib::modules::{Caps, Chat, Profile, Roster, MAM};
-use prose_core_lib::stanza::Namespace;
+use prose_core_lib::stanza::{presence, Namespace};
 use prose_core_lib::{Connection, ConnectionError, ConnectionEvent};
 
 use crate::cache::{AvatarCache, DataCache};
@@ -67,6 +68,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         &self,
         jid: &FullJid,
         password: impl Into<String> + Debug,
+        availability: Availability,
+        status: Option<&str>,
     ) -> anyhow::Result<(), ConnectionError> {
         if let Some(xmpp) = self.ctx.xmpp.write().await.take() {
             xmpp.client.disconnect();
@@ -102,6 +105,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .set_connection_handler(connection_handler)
             .connect(jid, password)
             .await?;
+
+        let show: presence::Show = crate::domain_ext::Availability::from(availability)
+            .try_into()
+            .map_err(|err: anyhow::Error| ConnectionError::Generic {
+                msg: err.to_string(),
+            })?;
+        profile
+            .send_presence(&connected_client.context(), Some(show), status)
+            .await
+            .map_err(|err| ConnectionError::Generic {
+                msg: err.to_string(),
+            })?;
 
         chat.set_message_carbons_enabled(&connected_client.context(), true)
             .map_err(|err| ConnectionError::Generic {

@@ -5,7 +5,6 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use jid::BareJid;
 use rusqlite::types::FromSqlError;
 use rusqlite::{params, Connection, OptionalExtension};
 use tracing::{debug, info};
@@ -174,8 +173,6 @@ impl SQLiteCache {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use prose_core_domain::Availability;
 
     use super::*;
