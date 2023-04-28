@@ -12,7 +12,7 @@ from_custom = "{}.path"
 type_name = "URL"
 imports = [ "Foundation" ]
 into_custom = "URL(string: {})!"
-from_custom = "{}.path"
+from_custom = "{}.absoluteString"
 
 [bindings.swift.custom_types.DateTime]
 type_name = "Date"
