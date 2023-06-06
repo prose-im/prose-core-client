@@ -114,9 +114,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                         first_remote_message_id, cutoff_idx
                     );
                     messages.truncate(cutoff_idx);
-                } else {
-                    debug!("Couldn't find the first remote message in our set of local messages. Discarding all local messages.");
-                    messages.retain(|_| false)
                 }
             }
 

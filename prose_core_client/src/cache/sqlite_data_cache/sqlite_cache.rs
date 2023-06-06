@@ -34,6 +34,13 @@ impl SQLiteCache {
             conn: Mutex::new(conn),
         })
     }
+
+    pub fn in_memory_cache() -> Self {
+        SQLiteCache::open_with_connection(
+            Connection::open_in_memory().expect("Couldn't create in-memory SQLite DB"),
+        )
+        .expect("Couldn't create SQLiteCache")
+    }
 }
 
 impl DataCache for SQLiteCache {

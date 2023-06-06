@@ -1,4 +1,5 @@
 use crate::helpers::StanzaCow;
+use crate::stanza::Namespace;
 use crate::stanza_base;
 use chrono::{DateTime, Utc};
 
@@ -9,6 +10,17 @@ pub struct Delay<'a> {
 }
 
 impl<'a> Delay<'a> {
+    pub fn new(stamp: DateTime<Utc>) -> Self {
+        let mut stanza = libstrophe::Stanza::new();
+        stanza.set_name("delay").unwrap();
+        stanza.set_ns(Namespace::Delay.to_string()).unwrap();
+        stanza.set_attribute("stamp", stamp.to_rfc3339()).unwrap();
+
+        Delay {
+            stanza: stanza.into(),
+        }
+    }
+
     /// The time when the XML stanza was originally sent. The format MUST adhere to the dateTime
     /// format specified in XEP-0082 and MUST be expressed in UTC.
     pub fn stamp(&self) -> Option<DateTime<Utc>> {

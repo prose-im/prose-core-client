@@ -1,5 +1,8 @@
 use jid::BareJid;
 
+#[cfg(feature = "test-helpers")]
+use auto_impl::auto_impl;
+
 use prose_core_domain::Contact;
 use prose_core_lib::modules::profile::avatar::ImageId;
 use prose_core_lib::stanza::message::ChatState;
@@ -7,6 +10,7 @@ use prose_core_lib::stanza::{message, presence};
 
 use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page, RosterItem, UserProfile};
 
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 pub trait DataCache: ContactsCache + MessageCache + Send + Sync {
     fn delete_all(&self) -> anyhow::Result<()>;
 
@@ -14,6 +18,7 @@ pub trait DataCache: ContactsCache + MessageCache + Send + Sync {
     fn load_account_settings(&self) -> anyhow::Result<Option<AccountSettings>>;
 }
 
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 pub trait ContactsCache {
     fn has_valid_roster_items(&self) -> anyhow::Result<bool>;
     fn insert_roster_items(&self, items: &[RosterItem]) -> anyhow::Result<()>;
@@ -43,6 +48,7 @@ pub trait ContactsCache {
     fn load_contacts(&self) -> anyhow::Result<Vec<(Contact, Option<ImageId>)>>;
 }
 
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 pub trait MessageCache {
     fn insert_messages<'a>(
         &self,

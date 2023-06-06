@@ -52,6 +52,16 @@ impl Client {
         self.modules.add_module(module);
         self
     }
+
+    pub fn set_id_provider<P: IDProvider + 'static>(mut self, id_provider: P) -> Self {
+        self.id_provider = Box::new(id_provider);
+        self
+    }
+
+    pub fn set_time_provider<T: TimeProvider + 'static>(mut self, time_provider: T) -> Self {
+        self.time_provider = Box::new(time_provider);
+        self
+    }
 }
 
 impl Client {

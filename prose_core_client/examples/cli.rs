@@ -12,7 +12,7 @@ use url::Url;
 use uuid::Uuid;
 
 use prose_core_client::types::Address;
-use prose_core_client::{CachePolicy, FsAvatarCache, SQLiteCache};
+use prose_core_client::{CachePolicy, ClientBuilder, FsAvatarCache, SQLiteCache};
 use prose_core_domain::{Availability, Contact, Message, MessageId};
 
 use crate::utilities::{enable_debug_logging, load_credentials, load_dot_env};
@@ -58,7 +58,10 @@ async fn configure_client() -> anyhow::Result<(BareJid, Client)> {
     let data_cache = SQLiteCache::open(&cache_path)?;
     let image_cache = FsAvatarCache::new(&cache_path.join("Avatar"))?;
 
-    let client = Client::new(data_cache, image_cache, None);
+    let client = ClientBuilder::<SQLiteCache, FsAvatarCache>::new()
+        .set_data_cache(data_cache)
+        .set_avatar_cache(image_cache)
+        .build();
 
     println!("Connecting to server…");
     client

@@ -1,6 +1,6 @@
 pub use self::libstrophe::LibstropheConnector;
-pub use connector::Connection;
-pub(crate) use connector::{ConnectionConfiguration, Connector};
+pub(crate) use connector::ConnectionConfiguration;
+pub use connector::{Connection, Connector};
 
 mod connector;
 mod libstrophe;

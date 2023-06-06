@@ -4,7 +4,7 @@ use jid::FullJid;
 use crate::{ConnectionError, ConnectionHandler, StanzaHandler, TimedHandler};
 
 #[async_trait]
-pub trait Connector {
+pub trait Connector: Send + Sync {
     async fn connect(
         &self,
         config: ConnectionConfiguration,

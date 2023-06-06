@@ -16,6 +16,8 @@ name = "prose_core_client"
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
+auto_impl = {version = "1.1.0", optional = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 either = "1.8"
@@ -23,6 +25,7 @@ image = "0.24.5"
 indexmap = "1.9"
 itertools = { workspace = true }
 jid = { workspace = true }
+libstrophe = { workspace = true, optional = true }
 microtype = { workspace = true }
 once_cell = { workspace = true }
 prose_core_domain = { path = "../prose_core_domain" }
@@ -44,13 +47,21 @@ uuid = { workspace = true }
 [dev-dependencies]
 dialoguer = "0.10.3"
 dotenvy = { workspace = true }
-tokio = { workspace = true, features = ["rt", "macros", "io-util", "io-std"] }
+tokio = { workspace = true, features = ["rt", "macros", "io-util", "io-std", "test-util"] }
 tracing-oslog = "0.1.2"
 tracing-subscriber = { workspace = true }
 
 [build-dependencies]
 uniffi = { workspace = true, features=["build"] }
 
+[features]
+test-helpers = ["prose_core_lib/test-helpers", "dep:auto_impl", "dep:libstrophe"]
+
 [[example]]
 name = "cli"
 path = "examples/cli.rs"
+
+[[test]]
+name = "load_messages"
+path = "tests/load_messages.rs"
+required-features = ["test-helpers"]

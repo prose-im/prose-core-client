@@ -1,5 +1,5 @@
-pub use client::Client;
 pub(crate) use client::ClientError;
+pub use client::{Client, ClientBuilder};
 
 mod client;
 mod client_contacts;

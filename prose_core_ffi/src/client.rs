@@ -5,7 +5,7 @@ use tracing::info;
 
 use prose_core_client::types::AccountSettings;
 use prose_core_client::{
-    CachePolicy, Client as ProseClient, ClientDelegate, FsAvatarCache, SQLiteCache,
+    CachePolicy, Client as ProseClient, ClientBuilder, ClientDelegate, FsAvatarCache, SQLiteCache,
 };
 use prose_core_lib::ConnectionError;
 
@@ -32,11 +32,11 @@ impl Client {
 
         Ok(Client {
             jid,
-            client: ProseClient::new(
-                SQLiteCache::open(&cache_dir)?,
-                FsAvatarCache::new(&cache_dir.join("Avatars"))?,
-                delegate,
-            ),
+            client: ClientBuilder::<SQLiteCache, FsAvatarCache>::new()
+                .set_data_cache(SQLiteCache::open(&cache_dir)?)
+                .set_avatar_cache(FsAvatarCache::new(&cache_dir.join("Avatars"))?)
+                .set_delegate(delegate)
+                .build(),
         })
     }
 }
