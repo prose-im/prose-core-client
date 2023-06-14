@@ -53,7 +53,11 @@ impl<'a> Context<'a> {
         self.send_iq_with_timeout(iq, Duration::from_secs(10)).await
     }
 
-    pub async fn send_iq_with_timeout(&self, iq: IQ<'_>, timeout: Duration) -> Result<IQ, RequestError> {
+    pub async fn send_iq_with_timeout(
+        &self,
+        iq: IQ<'_>,
+        timeout: Duration,
+    ) -> Result<IQ, RequestError> {
         let id = iq
             .id()
             .expect("Missing id for IQ stanza. Did you forget to set one?");
