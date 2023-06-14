@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use image::{guess_format, ImageFormat};
 use jid::{BareJid, Jid};
 use tokio::sync::RwLock;
 use tracing::info;
@@ -96,7 +97,11 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
             return Ok(None)
         };
 
-        let img = image::load_from_memory(&AvatarMetadata::decode_base64_data(base64_image_data)?)?
+        let image_buf = AvatarMetadata::decode_base64_data(base64_image_data)?;
+        let image_format =
+            ImageFormat::from_mime_type(&metadata.mime_type).unwrap_or(guess_format(&image_buf)?);
+
+        let img = image::load_from_memory_with_format(&image_buf, image_format)?
             .thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);
         self.avatar_cache
             .cache_avatar_image(&from, img, &metadata)
