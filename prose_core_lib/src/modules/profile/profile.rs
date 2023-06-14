@@ -175,8 +175,8 @@ impl Profile {
         bytes_len: usize,
         checksum: &ImageId,
         mime_type: impl AsRef<str>,
-        width: u32,
-        height: u32,
+        width: impl Into<Option<u32>>,
+        height: impl Into<Option<u32>>,
     ) -> anyhow::Result<()> {
         let iq = IQ::new(Set, ctx.generate_id()).add_child(
             PubSub::new().set_publish(

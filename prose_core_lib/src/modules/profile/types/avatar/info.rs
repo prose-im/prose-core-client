@@ -11,7 +11,13 @@ pub struct Info<'a> {
 id_string!(ImageId);
 
 impl<'a> Info<'a> {
-    pub fn new(bytes: i64, id: &ImageId, kind: impl AsRef<str>, width: u32, height: u32) -> Self {
+    pub fn new(
+        bytes: i64,
+        id: &ImageId,
+        kind: impl AsRef<str>,
+        width: impl Into<Option<u32>>,
+        height: impl Into<Option<u32>>,
+    ) -> Self {
         let mut stanza = libstrophe::Stanza::new();
         stanza.set_name("info").expect("Failed to set name");
         stanza
@@ -23,12 +29,17 @@ impl<'a> Info<'a> {
         stanza
             .set_attribute("type", kind)
             .expect("Failed to set attribute");
-        stanza
-            .set_attribute("width", width.to_string())
-            .expect("Failed to set attribute");
-        stanza
-            .set_attribute("height", height.to_string())
-            .expect("Failed to set attribute");
+
+        if let Some(width) = width.into() {
+            stanza
+                .set_attribute("width", width.to_string())
+                .expect("Failed to set attribute");
+        }
+        if let Some(height) = height.into() {
+            stanza
+                .set_attribute("height", height.to_string())
+                .expect("Failed to set attribute");
+        }
 
         Info {
             stanza: stanza.into(),

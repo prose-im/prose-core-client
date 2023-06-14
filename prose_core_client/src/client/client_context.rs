@@ -203,8 +203,8 @@ impl<D: DataCache, A: AvatarCache> ClientContext<D, A> {
         xmpp: &XMPPClient,
         bytes_len: usize,
         checksum: &ImageId,
-        width: u32,
-        height: u32,
+        width: impl Into<Option<u32>>,
+        height: impl Into<Option<u32>>,
     ) -> anyhow::Result<BareJid> {
         xmpp.profile
             .set_avatar_metadata(

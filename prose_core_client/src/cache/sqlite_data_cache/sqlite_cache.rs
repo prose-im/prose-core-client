@@ -83,7 +83,7 @@ impl DataCache for SQLiteCache {
     }
 }
 
-const DATABASE_VERSION: u8 = 3;
+const DATABASE_VERSION: u8 = 4;
 
 impl SQLiteCache {
     fn create_temporary_presence_table(conn: &Connection) -> anyhow::Result<()> {
@@ -138,6 +138,13 @@ impl SQLiteCache {
                 conn,
                 include_str!("../../../migrations/003_add_drafts.sql"),
                 3,
+            )?;
+        }
+        if version < 4 {
+            Self::run_migration(
+                conn,
+                include_str!("../../../migrations/004_optional_avatar_md_dimensions.sql"),
+                4,
             )?;
         }
 

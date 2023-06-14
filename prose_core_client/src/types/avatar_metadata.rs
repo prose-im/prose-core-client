@@ -9,12 +9,17 @@ use crate::types::error::StanzaParseError;
 pub struct AvatarMetadata {
     pub mime_type: String,
     pub checksum: ImageId,
-    pub width: u32,
-    pub height: u32,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
 }
 
 impl AvatarMetadata {
-    pub fn new(mime_type: impl Into<String>, checksum: ImageId, width: u32, height: u32) -> Self {
+    pub fn new(
+        mime_type: impl Into<String>,
+        checksum: ImageId,
+        width: Option<u32>,
+        height: Option<u32>,
+    ) -> Self {
         AvatarMetadata {
             mime_type: mime_type.into(),
             checksum: checksum.into(),
@@ -56,22 +61,12 @@ impl<'a> TryFrom<avatar::Info<'a>> for AvatarMetadata {
                 StanzaParseError::missing_attribute("type", &value))
             )
         };
-        let Some(width) = value.width() else {
-            return Err(anyhow::Error::new(
-                StanzaParseError::missing_attribute("width", &value))
-            )
-        };
-        let Some(height) = value.height() else {
-            return Err(anyhow::Error::new(
-                StanzaParseError::missing_attribute("height", &value))
-            )
-        };
 
         Ok(AvatarMetadata {
             mime_type: mime_type.to_string(),
             checksum,
-            width,
-            height,
+            width: value.width(),
+            height: value.height(),
         })
     }
 }

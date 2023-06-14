@@ -52,8 +52,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let metadata = AvatarMetadata::new(
             IMAGE_OUTPUT_MIME_TYPE,
             AvatarMetadata::generate_sha1_checksum(&image_data).into(),
-            img.dimensions().0,
-            img.dimensions().1,
+            Some(img.dimensions().0),
+            Some(img.dimensions().1),
         );
 
         info!("Uploading avatar…");
