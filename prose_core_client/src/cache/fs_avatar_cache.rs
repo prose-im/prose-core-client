@@ -33,7 +33,12 @@ impl AvatarCache for FsAvatarCache {
     ) -> anyhow::Result<PathBuf> {
         let output_path = self.path.join(self.filename_for(jid, &metadata.checksum));
         let mut output_file = std::fs::File::create(&output_path)?;
-        image.write_to(&mut output_file, IMAGE_OUTPUT_FORMAT)?;
+
+        // Sometimes we encounter e.g. rgb16 pngs and image-rs complains that the JPEG encoder
+        // cannot save these, so we convert the image to rgb8.
+        image
+            .into_rgb8()
+            .write_to(&mut output_file, IMAGE_OUTPUT_FORMAT)?;
         Ok(output_path)
     }
 
