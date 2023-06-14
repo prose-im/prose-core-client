@@ -5,7 +5,8 @@ use jid::{BareJid, Jid};
 use crate::modules::profile::avatar::ImageId;
 use crate::modules::profile::types::avatar::{Info, Metadata};
 use crate::modules::profile::VCard;
-use crate::modules::Module;
+use crate::modules::request_future::{XMPPError, XMPPErrorStatus};
+use crate::modules::{Module, RequestError};
 use crate::stanza::iq::Kind::{Get, Set};
 use crate::stanza::pubsub::{Event, Item, Items, Publish, Retract};
 use crate::stanza::{presence, Namespace, Presence, PubSub, Stanza, StanzaBase, IQ};
@@ -94,11 +95,19 @@ impl Profile {
             .add_child(Stanza::new("vcard").set_namespace(Namespace::VCard))
             .set_to(from);
 
-        let vcard: Option<VCard> = ctx
-            .send_iq(iq)
-            .await?
-            .child_by_name_and_namespace("vcard", Namespace::VCard)
-            .map(|s| s.clone().into());
+        let vcard: Option<VCard> = match ctx.send_iq(iq).await {
+            Ok(iq) => iq
+                .child_by_name_and_namespace("vcard", Namespace::VCard)
+                .map(|s| s.clone().into()),
+            Err(RequestError::XMPP {
+                err:
+                    XMPPError {
+                        status: Some(XMPPErrorStatus::ItemNotFound),
+                        ..
+                    },
+            }) => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
 
         Ok(vcard)
     }
@@ -160,7 +169,17 @@ impl Profile {
             ),
         );
 
-        let response = ctx.send_iq(iq).await?;
+        let response: IQ = match ctx.send_iq(iq).await {
+            Ok(iq) => iq,
+            Err(RequestError::XMPP {
+                err:
+                    XMPPError {
+                        status: Some(XMPPErrorStatus::ItemNotFound),
+                        ..
+                    },
+            }) => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
 
         let Some(pubsub) = response.pubsub() else {
             return Ok(None)

@@ -49,11 +49,11 @@ impl<'a> Context<'a> {
         self.connection.send_stanza(stanza.stanza_owned())
     }
 
-    pub async fn send_iq(&self, iq: IQ<'_>) -> anyhow::Result<IQ> {
+    pub async fn send_iq(&self, iq: IQ<'_>) -> Result<IQ, RequestError> {
         self.send_iq_with_timeout(iq, Duration::from_secs(10)).await
     }
 
-    pub async fn send_iq_with_timeout(&self, iq: IQ<'_>, timeout: Duration) -> anyhow::Result<IQ> {
+    pub async fn send_iq_with_timeout(&self, iq: IQ<'_>, timeout: Duration) -> Result<IQ, RequestError> {
         let id = iq
             .id()
             .expect("Missing id for IQ stanza. Did you forget to set one?");
