@@ -1,3 +1,4 @@
+use libstrophe::{ConnectionFlags, HandlerResult};
 use std::arch::asm;
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
 use std::time::{Duration, Instant};
@@ -19,7 +20,8 @@ impl ConnectionConfiguration {
         connection_receiver: Receiver<ConnectionMessage>,
     ) -> anyhow::Result<libstrophe::Context<'cx, 'cb>> {
         let mut connection = connection;
-        connection.set_flags(libstrophe::ConnectionFlags::TRUST_TLS)?;
+        connection
+            .set_flags(libstrophe::ConnectionFlags::TRUST_TLS | ConnectionFlags::DISABLE_SM)?;
         connection.set_jid(self.jid.to_string());
         connection.set_pass(self.password);
 
@@ -29,9 +31,9 @@ impl ConnectionConfiguration {
                     match connection_receiver.try_recv() {
                         Ok(ConnectionMessage::SendStanza(stanza)) => conn.send(&stanza),
                         Err(TryRecvError::Empty) => {}
-                        Err(TryRecvError::Disconnected) => return false,
+                        Err(TryRecvError::Disconnected) => return HandlerResult::RemoveHandler,
                     }
-                    true
+                    HandlerResult::KeepHandler
                 },
                 Duration::from_millis(1),
             )
@@ -54,7 +56,11 @@ impl ConnectionConfiguration {
                         unsafe {
                             asm!("nop");
                         }
-                        timeout_handler(&conn)
+                        if timeout_handler(&conn) {
+                            HandlerResult::KeepHandler
+                        } else {
+                            HandlerResult::RemoveHandler
+                        }
                     },
                     Duration::from_secs(2),
                 )
@@ -70,7 +76,16 @@ impl ConnectionConfiguration {
             let mut ping_handler = self.ping_handler;
 
             connection
-                .timed_handler_add(move |_, _| ping_handler(&conn), Duration::from_secs(60))
+                .timed_handler_add(
+                    move |_, _| {
+                        if ping_handler(&conn) {
+                            HandlerResult::KeepHandler
+                        } else {
+                            HandlerResult::RemoveHandler
+                        }
+                    },
+                    Duration::from_secs(60),
+                )
                 .expect("Could not install ping handler");
         }
 
@@ -86,7 +101,7 @@ impl ConnectionConfiguration {
                 .handler_add(
                     move |_, _, stanza| {
                         stanza_handler(&conn, stanza);
-                        true
+                        HandlerResult::KeepHandler
                     },
                     None,
                     None,
