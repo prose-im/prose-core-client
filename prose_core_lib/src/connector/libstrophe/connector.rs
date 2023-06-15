@@ -45,8 +45,9 @@ impl Connector for LibstropheConnector {
 
         let mut config = config;
         {
+            let mut connection_handler = config.connection_handler;
             let mut fut_state = Some(fut.state.clone());
-            config.connection_handler = Box::new(move |_, event| {
+            config.connection_handler = Box::new(move |conn, event| {
                 if let Some(fut_state) = fut_state.take() {
                     let mut state = fut_state.lock().unwrap();
                     state.connection_event = Some(event.clone());
@@ -55,6 +56,7 @@ impl Connector for LibstropheConnector {
                         waker.wake();
                     }
                 }
+                connection_handler(conn, event);
             });
         }
 
