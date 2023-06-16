@@ -8,7 +8,7 @@ use tracing::{error, info, warn};
 use crate::connector::{Connection, ConnectionConfiguration, Connector, LibstropheConnector};
 use crate::dependencies::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 use crate::helpers::CompoundModule;
-use crate::modules::{Context, Module, PendingRequest, RequestError};
+use crate::modules::{Context, Module, PendingRequest, RequestError, XMPPElement};
 use crate::stanza::message::Kind;
 use crate::stanza::pubsub::Event;
 use crate::stanza::{iq, Message, Namespace, StanzaBase, IQ};
@@ -139,11 +139,13 @@ impl Client {
                 let result: anyhow::Result<()> = {
                     match name {
                         "iq" => {
-                            let iq: IQ = stanza.into();
-
-                            if let Err(err) = modules.handle_iq_stanza(&ctx, &iq) {
+                            if let Err(err) =
+                                modules.handle_element(&ctx, &XMPPElement::IQ(stanza.into()))
+                            {
                                 error!("{:?}", err);
                             }
+
+                            let iq: IQ = stanza.into();
 
                             let Some(id) = iq.id() else {
                                 return
@@ -160,12 +162,16 @@ impl Client {
 
                             Ok(())
                         }
-                        "presence" => modules.handle_presence_stanza(&ctx, &(stanza.into())),
+                        "presence" => {
+                            modules.handle_element(&ctx, &XMPPElement::Presence(stanza.into()))
+                        }
                         "message" => {
                             let message: Message = stanza.into();
 
                             if message.kind() != Some(Kind::Headline) {
-                                if let Err(err) = modules.handle_message_stanza(&ctx, &message) {
+                                if let Err(err) = modules
+                                    .handle_element(&ctx, &XMPPElement::Message(message.into()))
+                                {
                                     error!("{:?}", err);
                                 }
                                 return;
@@ -194,7 +200,7 @@ impl Client {
 
                             Ok(())
                         }
-                        _ => Ok(()),
+                        _ => modules.handle_element(&ctx, &XMPPElement::Other(stanza.into())),
                     }
                 };
 

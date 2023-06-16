@@ -1,8 +1,21 @@
 use jid::Jid;
 
-use crate::stanza::{pubsub, Message, Namespace, Presence, IQ};
+use crate::stanza::{pubsub, Message, Namespace, Presence, Stanza, IQ};
 
 use super::Context;
+
+#[derive(Debug)]
+pub enum XMPPElement<'a> {
+    Presence(Presence<'a>),
+    Message(Message<'a>),
+    IQ(IQ<'a>),
+    PubSubEvent {
+        from: Jid,
+        node: Namespace,
+        event: pubsub::Event<'a>,
+    },
+    Other(Stanza<'a>),
+}
 
 #[allow(unused_variables)]
 pub trait Module {
@@ -11,6 +24,20 @@ pub trait Module {
     }
     fn handle_disconnect(&self) -> anyhow::Result<()> {
         Ok(())
+    }
+
+    fn handle_element(&self, ctx: &Context, element: &XMPPElement) -> anyhow::Result<()> {
+        match element {
+            XMPPElement::Presence(ref p) => self.handle_presence_stanza(ctx, p),
+            XMPPElement::Message(ref m) => self.handle_message_stanza(ctx, m),
+            XMPPElement::IQ(ref i) => self.handle_iq_stanza(ctx, i),
+            XMPPElement::PubSubEvent {
+                ref from,
+                ref node,
+                ref event,
+            } => self.handle_pubsub_event(ctx, from, node, event),
+            XMPPElement::Other(ref o) => Ok(()),
+        }
     }
 
     fn handle_presence_stanza(&self, ctx: &Context, stanza: &Presence) -> anyhow::Result<()> {

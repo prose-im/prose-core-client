@@ -4,7 +4,7 @@ pub(crate) use connection::Connection;
 pub use context::Context;
 pub(crate) use context::PendingRequest;
 pub use mam::{ArchivedMessage, Fin, MAM};
-pub use module::Module;
+pub use module::{Module, XMPPElement};
 pub use profile::{Profile, ProfileDelegate};
 pub use request_future::RequestError;
 pub use roster::Roster;
