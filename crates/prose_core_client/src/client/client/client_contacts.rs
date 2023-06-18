@@ -1,0 +1,142 @@
+use anyhow::Result;
+use jid::BareJid;
+use microtype::Microtype;
+use prose_core_domain::{Contact, UserProfile};
+use prose_core_lib::mods;
+use prose_core_lib::mods::{Profile, Roster};
+use prose_core_lib::stanza::avatar;
+use std::fmt::Debug;
+use std::path::PathBuf;
+use tracing::{info, instrument};
+
+use crate::cache::{AvatarCache, DataCache};
+use crate::types::{roster, AvatarMetadata};
+use crate::{domain_ext, CachePolicy};
+
+use super::Client;
+
+impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    #[instrument]
+    pub async fn load_profile(
+        &self,
+        from: impl Into<BareJid> + Debug,
+        cache_policy: CachePolicy,
+    ) -> Result<Option<UserProfile>> {
+        let from = from.into();
+
+        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
+            if let Some(cached_profile) = self.data_cache.load_user_profile(&from)? {
+                info!("Found cached profile for {}", from);
+                return Ok(Some(cached_profile));
+            }
+        }
+
+        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+            return Ok(None);
+        }
+
+        let profile = self.client.get_mod::<mods::Profile>();
+        let vcard = profile.load_vcard(from.clone()).await?;
+
+        let Some(vcard) = vcard else { return Ok(None) };
+
+        if vcard.is_empty() {
+            return Ok(None);
+        }
+
+        let profile = domain_ext::UserProfile::try_from(vcard)?;
+
+        self.data_cache.insert_user_profile(&from, &profile)?;
+        Ok(Some(profile.into_inner()))
+    }
+
+    #[cfg(feature = "native-app")]
+    #[instrument]
+    pub async fn load_avatar(
+        &self,
+        from: impl Into<BareJid> + Debug,
+        cache_policy: CachePolicy,
+    ) -> Result<Option<PathBuf>> {
+        let from = from.into();
+
+        let Some(metadata) = self.load_avatar_metadata(&from, cache_policy).await? else {
+            return Ok(None);
+        };
+
+        // TODO
+        // self.ctx
+        //     .load_and_cache_avatar_image(&from, &metadata, cache_policy)
+        //     .await
+
+        Ok(None)
+    }
+
+    #[instrument]
+    pub async fn load_contacts(&self, cache_policy: CachePolicy) -> Result<Vec<Contact>> {
+        if cache_policy == CachePolicy::ReloadIgnoringCacheData
+            || !self.data_cache.has_valid_roster_items()?
+        {
+            if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+                return Ok(vec![]);
+            }
+
+            let roster = self.client.get_mod::<Roster>();
+            let roster_items = roster
+                .load_roster()
+                .await?
+                .items
+                .into_iter()
+                .map(roster::Item::from)
+                .collect::<Vec<roster::Item>>();
+
+            self.data_cache
+                .insert_roster_items(roster_items.as_slice())
+                .ok();
+        }
+
+        let contacts: Vec<(Contact, Option<avatar::ImageId>)> = self.data_cache.load_contacts()?;
+
+        Ok(contacts
+            .into_iter()
+            .map(|(mut contact, image_id)| {
+                if let Some(image_id) = image_id {
+                    contact.avatar = self
+                        .avatar_cache
+                        .cached_avatar_image_url(&contact.jid, &image_id)
+                }
+                contact
+            })
+            .collect())
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    #[instrument]
+    async fn load_avatar_metadata(
+        &self,
+        from: &BareJid,
+        cache_policy: CachePolicy,
+    ) -> Result<Option<AvatarMetadata>> {
+        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
+            if let Some(metadata) = self.data_cache.load_avatar_metadata(from)? {
+                return Ok(Some(metadata.into()));
+            }
+        }
+
+        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
+            return Ok(None);
+        }
+
+        let profile = self.client.get_mod::<Profile>();
+        let metadata = profile
+            .load_latest_avatar_metadata(from.clone())
+            .await?
+            .map(Into::into);
+
+        let Some(metadata) = metadata else {
+            return Ok(None);
+        };
+        self.data_cache.insert_avatar_metadata(from, &metadata)?;
+        Ok(Some(metadata))
+    }
+}

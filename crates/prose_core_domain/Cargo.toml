@@ -1,0 +1,17 @@
+[package]
+name = "prose_core_domain"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = { workspace = true, features = ["serde"] }
+jid = { workspace = true, features = ["serde"] }
+microtype = { workspace = true }
+serde = {version = "1.0", features = ["derive"] }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+typeshare = "1.0"
+url = { workspace = true }
+
+[features]
+typescript = []
