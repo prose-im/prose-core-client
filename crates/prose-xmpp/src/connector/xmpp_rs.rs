@@ -13,6 +13,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio::{task, time};
 use tokio_xmpp::{AsyncClient, Error, Event, Packet};
+use tracing::error;
 
 use crate::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
@@ -116,7 +117,7 @@ impl Connection {
         let write_handle = task::spawn(async move {
             while let Some(packet) = rx.recv().await {
                 if let Err(err) = writer.send(packet).await {
-                    println!("cannot send Stanza to internal channel: {}", err);
+                    error!("cannot send Stanza to internal channel: {}", err);
                     break;
                 }
             }

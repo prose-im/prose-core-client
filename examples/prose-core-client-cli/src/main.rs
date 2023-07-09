@@ -4,54 +4,23 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Input, Password, Select};
+use dialoguer::{theme::ColorfulTheme, Input, Select};
 use jid::{BareJid, FullJid, Jid};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
-use tracing::{span, Level};
 use url::Url;
-use uuid::Uuid;
 
-use prose_core_client::types::Address;
+use common::{enable_debug_logging, load_credentials, Level};
+use prose_core_client::types::{Address, Availability, Contact, Message, MessageId};
 use prose_core_client::{CachePolicy, ClientBuilder, FsAvatarCache, SQLiteCache};
-use prose_core_domain::{Availability, Contact, Message, MessageId};
-use prose_xmpp::XmppRsConnector;
-
-use crate::utilities::{enable_debug_logging, load_credentials, load_dot_env};
-
-#[path = "utils/mod.rs"]
-mod utilities;
+use prose_xmpp::connector;
 
 type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
 
 async fn configure_client() -> Result<(BareJid, Client)> {
-    let jid_arg = env::args()
-        .nth(1)
-        .and_then(|str| BareJid::from_str(&str).ok());
-
-    // Allow passing in a bare jid argument and prompt for a password or load jid and password
-    // from .env file otherwise.
-    let (account_jid, account_password) = match jid_arg {
-        Some(jid) => (
-            FullJid {
-                domain: jid.domain,
-                node: jid.node,
-                resource: format!("cli-{}", Uuid::new_v4().to_string()),
-            },
-            Password::with_theme(&ColorfulTheme::default())
-                .with_prompt("Password")
-                .interact()
-                .unwrap(),
-        ),
-        None => {
-            load_dot_env();
-            load_credentials()
-        }
-    };
-
     let cache_path = env::current_dir()?
-        .join("prose-core-client")
         .join("examples")
+        .join("prose-core-client-cli")
         .join("cache");
     fs::create_dir_all(&cache_path)?;
 
@@ -60,19 +29,21 @@ async fn configure_client() -> Result<(BareJid, Client)> {
     let data_cache = SQLiteCache::open(&cache_path)?;
     let image_cache = FsAvatarCache::new(&cache_path.join("Avatar"))?;
 
-    let client = ClientBuilder::<SQLiteCache, FsAvatarCache>::new()
-        .set_connector_provider(Box::new(|| Box::new(XmppRsConnector::default())))
+    let client = ClientBuilder::new()
+        .set_connector_provider(connector::xmpp_rs::Connector::provider())
         .set_data_cache(data_cache)
         .set_avatar_cache(image_cache)
         .build();
 
+    let (jid, password) = load_credentials();
+
     println!("Connecting to server…");
     client
-        .connect(&account_jid, account_password, Availability::Away, None)
+        .connect(&jid, password, Availability::Away, None)
         .await?;
     println!("Connected.");
 
-    Ok((account_jid.into(), client))
+    Ok((jid.into(), client))
 }
 
 fn select_command() -> Selection {
@@ -416,9 +387,6 @@ enum Selection {
 async fn main() -> Result<()> {
     env::set_var("RUST_BACKTRACE", "1");
     enable_debug_logging(Level::TRACE);
-
-    let span = span!(Level::INFO, "start_cli");
-    let _enter = span.enter();
 
     let (jid, client) = configure_client().await?;
 

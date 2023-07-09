@@ -69,10 +69,10 @@ impl TryFrom<TimestampedMessage<Carbon>> for MessageLike {
     }
 }
 
-impl TryFrom<TimestampedMessage<&Message>> for MessageLike {
+impl TryFrom<TimestampedMessage<Message>> for MessageLike {
     type Error = anyhow::Error;
 
-    fn try_from(envelope: TimestampedMessage<&Message>) -> Result<Self> {
+    fn try_from(envelope: TimestampedMessage<Message>) -> Result<Self> {
         let msg = envelope.message;
 
         let id = msg
@@ -96,7 +96,7 @@ impl TryFrom<TimestampedMessage<&Message>> for MessageLike {
         let TargetedPayload {
             target: refs,
             payload,
-        } = TargetedPayload::try_from(msg)?;
+        } = TargetedPayload::try_from(&msg)?;
 
         Ok(MessageLike {
             id: id.clone(),

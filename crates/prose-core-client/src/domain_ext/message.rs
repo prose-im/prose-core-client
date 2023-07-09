@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use prose_core_domain::{Message, Reaction};
+use prose_domain::{Message, Reaction};
 
 use crate::types::message_like::Payload;
 use crate::types::MessageLike;

@@ -6,4 +6,5 @@ mod client;
 mod client_builder;
 mod client_contacts;
 mod client_conversation;
+mod client_event;
 mod client_user;

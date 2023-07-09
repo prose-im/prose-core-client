@@ -5,7 +5,7 @@ pub use event::Event;
 pub use stanza::ns;
 
 pub mod client;
-mod connector;
+pub mod connector;
 mod deps;
 mod event;
 pub mod mods;

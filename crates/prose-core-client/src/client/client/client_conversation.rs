@@ -4,15 +4,14 @@ use anyhow::{format_err, Result};
 use jid::{BareJid, Jid};
 use microtype::Microtype;
 use tracing::{debug, info, instrument};
-use xmpp_parsers::mam::{Complete, Fin};
+use xmpp_parsers::mam::Complete;
 
-use prose_core_domain::{Emoji, Message, MessageId};
+use prose_domain::{Emoji, Message, MessageId};
 use prose_xmpp::mods::{Chat, MAM};
 use prose_xmpp::stanza::message;
-use prose_xmpp::stanza::message::{mam, ChatState};
+use prose_xmpp::stanza::message::ChatState;
 
 use crate::cache::{AvatarCache, DataCache};
-use crate::client::ClientError;
 use crate::domain_ext::MessageExt;
 use crate::types::{MessageLike, Page};
 
@@ -45,14 +44,16 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 "Loading messages in conversation {} after {} from local cache…",
                 from, since
             );
-            self.data_cache
+            self.inner
+                .data_cache
                 .load_messages_after(from, since, Some(MESSAGE_PAGE_SIZE))?
         } else {
             info!(
                 "Loading last page of messages in conversation {} from local cache…",
                 from
             );
-            self.data_cache
+            self.inner
+                .data_cache
                 .load_messages_before(from, None, MESSAGE_PAGE_SIZE)?
                 .map(|page| page.items)
                 .unwrap_or_else(|| vec![])
@@ -87,7 +88,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .collect::<Result<Vec<_>, _>>()?;
 
             info!("Found {} messages. Saving to cache…", remote_messages.len());
-            self.data_cache.insert_messages(remote_messages.iter())?;
+            self.inner
+                .data_cache
+                .insert_messages(remote_messages.iter())?;
 
             // Remove all messages from the tail of the local messages including the message that
             // matches the first message returned from the server so that we don't have any
@@ -150,7 +153,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         // If we have messages cached already return these without a round trip to the server…
         if let Some(cached_messages) =
-            self.data_cache
+            self.inner
+                .data_cache
                 .load_messages_before(from, Some(&before), MESSAGE_PAGE_SIZE)?
         {
             info!("Returning cached messages for conversation {}…", from);
@@ -159,7 +163,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         // We couldn't find any older messages but we need to have the one matching the id at least.
         // So we'll fetch that to translate the MessageId into a StanzaId for the server.
-        let Some(stanza_id) = self.data_cache.load_stanza_id(from, &before)? else {
+        let Some(stanza_id) = self.inner.data_cache.load_stanza_id(from, &before)? else {
             return Err(format_err!(
                 "Could not determine stanza_id for message with id {}",
                 before
@@ -200,7 +204,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        self.data_cache.insert_messages(parsed_messages.iter())?;
+        self.inner
+            .data_cache
+            .insert_messages(parsed_messages.iter())?;
 
         self.enriching_messages_from_cache(
             from,
@@ -221,9 +227,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .iter()
             .map(|id| id.as_ref().into())
             .collect::<Vec<message::Id>>();
-        let messages =
-            self.data_cache
-                .load_messages_targeting(conversation, ids.as_slice(), None, true)?;
+        let messages = self.inner.data_cache.load_messages_targeting(
+            conversation,
+            ids.as_slice(),
+            None,
+            true,
+        )?;
         debug!(
             "{}",
             messages
@@ -278,7 +287,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         // We currently do not support multi-user chats. So either our conversation partner is
         // typing or they are not.
         let conversation_partner_is_composing =
-            self.data_cache.load_chat_state(conversation)? == Some(ChatState::Composing);
+            self.inner.data_cache.load_chat_state(conversation)? == Some(ChatState::Composing);
 
         if conversation_partner_is_composing {
             Ok(vec![conversation.clone()])
@@ -340,11 +349,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     pub async fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
-        self.data_cache.save_draft(conversation, text)
+        self.inner.data_cache.save_draft(conversation, text)
     }
 
     pub async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
-        self.data_cache.load_draft(conversation)
+        self.inner.data_cache.load_draft(conversation)
     }
 }
 
@@ -363,7 +372,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     ) -> Result<Page<Message>> {
         let message_ids = page.items.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
         let last_message_id = &page.items.last().unwrap().id;
-        let modifiers = self.data_cache.load_messages_targeting(
+        let modifiers = self.inner.data_cache.load_messages_targeting(
             &conversation,
             &message_ids,
             last_message_id,

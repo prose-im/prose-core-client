@@ -1,7 +1,7 @@
 use anyhow::Result;
 use jid::BareJid;
 use microtype::Microtype;
-use prose_core_domain::{Contact, UserProfile};
+use prose_domain::{Contact, UserProfile};
 use prose_xmpp::mods;
 use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::stanza::avatar;
@@ -25,7 +25,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let from = from.into();
 
         if cache_policy != CachePolicy::ReloadIgnoringCacheData {
-            if let Some(cached_profile) = self.data_cache.load_user_profile(&from)? {
+            if let Some(cached_profile) = self.inner.data_cache.load_user_profile(&from)? {
                 info!("Found cached profile for {}", from);
                 return Ok(Some(cached_profile));
             }
@@ -46,7 +46,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let profile = domain_ext::UserProfile::try_from(vcard)?;
 
-        self.data_cache.insert_user_profile(&from, &profile)?;
+        self.inner.data_cache.insert_user_profile(&from, &profile)?;
         Ok(Some(profile.into_inner()))
     }
 
@@ -74,7 +74,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     #[instrument]
     pub async fn load_contacts(&self, cache_policy: CachePolicy) -> Result<Vec<Contact>> {
         if cache_policy == CachePolicy::ReloadIgnoringCacheData
-            || !self.data_cache.has_valid_roster_items()?
+            || !self.inner.data_cache.has_valid_roster_items()?
         {
             if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
                 return Ok(vec![]);
@@ -89,18 +89,21 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .map(roster::Item::from)
                 .collect::<Vec<roster::Item>>();
 
-            self.data_cache
+            self.inner
+                .data_cache
                 .insert_roster_items(roster_items.as_slice())
                 .ok();
         }
 
-        let contacts: Vec<(Contact, Option<avatar::ImageId>)> = self.data_cache.load_contacts()?;
+        let contacts: Vec<(Contact, Option<avatar::ImageId>)> =
+            self.inner.data_cache.load_contacts()?;
 
         Ok(contacts
             .into_iter()
             .map(|(mut contact, image_id)| {
                 if let Some(image_id) = image_id {
                     contact.avatar = self
+                        .inner
                         .avatar_cache
                         .cached_avatar_image_url(&contact.jid, &image_id)
                 }
@@ -118,7 +121,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         cache_policy: CachePolicy,
     ) -> Result<Option<AvatarMetadata>> {
         if cache_policy != CachePolicy::ReloadIgnoringCacheData {
-            if let Some(metadata) = self.data_cache.load_avatar_metadata(from)? {
+            if let Some(metadata) = self.inner.data_cache.load_avatar_metadata(from)? {
                 return Ok(Some(metadata.into()));
             }
         }
@@ -136,7 +139,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let Some(metadata) = metadata else {
             return Ok(None);
         };
-        self.data_cache.insert_avatar_metadata(from, &metadata)?;
+        self.inner
+            .data_cache
+            .insert_avatar_metadata(from, &metadata)?;
         Ok(Some(metadata))
     }
 }

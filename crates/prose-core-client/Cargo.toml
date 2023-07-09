@@ -20,7 +20,7 @@ indexmap = "1.9"
 jid = { workspace = true }
 microtype = { workspace = true }
 once_cell = { workspace = true }
-prose-core-domain = { path = "../prose-core-domain" }
+prose-domain = { path = "../prose-domain" }
 prose-xmpp = { path = "../prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
 sha1 = { workspace = true }
@@ -43,13 +43,6 @@ tokio = { workspace = true, features = ["full"], optional = true }
 
 # Test helpers
 auto_impl = {version = "1.1.0", optional = true }
-
-[dev-dependencies]
-dialoguer = "0.10.3"
-dotenvy = { workspace = true }
-tokio = { workspace = true, features = ["rt", "macros", "io-util", "io-std", "test-util"] }
-tracing-oslog = "0.1.2"
-tracing-subscriber = { workspace = true }
 
 [build-dependencies]
 uniffi = { workspace = true, features=["build"] }

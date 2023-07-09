@@ -1,17 +1,19 @@
+use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
+
 use anyhow::Result;
 use jid::FullJid;
-use prose_core_domain::Availability;
-use prose_xmpp::mods::{Caps, Chat, Profile};
-use prose_xmpp::Client as XMPPClient;
-use prose_xmpp::ConnectionError;
-use std::fmt::{Debug, Formatter};
 use strum_macros::Display;
 use tracing::instrument;
 
+use prose_domain::Availability;
+use prose_xmpp::mods::{Caps, Chat, Profile};
+use prose_xmpp::Client as XMPPClient;
+use prose_xmpp::ConnectionError;
+
 use crate::cache::{AvatarCache, DataCache};
-use crate::client::client::{UndefinedAvatarCache, UndefinedDataCache};
 use crate::types::{AccountSettings, Capabilities};
-use crate::{ClientBuilder, ClientDelegate};
+use crate::ClientDelegate;
 
 #[derive(Debug, thiserror::Error, Display)]
 pub enum ClientError {
@@ -20,10 +22,14 @@ pub enum ClientError {
 
 pub struct Client<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub(super) client: XMPPClient,
-    pub(super) caps: Capabilities,
-    pub(super) data_cache: D,
-    pub(super) avatar_cache: A,
-    pub(super) delegate: Option<Box<dyn ClientDelegate>>,
+    pub(super) inner: Arc<ClientInner<D, A>>,
+}
+
+pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> {
+    pub caps: Capabilities,
+    pub data_cache: D,
+    pub avatar_cache: A,
+    pub delegate: Option<Box<dyn ClientDelegate>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
@@ -53,7 +59,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let caps = self.client.get_mod::<Caps>();
         // Send caps before the configured availability since that would otherwise override it
-        caps.publish_capabilities((&self.caps).into())
+        caps.publish_capabilities((&self.inner.caps).into())
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
@@ -88,19 +94,23 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn delete_cached_data(&self) -> Result<()> {
-        self.data_cache.delete_all()?;
-        self.avatar_cache.delete_all_cached_images()?;
+        self.inner.data_cache.delete_all()?;
+        self.inner.avatar_cache.delete_all_cached_images()?;
         Ok(())
     }
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn load_account_settings(&self) -> Result<AccountSettings> {
-        Ok(self.data_cache.load_account_settings()?.unwrap_or_default())
+        Ok(self
+            .inner
+            .data_cache
+            .load_account_settings()?
+            .unwrap_or_default())
     }
 
     pub async fn save_account_settings(&self, settings: &AccountSettings) -> Result<()> {
-        self.data_cache.save_account_settings(settings)
+        self.inner.data_cache.save_account_settings(settings)
     }
 }
 

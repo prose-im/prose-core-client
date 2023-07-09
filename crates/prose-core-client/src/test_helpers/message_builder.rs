@@ -4,7 +4,7 @@ use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::{date, mam, Element};
 
-use prose_core_domain::{Message, MessageId, Reaction, StanzaId};
+use prose_domain::{Message, MessageId, Reaction, StanzaId};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
 

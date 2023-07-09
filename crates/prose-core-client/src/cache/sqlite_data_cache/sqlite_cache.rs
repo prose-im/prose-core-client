@@ -188,7 +188,7 @@ impl SQLiteCache {
 
 #[cfg(test)]
 mod tests {
-    use prose_core_domain::Availability;
+    use prose_domain::Availability;
 
     use super::*;
 

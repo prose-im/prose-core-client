@@ -1,5 +1,5 @@
 use anyhow::Result;
-use prose_core_domain::{Availability, UserProfile};
+use prose_domain::{Availability, UserProfile};
 use prose_xmpp::mods::Profile;
 use tracing::instrument;
 
@@ -16,7 +16,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         profile.publish_vcard(user_profile.clone().into()).await?;
 
-        self.data_cache
+        self.inner
+            .data_cache
             .insert_user_profile(&self.connected_jid()?.into(), &user_profile)?;
 
         Ok(())
@@ -26,7 +27,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let profile = self.client.get_mod::<Profile>();
         profile.unpublish_vcard().await?;
         profile.delete_vcard().await?;
-        self.data_cache
+        self.inner
+            .data_cache
             .delete_user_profile(&self.connected_jid()?.into())?;
         Ok(())
     }
@@ -86,10 +88,15 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let jid = jid::BareJid::from(self.connected_jid()?);
 
         tracing::info!("Caching avatar metadata");
-        self.data_cache.insert_avatar_metadata(&jid, &metadata)?;
+        self.inner
+            .data_cache
+            .insert_avatar_metadata(&jid, &metadata)?;
 
         tracing::info!("Caching image locally…");
-        let path = self.avatar_cache.cache_avatar_image(&jid, img, &metadata)?;
+        let path = self
+            .inner
+            .avatar_cache
+            .cache_avatar_image(&jid, img, &metadata)?;
 
         Ok(path)
     }

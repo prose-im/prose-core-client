@@ -5,7 +5,7 @@ use microtype::Microtype;
 use rusqlite::{params, OptionalExtension};
 use xmpp_parsers::presence;
 
-use prose_core_domain::Contact;
+use prose_domain::Contact;
 use prose_xmpp::stanza::avatar;
 use prose_xmpp::stanza::message::ChatState;
 
@@ -281,7 +281,7 @@ impl ContactsCache for SQLiteCache {
                 let availability = if presence_count > 0 {
                     Availability::from((presence_kind, presence_show)).into_inner()
                 } else {
-                    prose_core_domain::Availability::Unavailable
+                    prose_domain::Availability::Unavailable
                 };
 
                 Ok((

@@ -53,7 +53,9 @@ impl Module for Caps {
             node,
         });
 
-        todo!()
+        Ok(())
+
+        // TODO
         // ctx.send_stanza(
         //     Iq::from_result(
         //         stanza.id.clone(),

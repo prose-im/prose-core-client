@@ -2,7 +2,7 @@ use anyhow::Result;
 #[cfg(feature = "test-helpers")]
 use auto_impl::auto_impl;
 use jid::BareJid;
-use prose_core_domain::Contact;
+use prose_domain::Contact;
 use prose_xmpp::stanza::message::{stanza_id, ChatState};
 use prose_xmpp::stanza::{avatar, message};
 use xmpp_parsers::presence;

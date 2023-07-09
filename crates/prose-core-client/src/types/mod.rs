@@ -4,7 +4,7 @@ pub use avatar_metadata::AvatarMetadata;
 pub use capabilities::{Capabilities, Feature};
 pub use message_like::MessageLike;
 pub use page::Page;
-pub use prose_core_domain::*;
+pub use prose_domain::*;
 
 mod account_settings;
 mod avatar_metadata;

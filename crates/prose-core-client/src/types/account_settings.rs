@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use prose_core_domain::Availability;
+use prose_domain::Availability;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct AccountSettings {

@@ -1,9 +1,15 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+
 use prose_xmpp::client::ConnectorProvider;
+use prose_xmpp::mods::{Caps, Chat, Profile, Roster, MAM};
 use prose_xmpp::{
     ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, TimeProvider,
 };
 
 use crate::cache::AvatarCache;
+use crate::client::client::client::ClientInner;
 use crate::types::{Capabilities, Feature};
 use crate::{Client, ClientDelegate, DataCache};
 
@@ -91,12 +97,31 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             ],
         );
 
-        Client {
-            client: self.builder.build(),
+        let inner = Arc::new(ClientInner {
             caps,
             data_cache: self.data_cache,
             avatar_cache: self.avatar_cache,
             delegate: self.delegate,
-        }
+        });
+
+        let event_inner = inner.clone();
+
+        let client = self
+            .builder
+            .add_mod(Caps::default())
+            .add_mod(MAM::default())
+            .add_mod(Chat::default())
+            .add_mod(Profile::default())
+            .add_mod(Roster::default())
+            .set_event_handler(Box::new(move |xmpp_client, event| {
+                let client = Client {
+                    client: xmpp_client,
+                    inner: event_inner.clone(),
+                };
+                async move { client.handle_event(event).await }
+            }))
+            .build();
+
+        Client { client, inner }
     }
 }

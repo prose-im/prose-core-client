@@ -1,5 +1,6 @@
 use jid::BareJid;
-use prose_core_domain::MessageId;
+
+use prose_domain::MessageId;
 use prose_xmpp::ConnectionError;
 
 pub enum ConnectionEvent {

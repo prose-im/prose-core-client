@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 pub use incrementing_id_provider::IncrementingIDProvider;
 pub use message_builder::MessageBuilder;
-use prose_core_domain::Availability;
+use prose_domain::Availability;
 use prose_xmpp::test_helpers::TestConnection;
 use prose_xmpp::IDProvider;
 

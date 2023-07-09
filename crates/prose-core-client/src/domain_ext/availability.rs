@@ -2,14 +2,14 @@ use microtype::microtype;
 use xmpp_parsers::presence;
 
 microtype! {
-    pub prose_core_domain::Availability {
+    pub prose_domain::Availability {
         Availability
     }
 }
 
 impl From<(Option<presence::Type>, Option<presence::Show>)> for Availability {
     fn from(value: (Option<presence::Type>, Option<presence::Show>)) -> Self {
-        use prose_core_domain::Availability;
+        use prose_domain::Availability;
 
         // https://datatracker.ietf.org/doc/html/rfc6121#section-4.7.1
         Availability(match (value.0, value.1) {
@@ -29,7 +29,7 @@ impl TryFrom<Availability> for xmpp_parsers::presence::Show {
     type Error = anyhow::Error;
 
     fn try_from(value: Availability) -> Result<Self, Self::Error> {
-        use prose_core_domain::Availability;
+        use prose_domain::Availability;
 
         match value.0 {
             Availability::Available => Ok(presence::Show::Chat),

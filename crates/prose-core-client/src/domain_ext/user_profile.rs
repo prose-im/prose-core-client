@@ -2,12 +2,12 @@ use anyhow::Result;
 use microtype::microtype;
 use url::Url;
 
-use prose_core_domain::Address;
+use prose_domain::Address;
 use prose_xmpp::stanza::{vcard, VCard4};
 
 microtype! {
     #[derive(Debug, Clone)]
-    pub prose_core_domain::UserProfile {
+    pub prose_domain::UserProfile {
         UserProfile
     }
 }
@@ -33,7 +33,7 @@ impl TryFrom<VCard4> for UserProfile {
     type Error = anyhow::Error;
 
     fn try_from(mut value: VCard4) -> Result<Self> {
-        Ok(UserProfile(prose_core_domain::UserProfile {
+        Ok(UserProfile(prose_domain::UserProfile {
             full_name: value.fn_.swap_remove_first().map(|v| v.value),
             nickname: value.nickname.swap_remove_first().map(|v| v.value),
             org: value.org.swap_remove_first().map(|v| v.value),

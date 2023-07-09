@@ -2,7 +2,7 @@ use anyhow::Result;
 use jid::BareJid;
 use xmpp_parsers::presence::{Show, Type};
 
-use prose_core_domain::{Contact, UserProfile};
+use prose_domain::{Contact, UserProfile};
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::{ChatState, Id};
 

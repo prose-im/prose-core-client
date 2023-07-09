@@ -1,0 +1,17 @@
+[package]
+name = "prose-core-client-cli"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+common = { path = "../common" }
+dialoguer = "0.10.3"
+jid = { workspace = true }
+prose-core-client = { path = "../../crates/prose-core-client", features = ["native-app"] }
+prose-xmpp = { path = "../../crates/prose-xmpp" }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+url = { workspace = true }
