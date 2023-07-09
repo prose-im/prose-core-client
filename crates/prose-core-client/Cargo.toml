@@ -1,0 +1,72 @@
+[package]
+name = "prose-core-client"
+version = "0.1.0"
+description = "Prose core XMPP client manager and protocols."
+readme = "README.md"
+license = "MPL-2.0"
+edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client"
+repository = "https://github.com/prose-im/prose-core-client.git"
+keywords = ["xmpp", "xmpp-client", "library"]
+categories = ["network-programming"]
+authors = ["Valerian Saliou <valerian@valeriansaliou.name>"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+indexmap = "1.9"
+jid = { workspace = true }
+microtype = { workspace = true }
+once_cell = { workspace = true }
+prose-core-domain = { path = "../prose-core-domain" }
+prose-xmpp = { path = "../prose-xmpp" }
+serde = { workspace = true, features = ["derive"] }
+sha1 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }
+xmpp-parsers = { workspace = true }
+
+# Native app
+deadpool-sqlite = "0.5"
+either = { version = "1.8", optional = true }
+image = {version = "0.24.5", optional = true }
+rusqlite = { version = "0.28.0", features = ["chrono", "url", "trace"], optional = true }
+serde_json = {version = "1.0", optional = true }
+tempfile = {version = "3.5.0", optional = true }
+tokio = { workspace = true, features = ["full"], optional = true }
+
+# Test helpers
+auto_impl = {version = "1.1.0", optional = true }
+
+[dev-dependencies]
+dialoguer = "0.10.3"
+dotenvy = { workspace = true }
+tokio = { workspace = true, features = ["rt", "macros", "io-util", "io-std", "test-util"] }
+tracing-oslog = "0.1.2"
+tracing-subscriber = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features=["build"] }
+
+[features]
+default = []
+native-app = ["sqlite", "dep:tempfile", "dep:tokio", "dep:image"]
+wasm = ["chrono/wasmbind"]
+test-helpers = ["prose-xmpp/test-helpers", "dep:auto_impl", "sqlite"]
+sqlite = ["dep:either", "dep:rusqlite", "dep:serde_json"]
+
+[[example]]
+name = "cli"
+path = "examples/cli.rs"
+required-features = ["native-app"]
+
+[[test]]
+name = "load_messages"
+path = "tests/load_messages.rs"
+required-features = ["test-helpers"]
