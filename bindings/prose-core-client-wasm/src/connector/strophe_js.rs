@@ -3,14 +3,13 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::{FullJid, JidParseError};
+use jid::FullJid;
 use minidom::Element;
-
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
-use crate::client::ConnectorProvider;
-use crate::connector::{
+use prose_xmpp::client::ConnectorProvider;
+use prose_xmpp::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
     Connector as ConnectorTrait,
 };
@@ -79,32 +78,6 @@ impl ConnectionTrait for Connection {
 
     fn disconnect(&self) {
         self.client.disconnect()
-    }
-}
-
-pub struct JSConnectionError(ConnectionError);
-
-impl From<ConnectionError> for JSConnectionError {
-    fn from(value: ConnectionError) -> Self {
-        JSConnectionError(value)
-    }
-}
-
-impl From<JidParseError> for JSConnectionError {
-    fn from(_value: JidParseError) -> Self {
-        JSConnectionError(ConnectionError::Generic {
-            msg: "Failed to parse JID".to_string(),
-        })
-    }
-}
-
-impl From<JSConnectionError> for JsValue {
-    fn from(value: JSConnectionError) -> Self {
-        match value.0 {
-            ConnectionError::TimedOut => "Connection timed out".into(),
-            ConnectionError::InvalidCredentials => "Invalid credentials".into(),
-            ConnectionError::Generic { msg } => msg.into(),
-        }
     }
 }
 

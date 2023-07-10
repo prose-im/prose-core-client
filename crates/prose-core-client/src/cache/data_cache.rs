@@ -5,12 +5,13 @@ use jid::BareJid;
 use prose_domain::Contact;
 use prose_xmpp::stanza::message::{stanza_id, ChatState};
 use prose_xmpp::stanza::{avatar, message};
+use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 use xmpp_parsers::presence;
 
 use crate::types::{roster, AccountSettings, AvatarMetadata, MessageLike, Page, UserProfile};
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
-pub trait DataCache: ContactsCache + MessageCache + Send + Sync {
+pub trait DataCache: ContactsCache + MessageCache + SendUnlessWasm + SyncUnlessWasm {
     fn delete_all(&self) -> Result<()>;
 
     fn save_account_settings(&self, settings: &AccountSettings) -> Result<()>;

@@ -1,7 +1,4 @@
-use std::future::Future;
-
 use anyhow::Result;
-use futures::FutureExt;
 use jid::{BareJid, Jid};
 use minidom::Element;
 use xmpp_parsers::hashes::Sha1HexAttribute;
@@ -285,11 +282,11 @@ impl Profile {
         Ok(Some(avatar::Data::try_from(payload)?.data))
     }
 
-    pub fn set_avatar_image(
+    pub async fn set_avatar_image(
         &self,
         checksum: &avatar::ImageId,
         base64_image_data: impl Into<String>,
-    ) -> impl Future<Output = Result<()>> {
+    ) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             pubsub::PubSub::Publish {
@@ -308,7 +305,9 @@ impl Profile {
                 publish_options: None,
             },
         );
-        self.ctx.send_iq(iq).map(|_| Ok(()))
+
+        self.ctx.send_iq(iq).await?;
+        Ok(())
     }
 
     pub fn send_presence(&self, show: Option<presence::Show>, status: Option<&str>) -> Result<()> {

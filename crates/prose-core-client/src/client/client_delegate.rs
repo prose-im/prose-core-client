@@ -1,7 +1,7 @@
 use jid::BareJid;
 
 use prose_domain::MessageId;
-use prose_xmpp::ConnectionError;
+use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
 
 pub enum ConnectionEvent {
     Connect,
@@ -37,6 +37,6 @@ pub enum ClientEvent {
     },
 }
 
-pub trait ClientDelegate: Send + Sync {
+pub trait ClientDelegate: SendUnlessWasm + SyncUnlessWasm {
     fn handle_event(&self, event: ClientEvent);
 }

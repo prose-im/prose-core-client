@@ -4,6 +4,33 @@ version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["cdylib"]
 
 [dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+console_error_panic_hook = "0.1"
+indexed_db_futures = "0.3"
+jid = { workspace = true }
+js-sys = "0.3"
+minidom = { workspace = true }
+prose-core-client = { path = "../../crates/prose-core-client", features = ["js"] }
+prose-domain = { path = "../../crates/prose-domain" }
+prose-xmpp = { path = "../../crates/prose-xmpp" }
+serde-wasm-bindgen = "0.5"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-web = "0.1"
+wasm-bindgen = { workspace = true, features = ["serde-serialize"] }
+wasm-bindgen-futures = { workspace = true }
+
+[profile.release]
+# Do not perform backtrace for panic on release builds.
+panic = 'abort'
+# Perform optimizations on all codegen units.
+codegen-units = 1
+# Optimize for size.
+opt-level = 's' # or 'z' to optimize "aggressively" for size
+# Enable link time optimization.
+lto = true

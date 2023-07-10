@@ -2,13 +2,14 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use jid::BareJid;
+use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
 use prose_xmpp::stanza::avatar;
 
 pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (600, 600);
 pub const IMAGE_OUTPUT_MIME_TYPE: &str = "image/jpeg";
 
-pub trait AvatarCache: Send + Sync {
+pub trait AvatarCache: SendUnlessWasm + SyncUnlessWasm {
     #[cfg(feature = "native-app")]
     fn cache_avatar_image(
         &self,

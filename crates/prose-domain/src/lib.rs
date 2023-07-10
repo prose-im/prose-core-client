@@ -1,18 +1,18 @@
 use std::path::PathBuf;
 
 pub use chrono::{DateTime, Utc};
-#[cfg(not(feature = "typescript"))]
-use jid::BareJid;
 use microtype::microtype;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 use typeshare::typeshare;
 pub use url::Url;
 
+#[cfg(not(feature = "typescript"))]
+use jid::BareJid;
+
 #[cfg(feature = "typescript")]
 use crate::jid::BareJid;
 
-mod ext;
 #[cfg(feature = "typescript")]
 mod jid;
 
@@ -44,7 +44,7 @@ pub struct Address {
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct UserProfile {
     pub full_name: Option<String>,
     pub nickname: Option<String>,

@@ -1,12 +1,7 @@
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone, Default)]
 pub enum CachePolicy {
+    #[default]
     ReturnCacheDataElseLoad,
     ReturnCacheDataDontLoad,
     ReloadIgnoringCacheData,
-}
-
-impl Default for CachePolicy {
-    fn default() -> Self {
-        CachePolicy::ReturnCacheDataElseLoad
-    }
 }

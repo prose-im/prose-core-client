@@ -14,6 +14,7 @@ use crate::connector::{ConnectionError, ConnectionEvent};
 use crate::mods::AnyModule;
 use crate::util::{ModuleFuturePoll, PinnedFuture, XMPPElement};
 
+#[derive(Clone)]
 pub struct Client {
     pub(super) inner: Arc<ClientInner>,
 }

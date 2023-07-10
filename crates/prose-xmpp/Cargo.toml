@@ -17,7 +17,7 @@ crate-type = ["staticlib", "rlib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 jid = { workspace = true }
-minidom = "0.15"
+minidom = { workspace = true }
 parking_lot = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 strum = { workspace = true }
@@ -29,8 +29,8 @@ xmpp-parsers = { workspace = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 js-sys = "0.3"
 uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics", "js"] }
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
-wasm-bindgen-futures = "0.4"
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 futures = "0.3"
