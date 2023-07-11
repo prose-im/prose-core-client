@@ -37,8 +37,8 @@ deadpool-sqlite = "0.5"
 either = { version = "1.8", optional = true }
 image = {version = "0.24.5", optional = true }
 rusqlite = { version = "0.28.0", features = ["chrono", "url", "trace"], optional = true }
-serde_json = {version = "1.0", optional = true }
-tempfile = {version = "3.5.0", optional = true }
+serde_json = { workspace = true, optional = true }
+tempfile = { version = "3.5.0", optional = true }
 tokio = { workspace = true, features = ["full"], optional = true }
 
 # Test helpers

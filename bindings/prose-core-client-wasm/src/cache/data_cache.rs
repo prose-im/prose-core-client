@@ -1,13 +1,8 @@
-use std::collections::HashMap;
-use std::sync::Mutex;
-
-use anyhow::Result;
-use indexed_db_futures::prelude::IdbOpenDbRequestLike;
+use async_trait::async_trait;
+use indexed_db_futures::prelude::*;
 use indexed_db_futures::web_sys::DomException;
 use indexed_db_futures::{IdbDatabase, IdbVersionChangeEvent};
 use jid::BareJid;
-use wasm_bindgen::JsValue;
-
 use prose_core_client::types::roster::Item;
 use prose_core_client::types::{AccountSettings, AvatarMetadata, MessageLike, Page};
 use prose_core_client::{ContactsCache, DataCache, MessageCache};
@@ -15,61 +10,102 @@ use prose_domain::{Contact, UserProfile};
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{message, presence};
+use thiserror::Error;
+use wasm_bindgen::JsValue;
 
-pub struct InMemoryDataCache {
-    db: IdbDatabase,
-    messages: Mutex<HashMap<message::Id, MessageLike>>,
+mod keys {
+    pub const DB_NAME: &str = "ProseCache";
+
+    pub const MESSAGES_STORE: &str = "messages";
 }
 
-impl InMemoryDataCache {
-    pub async fn new() -> Result<Self, DomException> {
-        let mut db_req = IdbDatabase::open("ProseCache")?;
+#[derive(Error, Debug)]
+pub enum IndexedDBDataCacheError {
+    #[error("DomException {name} ({code}): {message}")]
+    DomException {
+        code: u16,
+        name: String,
+        message: String,
+    },
+
+    #[error(transparent)]
+    JSON(#[from] serde_json::error::Error),
+}
+
+impl From<DomException> for IndexedDBDataCacheError {
+    fn from(value: DomException) -> Self {
+        IndexedDBDataCacheError::DomException {
+            code: value.code(),
+            name: value.name(),
+            message: value.message(),
+        }
+    }
+}
+
+type Result<T, E = IndexedDBDataCacheError> = std::result::Result<T, E>;
+
+pub struct IndexedDBDataCache {
+    db: IdbDatabase,
+}
+
+impl IndexedDBDataCache {
+    pub async fn new() -> Result<Self> {
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 1)?;
+
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
-            if !evt.db().object_store_names().any(|n| n == "ProseStore") {
-                evt.db().create_object_store("ProseStore")?;
+            let old_version = evt.old_version() as u32;
+            let db = evt.db();
+
+            if old_version < 1 {
+                db.create_object_store(keys::MESSAGES_STORE)?;
             }
+
             Ok(())
         }));
 
         let db = db_req.into_future().await?;
 
-        Ok(InMemoryDataCache {
-            db,
-            messages: Mutex::new(HashMap::new()),
-        })
+        Ok(IndexedDBDataCache { db })
     }
 }
 
-impl ContactsCache for InMemoryDataCache {
-    fn has_valid_roster_items(&self) -> Result<bool> {
+#[async_trait(? Send)]
+impl ContactsCache for IndexedDBDataCache {
+    type Error = IndexedDBDataCacheError;
+
+    async fn has_valid_roster_items(&self) -> Result<bool> {
         Ok(false)
     }
 
-    fn insert_roster_items(&self, _items: &[Item]) -> Result<()> {
+    async fn insert_roster_items(&self, _items: &[Item]) -> Result<()> {
         Ok(())
     }
 
-    fn insert_user_profile(&self, _jid: &BareJid, _profile: &UserProfile) -> Result<()> {
+    async fn insert_user_profile(&self, _jid: &BareJid, _profile: &UserProfile) -> Result<()> {
         Ok(())
     }
 
-    fn load_user_profile(&self, _jid: &BareJid) -> Result<Option<UserProfile>> {
+    async fn load_user_profile(&self, _jid: &BareJid) -> Result<Option<UserProfile>> {
         Ok(None)
     }
 
-    fn delete_user_profile(&self, _jid: &BareJid) -> Result<()> {
+    async fn delete_user_profile(&self, _jid: &BareJid) -> Result<()> {
         Ok(())
     }
 
-    fn insert_avatar_metadata(&self, _jid: &BareJid, _metadata: &AvatarMetadata) -> Result<()> {
+    async fn insert_avatar_metadata(
+        &self,
+        _jid: &BareJid,
+        _metadata: &AvatarMetadata,
+    ) -> Result<()> {
         Ok(())
     }
 
-    fn load_avatar_metadata(&self, _jid: &BareJid) -> Result<Option<AvatarMetadata>> {
+    async fn load_avatar_metadata(&self, _jid: &BareJid) -> Result<Option<AvatarMetadata>> {
         Ok(None)
     }
 
-    fn insert_presence(
+    async fn insert_presence(
         &self,
         _jid: &BareJid,
         _kind: Option<presence::Type>,
@@ -79,52 +115,54 @@ impl ContactsCache for InMemoryDataCache {
         Ok(())
     }
 
-    fn insert_chat_state(&self, _jid: &BareJid, _chat_state: &ChatState) -> Result<()> {
+    async fn insert_chat_state(&self, _jid: &BareJid, _chat_state: &ChatState) -> Result<()> {
         Ok(())
     }
 
-    fn load_chat_state(&self, _jid: &BareJid) -> Result<Option<ChatState>> {
+    async fn load_chat_state(&self, _jid: &BareJid) -> Result<Option<ChatState>> {
         Ok(None)
     }
 
-    fn load_contacts(&self) -> Result<Vec<(Contact, Option<ImageId>)>> {
+    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<ImageId>)>> {
         Ok(vec![])
     }
 }
 
-impl MessageCache for InMemoryDataCache {
-    fn insert_messages<'a>(
+#[async_trait(? Send)]
+impl MessageCache for IndexedDBDataCache {
+    type Error = IndexedDBDataCacheError;
+
+    async fn insert_messages<'a>(
         &self,
         messages: impl IntoIterator<Item = &'a MessageLike>,
     ) -> Result<()> {
-        let mut cached_messages = self.messages.lock().unwrap();
+        let tx = self
+            .db
+            .transaction_on_one_with_mode(keys::MESSAGES_STORE, IdbTransactionMode::Readwrite)?;
+        let store = tx.object_store(keys::MESSAGES_STORE)?;
 
-        for message in messages.into_iter() {
-            cached_messages.insert(message.id.clone(), message.clone());
+        for message in messages {
+            store.put_key_val(
+                &JsValue::from_str(message.id.as_ref()),
+                &JsValue::from_serde(message)?,
+            )?;
         }
+
+        tx.await.into_result()?;
         Ok(())
     }
 
-    fn load_messages_targeting<'a>(
+    async fn load_messages_targeting<'a>(
         &self,
         _conversation: &BareJid,
         targets: &[message::Id],
         _newer_than: impl Into<Option<&'a message::Id>>,
         _include_targeted_messages: bool,
     ) -> Result<Vec<MessageLike>> {
-        let all_messages = self.messages.lock().unwrap();
-
-        let mut messages = vec![];
-        for id in targets {
-            if let Some(message) = all_messages.get(id) {
-                messages.push(message.clone())
-            }
-        }
-
-        Ok(messages)
+        Ok(vec![])
     }
 
-    fn load_messages_before(
+    async fn load_messages_before(
         &self,
         _conversation: &BareJid,
         _older_than: Option<&message::Id>,
@@ -133,7 +171,7 @@ impl MessageCache for InMemoryDataCache {
         Ok(None)
     }
 
-    fn load_messages_after(
+    async fn load_messages_after(
         &self,
         _conversation: &BareJid,
         _newer_than: &message::Id,
@@ -142,7 +180,7 @@ impl MessageCache for InMemoryDataCache {
         Ok(vec![])
     }
 
-    fn load_stanza_id(
+    async fn load_stanza_id(
         &self,
         _conversation: &BareJid,
         _message_id: &message::Id,
@@ -150,25 +188,28 @@ impl MessageCache for InMemoryDataCache {
         Ok(None)
     }
 
-    fn save_draft(&self, _conversation: &BareJid, _text: Option<&str>) -> Result<()> {
+    async fn save_draft(&self, _conversation: &BareJid, _text: Option<&str>) -> Result<()> {
         Ok(())
     }
 
-    fn load_draft(&self, _conversation: &BareJid) -> Result<Option<String>> {
+    async fn load_draft(&self, _conversation: &BareJid) -> Result<Option<String>> {
         Ok(None)
     }
 }
 
-impl DataCache for InMemoryDataCache {
-    fn delete_all(&self) -> Result<()> {
+#[async_trait(? Send)]
+impl DataCache for IndexedDBDataCache {
+    type Error = IndexedDBDataCacheError;
+
+    async fn delete_all(&self) -> Result<()> {
         Ok(())
     }
 
-    fn save_account_settings(&self, _settings: &AccountSettings) -> Result<()> {
+    async fn save_account_settings(&self, _settings: &AccountSettings) -> Result<()> {
         Ok(())
     }
 
-    fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
+    async fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
         Ok(None)
     }
 }

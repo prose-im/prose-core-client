@@ -1,4 +1,4 @@
-use anyhow::Result;
+use async_trait::async_trait;
 #[cfg(feature = "test-helpers")]
 use auto_impl::auto_impl;
 use jid::BareJid;
@@ -11,47 +11,77 @@ use xmpp_parsers::presence;
 use crate::types::{roster, AccountSettings, AvatarMetadata, MessageLike, Page, UserProfile};
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 pub trait DataCache: ContactsCache + MessageCache + SendUnlessWasm + SyncUnlessWasm {
-    fn delete_all(&self) -> Result<()>;
+    type Error: std::error::Error + Send + Sync;
 
-    fn save_account_settings(&self, settings: &AccountSettings) -> Result<()>;
-    fn load_account_settings(&self) -> Result<Option<AccountSettings>>;
+    async fn delete_all(&self) -> Result<(), <Self as DataCache>::Error>;
+
+    async fn save_account_settings(
+        &self,
+        settings: &AccountSettings,
+    ) -> Result<(), <Self as DataCache>::Error>;
+    async fn load_account_settings(
+        &self,
+    ) -> Result<Option<AccountSettings>, <Self as DataCache>::Error>;
 }
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 pub trait ContactsCache {
-    fn has_valid_roster_items(&self) -> Result<bool>;
-    fn insert_roster_items(&self, items: &[roster::Item]) -> Result<()>;
+    type Error: std::error::Error + Send + Sync;
 
-    fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> Result<()>;
-    fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>>;
-    fn delete_user_profile(&self, jid: &BareJid) -> Result<()>;
+    async fn has_valid_roster_items(&self) -> Result<bool, Self::Error>;
+    async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<(), Self::Error>;
 
-    fn insert_avatar_metadata(&self, jid: &BareJid, metadata: &AvatarMetadata) -> Result<()>;
-    fn load_avatar_metadata(&self, jid: &BareJid) -> Result<Option<AvatarMetadata>>;
+    async fn insert_user_profile(
+        &self,
+        jid: &BareJid,
+        profile: &UserProfile,
+    ) -> Result<(), Self::Error>;
+    async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>, Self::Error>;
+    async fn delete_user_profile(&self, jid: &BareJid) -> Result<(), Self::Error>;
 
-    fn insert_presence(
+    async fn insert_avatar_metadata(
+        &self,
+        jid: &BareJid,
+        metadata: &AvatarMetadata,
+    ) -> Result<(), Self::Error>;
+    async fn load_avatar_metadata(
+        &self,
+        jid: &BareJid,
+    ) -> Result<Option<AvatarMetadata>, Self::Error>;
+
+    async fn insert_presence(
         &self,
         jid: &BareJid,
         kind: Option<presence::Type>,
         show: Option<presence::Show>,
         status: Option<String>,
-    ) -> Result<()>;
+    ) -> Result<(), Self::Error>;
 
-    fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()>;
-    fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>>;
+    async fn insert_chat_state(
+        &self,
+        jid: &BareJid,
+        chat_state: &ChatState,
+    ) -> Result<(), Self::Error>;
+    async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>, Self::Error>;
 
-    fn load_contacts(&self) -> Result<Vec<(Contact, Option<avatar::ImageId>)>>;
+    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<avatar::ImageId>)>, Self::Error>;
 }
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 pub trait MessageCache {
-    fn insert_messages<'a>(
+    type Error: std::error::Error + Send + Sync;
+
+    async fn insert_messages<'a>(
         &self,
-        messages: impl IntoIterator<Item = &'a MessageLike>,
-    ) -> Result<()>
-    where
-        Self: Sized;
+        messages: impl IntoIterator<Item = &'a MessageLike> + SendUnlessWasm,
+    ) -> Result<(), Self::Error>;
 
     /// Loads all `MessageLike` objects from the cache that have a `target` contained in `targets`.
     /// Returns them ordered by `timestamp` in ascending order.
@@ -63,13 +93,13 @@ pub trait MessageCache {
     /// * `newer_than`: Load only `MessageLike` objects newer than the given message id.
     /// * `include_targeted_messages`: Whether to include the targeted messages as identified
     ///    by `targets` in the result.
-    fn load_messages_targeting<'a>(
+    async fn load_messages_targeting<'a>(
         &self,
         conversation: &BareJid,
         targets: &[message::Id],
-        newer_than: impl Into<Option<&'a message::Id>>,
+        newer_than: impl Into<Option<&'a message::Id>> + SendUnlessWasm,
         include_targeted_messages: bool,
-    ) -> Result<Vec<MessageLike>>;
+    ) -> Result<Vec<MessageLike>, Self::Error>;
 
     /// Loads a page of `MessageLike` objects up to `max_count` items. Returns `None` if there are
     /// no objects in cache older than `older_than`. Returns an empty `Page` if the first page is
@@ -81,26 +111,30 @@ pub trait MessageCache {
     /// * `conversation`: The BareJid of the conversation to search in.
     /// * `older_than`: Load only `MessageLike` objects older than the given message id.
     /// * `max_count`: Load only up until `max_count` items.
-    fn load_messages_before(
+    async fn load_messages_before(
         &self,
         conversation: &BareJid,
         older_than: Option<&message::Id>,
         max_count: u32,
-    ) -> Result<Option<Page<MessageLike>>>;
+    ) -> Result<Option<Page<MessageLike>>, Self::Error>;
 
-    fn load_messages_after(
+    async fn load_messages_after(
         &self,
         conversation: &BareJid,
         newer_than: &message::Id,
         max_count: Option<u32>,
-    ) -> Result<Vec<MessageLike>>;
+    ) -> Result<Vec<MessageLike>, Self::Error>;
 
-    fn load_stanza_id(
+    async fn load_stanza_id(
         &self,
         conversation: &BareJid,
         message_id: &message::Id,
-    ) -> Result<Option<stanza_id::Id>>;
+    ) -> Result<Option<stanza_id::Id>, Self::Error>;
 
-    fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()>;
-    fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>>;
+    async fn save_draft(
+        &self,
+        conversation: &BareJid,
+        text: Option<&str>,
+    ) -> Result<(), Self::Error>;
+    async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>, Self::Error>;
 }

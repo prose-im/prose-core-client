@@ -18,7 +18,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         self.inner
             .data_cache
-            .insert_user_profile(&self.connected_jid()?.into(), &user_profile)?;
+            .insert_user_profile(&self.connected_jid()?.into(), &user_profile)
+            .await?;
 
         Ok(())
     }
@@ -29,7 +30,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         profile.delete_vcard().await?;
         self.inner
             .data_cache
-            .delete_user_profile(&self.connected_jid()?.into())?;
+            .delete_user_profile(&self.connected_jid()?.into())
+            .await?;
         Ok(())
     }
 
@@ -90,7 +92,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         tracing::info!("Caching avatar metadata");
         self.inner
             .data_cache
-            .insert_avatar_metadata(&jid, &metadata)?;
+            .insert_avatar_metadata(&jid, &metadata)
+            .await?;
 
         tracing::info!("Caching image locally…");
         let path = self

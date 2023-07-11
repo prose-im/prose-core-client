@@ -1,4 +1,4 @@
-use anyhow::Result;
+use async_trait::async_trait;
 use either::Either;
 use jid::BareJid;
 use rusqlite::types::FromSqlError;
@@ -7,15 +7,21 @@ use rusqlite::{params, params_from_iter};
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::stanza_id;
 
+use crate::cache::sqlite_data_cache::sqlite_cache::SQLiteCacheError;
 use crate::cache::sqlite_data_cache::{repeat_vars, FromStrSql};
 use crate::cache::MessageCache;
 use crate::types::{MessageLike, Page};
 use crate::SQLiteCache;
 
+type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
+
+#[async_trait]
 impl MessageCache for SQLiteCache {
-    fn insert_messages<'a>(
+    type Error = SQLiteCacheError;
+
+    async fn insert_messages<'a>(
         &self,
-        messages: impl IntoIterator<Item = &'a MessageLike>,
+        messages: impl IntoIterator<Item = &'a MessageLike> + Send,
     ) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();
         let trx = (*conn).transaction()?;
@@ -44,11 +50,11 @@ impl MessageCache for SQLiteCache {
         Ok(())
     }
 
-    fn load_messages_targeting<'a>(
+    async fn load_messages_targeting<'a>(
         &self,
         conversation: &BareJid,
         targets: &[message::Id],
-        newer_than: impl Into<Option<&'a message::Id>>,
+        newer_than: impl Into<Option<&'a message::Id>> + Send,
         include_targeted_messages: bool,
     ) -> Result<Vec<MessageLike>> {
         if targets.is_empty() {
@@ -120,7 +126,7 @@ impl MessageCache for SQLiteCache {
         Ok(messages)
     }
 
-    fn load_messages_before(
+    async fn load_messages_before(
         &self,
         conversation: &BareJid,
         older_than: Option<&message::Id>,
@@ -211,7 +217,7 @@ impl MessageCache for SQLiteCache {
         }
     }
 
-    fn load_messages_after(
+    async fn load_messages_after(
         &self,
         conversation: &BareJid,
         newer_than: &message::Id,
@@ -258,7 +264,7 @@ impl MessageCache for SQLiteCache {
         Ok(messages)
     }
 
-    fn load_stanza_id(
+    async fn load_stanza_id(
         &self,
         conversation: &BareJid,
         message_id: &message::Id,
@@ -276,7 +282,7 @@ impl MessageCache for SQLiteCache {
         Ok(stanza_id)
     }
 
-    fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
+    async fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt =
             conn.prepare("INSERT OR REPLACE INTO `drafts` (`jid`, `text`) VALUES (?, ?)")?;
@@ -284,7 +290,7 @@ impl MessageCache for SQLiteCache {
         Ok(())
     }
 
-    fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
+    async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT `text` FROM `drafts` WHERE `jid` = ?")?;
         Ok(stmt.query_row(params![conversation.to_string()], |row| Ok(row.get(0)?))?)
@@ -324,8 +330,8 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_load_messages_targeting() -> Result<()> {
+    #[tokio::test]
+    async fn test_load_messages_targeting() -> Result<()> {
         let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
 
         let messages = [
@@ -439,15 +445,17 @@ mod tests {
             },
         ];
 
-        cache.insert_messages(&messages)?;
+        cache.insert_messages(&messages).await?;
 
         assert_eq!(
-            cache.load_messages_targeting(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                &[message::Id::from("1000"), message::Id::from("1001")],
-                &message::Id::from("1"),
-                false
-            )?,
+            cache
+                .load_messages_targeting(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    &[message::Id::from("1000"), message::Id::from("1001")],
+                    &message::Id::from("1"),
+                    false
+                )
+                .await?,
             vec![
                 messages[3].clone(),
                 messages[5].clone(),
@@ -456,12 +464,14 @@ mod tests {
         );
 
         assert_eq!(
-            cache.load_messages_targeting(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                &[message::Id::from("1000"), message::Id::from("1001")],
-                None,
-                true
-            )?,
+            cache
+                .load_messages_targeting(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    &[message::Id::from("1000"), message::Id::from("1001")],
+                    None,
+                    true
+                )
+                .await?,
             vec![
                 messages[0].clone(),
                 messages[1].clone(),
@@ -475,8 +485,8 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn test_load_messages_before() -> Result<()> {
+    #[tokio::test]
+    async fn test_load_messages_before() -> Result<()> {
         let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
 
         let messages = [
@@ -557,14 +567,16 @@ mod tests {
             },
         ];
 
-        cache.insert_messages(&messages)?;
+        cache.insert_messages(&messages).await?;
 
         assert_eq!(
-            cache.load_messages_before(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                Some(&message::Id::from("3000")),
-                100,
-            )?,
+            cache
+                .load_messages_before(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    Some(&message::Id::from("3000")),
+                    100,
+                )
+                .await?,
             Some(Page {
                 is_complete: true,
                 items: vec![messages[0].clone(), messages[1].clone()]
@@ -572,11 +584,13 @@ mod tests {
         );
 
         assert_eq!(
-            cache.load_messages_before(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                Some(&message::Id::from("4000")),
-                2,
-            )?,
+            cache
+                .load_messages_before(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    Some(&message::Id::from("4000")),
+                    2,
+                )
+                .await?,
             Some(Page {
                 is_complete: false,
                 items: vec![messages[1].clone(), messages[2].clone()]
@@ -584,11 +598,13 @@ mod tests {
         );
 
         assert_eq!(
-            cache.load_messages_before(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                Some(&message::Id::from("1000")),
-                100,
-            )?,
+            cache
+                .load_messages_before(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    Some(&message::Id::from("1000")),
+                    100,
+                )
+                .await?,
             Some(Page {
                 is_complete: true,
                 items: vec![]
@@ -596,16 +612,20 @@ mod tests {
         );
 
         assert_eq!(
-            cache.load_messages_before(
-                &BareJid::from_str("c@prose.org").unwrap(),
-                Some(&message::Id::from("5000")),
-                100,
-            )?,
+            cache
+                .load_messages_before(
+                    &BareJid::from_str("c@prose.org").unwrap(),
+                    Some(&message::Id::from("5000")),
+                    100,
+                )
+                .await?,
             None
         );
 
         assert_eq!(
-            cache.load_messages_before(&BareJid::from_str("b@prose.org").unwrap(), None, 2,)?,
+            cache
+                .load_messages_before(&BareJid::from_str("b@prose.org").unwrap(), None, 2,)
+                .await?,
             Some(Page {
                 is_complete: false,
                 items: vec![messages[2].clone(), messages[3].clone()]
@@ -613,15 +633,17 @@ mod tests {
         );
 
         assert_eq!(
-            cache.load_messages_before(&BareJid::from_str("d@prose.org").unwrap(), None, 100,)?,
+            cache
+                .load_messages_before(&BareJid::from_str("d@prose.org").unwrap(), None, 100,)
+                .await?,
             None
         );
 
         Ok(())
     }
 
-    #[test]
-    fn test_load_messages_after() -> Result<()> {
+    #[tokio::test]
+    async fn test_load_messages_after() -> Result<()> {
         let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
 
         let messages = [
@@ -687,32 +709,38 @@ mod tests {
             },
         ];
 
-        cache.insert_messages(&messages)?;
+        cache.insert_messages(&messages).await?;
 
         assert_eq!(
-            cache.load_messages_after(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                &"4000".into(),
-                None,
-            )?,
+            cache
+                .load_messages_after(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    &"4000".into(),
+                    None,
+                )
+                .await?,
             vec![messages[1].clone()]
         );
 
         assert_eq!(
-            cache.load_messages_after(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                &"1000".into(),
-                None,
-            )?,
+            cache
+                .load_messages_after(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    &"1000".into(),
+                    None,
+                )
+                .await?,
             vec![messages[1].clone(), messages[3].clone()]
         );
 
         assert_eq!(
-            cache.load_messages_after(
-                &BareJid::from_str("b@prose.org").unwrap(),
-                &"1000".into(),
-                Some(1),
-            )?,
+            cache
+                .load_messages_after(
+                    &BareJid::from_str("b@prose.org").unwrap(),
+                    &"1000".into(),
+                    Some(1),
+                )
+                .await?,
             vec![messages[3].clone()]
         );
 

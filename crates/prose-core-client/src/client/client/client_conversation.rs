@@ -46,7 +46,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             );
             self.inner
                 .data_cache
-                .load_messages_after(from, since, Some(MESSAGE_PAGE_SIZE))?
+                .load_messages_after(from, since, Some(MESSAGE_PAGE_SIZE))
+                .await?
         } else {
             info!(
                 "Loading last page of messages in conversation {} from local cache…",
@@ -54,7 +55,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             );
             self.inner
                 .data_cache
-                .load_messages_before(from, None, MESSAGE_PAGE_SIZE)?
+                .load_messages_before(from, None, MESSAGE_PAGE_SIZE)
+                .await?
                 .map(|page| page.items)
                 .unwrap_or_else(|| vec![])
         };
@@ -90,7 +92,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             info!("Found {} messages. Saving to cache…", remote_messages.len());
             self.inner
                 .data_cache
-                .insert_messages(remote_messages.iter())?;
+                .insert_messages(remote_messages.iter())
+                .await?;
 
             // Remove all messages from the tail of the local messages including the message that
             // matches the first message returned from the server so that we don't have any
@@ -152,18 +155,21 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let before: message::Id = before.into().as_ref().into();
 
         // If we have messages cached already return these without a round trip to the server…
-        if let Some(cached_messages) =
-            self.inner
-                .data_cache
-                .load_messages_before(from, Some(&before), MESSAGE_PAGE_SIZE)?
+        if let Some(cached_messages) = self
+            .inner
+            .data_cache
+            .load_messages_before(from, Some(&before), MESSAGE_PAGE_SIZE)
+            .await?
         {
             info!("Returning cached messages for conversation {}…", from);
-            return self.enriching_messages_from_cache(from, cached_messages);
+            return self
+                .enriching_messages_from_cache(from, cached_messages)
+                .await;
         }
 
         // We couldn't find any older messages but we need to have the one matching the id at least.
         // So we'll fetch that to translate the MessageId into a StanzaId for the server.
-        let Some(stanza_id) = self.inner.data_cache.load_stanza_id(from, &before)? else {
+        let Some(stanza_id) = self.inner.data_cache.load_stanza_id(from, &before).await? else {
             return Err(format_err!(
                 "Could not determine stanza_id for message with id {}",
                 before
@@ -206,7 +212,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         self.inner
             .data_cache
-            .insert_messages(parsed_messages.iter())?;
+            .insert_messages(parsed_messages.iter())
+            .await?;
 
         self.enriching_messages_from_cache(
             from,
@@ -215,6 +222,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 is_complete: fin.complete == Complete::default(),
             },
         )
+        .await
     }
 
     #[instrument]
@@ -227,12 +235,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .iter()
             .map(|id| id.as_ref().into())
             .collect::<Vec<message::Id>>();
-        let messages = self.inner.data_cache.load_messages_targeting(
-            conversation,
-            ids.as_slice(),
-            None,
-            true,
-        )?;
+        let messages = self
+            .inner
+            .data_cache
+            .load_messages_targeting(conversation, ids.as_slice(), None, true)
+            .await?;
         debug!(
             "{}",
             messages
@@ -287,7 +294,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         // We currently do not support multi-user chats. So either our conversation partner is
         // typing or they are not.
         let conversation_partner_is_composing =
-            self.inner.data_cache.load_chat_state(conversation)? == Some(ChatState::Composing);
+            self.inner.data_cache.load_chat_state(conversation).await?
+                == Some(ChatState::Composing);
 
         if conversation_partner_is_composing {
             Ok(vec![conversation.clone()])
@@ -349,11 +357,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     pub async fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
-        self.inner.data_cache.save_draft(conversation, text)
+        self.inner.data_cache.save_draft(conversation, text).await?;
+        Ok(())
     }
 
     pub async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
-        self.inner.data_cache.load_draft(conversation)
+        Ok(self.inner.data_cache.load_draft(conversation).await?)
     }
 }
 
@@ -365,19 +374,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     ///
     /// * `conversation`: The conversation to which `page` belongs.
     /// * `page`: A page of messages.
-    fn enriching_messages_from_cache(
+    async fn enriching_messages_from_cache(
         &self,
         conversation: &BareJid,
         page: Page<MessageLike>,
     ) -> Result<Page<Message>> {
         let message_ids = page.items.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
         let last_message_id = &page.items.last().unwrap().id;
-        let modifiers = self.inner.data_cache.load_messages_targeting(
-            &conversation,
-            &message_ids,
-            last_message_id,
-            false,
-        )?;
+        let modifiers = self
+            .inner
+            .data_cache
+            .load_messages_targeting(&conversation, &message_ids, last_message_id, false)
+            .await?;
 
         let reduced_messages =
             Message::reducing_messages(page.items.into_iter().chain(modifiers.into_iter()));

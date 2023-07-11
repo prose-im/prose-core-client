@@ -101,7 +101,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let from = BareJid::from(from);
 
-        self.inner.data_cache.insert_user_profile(&from, &profile)?;
+        self.inner
+            .data_cache
+            .insert_user_profile(&from, &profile)
+            .await?;
         self.send_event(ClientEvent::ContactChanged { jid: from });
 
         Ok(())
@@ -126,7 +129,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         self.inner
             .data_cache
-            .insert_avatar_metadata(&from, &metadata)?;
+            .insert_avatar_metadata(&from, &metadata)
+            .await?;
 
         Ok(())
 
@@ -146,12 +150,15 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     async fn presence_did_change(&self, from: &Jid, presence: &Presence) -> Result<()> {
         let jid = BareJid::from(from.clone());
 
-        self.inner.data_cache.insert_presence(
-            &jid,
-            Some(presence.type_.clone()),
-            presence.show.as_ref().map(|s| s.clone()),
-            presence.statuses.first_key_value().map(|kv| kv.1.clone()),
-        )?;
+        self.inner
+            .data_cache
+            .insert_presence(
+                &jid,
+                Some(presence.type_.clone()),
+                presence.show.as_ref().map(|s| s.clone()),
+                presence.statuses.first_key_value().map(|kv| kv.1.clone()),
+            )
+            .await?;
 
         self.send_event(ClientEvent::ContactChanged { jid });
         Ok(())
@@ -194,7 +201,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         }
 
         debug!("Caching received message…");
-        self.inner.data_cache.insert_messages([&parsed_message])?;
+        self.inner
+            .data_cache
+            .insert_messages([&parsed_message])
+            .await?;
 
         let conversation = if message_is_carbon {
             &parsed_message.to
@@ -206,7 +216,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         if let Some(chat_state) = chat_state {
             self.inner
                 .data_cache
-                .insert_chat_state(&chat_state.from, &chat_state.state)?;
+                .insert_chat_state(&chat_state.from, &chat_state.state)
+                .await?;
             self.send_event(ClientEvent::ComposingUsersChanged {
                 conversation: chat_state.from,
             })
@@ -233,7 +244,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let message = MessageLike::try_from(timestamped_message)?;
 
         debug!("Caching sent message…");
-        self.inner.data_cache.insert_messages([&message])?;
+        self.inner.data_cache.insert_messages([&message]).await?;
         self.send_event_for_message(&message.to, &message);
 
         Ok(())

@@ -5,13 +5,24 @@
 use std::path::Path;
 use std::sync::Mutex;
 
-use anyhow::Result;
+use async_trait::async_trait;
 use rusqlite::types::FromSqlError;
 use rusqlite::{params, Connection, OptionalExtension};
+use thiserror::Error;
 use tracing::{debug, info};
 
 use crate::cache::data_cache::DataCache;
 use crate::types::AccountSettings;
+
+#[derive(Error, Debug)]
+pub enum SQLiteCacheError {
+    #[error(transparent)]
+    SQLite(#[from] rusqlite::Error),
+    #[error(transparent)]
+    JSON(#[from] serde_json::Error),
+}
+
+type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 
 pub struct SQLiteCache {
     pub(super) conn: Mutex<Connection>,
@@ -19,7 +30,8 @@ pub struct SQLiteCache {
 
 impl SQLiteCache {
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_connection(Connection::open(path.as_ref().join("db.sqlite3"))?)
+        let conn = Connection::open(path.as_ref().join("db.sqlite3"))?;
+        Self::open_with_connection(conn)
     }
 
     pub fn open_with_connection(conn: Connection) -> Result<Self> {
@@ -44,8 +56,11 @@ impl SQLiteCache {
     }
 }
 
+#[async_trait]
 impl DataCache for SQLiteCache {
-    fn delete_all(&self) -> Result<()> {
+    type Error = SQLiteCacheError;
+
+    async fn delete_all(&self) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         conn.execute_batch(
             r#"
@@ -59,7 +74,7 @@ impl DataCache for SQLiteCache {
         Ok(())
     }
 
-    fn save_account_settings(&self, settings: &AccountSettings) -> Result<()> {
+    async fn save_account_settings(&self, settings: &AccountSettings) -> Result<()> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare("INSERT OR REPLACE INTO kv VALUES (?, ?)")?;
         stmt.execute(params![
@@ -69,7 +84,7 @@ impl DataCache for SQLiteCache {
         Ok(())
     }
 
-    fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
+    async fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT `value` FROM kv WHERE `key` = ?")?;
         let settings = stmt
@@ -192,18 +207,18 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_save_and_load_account_settings() -> Result<()> {
+    #[tokio::test]
+    async fn test_save_and_load_account_settings() -> Result<()> {
         let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
 
-        assert_eq!(cache.load_account_settings()?, None);
+        assert_eq!(cache.load_account_settings().await?, None);
 
         let settings = AccountSettings {
             availability: Availability::Away,
         };
 
-        cache.save_account_settings(&settings)?;
-        assert_eq!(cache.load_account_settings()?, Some(settings));
+        cache.save_account_settings(&settings).await?;
+        assert_eq!(cache.load_account_settings().await?, Some(settings));
 
         Ok(())
     }

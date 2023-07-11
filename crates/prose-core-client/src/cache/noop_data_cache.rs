@@ -1,15 +1,23 @@
-use anyhow::Result;
+use async_trait::async_trait;
 use jid::BareJid;
+use thiserror::Error;
 use xmpp_parsers::presence::{Show, Type};
 
 use prose_domain::{Contact, UserProfile};
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::{ChatState, Id};
+use prose_xmpp::SendUnlessWasm;
 
 use crate::cache::ContactsCache;
 use crate::types::roster::Item;
 use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page};
 use crate::{DataCache, MessageCache};
+
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub struct NoopDataCacheError(#[from] anyhow::Error);
+
+type Result<T> = std::result::Result<T, NoopDataCacheError>;
 
 pub struct NoopDataCache {}
 
@@ -19,36 +27,44 @@ impl Default for NoopDataCache {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 impl ContactsCache for NoopDataCache {
-    fn has_valid_roster_items(&self) -> Result<bool> {
+    type Error = NoopDataCacheError;
+
+    async fn has_valid_roster_items(&self) -> Result<bool> {
         Ok(false)
     }
 
-    fn insert_roster_items(&self, _items: &[Item]) -> Result<()> {
+    async fn insert_roster_items(&self, _items: &[Item]) -> Result<()> {
         Ok(())
     }
 
-    fn insert_user_profile(&self, _jid: &BareJid, _profile: &UserProfile) -> Result<()> {
+    async fn insert_user_profile(&self, _jid: &BareJid, _profile: &UserProfile) -> Result<()> {
         Ok(())
     }
 
-    fn load_user_profile(&self, _jid: &BareJid) -> Result<Option<UserProfile>> {
+    async fn load_user_profile(&self, _jid: &BareJid) -> Result<Option<UserProfile>> {
         Ok(None)
     }
 
-    fn delete_user_profile(&self, _jid: &BareJid) -> Result<()> {
+    async fn delete_user_profile(&self, _jid: &BareJid) -> Result<()> {
         Ok(())
     }
 
-    fn insert_avatar_metadata(&self, _jid: &BareJid, _metadata: &AvatarMetadata) -> Result<()> {
+    async fn insert_avatar_metadata(
+        &self,
+        _jid: &BareJid,
+        _metadata: &AvatarMetadata,
+    ) -> Result<()> {
         Ok(())
     }
 
-    fn load_avatar_metadata(&self, _jid: &BareJid) -> Result<Option<AvatarMetadata>> {
+    async fn load_avatar_metadata(&self, _jid: &BareJid) -> Result<Option<AvatarMetadata>> {
         Ok(None)
     }
 
-    fn insert_presence(
+    async fn insert_presence(
         &self,
         _jid: &BareJid,
         _kind: Option<Type>,
@@ -58,41 +74,42 @@ impl ContactsCache for NoopDataCache {
         Ok(())
     }
 
-    fn insert_chat_state(&self, _jid: &BareJid, _chat_state: &ChatState) -> Result<()> {
+    async fn insert_chat_state(&self, _jid: &BareJid, _chat_state: &ChatState) -> Result<()> {
         Ok(())
     }
 
-    fn load_chat_state(&self, _jid: &BareJid) -> Result<Option<ChatState>> {
+    async fn load_chat_state(&self, _jid: &BareJid) -> Result<Option<ChatState>> {
         Ok(None)
     }
 
-    fn load_contacts(&self) -> Result<Vec<(Contact, Option<ImageId>)>> {
+    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<ImageId>)>> {
         Ok(vec![])
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 impl MessageCache for NoopDataCache {
-    fn insert_messages<'a>(
+    type Error = NoopDataCacheError;
+
+    async fn insert_messages<'a>(
         &self,
-        _messages: impl IntoIterator<Item = &'a MessageLike>,
-    ) -> Result<()>
-    where
-        Self: Sized,
-    {
+        _messages: impl IntoIterator<Item = &'a MessageLike> + SendUnlessWasm,
+    ) -> Result<()> {
         Ok(())
     }
 
-    fn load_messages_targeting<'a>(
+    async fn load_messages_targeting<'a>(
         &self,
         _conversation: &BareJid,
         _targets: &[Id],
-        _newer_than: impl Into<Option<&'a Id>>,
+        _newer_than: impl Into<Option<&'a Id>> + SendUnlessWasm,
         _include_targeted_messages: bool,
     ) -> Result<Vec<MessageLike>> {
         Ok(vec![])
     }
 
-    fn load_messages_before(
+    async fn load_messages_before(
         &self,
         _conversation: &BareJid,
         _older_than: Option<&Id>,
@@ -101,7 +118,7 @@ impl MessageCache for NoopDataCache {
         Ok(None)
     }
 
-    fn load_messages_after(
+    async fn load_messages_after(
         &self,
         _conversation: &BareJid,
         _newer_than: &Id,
@@ -110,7 +127,7 @@ impl MessageCache for NoopDataCache {
         Ok(vec![])
     }
 
-    fn load_stanza_id(
+    async fn load_stanza_id(
         &self,
         _conversation: &BareJid,
         _message_id: &Id,
@@ -118,25 +135,29 @@ impl MessageCache for NoopDataCache {
         Ok(None)
     }
 
-    fn save_draft(&self, _conversation: &BareJid, _text: Option<&str>) -> Result<()> {
+    async fn save_draft(&self, _conversation: &BareJid, _text: Option<&str>) -> Result<()> {
         Ok(())
     }
 
-    fn load_draft(&self, _conversation: &BareJid) -> Result<Option<String>> {
+    async fn load_draft(&self, _conversation: &BareJid) -> Result<Option<String>> {
         Ok(None)
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 impl DataCache for NoopDataCache {
-    fn delete_all(&self) -> Result<()> {
+    type Error = NoopDataCacheError;
+
+    async fn delete_all(&self) -> Result<()> {
         Ok(())
     }
 
-    fn save_account_settings(&self, _settings: &AccountSettings) -> Result<()> {
+    async fn save_account_settings(&self, _settings: &AccountSettings) -> Result<()> {
         Ok(())
     }
 
-    fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
+    async fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
         Ok(None)
     }
 }

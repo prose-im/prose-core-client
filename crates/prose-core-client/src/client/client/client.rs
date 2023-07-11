@@ -94,7 +94,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn delete_cached_data(&self) -> Result<()> {
-        self.inner.data_cache.delete_all()?;
+        self.inner.data_cache.delete_all().await?;
         self.inner.avatar_cache.delete_all_cached_images()?;
         Ok(())
     }
@@ -105,12 +105,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(self
             .inner
             .data_cache
-            .load_account_settings()?
+            .load_account_settings()
+            .await?
             .unwrap_or_default())
     }
 
     pub async fn save_account_settings(&self, settings: &AccountSettings) -> Result<()> {
-        self.inner.data_cache.save_account_settings(settings)
+        self.inner
+            .data_cache
+            .save_account_settings(settings)
+            .await?;
+        Ok(())
     }
 }
 

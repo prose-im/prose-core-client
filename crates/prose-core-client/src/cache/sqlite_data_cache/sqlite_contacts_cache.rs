@@ -1,22 +1,27 @@
-use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use microtype::Microtype;
-use rusqlite::{params, OptionalExtension};
-use xmpp_parsers::presence;
-
 use prose_domain::Contact;
 use prose_xmpp::stanza::avatar;
 use prose_xmpp::stanza::message::ChatState;
+use rusqlite::{params, OptionalExtension};
+use xmpp_parsers::presence;
 
+use crate::cache::sqlite_data_cache::sqlite_cache::SQLiteCacheError;
 use crate::cache::sqlite_data_cache::FromStrSql;
 use crate::cache::ContactsCache;
 use crate::domain_ext::Availability;
 use crate::types::{roster, Address, AvatarMetadata, UserProfile};
 use crate::SQLiteCache;
 
+type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
+
+#[async_trait]
 impl ContactsCache for SQLiteCache {
-    fn has_valid_roster_items(&self) -> Result<bool> {
+    type Error = SQLiteCacheError;
+
+    async fn has_valid_roster_items(&self) -> Result<bool> {
         let conn = self.conn.lock().unwrap();
 
         let last_update = conn
@@ -34,7 +39,7 @@ impl ContactsCache for SQLiteCache {
         Ok(Utc::now() - last_update <= Duration::days(10))
     }
 
-    fn insert_roster_items(&self, items: &[roster::Item]) -> Result<()> {
+    async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<()> {
         let mut conn = self.conn.lock().unwrap();
         let trx = (*conn).transaction()?;
         {
@@ -62,7 +67,7 @@ impl ContactsCache for SQLiteCache {
         Ok(())
     }
 
-    fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> Result<()> {
+    async fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
@@ -87,7 +92,7 @@ impl ContactsCache for SQLiteCache {
         Ok(())
     }
 
-    fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
+    async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
         let conn = &*self.conn.lock().unwrap();
 
         let mut stmt = conn.prepare(
@@ -126,7 +131,7 @@ impl ContactsCache for SQLiteCache {
         Ok(profile)
     }
 
-    fn delete_user_profile(&self, jid: &BareJid) -> Result<()> {
+    async fn delete_user_profile(&self, jid: &BareJid) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         conn.execute(
             "DELETE FROM user_profile WHERE jid = ?",
@@ -135,7 +140,7 @@ impl ContactsCache for SQLiteCache {
         Ok(())
     }
 
-    fn insert_avatar_metadata(&self, jid: &BareJid, metadata: &AvatarMetadata) -> Result<()> {
+    async fn insert_avatar_metadata(&self, jid: &BareJid, metadata: &AvatarMetadata) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "INSERT OR REPLACE INTO avatar_metadata \
@@ -153,7 +158,7 @@ impl ContactsCache for SQLiteCache {
         Ok(())
     }
 
-    fn load_avatar_metadata(&self, jid: &BareJid) -> Result<Option<AvatarMetadata>> {
+    async fn load_avatar_metadata(&self, jid: &BareJid) -> Result<Option<AvatarMetadata>> {
         let conn = &*self.conn.lock().unwrap();
 
         let mut stmt = conn.prepare(
@@ -180,7 +185,7 @@ impl ContactsCache for SQLiteCache {
         Ok(metadata)
     }
 
-    fn insert_presence(
+    async fn insert_presence(
         &self,
         jid: &BareJid,
         kind: Option<presence::Type>,
@@ -202,7 +207,7 @@ impl ContactsCache for SQLiteCache {
         Ok(())
     }
 
-    fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()> {
+    async fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "INSERT OR REPLACE INTO chat_states (jid, state, updated_at) VALUES (?, ?, ?)",
@@ -214,7 +219,7 @@ impl ContactsCache for SQLiteCache {
         ])?;
         Ok(())
     }
-    fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>> {
+    async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT state, updated_at FROM chat_states WHERE jid = ?")?;
         let row = stmt
@@ -237,7 +242,7 @@ impl ContactsCache for SQLiteCache {
         Ok(Some(row.0))
     }
 
-    fn load_contacts(&self) -> Result<Vec<(Contact, Option<avatar::ImageId>)>> {
+    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<avatar::ImageId>)>> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
@@ -309,39 +314,42 @@ mod tests {
     use rusqlite::Connection;
     use xmpp_parsers::presence::Show;
 
-    use prose_core_domain::Availability;
+    use prose_domain::Availability;
 
     use crate::types::roster::Subscription;
 
     use super::*;
 
-    #[test]
-    fn test_presence() -> Result<()> {
+    #[tokio::test]
+    async fn test_presence() -> Result<()> {
         let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
         let jid_a = BareJid::from_str("a@prose.org").unwrap();
         let jid_b = BareJid::from_str("b@prose.org").unwrap();
 
-        cache.insert_roster_items(&[
-            roster::Item {
-                jid: jid_a.clone(),
-                subscription: Subscription::Both,
-                groups: vec![],
-            },
-            roster::Item {
-                jid: jid_b.clone(),
-                subscription: Subscription::Both,
-                groups: vec![],
-            },
-        ])?;
+        cache
+            .insert_roster_items(&[
+                roster::Item {
+                    jid: jid_a.clone(),
+                    subscription: Subscription::Both,
+                    groups: vec![],
+                },
+                roster::Item {
+                    jid: jid_b.clone(),
+                    subscription: Subscription::Both,
+                    groups: vec![],
+                },
+            ])
+            .await?;
 
         // If we didn't receive a presence yet the contact should be considered unavailable.
         // If we did however receive an empty presence the contact should be considered
         // available, because of https://datatracker.ietf.org/doc/html/rfc6121#section-4.7.1
-        cache.insert_presence(&jid_b, None, None, None)?;
+        cache.insert_presence(&jid_b, None, None, None).await?;
 
         assert_eq!(
             cache
-                .load_contacts()?
+                .load_contacts()
+                .await?
                 .into_iter()
                 .map(|c| c.0)
                 .collect::<Vec<_>>(),
@@ -366,10 +374,13 @@ mod tests {
         );
 
         // And for good measure insert some non-empty values
-        cache.insert_presence(&jid_a, None, Some(Show::Dnd), Some(String::from("AFK!")))?;
+        cache
+            .insert_presence(&jid_a, None, Some(Show::Dnd), Some(String::from("AFK!")))
+            .await?;
         assert_eq!(
             cache
-                .load_contacts()?
+                .load_contacts()
+                .await?
                 .into_iter()
                 .map(|c| c.0)
                 .collect::<Vec<_>>(),
