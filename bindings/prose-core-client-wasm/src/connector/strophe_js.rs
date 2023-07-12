@@ -14,31 +14,65 @@ use prose_xmpp::connector::{
     Connector as ConnectorTrait,
 };
 
-#[wasm_bindgen]
-extern "C" {
-    type StropheJSClient;
-
-    #[wasm_bindgen(constructor)]
-    fn new() -> StropheJSClient;
-
-    #[wasm_bindgen(method, js_name = "setEventHandler")]
-    fn set_event_handler(this: &StropheJSClient, handlers: EventHandler);
-
-    #[wasm_bindgen(method)]
-    async fn connect(this: &StropheJSClient, jid: String, password: String);
-
-    #[wasm_bindgen(method)]
-    fn disconnect(this: &StropheJSClient);
-
-    #[wasm_bindgen(method, js_name = "sendStanza")]
-    fn send_stanza(this: &StropheJSClient, stanza: String);
+#[wasm_bindgen(typescript_custom_section)]
+const TS_APPEND_CONTENT: &'static str = r#"
+export interface ProseConnectionProvider {
+    provideConnection(): ProseConnection
 }
 
-pub struct Connector {}
+export interface ProseConnection {
+    setEventHandler(handler: ProseConnectionEventHandler)
+    async connect(jid: string, password: string)
+    disconnect()
+    sendStanza(stanza: string)
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "ProseConnectionProvider")]
+    pub type JSConnectionProvider;
+
+    #[wasm_bindgen(method, js_name = "provideConnection")]
+    pub fn provide_connection(this: &JSConnectionProvider) -> JSConnection;
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "ProseConnection")]
+    pub type JSConnection;
+
+    #[wasm_bindgen(method, js_name = "setEventHandler")]
+    fn set_event_handler(this: &JSConnection, handlers: EventHandler);
+
+    #[wasm_bindgen(method, catch)]
+    async fn connect(this: &JSConnection, jid: String, password: String) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method)]
+    fn disconnect(this: &JSConnection);
+
+    #[wasm_bindgen(method, catch, js_name = "sendStanza")]
+    fn send_stanza(this: &JSConnection, stanza: String) -> Result<(), JsValue>;
+}
+
+#[wasm_bindgen(js_name = "ProseConnectionEventHandler")]
+pub struct EventHandler {
+    connection: Connection,
+    handler: ConnectionEventHandler,
+}
+
+pub struct Connector {
+    provider: Rc<JSConnectionProvider>,
+}
 
 impl Connector {
-    pub fn provider() -> ConnectorProvider {
-        || Box::new(Connector {})
+    pub fn provider(provider: JSConnectionProvider) -> ConnectorProvider {
+        let provider = Rc::new(provider);
+        Box::new(move || {
+            Box::new(Connector {
+                provider: provider.clone(),
+            })
+        })
     }
 }
 
@@ -50,7 +84,7 @@ impl ConnectorTrait for Connector {
         password: &str,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
-        let client = Rc::new(StropheJSClient::new());
+        let client = Rc::new(self.provider.provide_connection());
 
         let event_handler = EventHandler {
             connection: Connection {
@@ -59,19 +93,24 @@ impl ConnectorTrait for Connector {
             handler: event_handler,
         };
         client.set_event_handler(event_handler);
-        client.connect(jid.to_string(), password.to_string()).await;
+        // TODO: Handle error
+        client
+            .connect(jid.to_string(), password.to_string())
+            .await
+            .unwrap();
 
         Ok(Box::new(Connection { client }))
     }
 }
 
 pub struct Connection {
-    client: Rc<StropheJSClient>,
+    client: Rc<JSConnection>,
 }
 
 impl ConnectionTrait for Connection {
     fn send_stanza(&self, stanza: Element) -> Result<()> {
-        self.client.send_stanza(String::from(&stanza));
+        // TODO: Handle result
+        self.client.send_stanza(String::from(&stanza)).unwrap();
         // self.client.send_stanza(DomParser::new().unwrap());
         Ok(())
     }
@@ -81,14 +120,9 @@ impl ConnectionTrait for Connection {
     }
 }
 
-#[wasm_bindgen]
-pub struct EventHandler {
-    connection: Connection,
-    handler: ConnectionEventHandler,
-}
-
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = "ProseConnectionEventHandler")]
 impl EventHandler {
+    #[wasm_bindgen(js_name = "handleDisconnect")]
     pub fn handle_disconnect(&self, error: String) {
         let fut = (self.handler)(
             &self.connection,
@@ -99,16 +133,19 @@ impl EventHandler {
         spawn_local(async move { fut.await })
     }
 
+    #[wasm_bindgen(js_name = "handleTimeout")]
     pub fn handle_timeout(&self) {
         let fut = (self.handler)(&self.connection, ConnectionEvent::TimeoutTimer);
         spawn_local(async move { fut.await })
     }
 
+    #[wasm_bindgen(js_name = "handlePingTimeout")]
     pub fn handle_ping_timeout(&self) {
         let fut = (self.handler)(&self.connection, ConnectionEvent::PingTimer);
         spawn_local(async move { fut.await })
     }
 
+    #[wasm_bindgen(js_name = "handleStanza")]
     pub fn handle_stanza(&self, stanza: String) {
         let fut = (self.handler)(
             &self.connection,

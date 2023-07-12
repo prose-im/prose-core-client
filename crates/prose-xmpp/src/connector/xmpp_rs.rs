@@ -24,7 +24,7 @@ pub struct Connector {}
 
 impl Connector {
     pub fn provider() -> ConnectorProvider {
-        || Box::new(Connector {})
+        Box::new(|| Box::new(Connector {}))
     }
 }
 

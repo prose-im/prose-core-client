@@ -104,7 +104,7 @@ impl Default for ModuleContext {
     fn default() -> Self {
         ModuleContext {
             inner: Arc::new(ModuleContextInner {
-                connector_provider: || Box::new(UndefinedConnector {}),
+                connector_provider: Box::new(|| Box::new(UndefinedConnector {})),
                 jid: RwLock::new(None),
                 connection: Default::default(),
                 event_handler: Box::new(|_, _| Box::pin(async {}) as PinnedFuture<_>),

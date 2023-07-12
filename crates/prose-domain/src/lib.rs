@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 pub use chrono::{DateTime, Utc};
 use microtype::microtype;
 use serde::{Deserialize, Serialize};
@@ -26,11 +24,11 @@ pub enum Availability {
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Contact {
     pub jid: BareJid,
     pub name: String,
-    pub avatar: Option<PathBuf>,
+    pub avatar: Option<String>,
     pub availability: Availability,
     pub status: Option<String>,
     pub groups: Vec<String>,
@@ -59,15 +57,15 @@ pub struct UserProfile {
 microtype! {
     pub String {
         #[string]
-        #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize)]
+        #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
         MessageId,
 
         #[string]
-        #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize)]
+        #[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
         StanzaId,
 
         #[string]
-        #[derive(Debug, PartialEq, Clone, Serialize)]
+        #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
         Emoji
     }
 }
@@ -81,14 +79,14 @@ type MessageId = String;
 type Reaction = String;
 
 #[typeshare]
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Reaction {
     pub emoji: Emoji,
     pub from: Vec<BareJid>,
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Serialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub id: MessageId,
     pub stanza_id: Option<StanzaId>,

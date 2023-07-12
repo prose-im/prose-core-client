@@ -112,6 +112,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                         .inner
                         .avatar_cache
                         .cached_avatar_image_url(&contact.jid, &image_id)
+                        .and_then(|path| path.into_os_string().into_string().ok())
                 }
                 contact
             })

@@ -31,7 +31,7 @@ pub struct ClientBuilder {
 impl ClientBuilder {
     pub(super) fn new() -> Self {
         ClientBuilder {
-            connector_provider: || Box::new(UndefinedConnector {}),
+            connector_provider: Box::new(|| Box::new(UndefinedConnector {})),
             mods: Default::default(),
             id_provider: Box::new(UUIDProvider::new()),
             time_provider: Box::new(SystemTimeProvider::new()),

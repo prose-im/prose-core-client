@@ -22,4 +22,8 @@ pub type EventHandler = Box<dyn Fn(Client, Event) -> PinnedFuture<()>>;
 pub type EventHandler = Box<dyn Fn(Client, Event) -> PinnedFuture<()> + Send + Sync>;
 
 pub(super) type ModuleLookup = BTreeMap<TypeId, RwLock<Box<dyn AnyModule>>>;
-pub type ConnectorProvider = fn() -> Box<dyn Connector>;
+
+#[cfg(target_arch = "wasm32")]
+pub type ConnectorProvider = Box<dyn Fn() -> Box<dyn Connector>>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type ConnectorProvider = Box<dyn Fn() -> Box<dyn Connector> + Send + Sync>;

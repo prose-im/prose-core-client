@@ -112,7 +112,9 @@ impl ClientInner {
     }
 
     fn handle_stanza(ctx: &ModuleContextInner, mods: &ModuleLookup, stanza: Element) {
-        let elem = XMPPElement::try_from(stanza).unwrap();
+        let Some(elem) = XMPPElement::try_from(stanza).ok() else {
+            return;
+        };
 
         let mut wakers = Vec::<Waker>::new();
         let mut idx = 0;

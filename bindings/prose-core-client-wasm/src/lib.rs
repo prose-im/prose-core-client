@@ -5,6 +5,7 @@ mod client;
 mod connector;
 mod delegate;
 mod error;
+mod types;
 
 use tracing::info;
 use tracing_subscriber::fmt::format::Pretty;
