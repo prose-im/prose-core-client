@@ -1,3 +1,4 @@
+use crate::cache::IndexedDBDataCacheError;
 use jid::JidParseError;
 use prose_xmpp::ConnectionError;
 use wasm_bindgen::JsValue;
@@ -25,5 +26,11 @@ impl From<JSConnectionError> for JsValue {
             ConnectionError::InvalidCredentials => "Invalid credentials".into(),
             ConnectionError::Generic { msg } => msg.into(),
         }
+    }
+}
+
+impl From<IndexedDBDataCacheError> for JsValue {
+    fn from(value: IndexedDBDataCacheError) -> Self {
+        JsValue::from_str(&value.to_string())
     }
 }

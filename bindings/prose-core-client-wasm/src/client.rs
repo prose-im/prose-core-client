@@ -4,6 +4,7 @@ use jid::{BareJid, FullJid, Jid};
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
+use crate::cache::IndexedDBDataCache;
 use prose_core_client::{Client as ProseClient, ClientBuilder, NoopAvatarCache, NoopDataCache};
 use prose_domain::{Availability, MessageId};
 
@@ -15,7 +16,7 @@ use crate::util::WasmTimeProvider;
 
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
-    client: ProseClient<NoopDataCache, NoopAvatarCache>,
+    client: ProseClient<IndexedDBDataCache, NoopAvatarCache>,
 }
 
 #[wasm_bindgen(js_class = "ProseClient")]
@@ -24,10 +25,12 @@ impl Client {
         connection_provider: JSConnectionProvider,
         delegate: JSDelegate,
     ) -> Result<Client, JsValue> {
+        let cache = IndexedDBDataCache::new().await?;
+
         let client = Client {
             client: ClientBuilder::new()
                 .set_connector_provider(Connector::provider(connection_provider))
-                .set_data_cache(NoopDataCache::default())
+                .set_data_cache(cache)
                 .set_avatar_cache(NoopAvatarCache::default())
                 .set_time_provider(WasmTimeProvider::default())
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))

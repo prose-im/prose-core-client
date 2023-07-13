@@ -10,10 +10,12 @@ serde = {version = "1.0", features = ["derive"] }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 typeshare = "1.0"
-url = { workspace = true }
+url = { workspace = true, features = ["serde"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { workspace = true, features = ["serde", "wasmbind"] }
+tsify = "0.4"
+wasm-bindgen = "0.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { workspace = true, features = ["serde"] }

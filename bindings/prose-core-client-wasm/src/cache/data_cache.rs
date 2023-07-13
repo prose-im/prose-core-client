@@ -1,22 +1,30 @@
+use std::future::IntoFuture;
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use indexed_db_futures::prelude::*;
 use indexed_db_futures::web_sys::DomException;
 use indexed_db_futures::{IdbDatabase, IdbVersionChangeEvent};
 use jid::BareJid;
-use prose_core_client::types::roster::Item;
+use thiserror::Error;
+use tracing::debug;
+use wasm_bindgen::JsValue;
+
+use prose_core_client::types::roster;
 use prose_core_client::types::{AccountSettings, AvatarMetadata, MessageLike, Page};
 use prose_core_client::{ContactsCache, DataCache, MessageCache};
-use prose_domain::{Contact, UserProfile};
+use prose_domain::{Availability, Contact, UserProfile};
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{message, presence};
-use thiserror::Error;
-use wasm_bindgen::JsValue;
 
 mod keys {
     pub const DB_NAME: &str = "ProseCache";
 
+    pub const SETTINGS_STORE: &str = "settings";
     pub const MESSAGES_STORE: &str = "messages";
+    pub const ROSTER_ITEMS_STORE: &str = "roster_item";
+    pub const USER_PROFILE_STORE: &str = "user_profile";
 }
 
 #[derive(Error, Debug)]
@@ -30,6 +38,12 @@ pub enum IndexedDBDataCacheError {
 
     #[error(transparent)]
     JSON(#[from] serde_json::error::Error),
+
+    #[error(transparent)]
+    JID(#[from] jid::JidParseError),
+
+    #[error("Invalid DB Key")]
+    InvalidDBKey,
 }
 
 impl From<DomException> for IndexedDBDataCacheError {
@@ -57,7 +71,10 @@ impl IndexedDBDataCache {
             let db = evt.db();
 
             if old_version < 1 {
+                db.create_object_store(keys::SETTINGS_STORE)?;
                 db.create_object_store(keys::MESSAGES_STORE)?;
+                db.create_object_store(keys::ROSTER_ITEMS_STORE)?;
+                db.create_object_store(keys::USER_PROFILE_STORE)?;
             }
 
             Ok(())
@@ -77,11 +94,42 @@ impl ContactsCache for IndexedDBDataCache {
         Ok(false)
     }
 
-    async fn insert_roster_items(&self, _items: &[Item]) -> Result<()> {
+    async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<()> {
+        debug!("Store {} roster items.", items.len());
+
+        let tx = self.db.transaction_on_one_with_mode(
+            keys::ROSTER_ITEMS_STORE,
+            IdbTransactionMode::Readwrite,
+        )?;
+        let store = tx.object_store(keys::ROSTER_ITEMS_STORE)?;
+
+        for item in items {
+            store.put_key_val(
+                &JsValue::from_str(&item.jid.to_string()),
+                &JsValue::from_serde(item)?,
+            )?;
+        }
+
+        tx.await.into_result()?;
         Ok(())
     }
 
-    async fn insert_user_profile(&self, _jid: &BareJid, _profile: &UserProfile) -> Result<()> {
+    async fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> Result<()> {
+        debug!("Store profile for {}.", jid);
+
+        let tx = self.db.transaction_on_one_with_mode(
+            keys::USER_PROFILE_STORE,
+            IdbTransactionMode::Readwrite,
+        )?;
+        let store = tx.object_store(keys::USER_PROFILE_STORE)?;
+
+        store.put_key_val(
+            &JsValue::from_str(&jid.to_string()),
+            &JsValue::from_serde(profile)?,
+        )?;
+
+        tx.await.into_result()?;
+
         Ok(())
     }
 
@@ -124,7 +172,52 @@ impl ContactsCache for IndexedDBDataCache {
     }
 
     async fn load_contacts(&self) -> Result<Vec<(Contact, Option<ImageId>)>> {
-        Ok(vec![])
+        let tx = self.db.transaction_on_multi_with_mode(
+            &[keys::USER_PROFILE_STORE, keys::ROSTER_ITEMS_STORE],
+            IdbTransactionMode::Readonly,
+        )?;
+
+        let roster_items_store = tx.object_store(keys::ROSTER_ITEMS_STORE)?;
+        let user_profile_store = tx.object_store(keys::USER_PROFILE_STORE)?;
+        let jids = roster_items_store.get_all_keys()?.await?;
+        let mut contacts = vec![];
+
+        for jid in jids {
+            let parsed_jid = BareJid::from_str(
+                &jid.as_string()
+                    .ok_or(IndexedDBDataCacheError::InvalidDBKey)?,
+            )?;
+
+            let Some(roster_item): Option<roster::Item> = roster_items_store
+                .get(&jid)?
+                .await?
+                .map(|v| v.into_serde())
+                .transpose()?
+            else {
+                continue;
+            };
+
+            let user_profile: Option<UserProfile> = user_profile_store
+                .get(&jid)?
+                .await?
+                .map(|v| v.into_serde())
+                .transpose()?;
+
+            let full_name = user_profile.as_ref().and_then(|u| u.full_name.clone());
+            let nickname = user_profile.as_ref().and_then(|u| u.nickname.clone());
+
+            let contact = Contact {
+                jid: parsed_jid.clone(),
+                name: full_name.or(nickname).unwrap_or(parsed_jid.to_string()),
+                avatar: None,
+                availability: Availability::Unavailable,
+                status: None,
+                groups: roster_item.groups,
+            };
+            contacts.push((contact, None))
+        }
+
+        Ok(contacts)
     }
 }
 

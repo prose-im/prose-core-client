@@ -1,8 +1,9 @@
 use jid::BareJid;
+use serde::{Deserialize, Serialize};
 use strum_macros::{Display, EnumString};
 use xmpp_parsers::roster;
 
-#[derive(Debug, PartialEq, Display, EnumString, Clone)]
+#[derive(Debug, PartialEq, Display, EnumString, Clone, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
 pub enum Subscription {
     None,
@@ -12,7 +13,7 @@ pub enum Subscription {
     Remove,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Item {
     pub jid: BareJid,
     pub subscription: Subscription,

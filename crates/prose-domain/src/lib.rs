@@ -1,12 +1,12 @@
 pub use chrono::{DateTime, Utc};
+#[cfg(not(feature = "typescript"))]
+use jid::BareJid;
 use microtype::microtype;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
+use tsify::Tsify;
 use typeshare::typeshare;
 pub use url::Url;
-
-#[cfg(not(feature = "typescript"))]
-use jid::BareJid;
 
 #[cfg(feature = "typescript")]
 use crate::jid::BareJid;
@@ -15,7 +15,7 @@ use crate::jid::BareJid;
 mod jid;
 
 #[typeshare]
-#[derive(Debug, Display, PartialEq, Serialize, Deserialize, Clone)]
+#[derive(Debug, Display, PartialEq, Serialize, Deserialize, Clone, Tsify)]
 pub enum Availability {
     Available,
     Unavailable,
@@ -24,7 +24,7 @@ pub enum Availability {
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Tsify)]
 pub struct Contact {
     pub jid: BareJid,
     pub name: String,
@@ -35,14 +35,14 @@ pub struct Contact {
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Tsify)]
 pub struct Address {
     pub locality: Option<String>,
     pub country: Option<String>,
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
 pub struct UserProfile {
     pub full_name: Option<String>,
     pub nickname: Option<String>,
@@ -65,7 +65,7 @@ microtype! {
         StanzaId,
 
         #[string]
-        #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+        #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Tsify)]
         Emoji
     }
 }
@@ -79,14 +79,14 @@ type MessageId = String;
 type Reaction = String;
 
 #[typeshare]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Tsify)]
 pub struct Reaction {
     pub emoji: Emoji,
     pub from: Vec<BareJid>,
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Tsify)]
 pub struct Message {
     pub id: MessageId,
     pub stanza_id: Option<StanzaId>,
