@@ -24,17 +24,22 @@ impl Args {
 }
 
 fn build(sh: &Shell) -> Result<()> {
-    cmd!(
-        sh,
-        "
-        wasm-pack build 
-            --target web 
-            --weak-refs
-            --scope prose-org
-            --release
-    "
-    )
-    .run()?;
+    let args = [
+        "--target",
+        "web",
+        "--weak-refs",
+        "--scope",
+        "prose-org",
+        "--release",
+    ];
+
+    cmd!(sh, "wasm-pack build")
+        .args(args)
+        .env(
+            "RUSTFLAGS",
+            "-C panic=abort -C codegen-units=1 -C opt-level=z",
+        )
+        .run()?;
 
     Ok(())
 }

@@ -40,3 +40,6 @@ wasm-bindgen-futures = "0.4"
 
 tokio-xmpp = { git = "https://gitlab.com/xmpp-rs/xmpp-rs.git", rev = "f9d44195133fa6b9bfd006ae3e2cd3d13210679a" }
 xmpp-parsers = { git = "https://gitlab.com/xmpp-rs/xmpp-rs.git", rev = "f9d44195133fa6b9bfd006ae3e2cd3d13210679a" }
+
+[profile.release]
+lto = true
