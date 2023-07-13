@@ -1,5 +1,4 @@
 use std::str::FromStr;
-use std::time::SystemTime;
 
 use jid::{BareJid, FullJid, Jid};
 use tracing::info;
@@ -7,28 +6,12 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::{Client as ProseClient, ClientBuilder, NoopAvatarCache, NoopDataCache};
 use prose_domain::{Availability, MessageId};
-use prose_xmpp::TimeProvider;
 
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::error::JSConnectionError;
 use crate::types::Message;
-
-struct WasmTimeProvider {}
-
-impl TimeProvider for WasmTimeProvider {
-    fn now(&self) -> SystemTime {
-        use js_sys::Date;
-        use std::time::Duration;
-
-        let now_ms = Date::now();
-        let secs = (now_ms / 1000.0).floor() as u64;
-        let nanos = (now_ms % 1000.0 * 1_000_000.0) as u32; // Convert remaining milliseconds to nanoseconds
-
-        let duration = Duration::new(secs, nanos);
-        SystemTime::UNIX_EPOCH + duration
-    }
-}
+use crate::util::WasmTimeProvider;
 
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
@@ -46,7 +29,7 @@ impl Client {
                 .set_connector_provider(Connector::provider(connection_provider))
                 .set_data_cache(NoopDataCache::default())
                 .set_avatar_cache(NoopAvatarCache::default())
-                .set_time_provider(WasmTimeProvider {})
+                .set_time_provider(WasmTimeProvider::default())
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .build(),
         };
