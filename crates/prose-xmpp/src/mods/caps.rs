@@ -56,15 +56,6 @@ impl Module for Caps {
         });
 
         Ok(())
-
-        // TODO
-        // ctx.send_stanza(
-        //     Iq::from_result(
-        //         stanza.id.clone(),
-        //         Some(handler.handle_disco_request(&node)?),
-        //     )
-        //     .with_from(from.clone()),
-        // )
     }
 }
 
