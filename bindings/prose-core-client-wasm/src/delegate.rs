@@ -1,4 +1,3 @@
-use minidom::Element;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent};
@@ -27,19 +26,19 @@ export interface ProseClientDelegate {
     clientDisconnected(error?: ConnectionError)
 
     /// A user in `conversation` started or stopped typing.
-    composingUsersChanged(conversation: String)
+    composingUsersChanged(conversation: string)
     
     /// Infos about a contact have changed.
-    contactChanged(jid: String)
+    contactChanged(jid: string)
     
     /// One or many messages were either received or sent.
-    messagesAppended(conversation: String, messageIDs: string[])
+    messagesAppended(conversation: string, messageIDs: string[])
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
-    messagesUpdated(conversation: String, messageIDs: string[])
+    messagesUpdated(conversation: string, messageIDs: string[])
     
     /// A message was deleted.
-    messagesDeleted(conversation: String, messageIDs: string[])
+    messagesDeleted(conversation: string, messageIDs: string[])
 }
 "#;
 
