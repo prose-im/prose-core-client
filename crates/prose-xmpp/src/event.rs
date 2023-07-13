@@ -15,6 +15,7 @@ pub enum Event {
 
     DiscoInfoQuery {
         from: Jid,
+        id: String,
         node: String,
     },
     CapsPresence {

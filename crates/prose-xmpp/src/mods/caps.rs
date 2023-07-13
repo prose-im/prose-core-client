@@ -1,8 +1,9 @@
 use anyhow::Result;
+use jid::Jid;
 use xmpp_parsers::disco::DiscoInfoQuery;
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::presence::Presence;
-use xmpp_parsers::{ns, presence};
+use xmpp_parsers::{disco, ns, presence};
 
 use crate::client::ModuleContext;
 use crate::event::Event;
@@ -50,6 +51,7 @@ impl Module for Caps {
 
         self.ctx.schedule_event(Event::DiscoInfoQuery {
             from: from.clone(),
+            id: stanza.id.clone(),
             node,
         });
 
@@ -71,6 +73,16 @@ impl Caps {
         let mut presence = Presence::new(presence::Type::None);
         presence.add_payload(caps);
         self.ctx.send_stanza(presence)
+    }
+
+    pub async fn send_disco_info_query_response(
+        &self,
+        to: impl Into<Jid>,
+        id: String,
+        disco: disco::DiscoInfoResult,
+    ) -> Result<()> {
+        self.ctx
+            .send_stanza(Iq::from_result(id, Some(disco)).with_to(to.into()))
     }
 
     pub async fn query_server_features(&self) -> Result<()> {

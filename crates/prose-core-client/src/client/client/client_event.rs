@@ -5,7 +5,7 @@ use tracing::{debug, error};
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::stanza::message::{ChatState, Forwarded};
+use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, VCard4};
 use prose_xmpp::{mods, Event};
 
@@ -20,7 +20,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let result = match event {
             Event::Connected => Ok(()),
             Event::Disconnected { .. } => Ok(()),
-            Event::DiscoInfoQuery { .. } => Ok(()),
+            Event::DiscoInfoQuery { from, id, node } => {
+                self.did_receive_disco_info_query(from, id, node).await
+            }
             Event::CapsPresence { .. } => Ok(()),
             Event::Message(message) => {
                 self.did_receive_message(ReceivedMessage::Message(message))
@@ -162,6 +164,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         self.send_event(ClientEvent::ContactChanged { jid });
         Ok(())
+    }
+
+    async fn did_receive_disco_info_query(
+        &self,
+        from: Jid,
+        id: String,
+        node: String,
+    ) -> Result<()> {
+        let caps = self.client.get_mod::<mods::Caps>();
+        caps.send_disco_info_query_response(from, id, (&self.inner.caps).into())
+            .await
     }
 
     async fn did_receive_message(&self, message: ReceivedMessage) -> Result<()> {
