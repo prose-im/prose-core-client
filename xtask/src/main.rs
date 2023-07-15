@@ -14,8 +14,9 @@ enum Command {
     WasmPack(wasm::Args),
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     match Xtask::parse().cmd {
-        Command::WasmPack(args) => args.run(),
+        Command::WasmPack(args) => args.run().await,
     }
 }
