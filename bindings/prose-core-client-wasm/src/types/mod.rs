@@ -1,3 +1,5 @@
-mod message;
+pub use jid::{BareJid, FullJid, Jid};
+pub use message::{Message, MessagesArray};
 
-pub use message::Message;
+mod jid;
+mod message;

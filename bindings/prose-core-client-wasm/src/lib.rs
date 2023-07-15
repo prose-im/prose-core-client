@@ -1,18 +1,20 @@
 #![feature(extern_types)]
 
-mod cache;
-mod client;
-mod connector;
-mod delegate;
-mod error;
-mod types;
-mod util;
+// Required for wasm-bindgen-derive
+extern crate alloc;
+extern crate core;
 
-use tracing::info;
 use tracing_subscriber::fmt::format::Pretty;
 use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeConsoleWriter};
 use wasm_bindgen::prelude::*;
+
+mod cache;
+mod client;
+mod connector;
+mod delegate;
+mod types;
+mod util;
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -28,9 +30,4 @@ pub fn start() {
         .with(fmt_layer)
         .with(perf_layer)
         .init();
-}
-
-#[wasm_bindgen(js_name = "helloProse")]
-pub fn hello_prose() {
-    info!("Hello from Prose");
 }

@@ -1,4 +1,3 @@
-use std::future::IntoFuture;
 use std::str::FromStr;
 
 use async_trait::async_trait;

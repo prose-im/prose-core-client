@@ -25,5 +25,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-web = "0.1"
+tsify = { version = "0.4", features = ["js", "wasm-bindgen"] }
 wasm-bindgen = { workspace = true, features = ["serde-serialize"] }
 wasm-bindgen-futures = { workspace = true }
+wasm-bindgen-derive = "0.2.0"

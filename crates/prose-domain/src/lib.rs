@@ -4,7 +4,6 @@ use jid::BareJid;
 use microtype::microtype;
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
-use tsify::Tsify;
 use typeshare::typeshare;
 pub use url::Url;
 
@@ -15,7 +14,7 @@ use crate::jid::BareJid;
 mod jid;
 
 #[typeshare]
-#[derive(Debug, Display, PartialEq, Serialize, Deserialize, Clone, Tsify)]
+#[derive(Debug, Display, PartialEq, Serialize, Deserialize, Clone)]
 pub enum Availability {
     Available,
     Unavailable,
@@ -24,7 +23,7 @@ pub enum Availability {
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Tsify)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Contact {
     pub jid: BareJid,
     pub name: String,
@@ -35,7 +34,7 @@ pub struct Contact {
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Tsify)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Address {
     pub locality: Option<String>,
     pub country: Option<String>,
@@ -65,7 +64,7 @@ microtype! {
         StanzaId,
 
         #[string]
-        #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Tsify)]
+        #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
         Emoji
     }
 }
@@ -79,14 +78,14 @@ type MessageId = String;
 type Reaction = String;
 
 #[typeshare]
-#[derive(Debug, PartialEq, Serialize, Deserialize, Tsify)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Reaction {
     pub emoji: Emoji,
     pub from: Vec<BareJid>,
 }
 
 #[typeshare]
-#[derive(Debug, PartialEq, Serialize, Deserialize, Tsify)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub id: MessageId,
     pub stanza_id: Option<StanzaId>,
