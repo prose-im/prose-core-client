@@ -21,10 +21,10 @@ export interface ProseConnectionProvider {
 }
 
 export interface ProseConnection {
-    setEventHandler(handler: ProseConnectionEventHandler)
-    async connect(jid: string, password: string)
-    disconnect()
-    sendStanza(stanza: string)
+    setEventHandler(handler: ProseConnectionEventHandler): void
+    async connect(jid: string, password: string): void
+    disconnect(): void
+    sendStanza(stanza: string): void
 }
 "#;
 

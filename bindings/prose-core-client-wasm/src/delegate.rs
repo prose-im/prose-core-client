@@ -22,23 +22,23 @@ export type ConnectionGenericError = {
 export type ConnectionError = ConnectionTimedOutError | ConnectionInvalidCredentialsError | ConnectionGenericError; 
 
 export interface ProseClientDelegate {
-    clientConnected()
-    clientDisconnected(error?: ConnectionError)
+    clientConnected(): void
+    clientDisconnected(error?: ConnectionError): void
 
     /// A user in `conversation` started or stopped typing.
-    composingUsersChanged(conversation: string)
+    composingUsersChanged(conversation: string): void
     
     /// Infos about a contact have changed.
-    contactChanged(jid: string)
+    contactChanged(jid: string): void
     
     /// One or many messages were either received or sent.
-    messagesAppended(conversation: string, messageIDs: string[])
+    messagesAppended(conversation: string, messageIDs: string[]): void
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
-    messagesUpdated(conversation: string, messageIDs: string[])
+    messagesUpdated(conversation: string, messageIDs: string[]): void
     
     /// A message was deleted.
-    messagesDeleted(conversation: string, messageIDs: string[])
+    messagesDeleted(conversation: string, messageIDs: string[]): void
 }
 "#;
 
