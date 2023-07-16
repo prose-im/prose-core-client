@@ -1,9 +1,7 @@
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_derive::TryFromJsValue;
 
 use crate::types::Jid;
 
-#[derive(TryFromJsValue, Clone)]
 #[wasm_bindgen]
 pub struct Message(prose_domain::Message);
 
