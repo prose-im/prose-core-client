@@ -19,7 +19,7 @@ impl Message {
 
     #[wasm_bindgen(getter, js_name = "from")]
     pub fn from_(&self) -> Jid {
-        Jid::Bare(self.0.from.clone().into())
+        jid::Jid::Bare(self.0.from.clone()).into()
     }
 
     #[wasm_bindgen(getter)]

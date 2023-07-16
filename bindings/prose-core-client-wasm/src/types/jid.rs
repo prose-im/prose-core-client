@@ -1,140 +1,221 @@
 use core::str::FromStr;
 
-use jid;
-use serde::{Deserialize, Serialize};
-use tsify::Tsify;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_derive::TryFromJsValue;
 
-#[derive(Tsify, Serialize, Deserialize)]
-#[tsify(namespace, into_wasm_abi, from_wasm_abi)]
-pub enum Jid {
-    Bare(BareJid),
-    Full(FullJid),
-}
-
-#[wasm_bindgen(js_name = "jidToString")]
-pub fn jid_to_string(jid: Jid) -> String {
-    match jid {
-        Jid::Bare(jid) => jid.to_string(),
-        Jid::Full(jid) => jid.to_string(),
-    }
-}
-
-#[wasm_bindgen(js_name = "parseJid")]
-pub fn parse_jid(str: &str) -> Result<Jid, JsError> {
-    match jid::Jid::from_str(str).unwrap() {
-        jid::Jid::Bare(jid) => Ok(Jid::Bare(jid.into())),
-        jid::Jid::Full(jid) => Ok(Jid::Full(jid.into())),
-    }
-}
-
-#[derive(TryFromJsValue, Serialize, Deserialize, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen]
-pub struct BareJid(jid::BareJid);
+pub struct Jid {
+    #[wasm_bindgen(skip)]
+    pub bare: Option<BareJid>,
+    #[wasm_bindgen(skip)]
+    pub full: Option<FullJid>,
+}
 
 #[wasm_bindgen]
-impl BareJid {
+impl Jid {
     #[wasm_bindgen(constructor)]
-    pub fn new(str: &str) -> Result<BareJid, JsError> {
-        Ok(BareJid(jid::BareJid::from_str(str)?))
+    pub fn new(str: &str) -> Result<Jid, JsError> {
+        let jid = jid::Jid::from_str(str)?;
+        Ok(jid.into())
     }
 
-    /// The node part of the Jabber ID, if it exists, else None.
-    #[wasm_bindgen(getter)]
-    pub fn node(&self) -> Option<String> {
-        self.0.node.clone()
+    pub fn bare(&self) -> BareJid {
+        if let Some(bare) = &self.bare {
+            return bare.clone();
+        };
+        if let Some(full) = &self.full {
+            return full.to_bare_jid();
+        };
+        unreachable!()
     }
 
-    /// The domain of the Jabber ID.
-    #[wasm_bindgen(getter)]
-    pub fn domain(&self) -> String {
-        self.0.domain.clone()
+    pub fn full(&self) -> Option<FullJid> {
+        self.full.clone()
     }
 
-    #[wasm_bindgen]
-    pub fn to_string(&self) -> String {
-        self.0.to_string()
+    pub fn withBare(jid: BareJid) -> Self {
+        Jid {
+            bare: Some(jid),
+            full: None,
+        }
     }
 
-    pub fn equals(&self, other: &BareJid) -> bool {
-        self.0 == other.0
-    }
-}
-
-#[derive(TryFromJsValue, Serialize, Deserialize, Clone)]
-#[wasm_bindgen]
-pub struct FullJid(jid::FullJid);
-
-#[wasm_bindgen]
-impl FullJid {
-    #[wasm_bindgen(constructor)]
-    pub fn new(str: &str) -> Result<FullJid, JsError> {
-        Ok(FullJid(jid::FullJid::from_str(str)?))
-    }
-
-    /// The node part of the Jabber ID, if it exists, else None.
-    #[wasm_bindgen(getter)]
-    pub fn node(&self) -> Option<String> {
-        self.0.node.clone()
-    }
-
-    /// The domain of the Jabber ID.
-    #[wasm_bindgen(getter)]
-    pub fn domain(&self) -> String {
-        self.0.domain.clone()
-    }
-
-    /// The resource of the Jabber ID.
-    #[wasm_bindgen(getter)]
-    pub fn resource(&self) -> String {
-        self.0.resource.clone()
+    pub fn withFull(jid: FullJid) -> Self {
+        Jid {
+            bare: None,
+            full: Some(jid),
+        }
     }
 
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
-        self.0.to_string()
+        let jid: jid::Jid = self.clone().into();
+        jid.to_string()
     }
 
-    #[wasm_bindgen(js_name = "bare")]
-    pub fn to_bare_jid(&self) -> BareJid {
-        BareJid(self.0.clone().into())
-    }
-
-    pub fn equals(&self, other: &FullJid) -> bool {
-        self.0 == other.0
+    pub fn equals(&self, other: &Jid) -> bool {
+        self == other
     }
 }
 
 impl From<Jid> for jid::Jid {
     fn from(value: Jid) -> Self {
-        match value {
-            Jid::Bare(jid) => jid::Jid::Bare(jid.0),
-            Jid::Full(jid) => jid::Jid::Full(jid.0),
+        if let Some(jid) = value.bare {
+            return jid::Jid::Bare(jid.into());
+        };
+        if let Some(jid) = value.full {
+            return jid::Jid::Full(jid.into());
         }
+        unreachable!()
+    }
+}
+
+impl From<jid::Jid> for Jid {
+    fn from(value: jid::Jid) -> Self {
+        match value {
+            jid::Jid::Bare(jid) => Jid {
+                bare: Some(jid.into()),
+                full: None,
+            },
+            jid::Jid::Full(jid) => Jid {
+                bare: None,
+                full: Some(jid.into()),
+            },
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+#[wasm_bindgen]
+pub struct BareJid {
+    #[wasm_bindgen(skip)]
+    pub node: Option<String>,
+
+    #[wasm_bindgen(skip)]
+    pub domain: String,
+}
+
+#[wasm_bindgen]
+impl BareJid {
+    #[wasm_bindgen(constructor)]
+    pub fn new(str: &str) -> Result<BareJid, JsError> {
+        let bare_jid = jid::BareJid::from_str(str)?;
+        Ok(bare_jid.into())
+    }
+
+    /// The node part of the Jabber ID, if it exists, else None.
+    #[wasm_bindgen(getter)]
+    pub fn node(&self) -> Option<String> {
+        self.node.clone()
+    }
+
+    /// The domain of the Jabber ID.
+    #[wasm_bindgen(getter)]
+    pub fn domain(&self) -> String {
+        self.domain.clone()
+    }
+
+    #[wasm_bindgen(js_name = "toString")]
+    pub fn to_string(&self) -> String {
+        let jid: jid::BareJid = self.clone().into();
+        jid.to_string()
+    }
+
+    pub fn equals(&self, other: &BareJid) -> bool {
+        self == other
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+#[wasm_bindgen]
+pub struct FullJid {
+    #[wasm_bindgen(skip)]
+    pub node: Option<String>,
+    #[wasm_bindgen(skip)]
+    pub domain: String,
+    #[wasm_bindgen(skip)]
+    pub resource: String,
+}
+
+#[wasm_bindgen]
+impl FullJid {
+    #[wasm_bindgen(constructor)]
+    pub fn new(str: &str) -> Result<FullJid, JsError> {
+        let full_jid = jid::FullJid::from_str(str)?;
+        Ok(full_jid.into())
+    }
+
+    /// The node part of the Jabber ID, if it exists, else None.
+    #[wasm_bindgen(getter)]
+    pub fn node(&self) -> Option<String> {
+        self.node.clone()
+    }
+
+    /// The domain of the Jabber ID.
+    #[wasm_bindgen(getter)]
+    pub fn domain(&self) -> String {
+        self.domain.clone()
+    }
+
+    /// The resource of the Jabber ID.
+    #[wasm_bindgen(getter)]
+    pub fn resource(&self) -> String {
+        self.resource.clone()
+    }
+
+    #[wasm_bindgen(js_name = "toString")]
+    pub fn to_string(&self) -> String {
+        let jid: jid::FullJid = self.clone().into();
+        jid.to_string()
+    }
+
+    #[wasm_bindgen(js_name = "bare")]
+    pub fn to_bare_jid(&self) -> BareJid {
+        BareJid {
+            node: self.node.clone(),
+            domain: self.domain.clone(),
+        }
+    }
+
+    pub fn equals(&self, other: &FullJid) -> bool {
+        self == other
     }
 }
 
 impl From<jid::BareJid> for BareJid {
     fn from(value: jid::BareJid) -> Self {
-        BareJid(value)
+        BareJid {
+            node: value.node,
+            domain: value.domain,
+        }
     }
 }
 
 impl From<BareJid> for jid::BareJid {
     fn from(value: BareJid) -> Self {
-        value.0
+        jid::BareJid {
+            node: value.node,
+            domain: value.domain,
+        }
     }
 }
 
 impl From<jid::FullJid> for FullJid {
     fn from(value: jid::FullJid) -> Self {
-        FullJid(value)
+        FullJid {
+            node: value.node,
+            domain: value.domain,
+            resource: value.resource,
+        }
     }
 }
 
 impl From<FullJid> for jid::FullJid {
     fn from(value: FullJid) -> Self {
-        value.0
+        jid::FullJid {
+            node: value.node,
+            domain: value.domain,
+            resource: value.resource,
+        }
     }
 }
