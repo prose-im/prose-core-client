@@ -33,17 +33,19 @@ impl Jid {
         self.full.clone()
     }
 
-    pub fn withBare(jid: BareJid) -> Self {
+    #[wasm_bindgen(js_name = "withBare")]
+    pub fn with_bare(jid: &BareJid) -> Self {
         Jid {
-            bare: Some(jid),
+            bare: Some(jid.clone()),
             full: None,
         }
     }
 
-    pub fn withFull(jid: FullJid) -> Self {
+    #[wasm_bindgen(js_name = "withFull")]
+    pub fn with_full(jid: &FullJid) -> Self {
         Jid {
             bare: None,
-            full: Some(jid),
+            full: Some(jid.clone()),
         }
     }
 

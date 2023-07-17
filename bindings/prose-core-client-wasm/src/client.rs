@@ -55,8 +55,8 @@ impl Client {
     }
 
     #[wasm_bindgen(js_name = "sendMessage")]
-    pub async fn send_message(&self, to: Jid, body: String) -> Result<()> {
-        let to = jid::Jid::from(to);
+    pub async fn send_message(&self, to: &Jid, body: String) -> Result<()> {
+        let to = jid::Jid::from(to.clone());
 
         info!("Sending message to {}…", to);
 
@@ -68,26 +68,30 @@ impl Client {
     }
 
     #[wasm_bindgen(js_name = "loadContacts")]
-    pub async fn load_contacts(&self) -> Result<JsValue, JsValue> {
-        let contacts = self.client.load_contacts(Default::default()).await.unwrap();
-        Ok(serde_wasm_bindgen::to_value(&contacts).unwrap())
+    pub async fn load_contacts(&self) -> Result<JsValue, JsError> {
+        let contacts = self
+            .client
+            .load_contacts(Default::default())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(serde_wasm_bindgen::to_value(&contacts)?)
     }
 
     #[wasm_bindgen(js_name = "loadLatestMessages")]
     pub async fn load_latest_messages(
         &self,
-        from: BareJid,
+        from: &BareJid,
         since: Option<String>,
         load_from_server: bool,
-    ) -> Result<MessagesArray, JsValue> {
+    ) -> Result<MessagesArray, JsError> {
         let since = since.map(|id| MessageId(id));
-        let from = jid::BareJid::from(from);
+        let from = jid::BareJid::from(from.clone());
 
         let messages = self
             .client
             .load_latest_messages(&from, since.as_ref(), load_from_server)
             .await
-            .unwrap();
+            .map_err(WasmError::from)?;
 
         Ok(messages
             .into_iter()
