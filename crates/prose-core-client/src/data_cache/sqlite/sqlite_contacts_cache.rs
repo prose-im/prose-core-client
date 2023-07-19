@@ -8,12 +8,11 @@ use prose_xmpp::stanza::message::ChatState;
 use rusqlite::{params, OptionalExtension};
 use xmpp_parsers::presence;
 
-use crate::cache::sqlite_data_cache::sqlite_cache::SQLiteCacheError;
-use crate::cache::sqlite_data_cache::FromStrSql;
-use crate::cache::ContactsCache;
+use crate::data_cache::sqlite::sqlite_cache::SQLiteCacheError;
+use crate::data_cache::sqlite::{FromStrSql, SQLiteCache};
+use crate::data_cache::ContactsCache;
 use crate::domain_ext::Availability;
 use crate::types::{roster, Address, AvatarMetadata, UserProfile};
-use crate::SQLiteCache;
 
 type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 

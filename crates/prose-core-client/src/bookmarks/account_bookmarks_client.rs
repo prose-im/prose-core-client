@@ -69,7 +69,7 @@ impl AccountBookmarksClient {
         let mut bookmarks = self.load_bookmarks()?;
         bookmarks.retain(|bookmark| &bookmark.jid != jid);
         if !bookmarks.iter().any(|bookmark| bookmark.is_selected) {
-            if let Some(mut bookmark) = bookmarks.get_mut(0) {
+            if let Some(bookmark) = bookmarks.get_mut(0) {
                 bookmark.is_selected = true;
             }
         }

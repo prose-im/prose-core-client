@@ -2,6 +2,7 @@ use std::env;
 use std::path::Path;
 use std::str::FromStr;
 
+use crate::paths;
 use anyhow::{anyhow, Result};
 use octocrab::Octocrab;
 use url::Url;
@@ -15,13 +16,14 @@ pub struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
-    Dev {},
-    Build {},
+    Build {
+        /// Create a development build. Enable debug info, and disable optimizations
+        #[arg(long)]
+        dev: bool,
+    },
     Publish {},
 }
 
-const BINDINGS_PATH: &str = "bindings";
-const CRATE_NAME: &str = "prose-core-client-wasm";
 const NPM_SCOPE: &str = "prose-im";
 const GH_OWNER: &str = "prose-im";
 const GH_REPO: &str = "prose-core-client";
@@ -29,22 +31,14 @@ const GH_REPO: &str = "prose-core-client";
 impl Args {
     pub async fn run(self) -> Result<()> {
         let sh = Shell::new()?;
-        sh.change_dir(Path::new(BINDINGS_PATH).join(CRATE_NAME));
+        sh.change_dir(Path::new(paths::BINDINGS).join(paths::bindings::WASM));
 
         match self.cmd {
-            Command::Dev {} => run_wasm_pack(
+            Command::Build { dev } => run_wasm_pack(
                 &sh,
                 WasmPackCommand::Build {
-                    release: false,
-                    dev: true,
-                    target: WasmPackTarget::Web,
-                },
-            ),
-            Command::Build {} => run_wasm_pack(
-                &sh,
-                WasmPackCommand::Build {
-                    release: true,
-                    dev: false,
+                    release: !dev,
+                    dev,
                     target: WasmPackTarget::Web,
                 },
             ),
@@ -62,17 +56,12 @@ enum WasmPackCommand {
     Pack,
 }
 
+#[allow(dead_code)]
 enum WasmPackTarget {
     Bundler,
     NodeJS,
     Web,
     NoModules,
-}
-
-struct WasmPackArgs {
-    command: WasmPackCommand,
-    target: Option<WasmPackTarget>,
-    release: bool,
 }
 
 fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
@@ -154,10 +143,10 @@ async fn publish(sh: &Shell) -> Result<()> {
         .send()
         .await?;
 
-    let filename = format!("{}-{}-{}.tgz", NPM_SCOPE, CRATE_NAME, version);
+    let filename = format!("{}-{}-{}.tgz", NPM_SCOPE, paths::bindings::WASM, version);
     let file_path = env::current_dir()?
-        .join(BINDINGS_PATH)
-        .join(CRATE_NAME)
+        .join(paths::BINDINGS)
+        .join(paths::bindings::WASM)
         .join("pkg")
         .join(&filename);
 

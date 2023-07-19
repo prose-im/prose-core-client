@@ -1,20 +1,22 @@
+use anyhow::anyhow;
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::{Client as ProseClient, ClientBuilder, NoopAvatarCache};
+use prose_core_client::avatar_cache::NoopAvatarCache;
+use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
+use prose_core_client::{Client as ProseClient, ClientBuilder};
 use prose_domain::{Availability, MessageId};
 
-use crate::cache::IndexedDBDataCache;
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
-use crate::types::{BareJid, FullJid, Jid, Message, MessagesArray};
+use crate::types::{BareJid, FullJid, Jid, MessagesArray};
 use crate::util::WasmTimeProvider;
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
 
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
-struct WasmError(#[from] anyhow::Error);
+pub struct WasmError(#[from] anyhow::Error);
 
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
@@ -93,11 +95,31 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
 
-        Ok(messages
+        Ok(messages.into())
+    }
+
+    #[wasm_bindgen(js_name = "loadMessagesWithIDs")]
+    pub async fn load_messages_with_ids(
+        &self,
+        conversation: &BareJid,
+        message_ids: &StringArray,
+    ) -> Result<MessagesArray, JsError> {
+        info!("Loading messages in conversation {:?}…", conversation);
+
+        let message_ids: Vec<MessageId> = Vec::<String>::try_from(message_ids)?
             .into_iter()
-            .map(|m| JsValue::from(Message::from(m)))
-            .collect::<js_sys::Array>()
-            .unchecked_into::<MessagesArray>())
+            .map(|id| MessageId(id))
+            .collect();
+
+        let messages = self
+            .client
+            .load_messages_with_ids(&(conversation.clone().into()), message_ids.as_slice())
+            .await
+            .map_err(WasmError::from)?;
+
+        info!("Found {} messages.", messages.len());
+
+        Ok(messages.into())
     }
 
     // #[wasm_bindgen(js_name = "loadMessagesBefore")]
@@ -109,28 +131,37 @@ impl Client {
     //     let page = self.client.load_messages_before(&from, &before).await?;
     //     Ok(page.into())
     // }
+}
 
-    // #[wasm_bindgen(js_name = "loadMessagesWithIDs")]
-    // pub async fn load_messages_with_ids(
-    //     &self,
-    //     conversation: String,
-    //     ids: Vec<JsValue>,
-    // ) -> Result<JsValue, JsValue> {
-    //     info!("Loading messages in conversation {}…", conversation);
-    //
-    //     let message_ids: Vec<MessageId> = ids
-    //         .into_iter()
-    //         .map(|m| JsValue::from(Message::from(m)))
-    //         .collect();
-    //
-    //     let messages = self
-    //         .client
-    //         .load_messages_with_ids(&BareJid::from_str(&conversation).unwrap(), &message_ids)
-    //         .await
-    //         .map_err(|err| JsValue::from(err.to_string()))?;
-    //
-    //     info!("Found {} messages.", messages.len());
-    //
-    //     Ok(serde_wasm_bindgen::to_value(&messages).unwrap())
-    // }
+// To have a correct typing annotation generated for TypeScript, declare a custom type.
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(typescript_type = "string[]")]
+    pub type StringArray;
+}
+
+impl TryFrom<&StringArray> for Vec<String> {
+    type Error = WasmError;
+
+    fn try_from(value: &StringArray) -> std::result::Result<Self, Self::Error> {
+        let js_val: &JsValue = value.as_ref();
+        let array: &js_sys::Array = js_val
+            .dyn_ref()
+            .ok_or_else(|| WasmError(anyhow!("The argument must be an array")))?;
+
+        let length: usize = array
+            .length()
+            .try_into()
+            .map_err(|err| WasmError(anyhow!("Failed to determine array length. {}", err)))?;
+
+        let mut typed_array = Vec::<String>::with_capacity(length);
+        for js in array.iter() {
+            let elem = js
+                .as_string()
+                .ok_or(WasmError(anyhow!("Couldn't unwrap String from Array")))?;
+            typed_array.push(elem);
+        }
+
+        Ok(typed_array)
+    }
 }

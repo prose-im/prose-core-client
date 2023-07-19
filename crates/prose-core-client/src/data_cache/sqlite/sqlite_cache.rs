@@ -7,11 +7,12 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use rusqlite::types::FromSqlError;
-use rusqlite::{params, Connection, OptionalExtension};
+pub use rusqlite::Connection;
+use rusqlite::{params, OptionalExtension};
 use thiserror::Error;
 use tracing::{debug, info};
 
-use crate::cache::data_cache::DataCache;
+use crate::data_cache::DataCache;
 use crate::types::AccountSettings;
 
 #[derive(Error, Debug)]
@@ -197,29 +198,6 @@ impl SQLiteCache {
             params!["version", version],
         )?;
         trx.commit()?;
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use prose_domain::Availability;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn test_save_and_load_account_settings() -> Result<()> {
-        let cache = SQLiteCache::open_with_connection(Connection::open_in_memory()?)?;
-
-        assert_eq!(cache.load_account_settings().await?, None);
-
-        let settings = AccountSettings {
-            availability: Availability::Away,
-        };
-
-        cache.save_account_settings(&settings).await?;
-        assert_eq!(cache.load_account_settings().await?, Some(settings));
-
         Ok(())
     }
 }

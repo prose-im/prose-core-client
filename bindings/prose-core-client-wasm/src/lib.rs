@@ -9,7 +9,6 @@ use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeConsoleWriter};
 use wasm_bindgen::prelude::*;
 
-mod cache;
 mod client;
 mod connector;
 mod delegate;

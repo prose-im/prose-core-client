@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 
-pub use sqlite_cache::SQLiteCache;
+pub use sqlite_cache::{Connection, SQLiteCache};
 
 mod sqlite_cache;
 mod sqlite_contacts_cache;

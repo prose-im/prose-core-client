@@ -1,21 +1,22 @@
+use std::future::IntoFuture;
 use std::str::FromStr;
 
 use async_trait::async_trait;
-use indexed_db_futures::prelude::*;
-use indexed_db_futures::web_sys::DomException;
-use indexed_db_futures::{IdbDatabase, IdbVersionChangeEvent};
 use jid::BareJid;
 use thiserror::Error;
 use tracing::debug;
-use wasm_bindgen::JsValue;
 
-use prose_core_client::types::roster;
-use prose_core_client::types::{AccountSettings, AvatarMetadata, MessageLike, Page};
-use prose_core_client::{ContactsCache, DataCache, MessageCache};
+use indexed_db_futures::prelude::*;
+use indexed_db_futures::web_sys::{DomException, IdbKeyRange};
+use indexed_db_futures::{IdbDatabase, IdbVersionChangeEvent};
 use prose_domain::{Availability, Contact, UserProfile};
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{message, presence};
+use wasm_bindgen::JsValue;
+
+use crate::data_cache::{ContactsCache, DataCache, MessageCache};
+use crate::types::{roster, AccountSettings, AvatarMetadata, MessageLike, Page};
 
 mod keys {
     pub const DB_NAME: &str = "ProseCache";
@@ -24,6 +25,8 @@ mod keys {
     pub const MESSAGES_STORE: &str = "messages";
     pub const ROSTER_ITEMS_STORE: &str = "roster_item";
     pub const USER_PROFILE_STORE: &str = "user_profile";
+
+    pub const TARGET_INDEX: &str = "target_idx";
 }
 
 #[derive(Error, Debug)]
@@ -63,7 +66,7 @@ pub struct IndexedDBDataCache {
 
 impl IndexedDBDataCache {
     pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 1)?;
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 2)?;
 
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             let old_version = evt.old_version() as u32;
@@ -74,6 +77,17 @@ impl IndexedDBDataCache {
                 db.create_object_store(keys::MESSAGES_STORE)?;
                 db.create_object_store(keys::ROSTER_ITEMS_STORE)?;
                 db.create_object_store(keys::USER_PROFILE_STORE)?;
+            }
+
+            if old_version < 2 {
+                db.delete_object_store(keys::MESSAGES_STORE)?;
+
+                let store = db.create_object_store(keys::MESSAGES_STORE)?;
+                store.create_index_with_params(
+                    keys::TARGET_INDEX,
+                    &IdbKeyPath::str("target"),
+                    &IdbIndexParameters::new().unique(false),
+                )?;
             }
 
             Ok(())
@@ -251,6 +265,50 @@ impl MessageCache for IndexedDBDataCache {
         _newer_than: impl Into<Option<&'a message::Id>>,
         _include_targeted_messages: bool,
     ) -> Result<Vec<MessageLike>> {
+        let tx = self
+            .db
+            .transaction_on_one_with_mode(keys::MESSAGES_STORE, IdbTransactionMode::Readonly)?;
+        let store = tx.object_store(keys::MESSAGES_STORE)?;
+        let targetIdx = store.index(keys::TARGET_INDEX)?;
+
+        for target in targets {
+            let range = IdbKeyRange::only(&JsValue::from_str(target.as_ref()))
+                .map_err(|_| IndexedDBDataCacheError::InvalidDBKey)?;
+            let cursor = targetIdx.open_key_cursor_with_range_owned(range)?.await?;
+        }
+
+        // openRequest.onsuccess = (event) => {
+        //     const db = event.target.result;
+        //     const messagesStore = db.transaction('messages', 'readonly').objectStore('messages');
+        //     const targetIndex = messagesStore.index('target');
+        //
+        //     const cursorRequest = targetIndex.openCursor(IDBKeyRange.only(searchValue));
+        //
+        //     cursorRequest.onsuccess = (event) => {
+        //         const cursor = event.target.result;
+        //         if (cursor) {
+        //             // If the "target" key matches the search value, add it to the results array
+        //             if (cursor.value.target === searchValue) {
+        //                 results.push(cursor.value);
+        //             }
+        //
+        //             // Continue searching
+        //             cursor.continue();
+        //         } else {
+        //             // If the cursor is null, we have processed all records
+        //             // Now let's check if the "id" key matches the search value
+        //             messagesStore.get(searchValue).onsuccess = (event) => {
+        //                 if (event.target.result) {
+        //                     // Add the result to the results array if it matches the search value
+        //                     results.push(event.target.result);
+        //                 }
+        //
+        //                 console.log(results); // Do something with the fetched records
+        //             };
+        //         }
+        //     };
+        // };
+
         Ok(vec![])
     }
 

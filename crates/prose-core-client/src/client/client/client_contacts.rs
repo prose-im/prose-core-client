@@ -1,5 +1,4 @@
 use std::fmt::Debug;
-use std::path::PathBuf;
 
 use anyhow::Result;
 use jid::BareJid;
@@ -11,7 +10,8 @@ use prose_xmpp::mods;
 use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::stanza::avatar;
 
-use crate::cache::{AvatarCache, DataCache};
+use crate::avatar_cache::AvatarCache;
+use crate::data_cache::DataCache;
 use crate::types::{roster, AvatarMetadata};
 use crate::{domain_ext, CachePolicy};
 
@@ -61,7 +61,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         &self,
         from: impl Into<BareJid> + Debug,
         cache_policy: CachePolicy,
-    ) -> Result<Option<PathBuf>> {
+    ) -> Result<Option<std::path::PathBuf>> {
         let from = from.into();
 
         let Some(metadata) = self.load_avatar_metadata(&from, cache_policy).await? else {

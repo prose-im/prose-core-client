@@ -5,7 +5,7 @@ use jid::BareJid;
 
 use prose_xmpp::stanza::avatar;
 
-use crate::cache::AvatarCache;
+use crate::avatar_cache::AvatarCache;
 
 pub struct NoopAvatarCache {}
 

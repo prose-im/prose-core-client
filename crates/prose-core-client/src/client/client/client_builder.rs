@@ -6,10 +6,11 @@ use prose_xmpp::{
     ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, TimeProvider,
 };
 
-use crate::cache::AvatarCache;
+use crate::avatar_cache::AvatarCache;
 use crate::client::client::client::ClientInner;
+use crate::data_cache::DataCache;
 use crate::types::{Capabilities, Feature};
-use crate::{Client, ClientDelegate, DataCache};
+use crate::{Client, ClientDelegate};
 
 pub struct UndefinedDataCache {}
 pub struct UndefinedAvatarCache {}

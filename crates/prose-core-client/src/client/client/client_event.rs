@@ -9,11 +9,12 @@ use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, VCard4};
 use prose_xmpp::{mods, Event};
 
-use crate::cache::AvatarCache;
+use crate::avatar_cache::AvatarCache;
+use crate::data_cache::DataCache;
 use crate::domain_ext::UserProfile;
 use crate::types::message_like::{Payload, TimestampedMessage};
 use crate::types::{AvatarMetadata, MessageLike};
-use crate::{Client, ClientEvent, DataCache};
+use crate::{Client, ClientEvent};
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_event(&self, event: Event) {
@@ -37,7 +38,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             Event::AvatarMetadata { from, metadata } => {
                 self.avatar_metadata_did_change(from, metadata).await
             }
-            Event::Presence(_) => Ok(()),
+            Event::Presence(presence) => self.presence_did_change(presence).await,
         };
 
         if let Err(err) = result {
@@ -149,8 +150,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         // }
     }
 
-    async fn presence_did_change(&self, from: &Jid, presence: &Presence) -> Result<()> {
-        let jid = BareJid::from(from.clone());
+    async fn presence_did_change(&self, presence: Presence) -> Result<()> {
+        let Some(from) = presence.from else {
+            return Ok(());
+        };
+
+        let jid = BareJid::from(from);
 
         self.inner
             .data_cache
@@ -170,7 +175,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         &self,
         from: Jid,
         id: String,
-        node: String,
+        _node: String,
     ) -> Result<()> {
         let caps = self.client.get_mod::<mods::Caps>();
         caps.send_disco_info_query_response(from, id, (&self.inner.caps).into())

@@ -7,7 +7,7 @@ use jid::BareJid;
 
 use prose_xmpp::stanza::avatar;
 
-use crate::cache::avatar_cache::AvatarCache;
+use crate::avatar_cache::AvatarCache;
 use crate::types::AvatarMetadata;
 
 pub const IMAGE_OUTPUT_FORMAT: ImageOutputFormat = ImageOutputFormat::Jpeg(80);

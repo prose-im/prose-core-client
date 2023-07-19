@@ -1,16 +1,14 @@
 #[cfg(feature = "native-app")]
-pub use bookmarks::{AccountBookmark, AccountBookmarksClient};
+pub use avatar_cache::fs_avatar_cache::FsAvatarCache;
 #[cfg(feature = "native-app")]
-pub use cache::fs_avatar_cache::FsAvatarCache;
-#[cfg(any(feature = "native-app", feature = "test-helpers"))]
-pub use cache::sqlite_data_cache::SQLiteCache;
-pub use cache::{ContactsCache, DataCache, MessageCache, NoopAvatarCache, NoopDataCache};
+pub use bookmarks::{AccountBookmark, AccountBookmarksClient};
 pub use client::{
     CachePolicy, Client, ClientBuilder, ClientDelegate, ClientEvent, ConnectionEvent,
 };
 
-mod cache;
+pub mod avatar_cache;
 mod client;
+pub mod data_cache;
 mod domain_ext;
 pub mod types;
 

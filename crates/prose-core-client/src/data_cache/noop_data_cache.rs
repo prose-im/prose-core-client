@@ -8,10 +8,9 @@ use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::{ChatState, Id};
 use prose_xmpp::SendUnlessWasm;
 
-use crate::cache::ContactsCache;
+use crate::data_cache::{ContactsCache, DataCache, MessageCache};
 use crate::types::roster::Item;
 use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page};
-use crate::{DataCache, MessageCache};
 
 #[derive(Error, Debug)]
 #[error(transparent)]

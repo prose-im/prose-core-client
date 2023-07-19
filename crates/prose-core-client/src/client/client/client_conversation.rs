@@ -11,7 +11,8 @@ use prose_xmpp::mods::{Chat, MAM};
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::ChatState;
 
-use crate::cache::{AvatarCache, DataCache};
+use crate::avatar_cache::AvatarCache;
+use crate::data_cache::DataCache;
 use crate::domain_ext::MessageExt;
 use crate::types::{MessageLike, Page};
 

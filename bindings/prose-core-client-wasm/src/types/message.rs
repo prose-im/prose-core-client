@@ -126,3 +126,13 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "BareJid[]")]
     pub type BareJidArray;
 }
+
+impl From<Vec<prose_domain::Message>> for MessagesArray {
+    fn from(value: Vec<prose_domain::Message>) -> Self {
+        value
+            .into_iter()
+            .map(|message| JsValue::from(Message::from(message)))
+            .collect::<js_sys::Array>()
+            .unchecked_into::<MessagesArray>()
+    }
+}

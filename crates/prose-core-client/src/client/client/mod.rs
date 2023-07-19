@@ -1,5 +1,4 @@
 pub use client::Client;
-pub(crate) use client::ClientError;
 pub use client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDataCache};
 
 mod client;

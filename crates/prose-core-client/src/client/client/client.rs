@@ -11,7 +11,8 @@ use prose_xmpp::mods::{Caps, Chat, Profile};
 use prose_xmpp::Client as XMPPClient;
 use prose_xmpp::ConnectionError;
 
-use crate::cache::{AvatarCache, DataCache};
+use crate::avatar_cache::AvatarCache;
+use crate::data_cache::DataCache;
 use crate::types::{AccountSettings, Capabilities};
 use crate::ClientDelegate;
 

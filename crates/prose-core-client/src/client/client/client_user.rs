@@ -1,9 +1,11 @@
 use anyhow::Result;
-use prose_domain::{Availability, UserProfile};
-use prose_xmpp::mods::Profile;
 use tracing::instrument;
 
-use crate::cache::{AvatarCache, DataCache};
+use prose_domain::{Availability, UserProfile};
+use prose_xmpp::mods::Profile;
+
+use crate::avatar_cache::AvatarCache;
+use crate::data_cache::DataCache;
 use crate::domain_ext;
 
 use super::Client;
@@ -38,12 +40,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     #[cfg(feature = "native-app")]
     #[instrument]
     pub async fn save_avatar(&self, image_path: &std::path::Path) -> Result<std::path::PathBuf> {
-        use crate::cache::fs_avatar_cache::IMAGE_OUTPUT_FORMAT;
-        use crate::cache::{IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS};
+        use crate::avatar_cache::fs_avatar_cache::IMAGE_OUTPUT_FORMAT;
+        use crate::avatar_cache::{IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS};
         use crate::types::AvatarMetadata;
         use image::GenericImageView;
         use std::io::Cursor;
-        use std::path::{Path, PathBuf};
         use std::time::Instant;
 
         let now = Instant::now();

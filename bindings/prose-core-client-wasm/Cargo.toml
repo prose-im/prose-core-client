@@ -11,9 +11,8 @@ crate-type = ["cdylib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 console_error_panic_hook = "0.1"
-indexed_db_futures = "0.3"
 jid = { workspace = true }
-js-sys = "0.3"
+js-sys = { workspace = true }
 minidom = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client", features = ["js"] }
 prose-domain = { path = "../../crates/prose-domain" }
@@ -25,7 +24,6 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-web = "0.1"
-tsify = { version = "0.4", features = ["js", "wasm-bindgen"] }
 wasm-bindgen = { workspace = true, features = ["serde-serialize"] }
 wasm-bindgen-futures = { workspace = true }
 wasm-bindgen-derive = "0.2.0"
