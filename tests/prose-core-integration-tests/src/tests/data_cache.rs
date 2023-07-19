@@ -1,20 +1,23 @@
-use anyhow::Result;
-use jid::BareJid;
 use std::str::FromStr;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen_test::wasm_bindgen_test as async_test;
+use anyhow::Result;
+use chrono::{TimeZone, Utc};
+use jid::BareJid;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::test as async_test;
+use xmpp_parsers::presence::Show;
 
 #[cfg(target_arch = "wasm32")]
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 #[cfg(not(target_arch = "wasm32"))]
 use prose_core_client::data_cache::sqlite::{Connection, SQLiteCache};
-use prose_core_client::data_cache::{ContactsCache, DataCache};
+use prose_core_client::data_cache::{ContactsCache, DataCache, MessageCache};
+use prose_core_client::types::message_like::Payload;
 use prose_core_client::types::roster::Subscription;
-use prose_core_client::types::{roster, AccountSettings, Availability, Contact};
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::test as async_test;
-use xmpp_parsers::presence::Show;
+use prose_core_client::types::{roster, AccountSettings, Availability, Contact, MessageLike, Page};
+use prose_xmpp::stanza::message;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as async_test;
 
 #[cfg(not(target_arch = "wasm32"))]
 async fn cache() -> Result<SQLiteCache> {
@@ -126,6 +129,423 @@ async fn test_presence() -> Result<()> {
                 groups: vec![String::from("")],
             }
         ]
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_load_messages_targeting() -> Result<()> {
+    let cache = cache().await?;
+
+    let messages = [
+        MessageLike {
+            id: "1000".into(),
+            stanza_id: None,
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from(""),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "1001".into(),
+            stanza_id: None,
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 07, 17, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from(""),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "1".into(),
+            stanza_id: None,
+            target: Some("1000".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Retraction,
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "2".into(),
+            stanza_id: None,
+            target: Some("1001".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Retraction,
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "3".into(),
+            stanza_id: None,
+            target: Some("2000".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Retraction,
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "4".into(),
+            stanza_id: None,
+            target: Some("1000".into()),
+            to: BareJid::from_str("b@prose.org").unwrap(),
+            from: BareJid::from_str("a@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 19, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Retraction,
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "5".into(),
+            stanza_id: None,
+            target: Some("1000".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("c@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 20, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Retraction,
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "6".into(),
+            stanza_id: None,
+            target: Some("1000".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 21, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Retraction,
+            is_first_message: false,
+        },
+    ];
+
+    cache.insert_messages(&messages).await?;
+
+    assert_eq!(
+        cache
+            .load_messages_targeting(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                &[message::Id::from("1000"), message::Id::from("1001")],
+                &message::Id::from("1"),
+                false
+            )
+            .await?,
+        vec![
+            messages[3].clone(),
+            messages[5].clone(),
+            messages[7].clone(),
+        ]
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_targeting(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                &[message::Id::from("1000"), message::Id::from("1001")],
+                None,
+                true
+            )
+            .await?,
+        vec![
+            messages[0].clone(),
+            messages[1].clone(),
+            messages[2].clone(),
+            messages[3].clone(),
+            messages[5].clone(),
+            messages[7].clone(),
+        ]
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_load_messages_before() -> Result<()> {
+    let cache = cache().await?;
+
+    let messages = [
+        MessageLike {
+            id: "1000".into(),
+            stanza_id: Some("1".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg1"),
+            },
+            is_first_message: true,
+        },
+        MessageLike {
+            id: "2000".into(),
+            stanza_id: Some("2".into()),
+            target: None,
+            to: BareJid::from_str("b@prose.org").unwrap(),
+            from: BareJid::from_str("a@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg2"),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "3000".into(),
+            stanza_id: Some("3".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg3"),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "4000".into(),
+            stanza_id: Some("4".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 19, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg4"),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "5000".into(),
+            stanza_id: Some("5".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("c@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg5"),
+            },
+            is_first_message: false,
+        },
+    ];
+
+    cache.insert_messages(&messages).await?;
+
+    assert_eq!(
+        cache
+            .load_messages_before(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                Some(&message::Id::from("3000")),
+                100,
+            )
+            .await?,
+        Some(Page {
+            is_complete: true,
+            items: vec![messages[0].clone(), messages[1].clone()]
+        })
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_before(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                Some(&message::Id::from("4000")),
+                2,
+            )
+            .await?,
+        Some(Page {
+            is_complete: false,
+            items: vec![messages[1].clone(), messages[2].clone()]
+        })
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_before(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                Some(&message::Id::from("1000")),
+                100,
+            )
+            .await?,
+        Some(Page {
+            is_complete: true,
+            items: vec![]
+        })
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_before(
+                &BareJid::from_str("c@prose.org").unwrap(),
+                Some(&message::Id::from("5000")),
+                100,
+            )
+            .await?,
+        None
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_before(&BareJid::from_str("b@prose.org").unwrap(), None, 2,)
+            .await?,
+        Some(Page {
+            is_complete: false,
+            items: vec![messages[2].clone(), messages[3].clone()]
+        })
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_before(&BareJid::from_str("d@prose.org").unwrap(), None, 100,)
+            .await?,
+        None
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_load_messages_after() -> Result<()> {
+    let cache = cache().await?;
+
+    let messages = [
+        MessageLike {
+            id: "1000".into(),
+            stanza_id: Some("1".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg1"),
+            },
+            is_first_message: true,
+        },
+        MessageLike {
+            id: "2000".into(),
+            stanza_id: Some("2".into()),
+            target: None,
+            to: BareJid::from_str("b@prose.org").unwrap(),
+            from: BareJid::from_str("a@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg2"),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "3000".into(),
+            stanza_id: Some("3".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("c@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg3"),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "4000".into(),
+            stanza_id: Some("4".into()),
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("msg4"),
+            },
+            is_first_message: false,
+        },
+    ];
+
+    cache.insert_messages(&messages).await?;
+
+    assert_eq!(
+        cache
+            .load_messages_after(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                &"4000".into(),
+                None,
+            )
+            .await?,
+        vec![messages[1].clone()]
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_after(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                &"1000".into(),
+                None,
+            )
+            .await?,
+        vec![messages[1].clone(), messages[3].clone()]
+    );
+
+    assert_eq!(
+        cache
+            .load_messages_after(
+                &BareJid::from_str("b@prose.org").unwrap(),
+                &"1000".into(),
+                Some(1),
+            )
+            .await?,
+        vec![messages[3].clone()]
     );
 
     Ok(())
