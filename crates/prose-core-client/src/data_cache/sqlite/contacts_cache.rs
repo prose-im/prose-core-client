@@ -8,7 +8,7 @@ use prose_xmpp::stanza::message::ChatState;
 use rusqlite::{params, OptionalExtension};
 use xmpp_parsers::presence;
 
-use crate::data_cache::sqlite::sqlite_cache::SQLiteCacheError;
+use crate::data_cache::sqlite::cache::SQLiteCacheError;
 use crate::data_cache::sqlite::{FromStrSql, SQLiteCache};
 use crate::data_cache::ContactsCache;
 use crate::domain_ext::Availability;

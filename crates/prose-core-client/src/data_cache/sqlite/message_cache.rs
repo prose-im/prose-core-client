@@ -7,7 +7,7 @@ use rusqlite::{params, params_from_iter};
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::stanza_id;
 
-use crate::data_cache::sqlite::sqlite_cache::SQLiteCacheError;
+use crate::data_cache::sqlite::cache::SQLiteCacheError;
 use crate::data_cache::sqlite::{repeat_vars, FromStrSql, SQLiteCache};
 use crate::data_cache::MessageCache;
 use crate::types::{MessageLike, Page};

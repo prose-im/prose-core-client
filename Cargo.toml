@@ -38,7 +38,7 @@ tracing-subscriber = "0.3"
 uniffi = { git = "https://github.com/mozilla/uniffi-rs", rev = "41e94c0a4834137d8d359b829e2d4b334f5ab5b5" }
 url = "2.3"
 uuid = {version = "1.1", features=["v4", "fast-rng", "macro-diagnostics"]}
-wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+wasm-bindgen = { version = "0.2" }
 wasm-bindgen-futures = "0.4"
 
 tokio-xmpp = { git = "https://gitlab.com/xmpp-rs/xmpp-rs.git", rev = "f9d44195133fa6b9bfd006ae3e2cd3d13210679a" }

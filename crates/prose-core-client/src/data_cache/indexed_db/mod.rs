@@ -1,3 +1,5 @@
-mod data_cache;
+mod cache;
+mod contacts_cache;
+mod message_cache;
 
-pub use data_cache::IndexedDBDataCache;
+pub use cache::IndexedDBDataCache;

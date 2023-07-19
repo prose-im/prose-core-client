@@ -2,11 +2,11 @@ use std::str::FromStr;
 
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ValueRef};
 
-pub use sqlite_cache::{Connection, SQLiteCache};
+pub use cache::{Connection, SQLiteCache};
 
-mod sqlite_cache;
-mod sqlite_contacts_cache;
-mod sqlite_message_cache;
+mod cache;
+mod contacts_cache;
+mod message_cache;
 
 pub(self) fn repeat_vars(count: usize) -> String {
     let mut s = "?,".repeat(count);
