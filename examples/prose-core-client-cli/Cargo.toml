@@ -3,6 +3,7 @@ name = "prose-core-client-cli"
 version = "0.1.0"
 edition = "2021"
 rust-version.workspace = true
+publish = false
 
 [dependencies]
 anyhow = { workspace = true }
