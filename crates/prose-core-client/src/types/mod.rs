@@ -4,6 +4,7 @@ pub use avatar_metadata::AvatarMetadata;
 pub use capabilities::{Capabilities, Feature};
 pub use message_like::MessageLike;
 pub use page::Page;
+pub use presence::Presence;
 pub use prose_domain::*;
 
 mod account_settings;
@@ -12,4 +13,5 @@ mod capabilities;
 mod error;
 pub mod message_like;
 mod page;
+pub mod presence;
 pub mod roster;

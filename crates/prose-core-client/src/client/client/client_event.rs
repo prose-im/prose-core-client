@@ -14,7 +14,7 @@ use crate::data_cache::DataCache;
 use crate::domain_ext::UserProfile;
 use crate::types::message_like::{Payload, TimestampedMessage};
 use crate::types::{AvatarMetadata, MessageLike};
-use crate::{Client, ClientEvent};
+use crate::{types, Client, ClientEvent};
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_event(&self, event: Event) {
@@ -161,9 +161,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .data_cache
             .insert_presence(
                 &jid,
-                Some(presence.type_.clone()),
-                presence.show.as_ref().map(|s| s.clone()),
-                presence.statuses.first_key_value().map(|kv| kv.1.clone()),
+                &types::Presence {
+                    kind: Some(presence.type_.clone().into()),
+                    show: presence.show.as_ref().map(|s| s.clone().into()),
+                    status: presence.statuses.first_key_value().map(|kv| kv.1.clone()),
+                },
             )
             .await?;
 

@@ -49,7 +49,7 @@ impl MessageCache for IndexedDBDataCache {
             .db
             .transaction_on_one_with_mode(keys::MESSAGES_STORE, IdbTransactionMode::Readonly)?;
         let store = tx.object_store(keys::MESSAGES_STORE)?;
-        let target_idx = store.index(keys::TARGET_INDEX)?;
+        let target_idx = store.index(keys::messages::TARGET_INDEX)?;
 
         for target in targets {
             let range = IdbKeyRange::only(&JsValue::from_str(target.as_ref()))

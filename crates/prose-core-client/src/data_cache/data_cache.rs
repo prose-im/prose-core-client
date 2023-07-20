@@ -1,14 +1,17 @@
 use async_trait::async_trait;
 #[cfg(feature = "test-helpers")]
 use auto_impl::auto_impl;
+use chrono::{DateTime, Utc};
 use jid::BareJid;
+
 use prose_domain::Contact;
 use prose_xmpp::stanza::message::{stanza_id, ChatState};
 use prose_xmpp::stanza::{avatar, message};
 use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
-use xmpp_parsers::presence;
 
-use crate::types::{roster, AccountSettings, AvatarMetadata, MessageLike, Page, UserProfile};
+use crate::types::{
+    roster, AccountSettings, AvatarMetadata, MessageLike, Page, Presence, UserProfile,
+};
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -33,7 +36,9 @@ pub trait DataCache: ContactsCache + MessageCache + SendUnlessWasm + SyncUnlessW
 pub trait ContactsCache {
     type Error: std::error::Error + Send + Sync;
 
-    async fn has_valid_roster_items(&self) -> Result<bool, Self::Error>;
+    async fn set_roster_update_time(&self, timestamp: &DateTime<Utc>) -> Result<(), Self::Error>;
+    async fn roster_update_time(&self) -> Result<Option<DateTime<Utc>>, Self::Error>;
+
     async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<(), Self::Error>;
 
     async fn insert_user_profile(
@@ -54,13 +59,7 @@ pub trait ContactsCache {
         jid: &BareJid,
     ) -> Result<Option<AvatarMetadata>, Self::Error>;
 
-    async fn insert_presence(
-        &self,
-        jid: &BareJid,
-        kind: Option<presence::Type>,
-        show: Option<presence::Show>,
-        status: Option<String>,
-    ) -> Result<(), Self::Error>;
+    async fn insert_presence(&self, jid: &BareJid, presence: &Presence) -> Result<(), Self::Error>;
 
     async fn insert_chat_state(
         &self,

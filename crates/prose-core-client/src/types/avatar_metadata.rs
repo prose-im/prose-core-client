@@ -1,9 +1,11 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, Engine as _};
+use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 
 use prose_xmpp::stanza::avatar;
 
+#[derive(Serialize, Deserialize)]
 pub struct AvatarMetadata {
     pub mime_type: String,
     pub checksum: avatar::ImageId,

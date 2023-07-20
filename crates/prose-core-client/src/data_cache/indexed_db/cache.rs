@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use gloo_utils::format::JsValueSerdeExt;
 use indexed_db_futures::prelude::*;
 use indexed_db_futures::web_sys::DomException;
 use indexed_db_futures::{IdbDatabase, IdbVersionChangeEvent};
 use thiserror::Error;
 use wasm_bindgen::JsValue;
 
+use crate::data_cache::indexed_db::idb_database_ext::IdbDatabaseExt;
 use crate::data_cache::DataCache;
 use crate::types::AccountSettings;
 
@@ -16,8 +16,18 @@ pub(super) mod keys {
     pub const MESSAGES_STORE: &str = "messages";
     pub const ROSTER_ITEMS_STORE: &str = "roster_item";
     pub const USER_PROFILE_STORE: &str = "user_profile";
+    pub const PRESENCE_STORE: &str = "presence";
+    pub const AVATAR_METADATA_STORE: &str = "avatar_metadata";
+    pub const CHAT_STATE_STORE: &str = "chat_state";
 
-    pub const TARGET_INDEX: &str = "target_idx";
+    pub mod settings {
+        pub const ACCOUNT: &str = "account";
+        pub const ROSTER_UPDATE: &str = "roster_updated";
+    }
+
+    pub mod messages {
+        pub const TARGET_INDEX: &str = "target_idx";
+    }
 }
 
 #[derive(Error, Debug)]
@@ -57,7 +67,7 @@ pub struct IndexedDBDataCache {
 
 impl IndexedDBDataCache {
     pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 2)?;
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 3)?;
 
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             let old_version = evt.old_version() as u32;
@@ -75,16 +85,26 @@ impl IndexedDBDataCache {
 
                 let store = db.create_object_store(keys::MESSAGES_STORE)?;
                 store.create_index_with_params(
-                    keys::TARGET_INDEX,
+                    keys::messages::TARGET_INDEX,
                     &IdbKeyPath::str("target"),
                     &IdbIndexParameters::new().unique(false),
                 )?;
+            }
+
+            if old_version < 3 {
+                db.create_object_store(keys::PRESENCE_STORE)?;
+                db.create_object_store(keys::AVATAR_METADATA_STORE)?;
+                db.create_object_store(keys::CHAT_STATE_STORE)?;
             }
 
             Ok(())
         }));
 
         let db = db_req.into_future().await?;
+
+        // Clear (outdated) presence entries from our last session.
+        db.clear_stores(&[keys::PRESENCE_STORE, keys::CHAT_STATE_STORE])
+            .await?;
 
         Ok(IndexedDBDataCache { db })
     }
@@ -95,37 +115,28 @@ impl DataCache for IndexedDBDataCache {
     type Error = IndexedDBDataCacheError;
 
     async fn delete_all(&self) -> Result<()> {
-        Ok(())
+        self.db
+            .clear_stores(&[
+                keys::SETTINGS_STORE,
+                keys::PRESENCE_STORE,
+                keys::MESSAGES_STORE,
+                keys::USER_PROFILE_STORE,
+                keys::ROSTER_ITEMS_STORE,
+                keys::AVATAR_METADATA_STORE,
+                keys::CHAT_STATE_STORE,
+            ])
+            .await
     }
 
     async fn save_account_settings(&self, settings: &AccountSettings) -> Result<()> {
-        let tx = self
-            .db
-            .transaction_on_one_with_mode(keys::SETTINGS_STORE, IdbTransactionMode::Readwrite)?;
-        let store = tx.object_store(keys::SETTINGS_STORE)?;
-
-        store.put_key_val(
-            &JsValue::from_str("settings"),
-            &JsValue::from_serde(settings)?,
-        )?;
-
-        tx.await.into_result()?;
-
-        Ok(())
+        self.db
+            .set_value(keys::SETTINGS_STORE, keys::settings::ACCOUNT, settings)
+            .await
     }
 
     async fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
-        let tx = self
-            .db
-            .transaction_on_one_with_mode(keys::SETTINGS_STORE, IdbTransactionMode::Readonly)?;
-        let store = tx.object_store(keys::SETTINGS_STORE)?;
-
-        let settings: Option<AccountSettings> = store
-            .get(&JsValue::from_str("settings"))?
-            .await?
-            .map(|s| s.into_serde())
-            .transpose()?;
-
-        Ok(settings)
+        self.db
+            .get_value(keys::SETTINGS_STORE, keys::settings::ACCOUNT)
+            .await
     }
 }

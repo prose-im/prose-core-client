@@ -11,8 +11,9 @@ use strum_macros::{Display, EnumIter};
 use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
+use prose_core_client::data_cache::sqlite::SQLiteCache;
 use prose_core_client::types::{Address, Availability, Contact, Message, MessageId};
-use prose_core_client::{CachePolicy, ClientBuilder, FsAvatarCache, SQLiteCache};
+use prose_core_client::{CachePolicy, ClientBuilder, FsAvatarCache};
 use prose_xmpp::connector;
 
 type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
@@ -302,10 +303,7 @@ async fn load_contacts(client: &Client) -> Result<()> {
     "#,
             contact.jid,
             contact.name,
-            contact
-                .avatar
-                .and_then(|path| path.into_os_string().into_string().ok())
-                .unwrap_or("<not set>".to_string()),
+            contact.avatar.unwrap_or("<not set>".to_string()),
             contact.availability,
             format_opt(contact.status),
             contact.groups.join(", "),

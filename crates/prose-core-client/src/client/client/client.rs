@@ -8,8 +8,8 @@ use tracing::instrument;
 
 use prose_domain::Availability;
 use prose_xmpp::mods::{Caps, Chat, Profile};
-use prose_xmpp::Client as XMPPClient;
 use prose_xmpp::ConnectionError;
+use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
@@ -30,6 +30,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub caps: Capabilities,
     pub data_cache: D,
     pub avatar_cache: A,
+    pub time_provider: Arc<dyn TimeProvider>,
     pub delegate: Option<Box<dyn ClientDelegate>>,
 }
 

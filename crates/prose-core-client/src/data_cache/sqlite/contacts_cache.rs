@@ -2,17 +2,18 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use microtype::Microtype;
+use rusqlite::{params, OptionalExtension};
+use xmpp_parsers::presence;
+
 use prose_domain::Contact;
 use prose_xmpp::stanza::avatar;
 use prose_xmpp::stanza::message::ChatState;
-use rusqlite::{params, OptionalExtension};
-use xmpp_parsers::presence;
 
 use crate::data_cache::sqlite::cache::SQLiteCacheError;
 use crate::data_cache::sqlite::{FromStrSql, SQLiteCache};
 use crate::data_cache::ContactsCache;
 use crate::domain_ext::Availability;
-use crate::types::{roster, Address, AvatarMetadata, UserProfile};
+use crate::types::{roster, Address, AvatarMetadata, Presence, UserProfile};
 
 type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 
@@ -20,9 +21,18 @@ type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 impl ContactsCache for SQLiteCache {
     type Error = SQLiteCacheError;
 
-    async fn has_valid_roster_items(&self) -> Result<bool> {
-        let conn = self.conn.lock().unwrap();
+    async fn set_roster_update_time(
+        &self,
+        timestamp: &DateTime<Utc>,
+    ) -> std::result::Result<(), Self::Error> {
+        let conn = &*self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("INSERT OR REPLACE INTO kv VALUES (?1, ?2)")?;
+        stmt.execute(params!["roster_updated_at", timestamp])?;
+        Ok(())
+    }
 
+    async fn roster_update_time(&self) -> std::result::Result<Option<DateTime<Utc>>, Self::Error> {
+        let conn = &*self.conn.lock().unwrap();
         let last_update = conn
             .query_row(
                 "SELECT `value` FROM 'kv' WHERE `key` = 'roster_updated_at'",
@@ -30,12 +40,7 @@ impl ContactsCache for SQLiteCache {
                 |row| row.get::<_, DateTime<Utc>>(0),
             )
             .optional()?;
-
-        let Some(last_update) = last_update else {
-            return Ok(false);
-        };
-
-        Ok(Utc::now() - last_update <= Duration::days(10))
+        Ok(last_update)
     }
 
     async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<()> {
@@ -56,11 +61,6 @@ impl ContactsCache for SQLiteCache {
                     &item.groups.join(","),
                 ))?;
             }
-
-            trx.execute(
-                "INSERT OR REPLACE INTO kv VALUES (?1, ?2)",
-                params!["roster_updated_at", Utc::now()],
-            )?;
         }
         trx.commit()?;
         Ok(())
@@ -184,13 +184,7 @@ impl ContactsCache for SQLiteCache {
         Ok(metadata)
     }
 
-    async fn insert_presence(
-        &self,
-        jid: &BareJid,
-        kind: Option<presence::Type>,
-        show: Option<presence::Show>,
-        status: Option<String>,
-    ) -> Result<()> {
+    async fn insert_presence(&self, jid: &BareJid, presence: &Presence) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             "INSERT OR REPLACE INTO presence \
@@ -199,9 +193,9 @@ impl ContactsCache for SQLiteCache {
         )?;
         stmt.execute(params![
             &jid.to_string(),
-            kind.as_ref().map(|kind| kind.to_string()),
-            show.as_ref().map(|show| show.to_string()),
-            status
+            presence.kind.as_ref().map(|kind| kind.to_string()),
+            presence.show.as_ref().map(|show| show.to_string()),
+            presence.status
         ])?;
         Ok(())
     }
@@ -218,6 +212,7 @@ impl ContactsCache for SQLiteCache {
         ])?;
         Ok(())
     }
+
     async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT state, updated_at FROM chat_states WHERE jid = ?")?;
@@ -303,41 +298,5 @@ impl ContactsCache for SQLiteCache {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(contacts)
-    }
-}
-
-trait Stringify {
-    fn to_string(&self) -> String;
-}
-
-impl Stringify for presence::Type {
-    fn to_string(&self) -> String {
-        use presence::Type;
-
-        match self {
-            Type::None => "",
-            Type::Error => "error",
-            Type::Probe => "probe",
-            Type::Subscribe => "subscribe",
-            Type::Subscribed => "subscribed",
-            Type::Unavailable => "unavailable",
-            Type::Unsubscribe => "unsubscribe",
-            Type::Unsubscribed => "unsubscribed",
-        }
-        .to_string()
-    }
-}
-
-impl Stringify for presence::Show {
-    fn to_string(&self) -> String {
-        use presence::Show;
-
-        match self {
-            Show::Away => "away",
-            Show::Chat => "chat",
-            Show::Dnd => "dnd",
-            Show::Xa => "xa",
-        }
-        .to_string()
     }
 }

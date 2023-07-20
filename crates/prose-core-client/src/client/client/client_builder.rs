@@ -3,7 +3,8 @@ use std::sync::Arc;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::mods::{Caps, Chat, Profile, Roster, MAM};
 use prose_xmpp::{
-    ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, TimeProvider,
+    ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, SystemTimeProvider,
+    TimeProvider,
 };
 
 use crate::avatar_cache::AvatarCache;
@@ -19,6 +20,7 @@ pub struct ClientBuilder<D, A> {
     builder: XMPPClientBuilder,
     data_cache: D,
     avatar_cache: A,
+    time_provider: Arc<dyn TimeProvider>,
     delegate: Option<Box<dyn ClientDelegate>>,
 }
 
@@ -28,6 +30,7 @@ impl ClientBuilder<UndefinedDataCache, UndefinedAvatarCache> {
             builder: XMPPClient::builder(),
             data_cache: UndefinedDataCache {},
             avatar_cache: UndefinedAvatarCache {},
+            time_provider: Arc::new(SystemTimeProvider::new()),
             delegate: None,
         }
     }
@@ -39,6 +42,7 @@ impl<A> ClientBuilder<UndefinedDataCache, A> {
             builder: self.builder,
             data_cache,
             avatar_cache: self.avatar_cache,
+            time_provider: self.time_provider,
             delegate: self.delegate,
         }
     }
@@ -50,6 +54,7 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
             builder: self.builder,
             data_cache: self.data_cache,
             avatar_cache,
+            time_provider: self.time_provider,
             delegate: self.delegate,
         }
     }
@@ -72,7 +77,7 @@ impl<D, A> ClientBuilder<D, A> {
     }
 
     pub fn set_time_provider<T: TimeProvider + 'static>(mut self, time_provider: T) -> Self {
-        self.builder = self.builder.set_time_provider(time_provider);
+        self.time_provider = Arc::new(time_provider);
         self
     }
 }
@@ -100,6 +105,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             caps,
             data_cache: self.data_cache,
             avatar_cache: self.avatar_cache,
+            time_provider: self.time_provider.clone(),
             delegate: self.delegate,
         });
 
@@ -112,6 +118,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             .add_mod(Chat::default())
             .add_mod(Profile::default())
             .add_mod(Roster::default())
+            .set_time_provider(self.time_provider)
             .set_event_handler(Box::new(move |xmpp_client, event| {
                 let client = Client {
                     client: xmpp_client,

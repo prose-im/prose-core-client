@@ -1,7 +1,7 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use jid::BareJid;
 use thiserror::Error;
-use xmpp_parsers::presence::{Show, Type};
 
 use prose_domain::{Contact, UserProfile};
 use prose_xmpp::stanza::avatar::ImageId;
@@ -10,7 +10,7 @@ use prose_xmpp::SendUnlessWasm;
 
 use crate::data_cache::{ContactsCache, DataCache, MessageCache};
 use crate::types::roster::Item;
-use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page};
+use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page, Presence};
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -31,8 +31,15 @@ impl Default for NoopDataCache {
 impl ContactsCache for NoopDataCache {
     type Error = NoopDataCacheError;
 
-    async fn has_valid_roster_items(&self) -> Result<bool> {
-        Ok(false)
+    async fn set_roster_update_time(
+        &self,
+        _timestamp: &DateTime<Utc>,
+    ) -> std::result::Result<(), Self::Error> {
+        Ok(())
+    }
+
+    async fn roster_update_time(&self) -> std::result::Result<Option<DateTime<Utc>>, Self::Error> {
+        Ok(None)
     }
 
     async fn insert_roster_items(&self, _items: &[Item]) -> Result<()> {
@@ -63,13 +70,7 @@ impl ContactsCache for NoopDataCache {
         Ok(None)
     }
 
-    async fn insert_presence(
-        &self,
-        _jid: &BareJid,
-        _kind: Option<Type>,
-        _show: Option<Show>,
-        _status: Option<String>,
-    ) -> Result<()> {
+    async fn insert_presence(&self, _jid: &BareJid, _presence: &Presence) -> Result<()> {
         Ok(())
     }
 

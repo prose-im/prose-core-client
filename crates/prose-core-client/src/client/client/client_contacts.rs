@@ -1,17 +1,18 @@
 use std::fmt::Debug;
 
 use anyhow::Result;
+use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use microtype::Microtype;
 use tracing::{info, instrument};
 
 use prose_domain::{Contact, UserProfile};
-use prose_xmpp::mods;
 use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::stanza::avatar;
+use prose_xmpp::{mods, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
-use crate::data_cache::DataCache;
+use crate::data_cache::{ContactsCache, DataCache};
 use crate::types::{roster, AvatarMetadata};
 use crate::{domain_ext, CachePolicy};
 
@@ -78,8 +79,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
     #[instrument]
     pub async fn load_contacts(&self, cache_policy: CachePolicy) -> Result<Vec<Contact>> {
+        async fn has_valid_roster_items<D: DataCache, A: AvatarCache>(
+            client: &Client<D, A>,
+        ) -> Result<bool, <D as ContactsCache>::Error> {
+            let Some(last_update) = client.inner.data_cache.roster_update_time().await? else {
+                return Ok(false);
+            };
+            let now: DateTime<Utc> = client.inner.time_provider.now().into();
+            Ok(now - last_update <= Duration::minutes(10))
+        }
+
         if cache_policy == CachePolicy::ReloadIgnoringCacheData
-            || !self.inner.data_cache.has_valid_roster_items().await?
+            || !has_valid_roster_items(self).await?
         {
             if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
                 return Ok(vec![]);
@@ -99,6 +110,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .insert_roster_items(roster_items.as_slice())
                 .await
                 .ok();
+
+            self.inner
+                .data_cache
+                .set_roster_update_time(&self.inner.time_provider.now().into())
+                .await?;
         }
 
         let contacts: Vec<(Contact, Option<avatar::ImageId>)> =

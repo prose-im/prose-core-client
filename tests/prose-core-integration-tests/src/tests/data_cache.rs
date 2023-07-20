@@ -3,8 +3,8 @@ use std::str::FromStr;
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
 use jid::BareJid;
-#[cfg(not(target_arch = "wasm32"))]
-use tokio::test as async_test;
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen_test::wasm_bindgen_test as async_test;
 use xmpp_parsers::presence::Show;
 
 #[cfg(target_arch = "wasm32")]
@@ -14,10 +14,12 @@ use prose_core_client::data_cache::sqlite::{Connection, SQLiteCache};
 use prose_core_client::data_cache::{ContactsCache, DataCache, MessageCache};
 use prose_core_client::types::message_like::Payload;
 use prose_core_client::types::roster::Subscription;
-use prose_core_client::types::{roster, AccountSettings, Availability, Contact, MessageLike, Page};
+use prose_core_client::types::{
+    presence, roster, AccountSettings, Availability, Contact, MessageLike, Page, Presence,
+};
 use prose_xmpp::stanza::message;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen_test::wasm_bindgen_test as async_test;
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::test as async_test;
 
 #[cfg(not(target_arch = "wasm32"))]
 async fn cache() -> Result<SQLiteCache> {
@@ -48,6 +50,27 @@ async fn test_save_and_load_account_settings() -> Result<()> {
 }
 
 #[async_test]
+async fn test_set_roster_update_time() -> Result<()> {
+    let cache = cache().await?;
+
+    let date1 = Utc.with_ymd_and_hms(2023, 7, 20, 18, 00, 00).unwrap();
+    let date2 = Utc.with_ymd_and_hms(2023, 7, 19, 17, 30, 10).unwrap();
+
+    assert_eq!(cache.roster_update_time().await?, None);
+
+    cache.set_roster_update_time(&date1).await?;
+    assert_eq!(cache.roster_update_time().await?, Some(date1));
+
+    cache.set_roster_update_time(&date2).await?;
+    assert_eq!(cache.roster_update_time().await?, Some(date2));
+
+    cache.delete_all().await?;
+    assert_eq!(cache.roster_update_time().await?, None);
+
+    Ok(())
+}
+
+#[async_test]
 async fn test_presence() -> Result<()> {
     let cache = cache().await?;
     let jid_a = BareJid::from_str("a@prose.org").unwrap();
@@ -71,7 +94,16 @@ async fn test_presence() -> Result<()> {
     // If we didn't receive a presence yet the contact should be considered unavailable.
     // If we did however receive an empty presence the contact should be considered
     // available, because of https://datatracker.ietf.org/doc/html/rfc6121#section-4.7.1
-    cache.insert_presence(&jid_b, None, None, None).await?;
+    cache
+        .insert_presence(
+            &jid_b,
+            &Presence {
+                kind: None,
+                show: None,
+                status: None,
+            },
+        )
+        .await?;
 
     assert_eq!(
         cache
@@ -102,7 +134,14 @@ async fn test_presence() -> Result<()> {
 
     // And for good measure insert some non-empty values
     cache
-        .insert_presence(&jid_a, None, Some(Show::Dnd), Some(String::from("AFK!")))
+        .insert_presence(
+            &jid_a,
+            &Presence {
+                kind: None,
+                show: Some(presence::Show(Show::Dnd)),
+                status: Some(String::from("AFK!")),
+            },
+        )
         .await?;
     assert_eq!(
         cache
