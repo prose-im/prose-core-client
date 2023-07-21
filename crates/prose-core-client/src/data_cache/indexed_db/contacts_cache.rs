@@ -12,7 +12,9 @@ use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::ChatState;
 
 use crate::data_cache::indexed_db::cache::{keys, IndexedDBDataCacheError};
-use crate::data_cache::indexed_db::idb_database_ext::{IdbDatabaseExt, IdbObjectStoreExt};
+use crate::data_cache::indexed_db::idb_database_ext::{
+    IdbDatabaseExt, IdbObjectStoreExtGet, IdbObjectStoreExtSet,
+};
 use crate::data_cache::indexed_db::IndexedDBDataCache;
 use crate::data_cache::ContactsCache;
 use crate::domain_ext::Availability;

@@ -27,7 +27,9 @@ pub(super) mod keys {
     }
 
     pub mod messages {
+        pub const ID_INDEX: &str = "id_idx";
         pub const TARGET_INDEX: &str = "target_idx";
+        pub const TIMESTAMP_INDEX: &str = "timestamp_idx";
     }
 }
 
@@ -48,6 +50,9 @@ pub enum IndexedDBDataCacheError {
 
     #[error("Invalid DB Key")]
     InvalidDBKey,
+
+    #[error("Invalid MessageId")]
+    InvalidMessageId,
 }
 
 impl From<DomException> for IndexedDBDataCacheError {
@@ -68,38 +73,42 @@ pub struct IndexedDBDataCache {
 
 impl IndexedDBDataCache {
     pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 4)?;
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 1)?;
 
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             let old_version = evt.old_version() as u32;
             let db = evt.db();
 
             if old_version < 1 {
-                db.create_object_store(keys::SETTINGS_STORE)?;
-                db.create_object_store(keys::MESSAGES_STORE)?;
+                db.create_object_store(keys::AVATAR_METADATA_STORE)?;
+                db.create_object_store(keys::CHAT_STATE_STORE)?;
+                db.create_object_store(keys::DRAFTS_STORE)?;
+                db.create_object_store(keys::PRESENCE_STORE)?;
                 db.create_object_store(keys::ROSTER_ITEMS_STORE)?;
+                db.create_object_store(keys::SETTINGS_STORE)?;
                 db.create_object_store(keys::USER_PROFILE_STORE)?;
-            }
 
-            if old_version < 2 {
-                db.delete_object_store(keys::MESSAGES_STORE)?;
-
-                let store = db.create_object_store(keys::MESSAGES_STORE)?;
+                let store = db.create_object_store_with_params(
+                    keys::MESSAGES_STORE,
+                    &IdbObjectStoreParameters::new()
+                        .auto_increment(true)
+                        .key_path(Some(&IdbKeyPath::str("rowId"))),
+                )?;
+                store.create_index_with_params(
+                    keys::messages::ID_INDEX,
+                    &IdbKeyPath::str("id"),
+                    &IdbIndexParameters::new().unique(true),
+                )?;
                 store.create_index_with_params(
                     keys::messages::TARGET_INDEX,
                     &IdbKeyPath::str("target"),
                     &IdbIndexParameters::new().unique(false),
                 )?;
-            }
-
-            if old_version < 3 {
-                db.create_object_store(keys::PRESENCE_STORE)?;
-                db.create_object_store(keys::AVATAR_METADATA_STORE)?;
-                db.create_object_store(keys::CHAT_STATE_STORE)?;
-            }
-
-            if old_version < 4 {
-                db.create_object_store(keys::DRAFTS_STORE)?;
+                store.create_index_with_params(
+                    keys::messages::TIMESTAMP_INDEX,
+                    &IdbKeyPath::str("timestamp"),
+                    &IdbIndexParameters::new().unique(false),
+                )?;
             }
 
             Ok(())
@@ -122,14 +131,14 @@ impl DataCache for IndexedDBDataCache {
     async fn delete_all(&self) -> Result<()> {
         self.db
             .clear_stores(&[
-                keys::SETTINGS_STORE,
-                keys::PRESENCE_STORE,
-                keys::MESSAGES_STORE,
-                keys::USER_PROFILE_STORE,
-                keys::ROSTER_ITEMS_STORE,
                 keys::AVATAR_METADATA_STORE,
                 keys::CHAT_STATE_STORE,
                 keys::DRAFTS_STORE,
+                keys::MESSAGES_STORE,
+                keys::PRESENCE_STORE,
+                keys::ROSTER_ITEMS_STORE,
+                keys::SETTINGS_STORE,
+                keys::USER_PROFILE_STORE,
             ])
             .await
     }

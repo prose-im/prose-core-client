@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use gloo_utils::format::JsValueSerdeExt;
 use indexed_db_futures::prelude::{IdbObjectStore, IdbTransactionMode};
-use indexed_db_futures::{IdbDatabase, IdbQuerySource};
+use indexed_db_futures::{IdbDatabase, IdbIndex, IdbQuerySource};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::JsValue;
 
@@ -74,24 +74,24 @@ impl IdbDatabaseExt for IdbDatabase {
 }
 
 #[async_trait(? Send)]
-pub trait IdbObjectStoreExt {
-    fn set_value<T: Serialize>(&self, key: impl AsRef<str>, value: &T) -> Result<()>;
+pub trait IdbObjectStoreExtGet {
     async fn get_value<T: for<'de> Deserialize<'de>>(
         &self,
         key: impl AsRef<str>,
     ) -> Result<Option<T>>;
+
+    async fn get_all_values<T: for<'de> Deserialize<'de>>(
+        &self,
+        key: impl AsRef<str>,
+    ) -> Result<Vec<T>>;
+}
+
+pub trait IdbObjectStoreExtSet {
+    fn set_value<T: Serialize>(&self, key: impl AsRef<str>, value: &T) -> Result<()>;
 }
 
 #[async_trait(? Send)]
-impl IdbObjectStoreExt for IdbObjectStore<'_> {
-    fn set_value<T: Serialize>(&self, key: impl AsRef<str>, value: &T) -> Result<()> {
-        self.put_key_val(
-            &JsValue::from_str(key.as_ref()),
-            &JsValue::from_serde(value)?,
-        )?;
-        Ok(())
-    }
-
+impl IdbObjectStoreExtGet for IdbObjectStore<'_> {
     async fn get_value<T: for<'de> Deserialize<'de>>(
         &self,
         key: impl AsRef<str>,
@@ -102,5 +102,56 @@ impl IdbObjectStoreExt for IdbObjectStore<'_> {
             .map(|value| value.into_serde())
             .transpose()?;
         Ok(value)
+    }
+
+    async fn get_all_values<T: for<'de> Deserialize<'de>>(
+        &self,
+        key: impl AsRef<str>,
+    ) -> Result<Vec<T>> {
+        let values = self
+            .get_all_with_key(&JsValue::from_str(key.as_ref()))?
+            .await?
+            .into_iter()
+            .map(|value| value.into_serde())
+            .collect::<Result<Vec<T>, _>>()?;
+        Ok(values)
+    }
+}
+
+impl IdbObjectStoreExtSet for IdbObjectStore<'_> {
+    fn set_value<T: Serialize>(&self, key: impl AsRef<str>, value: &T) -> Result<()> {
+        self.put_key_val(
+            &JsValue::from_str(key.as_ref()),
+            &JsValue::from_serde(value)?,
+        )?;
+        Ok(())
+    }
+}
+
+#[async_trait(? Send)]
+impl IdbObjectStoreExtGet for IdbIndex<'_> {
+    async fn get_value<T: for<'de> Deserialize<'de>>(
+        &self,
+        key: impl AsRef<str>,
+    ) -> Result<Option<T>> {
+        let value: Option<T> = self
+            .get(&JsValue::from_str(key.as_ref()))?
+            .await?
+            .map(|value| value.into_serde())
+            .transpose()?;
+        Ok(value)
+    }
+
+    async fn get_all_values<T: for<'de> Deserialize<'de>>(
+        &self,
+        key: impl AsRef<str>,
+    ) -> Result<Vec<T>> {
+        let values = self
+            .get_all_with_key(&JsValue::from_str(key.as_ref()))?
+            .await?
+            .into_iter()
+            .map(|value| value.into_serde())
+            .collect::<Result<Vec<T>, _>>()?;
+        Ok(values)
     }
 }
