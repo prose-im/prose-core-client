@@ -64,7 +64,8 @@ impl IdbDatabaseExt for IdbDatabase {
     }
 
     async fn delete_value(&self, store: impl AsRef<str>, key: impl AsRef<str>) -> Result<()> {
-        let tx = self.transaction_on_one_with_mode(store.as_ref(), IdbTransactionMode::Readonly)?;
+        let tx =
+            self.transaction_on_one_with_mode(store.as_ref(), IdbTransactionMode::Readwrite)?;
         let store = tx.object_store(store.as_ref())?;
         store.delete(&JsValue::from_str(key.as_ref()))?;
         tx.await.into_result()?;

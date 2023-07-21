@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use gloo_utils::format::JsValueSerdeExt;
 use indexed_db_futures::prelude::*;
 use indexed_db_futures::web_sys::IdbKeyRange;
 use jid::BareJid;
@@ -8,6 +7,7 @@ use wasm_bindgen::JsValue;
 use prose_xmpp::stanza::message;
 
 use crate::data_cache::indexed_db::cache::{keys, IndexedDBDataCacheError};
+use crate::data_cache::indexed_db::idb_database_ext::{IdbDatabaseExt, IdbObjectStoreExt};
 use crate::data_cache::indexed_db::IndexedDBDataCache;
 use crate::data_cache::MessageCache;
 use crate::types::{MessageLike, Page};
@@ -28,10 +28,7 @@ impl MessageCache for IndexedDBDataCache {
         let store = tx.object_store(keys::MESSAGES_STORE)?;
 
         for message in messages {
-            store.put_key_val(
-                &JsValue::from_str(message.id.as_ref()),
-                &JsValue::from_serde(message)?,
-            )?;
+            store.set_value(message.id.as_ref(), message)?;
         }
 
         tx.await.into_result()?;
@@ -118,11 +115,21 @@ impl MessageCache for IndexedDBDataCache {
         Ok(None)
     }
 
-    async fn save_draft(&self, _conversation: &BareJid, _text: Option<&str>) -> Result<()> {
-        Ok(())
+    async fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
+        if let Some(text) = text {
+            self.db
+                .set_value(keys::DRAFTS_STORE, conversation.to_string(), &text)
+                .await
+        } else {
+            self.db
+                .delete_value(keys::DRAFTS_STORE, conversation.to_string())
+                .await
+        }
     }
 
-    async fn load_draft(&self, _conversation: &BareJid) -> Result<Option<String>> {
-        Ok(None)
+    async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
+        self.db
+            .get_value(keys::DRAFTS_STORE, conversation.to_string())
+            .await
     }
 }

@@ -174,6 +174,29 @@ async fn test_presence() -> Result<()> {
 }
 
 #[async_test]
+async fn test_saves_draft() -> Result<()> {
+    let cache = cache().await?;
+    let jid_a = BareJid::from_str("a@prose.org").unwrap();
+    let jid_b = BareJid::from_str("b@prose.org").unwrap();
+
+    assert_eq!(cache.load_draft(&jid_a).await?, None);
+    assert_eq!(cache.load_draft(&jid_b).await?, None);
+
+    cache.save_draft(&jid_a, Some("Hello")).await?;
+    cache.save_draft(&jid_b, Some("World")).await?;
+
+    assert_eq!(cache.load_draft(&jid_a).await?, Some("Hello".to_string()));
+    assert_eq!(cache.load_draft(&jid_b).await?, Some("World".to_string()));
+
+    cache.save_draft(&jid_b, None).await?;
+
+    assert_eq!(cache.load_draft(&jid_a).await?, Some("Hello".to_string()));
+    assert_eq!(cache.load_draft(&jid_b).await?, None);
+
+    Ok(())
+}
+
+#[async_test]
 async fn test_load_messages_targeting() -> Result<()> {
     let cache = cache().await?;
 

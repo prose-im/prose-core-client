@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use either::Either;
 use jid::BareJid;
 use rusqlite::types::FromSqlError;
-use rusqlite::{params, params_from_iter};
+use rusqlite::{params, params_from_iter, OptionalExtension};
 
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::stanza_id;
@@ -283,16 +283,25 @@ impl MessageCache for SQLiteCache {
 
     async fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
-        let mut stmt =
-            conn.prepare("INSERT OR REPLACE INTO `drafts` (`jid`, `text`) VALUES (?, ?)")?;
-        stmt.execute(params![conversation.to_string(), text])?;
+
+        if let Some(text) = text {
+            let mut stmt =
+                conn.prepare("INSERT OR REPLACE INTO `drafts` (`jid`, `text`) VALUES (?, ?)")?;
+            stmt.execute(params![conversation.to_string(), text])?;
+        } else {
+            let mut stmt = conn.prepare("DELETE FROM `drafts` WHERE `jid` = ?")?;
+            stmt.execute(params![conversation.to_string()])?;
+        }
+
         Ok(())
     }
 
     async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare("SELECT `text` FROM `drafts` WHERE `jid` = ?")?;
-        Ok(stmt.query_row(params![conversation.to_string()], |row| Ok(row.get(0)?))?)
+        Ok(stmt
+            .query_row(params![conversation.to_string()], |row| Ok(row.get(0)?))
+            .optional()?)
     }
 }
 
