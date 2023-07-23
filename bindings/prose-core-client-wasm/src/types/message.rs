@@ -13,8 +13,6 @@ pub struct Reaction {
     pub from: Vec<BareJid>,
 }
 
-//if (!t.id || !t.type || !t.date || !t.content || !t.from)
-
 #[wasm_bindgen]
 impl Message {
     #[wasm_bindgen(getter)]

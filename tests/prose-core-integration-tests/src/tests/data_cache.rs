@@ -237,6 +237,75 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
 }
 
 #[async_test]
+async fn test_loads_message_with_emoji() -> Result<()> {
+    let cache = cache().await?;
+
+    let messages = [
+        MessageLike {
+            id: "1".into(),
+            stanza_id: None,
+            target: None,
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
+                .unwrap()
+                .into(),
+            payload: Payload::Message {
+                body: String::from("Hello World"),
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "2".into(),
+            stanza_id: None,
+            target: Some("1".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 07, 16, 00, 01)
+                .unwrap()
+                .into(),
+            payload: Payload::Reaction {
+                emojis: vec!["🍿".into()],
+            },
+            is_first_message: false,
+        },
+        MessageLike {
+            id: "3".into(),
+            stanza_id: None,
+            target: Some("1".into()),
+            to: BareJid::from_str("a@prose.org").unwrap(),
+            from: BareJid::from_str("b@prose.org").unwrap(),
+            timestamp: Utc
+                .with_ymd_and_hms(2023, 04, 07, 16, 00, 02)
+                .unwrap()
+                .into(),
+            payload: Payload::Reaction {
+                emojis: vec!["🍿".into(), "📼".into()],
+            },
+            is_first_message: false,
+        },
+    ];
+
+    cache.insert_messages(&messages).await?;
+
+    let loaded_messages = cache
+        .load_messages_before(&BareJid::from_str("a@prose.org").unwrap(), None, 100)
+        .await?;
+
+    assert_eq!(
+        Some(Page {
+            items: messages.into_iter().collect(),
+            is_complete: false
+        }),
+        loaded_messages
+    );
+
+    Ok(())
+}
+
+#[async_test]
 async fn test_load_messages_targeting() -> Result<()> {
     let cache = cache().await?;
 

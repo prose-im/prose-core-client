@@ -1,11 +1,12 @@
 use anyhow::anyhow;
+use microtype::Microtype;
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::avatar_cache::NoopAvatarCache;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::{Client as ProseClient, ClientBuilder};
-use prose_domain::{Availability, MessageId};
+use prose_domain::{Availability, Emoji, MessageId};
 
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
@@ -70,7 +71,7 @@ impl Client {
     }
 
     #[wasm_bindgen(js_name = "loadContacts")]
-    pub async fn load_contacts(&self) -> Result<JsValue, JsError> {
+    pub async fn load_contacts(&self) -> Result<JsValue> {
         let contacts = self
             .client
             .load_contacts(Default::default())
@@ -85,7 +86,7 @@ impl Client {
         from: &BareJid,
         since: Option<String>,
         load_from_server: bool,
-    ) -> Result<MessagesArray, JsError> {
+    ) -> Result<MessagesArray> {
         let since = since.map(|id| MessageId(id));
         let from = jid::BareJid::from(from.clone());
 
@@ -103,7 +104,7 @@ impl Client {
         &self,
         conversation: &BareJid,
         message_ids: &StringArray,
-    ) -> Result<MessagesArray, JsError> {
+    ) -> Result<MessagesArray> {
         info!("Loading messages in conversation {:?}…", conversation);
 
         let message_ids: Vec<MessageId> = Vec::<String>::try_from(message_ids)?
@@ -118,8 +119,25 @@ impl Client {
             .map_err(WasmError::from)?;
 
         info!("Found {} messages.", messages.len());
-
         Ok(messages.into())
+    }
+
+    #[wasm_bindgen(js_name = "toggleReactionToMessage")]
+    pub async fn toggle_reaction_to_message(
+        &self,
+        conversation: &BareJid,
+        id: &str,
+        emoji: &str,
+    ) -> Result<()> {
+        self.client
+            .toggle_reaction_to_message(
+                jid::BareJid::from(conversation.clone()),
+                MessageId::new(id.into()),
+                Emoji::new(emoji.into()),
+            )
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
     }
 
     // #[wasm_bindgen(js_name = "loadMessagesBefore")]
