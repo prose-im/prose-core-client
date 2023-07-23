@@ -4,6 +4,8 @@ use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent};
 use prose_domain::MessageId;
 use prose_xmpp::ConnectionError;
 
+use crate::types::BareJid;
+
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
 export type ConnectionTimedOutError = {
@@ -26,19 +28,19 @@ export interface ProseClientDelegate {
     clientDisconnected(error?: ConnectionError): void
 
     /// A user in `conversation` started or stopped typing.
-    composingUsersChanged(conversation: string): void
+    composingUsersChanged(conversation: BareJID): void
     
     /// Infos about a contact have changed.
-    contactChanged(jid: string): void
+    contactChanged(jid: BareJID): void
     
     /// One or many messages were either received or sent.
-    messagesAppended(conversation: string, messageIDs: string[]): void
+    messagesAppended(conversation: BareJID, messageIDs: string[]): void
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
-    messagesUpdated(conversation: string, messageIDs: string[]): void
+    messagesUpdated(conversation: BareJID, messageIDs: string[]): void
     
     /// A message was deleted.
-    messagesDeleted(conversation: string, messageIDs: string[]): void
+    messagesDeleted(conversation: BareJID, messageIDs: string[]): void
 }
 "#;
 
@@ -54,19 +56,19 @@ extern "C" {
     fn client_disconnected(this: &JSDelegate, error: Option<JSConnectionError>);
 
     #[wasm_bindgen(method, js_name = "composingUsersChanged")]
-    fn composing_users_changed(this: &JSDelegate, conversation: String);
+    fn composing_users_changed(this: &JSDelegate, conversation: BareJid);
 
     #[wasm_bindgen(method, js_name = "contactChanged")]
-    fn contactChanged(this: &JSDelegate, jid: String);
+    fn contactChanged(this: &JSDelegate, jid: BareJid);
 
     #[wasm_bindgen(method, js_name = "messagesAppended")]
-    fn messages_appended(this: &JSDelegate, conversation: String, ids: Vec<JsValue>);
+    fn messages_appended(this: &JSDelegate, conversation: BareJid, ids: Vec<JsValue>);
 
     #[wasm_bindgen(method, js_name = "messagesUpdated")]
-    fn messages_updated(this: &JSDelegate, conversation: String, ids: Vec<JsValue>);
+    fn messages_updated(this: &JSDelegate, conversation: BareJid, ids: Vec<JsValue>);
 
     #[wasm_bindgen(method, js_name = "messagesDeleted")]
-    fn messages_deleted(this: &JSDelegate, conversation: String, ids: Vec<JsValue>);
+    fn messages_deleted(this: &JSDelegate, conversation: BareJid, ids: Vec<JsValue>);
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -118,7 +120,7 @@ impl ClientDelegate for Delegate {
     fn handle_event(&self, event: ClientEvent) {
         match event {
             ClientEvent::ComposingUsersChanged { conversation } => {
-                self.inner.composing_users_changed(conversation.to_string())
+                self.inner.composing_users_changed(conversation.into())
             }
             ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Connect,
@@ -126,25 +128,25 @@ impl ClientDelegate for Delegate {
             ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Disconnect { error },
             } => self.inner.client_disconnected(error.map(Into::into)),
-            ClientEvent::ContactChanged { jid } => self.inner.contactChanged(jid.to_string()),
+            ClientEvent::ContactChanged { jid } => self.inner.contactChanged(jid.into()),
             ClientEvent::MessagesAppended {
                 conversation,
                 message_ids,
             } => self
                 .inner
-                .messages_appended(conversation.to_string(), message_ids.into_js_array()),
+                .messages_appended(conversation.into(), message_ids.into_js_array()),
             ClientEvent::MessagesUpdated {
                 conversation,
                 message_ids,
             } => self
                 .inner
-                .messages_updated(conversation.to_string(), message_ids.into_js_array()),
+                .messages_updated(conversation.into(), message_ids.into_js_array()),
             ClientEvent::MessagesDeleted {
                 conversation,
                 message_ids,
             } => self
                 .inner
-                .messages_deleted(conversation.to_string(), message_ids.into_js_array()),
+                .messages_deleted(conversation.into(), message_ids.into_js_array()),
         }
     }
 }
