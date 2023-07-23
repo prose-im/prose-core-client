@@ -199,6 +199,44 @@ async fn test_saves_draft() -> Result<()> {
 }
 
 #[async_test]
+async fn test_can_insert_same_message_twice() -> Result<()> {
+    let cache = cache().await?;
+
+    let messages = [MessageLike {
+        id: "1000".into(),
+        stanza_id: None,
+        target: None,
+        to: BareJid::from_str("a@prose.org").unwrap(),
+        from: BareJid::from_str("b@prose.org").unwrap(),
+        timestamp: Utc
+            .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
+            .unwrap()
+            .into(),
+        payload: Payload::Message {
+            body: String::from(""),
+        },
+        is_first_message: false,
+    }];
+
+    cache.insert_messages(&messages).await?;
+    cache.insert_messages(&messages).await?;
+
+    let loaded_messages = cache
+        .load_messages_before(&BareJid::from_str("a@prose.org").unwrap(), None, 100)
+        .await?;
+
+    assert_eq!(
+        Some(Page {
+            items: messages.into_iter().collect(),
+            is_complete: false
+        }),
+        loaded_messages
+    );
+
+    Ok(())
+}
+
+#[async_test]
 async fn test_load_messages_targeting() -> Result<()> {
     let cache = cache().await?;
 

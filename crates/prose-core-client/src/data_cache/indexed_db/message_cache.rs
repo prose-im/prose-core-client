@@ -38,8 +38,16 @@ impl MessageCache for IndexedDBDataCache {
             .db
             .transaction_on_one_with_mode(keys::MESSAGES_STORE, IdbTransactionMode::Readwrite)?;
         let store = tx.object_store(keys::MESSAGES_STORE)?;
+        let idx = store.index(keys::messages::ID_INDEX)?;
+
         for message in messages {
-            store.put_val(&JsValue::from_serde(&message)?)?;
+            if idx
+                .get_key(&JsValue::from_str(message.id.as_ref()))?
+                .await?
+                .is_none()
+            {
+                store.put_val(&JsValue::from_serde(&message)?)?;
+            }
         }
         tx.await.into_result()?;
         Ok(())
