@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::Utc;
 use jid::{BareJid, Jid};
 use tracing::{debug, error};
+use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
@@ -151,6 +152,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn presence_did_change(&self, presence: Presence) -> Result<()> {
+        if presence.type_ == presence::Type::None {
+            return Ok(());
+        }
+
         let Some(from) = presence.from else {
             return Ok(());
         };
