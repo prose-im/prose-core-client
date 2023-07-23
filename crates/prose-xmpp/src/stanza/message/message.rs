@@ -53,6 +53,7 @@ pub struct Message {
     pub archived_message: Option<mam::ArchivedMessage>,
     pub sent_carbon: Option<carbons::Sent>,
     pub received_carbon: Option<carbons::Received>,
+    pub store: Option<bool>,
 }
 
 impl Message {
@@ -78,6 +79,7 @@ impl Message {
             archived_message: None,
             sent_carbon: None,
             received_carbon: None,
+            store: None,
         }
     }
 }
@@ -227,6 +229,11 @@ impl From<Message> for xmpp_parsers::message::Message {
         }
         if let Some(sent_carbon) = value.sent_carbon {
             message.payloads.push(sent_carbon.into());
+        }
+        if let Some(store) = value.store {
+            message.payloads.push(
+                Element::builder(if store { "store" } else { "no-store" }, ns::HINTS).build(),
+            );
         }
         message
     }

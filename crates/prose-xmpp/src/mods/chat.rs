@@ -125,6 +125,7 @@ impl Chat {
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
+            .set_store(true)
             .set_message_reactions(Reactions {
                 id,
                 reactions: reactions.into_iter().collect(),

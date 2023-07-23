@@ -17,3 +17,6 @@ pub const DELAY: &str = "urn:xmpp:delay";
 
 /// XEP-0428: Fallback Indication
 pub const FALLBACK: &str = "urn:xmpp:fallback:0";
+
+/// XEP-0334: Message Processing Hints
+pub const HINTS: &str = "urn:xmpp:hints";

@@ -82,4 +82,9 @@ impl Message {
         self.archived_message = Some(message);
         self
     }
+
+    pub fn set_store(mut self, store: bool) -> Self {
+        self.store = Some(store);
+        self
+    }
 }
