@@ -3,11 +3,13 @@ use jid::BareJid;
 use prose_domain::MessageId;
 use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
 
+#[derive(Debug)]
 pub enum ConnectionEvent {
     Connect,
     Disconnect { error: Option<ConnectionError> },
 }
 
+#[derive(Debug)]
 pub enum ClientEvent {
     /// A user in `conversation` started or stopped typing.
     ComposingUsersChanged { conversation: BareJid },

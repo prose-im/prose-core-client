@@ -48,6 +48,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 }
 
+#[derive(Debug)]
 pub enum ReceivedMessage {
     Message(Message),
     Carbon(Carbon),
@@ -219,11 +220,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 timestamp: now.into(),
             })?,
         };
-
-        if chat_state.is_none() {
-            // Nothing to do…
-            return Ok(());
-        }
 
         debug!("Caching received message…");
         self.inner
