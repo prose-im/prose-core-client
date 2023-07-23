@@ -3,7 +3,7 @@ use core::str::FromStr;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, PartialEq, Clone)]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "JID")]
 pub struct Jid {
     #[wasm_bindgen(skip)]
     pub bare: Option<BareJid>,
@@ -11,7 +11,7 @@ pub struct Jid {
     pub full: Option<FullJid>,
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = "JID")]
 impl Jid {
     #[wasm_bindgen(constructor)]
     pub fn new(str: &str) -> Result<Jid, JsError> {
@@ -88,7 +88,7 @@ impl From<jid::Jid> for Jid {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "BareJID")]
 pub struct BareJid {
     #[wasm_bindgen(skip)]
     pub node: Option<String>,
@@ -97,7 +97,7 @@ pub struct BareJid {
     pub domain: String,
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = "BareJID")]
 impl BareJid {
     #[wasm_bindgen(constructor)]
     pub fn new(str: &str) -> Result<BareJid, JsError> {
@@ -129,7 +129,7 @@ impl BareJid {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = "FullJID")]
 pub struct FullJid {
     #[wasm_bindgen(skip)]
     pub node: Option<String>,
@@ -139,7 +139,7 @@ pub struct FullJid {
     pub resource: String,
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_class = "FullJID")]
 impl FullJid {
     #[wasm_bindgen(constructor)]
     pub fn new(str: &str) -> Result<FullJid, JsError> {
