@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use microtype::Microtype;
 use tracing::info;
 use wasm_bindgen::prelude::*;
@@ -10,7 +9,9 @@ use prose_domain::{Availability, Emoji, MessageId};
 
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
-use crate::types::{BareJid, FullJid, Jid, MessagesArray};
+use crate::types::{
+    BareJid, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray, StringArray,
+};
 use crate::util::WasmTimeProvider;
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -71,13 +72,15 @@ impl Client {
     }
 
     #[wasm_bindgen(js_name = "loadContacts")]
-    pub async fn load_contacts(&self) -> Result<JsValue> {
-        let contacts = self
+    pub async fn load_contacts(&self) -> Result<ContactsArray> {
+        Ok(self
             .client
             .load_contacts(Default::default())
             .await
-            .map_err(WasmError::from)?;
-        Ok(serde_wasm_bindgen::to_value(&contacts)?)
+            .map_err(WasmError::from)?
+            .into_iter()
+            .map(|c| JsValue::from(Contact::from(c)))
+            .collect_into_js_array::<ContactsArray>())
     }
 
     #[wasm_bindgen(js_name = "loadLatestMessages")]
@@ -149,37 +152,4 @@ impl Client {
     //     let page = self.client.load_messages_before(&from, &before).await?;
     //     Ok(page.into())
     // }
-}
-
-// To have a correct typing annotation generated for TypeScript, declare a custom type.
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(typescript_type = "string[]")]
-    pub type StringArray;
-}
-
-impl TryFrom<&StringArray> for Vec<String> {
-    type Error = WasmError;
-
-    fn try_from(value: &StringArray) -> std::result::Result<Self, Self::Error> {
-        let js_val: &JsValue = value.as_ref();
-        let array: &js_sys::Array = js_val
-            .dyn_ref()
-            .ok_or_else(|| WasmError(anyhow!("The argument must be an array")))?;
-
-        let length: usize = array
-            .length()
-            .try_into()
-            .map_err(|err| WasmError(anyhow!("Failed to determine array length. {}", err)))?;
-
-        let mut typed_array = Vec::<String>::with_capacity(length);
-        for js in array.iter() {
-            let elem = js
-                .as_string()
-                .ok_or(WasmError(anyhow!("Couldn't unwrap String from Array")))?;
-            typed_array.push(elem);
-        }
-
-        Ok(typed_array)
-    }
 }

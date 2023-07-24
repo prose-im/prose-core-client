@@ -22,7 +22,7 @@ export interface ProseConnectionProvider {
 
 export interface ProseConnection {
     setEventHandler(handler: ProseConnectionEventHandler): void
-    async connect(jid: string, password: string): void
+    connect(jid: string, password: string): Promise<void>
     disconnect(): void
     sendStanza(stanza: string): void
 }

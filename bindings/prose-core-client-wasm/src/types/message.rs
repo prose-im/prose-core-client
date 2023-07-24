@@ -1,6 +1,7 @@
+use crate::types::IntoJSArray;
 use wasm_bindgen::prelude::*;
 
-use crate::types::BareJid;
+use super::{BareJid, BareJidArray, ReactionsArray};
 
 #[wasm_bindgen]
 pub struct Message(prose_domain::Message);
@@ -72,12 +73,8 @@ impl Message {
         self.0
             .reactions
             .iter()
-            .map(|r| {
-                let r: Reaction = r.clone().into();
-                JsValue::from(r)
-            })
-            .collect::<js_sys::Array>()
-            .unchecked_into::<ReactionsArray>()
+            .map(|r| Reaction::from(r.clone()))
+            .collect_into_js_array::<ReactionsArray>()
     }
 }
 
@@ -89,12 +86,11 @@ impl Reaction {
     }
 
     #[wasm_bindgen(getter, js_name = "authors")]
-    pub fn from(&self) -> BareJidArray {
+    pub fn from_(&self) -> BareJidArray {
         self.from
             .iter()
-            .map(|b| JsValue::from(b.clone()))
-            .collect::<js_sys::Array>()
-            .unchecked_into::<BareJidArray>()
+            .map(Clone::clone)
+            .collect_into_js_array::<BareJidArray>()
     }
 }
 
@@ -110,27 +106,5 @@ impl From<prose_domain::Reaction> for Reaction {
             emoji: value.emoji.0,
             from: value.from.into_iter().map(Into::into).collect(),
         }
-    }
-}
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(typescript_type = "Message[]")]
-    pub type MessagesArray;
-
-    #[wasm_bindgen(typescript_type = "Reaction[]")]
-    pub type ReactionsArray;
-
-    #[wasm_bindgen(typescript_type = "BareJid[]")]
-    pub type BareJidArray;
-}
-
-impl From<Vec<prose_domain::Message>> for MessagesArray {
-    fn from(value: Vec<prose_domain::Message>) -> Self {
-        value
-            .into_iter()
-            .map(|message| JsValue::from(Message::from(message)))
-            .collect::<js_sys::Array>()
-            .unchecked_into::<MessagesArray>()
     }
 }
