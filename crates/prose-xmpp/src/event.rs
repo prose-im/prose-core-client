@@ -4,7 +4,7 @@ use xmpp_parsers::presence::Presence;
 
 use crate::connector::ConnectionError;
 use crate::mods::chat::Carbon;
-use crate::stanza::{avatar, Message, VCard4};
+use crate::stanza::{avatar, Message, UserActivity, VCard4};
 
 #[derive(Debug, Clone)]
 pub enum Event {
@@ -36,4 +36,8 @@ pub enum Event {
         metadata: avatar::Metadata,
     },
     Presence(Presence),
+    UserActivity {
+        from: Jid,
+        user_activity: UserActivity,
+    },
 }

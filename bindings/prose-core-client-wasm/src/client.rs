@@ -4,13 +4,15 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::avatar_cache::NoopAvatarCache;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
+use prose_core_client::types::{Availability, UserActivity};
 use prose_core_client::{Client as ProseClient, ClientBuilder};
-use prose_domain::{Availability, Emoji, MessageId};
+use prose_domain::{Emoji, MessageId};
 
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    BareJid, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray, StringArray,
+    BareJid, BareJidArray, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray,
+    StringArray,
 };
 use crate::util::WasmTimeProvider;
 
@@ -46,8 +48,8 @@ impl Client {
         Ok(client)
     }
 
-    pub async fn connect(&self, jid: FullJid, password: String) -> Result<()> {
-        let jid = jid::FullJid::from(jid);
+    pub async fn connect(&self, jid: &FullJid, password: &str) -> Result<()> {
+        let jid = jid::FullJid::from(jid.clone());
 
         info!("Connect {} - {}", jid, password);
 
@@ -69,6 +71,92 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(())
+    }
+
+    /// XEP-0308: Last Message Correction
+    /// https://xmpp.org/extensions/xep-0308.html
+    #[wasm_bindgen(js_name = "updateMessage")]
+    pub async fn update_message(
+        &self,
+        conversation: &Jid,
+        message_id: &str,
+        body: String,
+    ) -> Result<()> {
+        self.client
+            .update_message(
+                jid::Jid::from(conversation.clone()),
+                message_id.into(),
+                body,
+            )
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    /// XEP-0424: Message Retraction
+    /// https://xmpp.org/extensions/xep-0424.html
+    #[wasm_bindgen(js_name = "retractMessage")]
+    pub async fn retract_message(&self, conversation: &Jid, message_id: &str) -> Result<()> {
+        self.client
+            .retract_message(jid::Jid::from(conversation.clone()), message_id.into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    /// XEP-0085: Chat State Notifications
+    /// https://xmpp.org/extensions/xep-0085.html
+    #[wasm_bindgen(js_name = "setUserIsComposing")]
+    pub async fn set_user_is_composing(
+        &self,
+        conversation: &Jid,
+        is_composing: bool,
+    ) -> Result<()> {
+        self.client
+            .set_user_is_composing(jid::Jid::from(conversation.clone()), is_composing)
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    /// XEP-0108: User Activity
+    /// https://xmpp.org/extensions/xep-0108.html
+    #[wasm_bindgen(js_name = "sendActivity")]
+    pub async fn set_user_activity(
+        &self,
+        icon: Option<String>,
+        text: Option<String>,
+    ) -> Result<()> {
+        let user_activity = if let Some(icon) = &icon {
+            Some(UserActivity {
+                emoji: icon.clone(),
+                status: text.clone(),
+            })
+        } else {
+            None
+        };
+
+        self.client
+            .set_user_activity(user_activity)
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "loadComposingUsersInConversation")]
+    pub async fn load_composing_users_in_conversation(
+        &self,
+        conversation: &Jid,
+    ) -> Result<BareJidArray> {
+        let user_jids = self
+            .client
+            .load_composing_users(&jid::BareJid::from(conversation.bare()))
+            .await
+            .map_err(WasmError::from)?
+            .into_iter()
+            .map(|jid| BareJid::from(jid))
+            .collect_into_js_array::<BareJidArray>();
+        Ok(user_jids)
     }
 
     #[wasm_bindgen(js_name = "loadContacts")]
@@ -125,6 +213,8 @@ impl Client {
         Ok(messages.into())
     }
 
+    /// XEP-0444: Message Reactions
+    /// https://xmpp.org/extensions/xep-0444.html
     #[wasm_bindgen(js_name = "toggleReactionToMessage")]
     pub async fn toggle_reaction_to_message(
         &self,

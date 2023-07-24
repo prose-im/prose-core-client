@@ -126,6 +126,11 @@ impl BareJid {
     pub fn equals(&self, other: &BareJid) -> bool {
         self == other
     }
+
+    #[wasm_bindgen(js_name = "toJID")]
+    pub fn to_jid(&self) -> Jid {
+        Jid::with_bare(self)
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -177,6 +182,11 @@ impl FullJid {
             node: self.node.clone(),
             domain: self.domain.clone(),
         }
+    }
+
+    #[wasm_bindgen(js_name = "toJID")]
+    pub fn to_jid(&self) -> Jid {
+        Jid::with_full(self)
     }
 
     pub fn equals(&self, other: &FullJid) -> bool {

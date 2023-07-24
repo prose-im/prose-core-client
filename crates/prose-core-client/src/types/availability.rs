@@ -1,18 +1,19 @@
-use microtype::microtype;
+use serde::{Deserialize, Serialize};
+use strum_macros::Display;
 use xmpp_parsers::presence;
 
-microtype! {
-    pub prose_domain::Availability {
-        Availability
-    }
+#[derive(Debug, Display, PartialEq, Serialize, Deserialize, Clone)]
+pub enum Availability {
+    Available,
+    Unavailable,
+    DoNotDisturb,
+    Away,
 }
 
 impl From<(Option<presence::Type>, Option<presence::Show>)> for Availability {
     fn from(value: (Option<presence::Type>, Option<presence::Show>)) -> Self {
-        use prose_domain::Availability;
-
         // https://datatracker.ietf.org/doc/html/rfc6121#section-4.7.1
-        Availability(match (value.0, value.1) {
+        match (value.0, value.1) {
             // The absence of a 'type' attribute signals that the relevant entity is
             // available for communication (see Section 4.2 and Section 4.4).
             (None, None) => Availability::Available,
@@ -21,17 +22,15 @@ impl From<(Option<presence::Type>, Option<presence::Show>)> for Availability {
             (None, Some(presence::Show::Dnd)) => Availability::DoNotDisturb,
             (None, Some(presence::Show::Xa)) => Availability::Away,
             (Some(_), _) => Availability::Unavailable,
-        })
+        }
     }
 }
 
-impl TryFrom<Availability> for xmpp_parsers::presence::Show {
+impl TryFrom<Availability> for presence::Show {
     type Error = anyhow::Error;
 
     fn try_from(value: Availability) -> Result<Self, Self::Error> {
-        use prose_domain::Availability;
-
-        match value.0 {
+        match value {
             Availability::Available => Ok(presence::Show::Chat),
             Availability::Unavailable => Err(anyhow::format_err!(
                 "You cannot set yourself to Unavailable. Choose 'Away' instead."

@@ -6,14 +6,14 @@ use jid::BareJid;
 use microtype::Microtype;
 use tracing::{info, instrument};
 
-use prose_domain::{Contact, UserProfile};
+use prose_domain::UserProfile;
 use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::stanza::avatar;
 use prose_xmpp::{mods, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::{ContactsCache, DataCache};
-use crate::types::{roster, AvatarMetadata};
+use crate::types::{roster, AvatarMetadata, Contact};
 use crate::{domain_ext, CachePolicy};
 
 use super::Client;

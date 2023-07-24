@@ -1,13 +1,16 @@
 use crate::types::{IntoJSStringArray, StringArray};
+use prose_core_client::types::{
+    Availability as ProseAvailability, Contact as ProseContact, UserActivity as ProseUserActivity,
+};
 use wasm_bindgen::prelude::*;
 
 use super::BareJid;
 
 #[wasm_bindgen]
-pub struct Contact(prose_domain::Contact);
+pub struct Contact(ProseContact);
 
-impl From<prose_domain::Contact> for Contact {
-    fn from(value: prose_domain::Contact) -> Self {
+impl From<ProseContact> for Contact {
+    fn from(value: ProseContact) -> Self {
         Contact(value)
     }
 }
@@ -19,6 +22,9 @@ pub enum Availability {
     DoNotDisturb = 2,
     Away = 3,
 }
+
+#[wasm_bindgen]
+pub struct UserActivity(ProseUserActivity);
 
 #[wasm_bindgen]
 impl Contact {
@@ -43,6 +49,14 @@ impl Contact {
     }
 
     #[wasm_bindgen(getter)]
+    pub fn activity(&self) -> Option<UserActivity> {
+        self.0
+            .activity
+            .as_ref()
+            .map(|activity| UserActivity(activity.clone()))
+    }
+
+    #[wasm_bindgen(getter)]
     pub fn groups(&self) -> StringArray {
         self.0.groups.iter().collect_into_js_string_array()
     }
@@ -50,13 +64,34 @@ impl Contact {
     // pub avatar: Option<String>,
 }
 
-impl From<prose_domain::Availability> for Availability {
-    fn from(value: prose_domain::Availability) -> Self {
+#[wasm_bindgen]
+impl UserActivity {
+    #[wasm_bindgen(constructor)]
+    pub fn new(icon: &str, status: Option<String>) -> Self {
+        UserActivity(ProseUserActivity {
+            emoji: icon.to_string(),
+            status: status.clone(),
+        })
+    }
+
+    #[wasm_bindgen(getter, js_name = "icon")]
+    pub fn emoji(&self) -> String {
+        self.0.emoji.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "text")]
+    pub fn status(&self) -> Option<String> {
+        self.0.status.clone()
+    }
+}
+
+impl From<ProseAvailability> for Availability {
+    fn from(value: ProseAvailability) -> Self {
         match value {
-            prose_domain::Availability::Available => Availability::Available,
-            prose_domain::Availability::Unavailable => Availability::Unavailable,
-            prose_domain::Availability::DoNotDisturb => Availability::DoNotDisturb,
-            prose_domain::Availability::Away => Availability::Away,
+            ProseAvailability::Available => Availability::Available,
+            ProseAvailability::Unavailable => Availability::Unavailable,
+            ProseAvailability::DoNotDisturb => Availability::DoNotDisturb,
+            ProseAvailability::Away => Availability::Away,
         }
     }
 }

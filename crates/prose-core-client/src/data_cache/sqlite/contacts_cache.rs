@@ -1,19 +1,18 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
-use microtype::Microtype;
 use rusqlite::{params, OptionalExtension};
 use xmpp_parsers::presence;
 
-use prose_domain::Contact;
 use prose_xmpp::stanza::avatar;
 use prose_xmpp::stanza::message::ChatState;
 
 use crate::data_cache::sqlite::cache::SQLiteCacheError;
 use crate::data_cache::sqlite::{FromStrSql, SQLiteCache};
 use crate::data_cache::ContactsCache;
-use crate::domain_ext::Availability;
-use crate::types::{roster, Address, AvatarMetadata, Presence, UserProfile};
+use crate::types::{
+    roster, Address, Availability, AvatarMetadata, Contact, Presence, UserActivity, UserProfile,
+};
 
 type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 
@@ -200,6 +199,14 @@ impl ContactsCache for SQLiteCache {
         Ok(())
     }
 
+    async fn insert_user_activity(
+        &self,
+        _jid: &BareJid,
+        _user_activity: &UserActivity,
+    ) -> Result<(), Self::Error> {
+        todo!()
+    }
+
     async fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
@@ -278,9 +285,9 @@ impl ContactsCache for SQLiteCache {
                 let status: Option<String> = row.get(8)?;
 
                 let availability = if presence_count > 0 {
-                    Availability::from((presence_kind, presence_show)).into_inner()
+                    Availability::from((presence_kind, presence_show))
                 } else {
-                    prose_domain::Availability::Unavailable
+                    Availability::Unavailable
                 };
 
                 Ok((
@@ -289,6 +296,7 @@ impl ContactsCache for SQLiteCache {
                         name: full_name.or(nickname).unwrap_or(jid.to_string()),
                         avatar: None,
                         availability,
+                        activity: None,
                         status,
                         groups,
                     },

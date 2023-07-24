@@ -4,10 +4,9 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use indexed_db_futures::prelude::*;
 use jid::BareJid;
-use microtype::Microtype;
 use tracing::debug;
 
-use prose_domain::{Contact, UserProfile};
+use prose_domain::UserProfile;
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::ChatState;
 
@@ -17,8 +16,7 @@ use crate::data_cache::indexed_db::idb_database_ext::{
 };
 use crate::data_cache::indexed_db::IndexedDBDataCache;
 use crate::data_cache::ContactsCache;
-use crate::domain_ext::Availability;
-use crate::types::{roster, AvatarMetadata, Presence};
+use crate::types::{roster, Availability, AvatarMetadata, Contact, Presence, UserActivity};
 
 use super::cache::Result;
 
@@ -96,6 +94,22 @@ impl ContactsCache for IndexedDBDataCache {
             .await
     }
 
+    async fn insert_user_activity(
+        &self,
+        jid: &BareJid,
+        user_activity: &Option<UserActivity>,
+    ) -> Result<()> {
+        if let Some(user_activity) = user_activity {
+            self.db
+                .set_value(keys::USER_ACTIVITY_STORE, jid.to_string(), &user_activity)
+                .await
+        } else {
+            self.db
+                .delete_value(keys::USER_ACTIVITY_STORE, jid.to_string())
+                .await
+        }
+    }
+
     async fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()> {
         self.db
             .set_value(keys::CHAT_STATE_STORE, jid.to_string(), &chat_state)
@@ -114,6 +128,7 @@ impl ContactsCache for IndexedDBDataCache {
                 keys::USER_PROFILE_STORE,
                 keys::ROSTER_ITEMS_STORE,
                 keys::PRESENCE_STORE,
+                keys::USER_ACTIVITY_STORE,
             ],
             IdbTransactionMode::Readonly,
         )?;
@@ -121,6 +136,7 @@ impl ContactsCache for IndexedDBDataCache {
         let roster_items_store = tx.object_store(keys::ROSTER_ITEMS_STORE)?;
         let user_profile_store = tx.object_store(keys::USER_PROFILE_STORE)?;
         let presence_store = tx.object_store(keys::PRESENCE_STORE)?;
+        let activity_store = tx.object_store(keys::USER_ACTIVITY_STORE)?;
 
         let jids = roster_items_store.get_all_keys()?.await?;
         let mut contacts = vec![];
@@ -143,15 +159,15 @@ impl ContactsCache for IndexedDBDataCache {
                 .get_value::<UserProfile>(&jid_str)
                 .await?;
             let presence = presence_store.get_value::<Presence>(&jid_str).await?;
+            let user_activity = activity_store.get_value::<UserActivity>(&jid_str).await?;
 
             let availability = if let Some(presence) = &presence {
                 Availability::from((
                     presence.kind.as_ref().map(|v| v.0.clone()),
                     presence.show.as_ref().map(|v| v.0.clone()),
                 ))
-                .into_inner()
             } else {
-                prose_domain::Availability::Unavailable
+                Availability::Unavailable
             };
 
             let full_name = user_profile.as_ref().and_then(|u| u.full_name.clone());
@@ -162,6 +178,7 @@ impl ContactsCache for IndexedDBDataCache {
                 name: full_name.or(nickname).unwrap_or(parsed_jid.to_string()),
                 avatar: None,
                 availability,
+                activity: user_activity,
                 status: presence.and_then(|p| p.status),
                 groups: if roster_item.groups.is_empty() {
                     vec!["".to_string()]

@@ -7,7 +7,7 @@ use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message::ChatState;
-use prose_xmpp::stanza::{avatar, Message, VCard4};
+use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{mods, Event};
 
 use crate::avatar_cache::AvatarCache;
@@ -40,6 +40,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 self.avatar_metadata_did_change(from, metadata).await
             }
             Event::Presence(presence) => self.presence_did_change(presence).await,
+            Event::UserActivity {
+                from,
+                user_activity,
+            } => self.user_activity_did_change(from, user_activity).await,
         };
 
         if let Err(err) = result {
@@ -179,6 +183,20 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
+    async fn user_activity_did_change(&self, from: Jid, user_activity: UserActivity) -> Result<()> {
+        let jid = BareJid::from(from);
+
+        let user_activity = types::UserActivity::try_from(user_activity).ok();
+
+        self.inner
+            .data_cache
+            .insert_user_activity(&jid, &user_activity)
+            .await?;
+        self.send_event(ClientEvent::ContactChanged { jid });
+
+        Ok(())
+    }
+
     async fn did_receive_disco_info_query(
         &self,
         from: Jid,
@@ -210,29 +228,41 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let message_is_carbon = message.is_carbon();
         let now = Utc::now();
 
-        let parsed_message = match message {
+        let parsed_message: Result<MessageLike> = match message {
             ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
                 message,
                 timestamp: now.into(),
-            })?,
+            }),
             ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
                 message: carbon,
                 timestamp: now.into(),
-            })?,
+            }),
         };
 
-        debug!("Caching received message…");
-        self.inner
-            .data_cache
-            .insert_messages([&parsed_message])
-            .await?;
-
-        let conversation = if message_is_carbon {
-            &parsed_message.to
-        } else {
-            &parsed_message.from
+        let parsed_message = match parsed_message {
+            Ok(message) => Some(message),
+            Err(err) => {
+                error!("Failed to parse received message: {}", err);
+                None
+            }
         };
-        self.send_event_for_message(conversation, &parsed_message);
+
+        if parsed_message.is_none() && chat_state.is_none() {
+            // Nothing to do…
+            return Ok(());
+        }
+
+        if let Some(message) = &parsed_message {
+            debug!("Caching received message…");
+            self.inner.data_cache.insert_messages([message]).await?;
+
+            let conversation = if message_is_carbon {
+                &message.to
+            } else {
+                &message.from
+            };
+            self.send_event_for_message(conversation, message);
+        }
 
         if let Some(chat_state) = chat_state {
             self.inner
@@ -244,13 +274,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             })
         }
 
+        let Some(message) = parsed_message else {
+            return Ok(());
+        };
+
         // Don't send delivery receipts for carbons or anything other than a regular message.
-        if message_is_carbon || !parsed_message.payload.is_message() {
+        if message_is_carbon || !message.payload.is_message() {
             return Ok(());
         }
 
         let chat = self.client.get_mod::<mods::Chat>();
-        chat.mark_message_received(parsed_message.id.clone(), parsed_message.from)?;
+        chat.mark_message_received(message.id.clone(), message.from)?;
 
         Ok(())
     }

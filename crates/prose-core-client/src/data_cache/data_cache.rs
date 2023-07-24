@@ -4,13 +4,13 @@ use auto_impl::auto_impl;
 use chrono::{DateTime, Utc};
 use jid::BareJid;
 
-use prose_domain::Contact;
 use prose_xmpp::stanza::message::{stanza_id, ChatState};
 use prose_xmpp::stanza::{avatar, message};
 use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::types::{
-    roster, AccountSettings, AvatarMetadata, MessageLike, Page, Presence, UserProfile,
+    roster, AccountSettings, AvatarMetadata, Contact, MessageLike, Page, Presence, UserActivity,
+    UserProfile,
 };
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
@@ -60,6 +60,11 @@ pub trait ContactsCache {
     ) -> Result<Option<AvatarMetadata>, Self::Error>;
 
     async fn insert_presence(&self, jid: &BareJid, presence: &Presence) -> Result<(), Self::Error>;
+    async fn insert_user_activity(
+        &self,
+        jid: &BareJid,
+        user_activity: &Option<UserActivity>,
+    ) -> Result<(), Self::Error>;
 
     async fn insert_chat_state(
         &self,

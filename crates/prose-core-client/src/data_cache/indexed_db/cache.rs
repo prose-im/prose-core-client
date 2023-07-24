@@ -20,6 +20,7 @@ pub(super) mod keys {
     pub const AVATAR_METADATA_STORE: &str = "avatar_metadata";
     pub const CHAT_STATE_STORE: &str = "chat_state";
     pub const DRAFTS_STORE: &str = "drafts";
+    pub const USER_ACTIVITY_STORE: &str = "user_activity";
 
     pub mod settings {
         pub const ACCOUNT: &str = "account";
@@ -73,7 +74,7 @@ pub struct IndexedDBDataCache {
 
 impl IndexedDBDataCache {
     pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 1)?;
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 2)?;
 
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             let old_version = evt.old_version() as u32;
@@ -109,6 +110,10 @@ impl IndexedDBDataCache {
                     &IdbKeyPath::str("timestamp"),
                     &IdbIndexParameters::new().unique(false),
                 )?;
+            }
+
+            if old_version < 2 {
+                db.create_object_store(keys::USER_ACTIVITY_STORE)?;
             }
 
             Ok(())

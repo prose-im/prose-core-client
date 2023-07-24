@@ -3,14 +3,16 @@ use chrono::{DateTime, Utc};
 use jid::BareJid;
 use thiserror::Error;
 
-use prose_domain::{Contact, UserProfile};
+use prose_domain::UserProfile;
 use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::{ChatState, Id};
 use prose_xmpp::SendUnlessWasm;
 
 use crate::data_cache::{ContactsCache, DataCache, MessageCache};
 use crate::types::roster::Item;
-use crate::types::{AccountSettings, AvatarMetadata, MessageLike, Page, Presence};
+use crate::types::{
+    AccountSettings, AvatarMetadata, Contact, MessageLike, Page, Presence, UserActivity,
+};
 
 #[derive(Error, Debug)]
 #[error(transparent)]
@@ -71,6 +73,13 @@ impl ContactsCache for NoopDataCache {
     }
 
     async fn insert_presence(&self, _jid: &BareJid, _presence: &Presence) -> Result<()> {
+        Ok(())
+    }
+    async fn insert_user_activity(
+        &self,
+        _jid: &BareJid,
+        _user_activity: &Option<UserActivity>,
+    ) -> std::result::Result<(), Self::Error> {
         Ok(())
     }
 

@@ -9,6 +9,7 @@ pub use chat::Chat;
 pub use mam::MAM;
 pub use profile::Profile;
 pub use roster::Roster;
+pub use status::Status;
 
 use crate::client::ModuleContext;
 use crate::stanza::{Message, PubSubMessage};
@@ -20,6 +21,7 @@ mod mam;
 mod ping;
 mod profile;
 mod roster;
+mod status;
 
 pub trait Module: Any + SendUnlessWasm + SyncUnlessWasm {
     fn register_with(&mut self, context: ModuleContext);

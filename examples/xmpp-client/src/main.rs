@@ -3,7 +3,7 @@ use futures::FutureExt;
 use tracing::info;
 
 use common::{enable_debug_logging, load_credentials, Level};
-use prose_xmpp::mods::{Chat, Profile};
+use prose_xmpp::mods::{Chat, Profile, Status};
 use prose_xmpp::stanza::presence::Show;
 use prose_xmpp::{connector, Client, Event};
 
@@ -18,6 +18,7 @@ async fn main() -> Result<()> {
         .set_connector_provider(Connector::provider())
         .add_mod(Chat::default())
         .add_mod(Profile::default())
+        .add_mod(Status::default())
         .set_event_handler(|client, event| handle_event(client, event).map(|f| f.unwrap()))
         .build();
 

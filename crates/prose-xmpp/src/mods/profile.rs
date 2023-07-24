@@ -3,8 +3,7 @@ use jid::{BareJid, Jid};
 use minidom::Element;
 use xmpp_parsers::hashes::Sha1HexAttribute;
 use xmpp_parsers::iq::{Iq, IqType};
-use xmpp_parsers::presence;
-use xmpp_parsers::presence::{Presence, Type};
+use xmpp_parsers::presence::Presence;
 use xmpp_parsers::pubsub;
 use xmpp_parsers::pubsub::pubsub::Items;
 use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
@@ -308,14 +307,5 @@ impl Profile {
 
         self.ctx.send_iq(iq).await?;
         Ok(())
-    }
-
-    pub fn send_presence(&self, show: Option<presence::Show>, status: Option<&str>) -> Result<()> {
-        let mut presence = Presence::new(Type::None);
-        presence.show = show;
-        if let Some(status) = status {
-            presence.set_status("", status);
-        }
-        self.ctx.send_stanza(presence)
     }
 }

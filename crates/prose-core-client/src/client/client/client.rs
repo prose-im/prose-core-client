@@ -6,14 +6,13 @@ use jid::FullJid;
 use strum_macros::Display;
 use tracing::instrument;
 
-use prose_domain::Availability;
-use prose_xmpp::mods::{Caps, Chat, Profile};
+use prose_xmpp::mods::{Caps, Chat, Status};
 use prose_xmpp::ConnectionError;
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::{AccountSettings, Capabilities};
+use crate::types::{AccountSettings, Availability, Capabilities};
 use crate::ClientDelegate;
 
 #[derive(Debug, thiserror::Error, Display)]
@@ -67,14 +66,14 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             })?;
 
         let show: xmpp_parsers::presence::Show =
-            crate::domain_ext::Availability::from(availability)
+            availability
                 .try_into()
                 .map_err(|err: anyhow::Error| ConnectionError::Generic {
                     msg: err.to_string(),
                 })?;
 
-        let profile = self.client.get_mod::<Profile>();
-        profile
+        let status_mod = self.client.get_mod::<Status>();
+        status_mod
             .send_presence(Some(show), status)
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),

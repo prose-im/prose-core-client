@@ -20,3 +20,6 @@ pub const FALLBACK: &str = "urn:xmpp:fallback:0";
 
 /// XEP-0334: Message Processing Hints
 pub const HINTS: &str = "urn:xmpp:hints";
+
+/// XEP-0108: User Activity
+pub const ACTIVITY: &str = "http://jabber.org/protocol/activity";

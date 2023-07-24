@@ -3,7 +3,6 @@ pub use chrono::{DateTime, Utc};
 use jid::BareJid;
 use microtype::microtype;
 use serde::{Deserialize, Serialize};
-use strum_macros::Display;
 use typeshare::typeshare;
 pub use url::Url;
 
@@ -12,26 +11,6 @@ use crate::jid::BareJid;
 
 #[cfg(feature = "typescript")]
 mod jid;
-
-#[typeshare]
-#[derive(Debug, Display, PartialEq, Serialize, Deserialize, Clone)]
-pub enum Availability {
-    Available,
-    Unavailable,
-    DoNotDisturb,
-    Away,
-}
-
-#[typeshare]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Contact {
-    pub jid: BareJid,
-    pub name: String,
-    pub avatar: Option<String>,
-    pub availability: Availability,
-    pub status: Option<String>,
-    pub groups: Vec<String>,
-}
 
 #[typeshare]
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
