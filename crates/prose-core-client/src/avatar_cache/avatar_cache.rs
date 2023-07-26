@@ -1,28 +1,40 @@
-use std::path::PathBuf;
-
-use anyhow::Result;
+use async_trait::async_trait;
+#[cfg(target_arch = "wasm32")]
+use auto_impl::auto_impl;
 use jid::BareJid;
+
+use prose_xmpp::mods::AvatarData;
+use prose_xmpp::stanza::avatar;
 use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
-use prose_xmpp::stanza::avatar;
+use crate::types::AvatarMetadata;
 
 pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (600, 600);
-pub const IMAGE_OUTPUT_MIME_TYPE: &str = "image/jpeg";
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
+#[async_trait]
 pub trait AvatarCache: SendUnlessWasm + SyncUnlessWasm {
-    #[cfg(feature = "native-app")]
-    fn cache_avatar_image(
+    type Image;
+    type Error: std::error::Error + Send + Sync;
+
+    async fn cache_avatar_image(
         &self,
         jid: &BareJid,
-        image: image::DynamicImage,
-        metadata: &crate::types::AvatarMetadata,
-    ) -> Result<PathBuf>;
+        image: &AvatarData,
+        metadata: &AvatarMetadata,
+    ) -> Result<(), Self::Error>;
 
-    fn cached_avatar_image_url(
+    async fn has_cached_avatar_image(
         &self,
         jid: &BareJid,
         image_checksum: &avatar::ImageId,
-    ) -> Option<PathBuf>;
+    ) -> Result<bool, Self::Error>;
 
-    fn delete_all_cached_images(&self) -> Result<()>;
+    async fn cached_avatar_image(
+        &self,
+        jid: &BareJid,
+        image_checksum: &avatar::ImageId,
+    ) -> Result<Option<Self::Image>, Self::Error>;
+
+    async fn delete_all_cached_images(&self) -> Result<(), Self::Error>;
 }

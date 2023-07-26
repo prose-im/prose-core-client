@@ -1,20 +1,19 @@
-use microtype::Microtype;
-use tracing::info;
-use wasm_bindgen::prelude::*;
-
-use prose_core_client::avatar_cache::NoopAvatarCache;
-use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
-use prose_core_client::types::{Availability, UserActivity};
-use prose_core_client::{Client as ProseClient, ClientBuilder};
-use prose_domain::{Emoji, MessageId};
-
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     BareJid, BareJidArray, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray,
-    StringArray,
+    StringArray, UserProfile,
 };
 use crate::util::WasmTimeProvider;
+use base64::{engine::general_purpose, Engine as _};
+use microtype::Microtype;
+use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
+use prose_core_client::types::{Availability, UserActivity};
+use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
+use prose_domain::{Emoji, MessageId};
+use std::rc::Rc;
+use tracing::info;
+use wasm_bindgen::prelude::*;
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
 
@@ -24,7 +23,7 @@ pub struct WasmError(#[from] anyhow::Error);
 
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
-    client: ProseClient<IndexedDBDataCache, NoopAvatarCache>,
+    client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>,
 }
 
 #[wasm_bindgen(js_class = "ProseClient")]
@@ -33,13 +32,13 @@ impl Client {
         connection_provider: JSConnectionProvider,
         delegate: JSDelegate,
     ) -> Result<Client> {
-        let cache = IndexedDBDataCache::new().await?;
+        let cache = Rc::new(IndexedDBDataCache::new().await?);
 
         let client = Client {
             client: ClientBuilder::new()
                 .set_connector_provider(Connector::provider(connection_provider))
-                .set_data_cache(cache)
-                .set_avatar_cache(NoopAvatarCache::default())
+                .set_data_cache(cache.clone())
+                .set_avatar_cache(cache)
                 .set_time_provider(WasmTimeProvider::default())
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .build(),
@@ -233,13 +232,58 @@ impl Client {
         Ok(())
     }
 
-    // #[wasm_bindgen(js_name = "loadMessagesBefore")]
-    // pub async fn load_messages_before(
-    //     &self,
-    //     from: BareJid,
-    //     before: MessageId,
-    // ) -> Result<MessagesPage, ClientError> {
-    //     let page = self.client.load_messages_before(&from, &before).await?;
-    //     Ok(page.into())
-    // }
+    /// XEP-0084: User Avatar
+    /// https://xmpp.org/extensions/xep-0084.html
+    #[wasm_bindgen(js_name = "loadAvatarDataURL")]
+    pub async fn load_avatar_data_url(&self, jid: &BareJid) -> Result<Option<String>> {
+        let jid = jid::BareJid::from(jid.clone());
+        let avatar = self
+            .client
+            .load_avatar(jid, CachePolicy::ReturnCacheDataDontLoad)
+            .await
+            .map_err(WasmError::from)?;
+        Ok(avatar)
+    }
+
+    /// XEP-0084: User Avatar
+    /// https://xmpp.org/extensions/xep-0084.html
+    #[wasm_bindgen(js_name = "saveAvatar")]
+    pub async fn save_avatar(&self, image_data: &str, mime_type: &str) -> Result<()> {
+        // Somehow converting the String from FileReader.readAsBinaryString via String::as_bytes()
+        // did not work. Maybe just the the Blob (e.g. via gloo-file/Blob)
+        let image_data = general_purpose::STANDARD
+            .decode(image_data)
+            .map_err(|err| WasmError::from(anyhow::Error::from(err)))?;
+
+        self.client
+            .save_avatar(&image_data, None, None, mime_type)
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    /// XEP-0292: vCard4 Over XMPP
+    /// https://xmpp.org/extensions/xep-0292.html
+    #[wasm_bindgen(js_name = "loadUserProfile")]
+    pub async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
+        let jid = jid::BareJid::from(jid.clone());
+        let profile = self
+            .client
+            .load_profile(jid, CachePolicy::ReturnCacheDataElseLoad)
+            .await
+            .map_err(WasmError::from)?;
+
+        Ok(profile.map(Into::into))
+    }
+
+    /// XEP-0292: vCard4 Over XMPP
+    /// https://xmpp.org/extensions/xep-0292.html
+    #[wasm_bindgen(js_name = "saveUserProfile")]
+    pub async fn save_user_profile(&self, profile: &UserProfile) -> Result<()> {
+        self.client
+            .save_profile((profile.clone()).into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
 }

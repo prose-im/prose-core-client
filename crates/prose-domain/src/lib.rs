@@ -12,26 +12,6 @@ use crate::jid::BareJid;
 #[cfg(feature = "typescript")]
 mod jid;
 
-#[typeshare]
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct Address {
-    pub locality: Option<String>,
-    pub country: Option<String>,
-}
-
-#[typeshare]
-#[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
-pub struct UserProfile {
-    pub full_name: Option<String>,
-    pub nickname: Option<String>,
-    pub org: Option<String>,
-    pub title: Option<String>,
-    pub email: Option<String>,
-    pub tel: Option<String>,
-    pub url: Option<Url>,
-    pub address: Option<Address>,
-}
-
 microtype! {
     pub String {
         #[string]

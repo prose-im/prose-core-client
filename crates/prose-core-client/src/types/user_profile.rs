@@ -1,15 +1,24 @@
 use anyhow::Result;
-use microtype::microtype;
+use prose_xmpp::stanza::{vcard, VCard4};
+use serde::{Deserialize, Serialize};
 use url::Url;
 
-use prose_domain::Address;
-use prose_xmpp::stanza::{vcard, VCard4};
+#[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
+pub struct Address {
+    pub locality: Option<String>,
+    pub country: Option<String>,
+}
 
-microtype! {
-    #[derive(Debug, Clone)]
-    pub prose_domain::UserProfile {
-        UserProfile
-    }
+#[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
+pub struct UserProfile {
+    pub full_name: Option<String>,
+    pub nickname: Option<String>,
+    pub org: Option<String>,
+    pub title: Option<String>,
+    pub email: Option<String>,
+    pub tel: Option<String>,
+    pub url: Option<Url>,
+    pub address: Option<Address>,
 }
 
 trait VecExt {
@@ -33,7 +42,7 @@ impl TryFrom<VCard4> for UserProfile {
     type Error = anyhow::Error;
 
     fn try_from(mut value: VCard4) -> Result<Self> {
-        Ok(UserProfile(prose_domain::UserProfile {
+        Ok(UserProfile {
             full_name: value.fn_.swap_remove_first().map(|v| v.value),
             nickname: value.nickname.swap_remove_first().map(|v| v.value),
             org: value.org.swap_remove_first().map(|v| v.value),
@@ -48,7 +57,7 @@ impl TryFrom<VCard4> for UserProfile {
                 locality: adr.locality.swap_remove_first(),
                 country: adr.country.swap_remove_first(),
             }),
-        }))
+        })
     }
 }
 

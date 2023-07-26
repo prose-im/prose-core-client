@@ -5,6 +5,7 @@
 use std::path::Path;
 use std::sync::Mutex;
 
+use crate::data_cache::data_cache::AccountCache;
 use async_trait::async_trait;
 use rusqlite::types::FromSqlError;
 pub use rusqlite::Connection;
@@ -58,7 +59,7 @@ impl SQLiteCache {
 }
 
 #[async_trait]
-impl DataCache for SQLiteCache {
+impl AccountCache for SQLiteCache {
     type Error = SQLiteCacheError;
 
     async fn delete_all(&self) -> Result<()> {
@@ -99,6 +100,8 @@ impl DataCache for SQLiteCache {
         Ok(settings)
     }
 }
+
+impl DataCache for SQLiteCache {}
 
 const DATABASE_VERSION: u8 = 4;
 

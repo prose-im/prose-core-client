@@ -202,7 +202,7 @@ impl ContactsCache for SQLiteCache {
     async fn insert_user_activity(
         &self,
         _jid: &BareJid,
-        _user_activity: &UserActivity,
+        _user_activity: &Option<UserActivity>,
     ) -> Result<(), Self::Error> {
         todo!()
     }
@@ -243,7 +243,7 @@ impl ContactsCache for SQLiteCache {
         Ok(Some(row.0))
     }
 
-    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<avatar::ImageId>)>> {
+    async fn load_contacts(&self) -> Result<Vec<Contact>> {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
@@ -290,18 +290,15 @@ impl ContactsCache for SQLiteCache {
                     Availability::Unavailable
                 };
 
-                Ok((
-                    Contact {
-                        jid: jid.clone(),
-                        name: full_name.or(nickname).unwrap_or(jid.to_string()),
-                        avatar: None,
-                        availability,
-                        activity: None,
-                        status,
-                        groups,
-                    },
-                    checksum,
-                ))
+                Ok(Contact {
+                    jid: jid.clone(),
+                    name: full_name.or(nickname).unwrap_or(jid.to_string()),
+                    avatar_id: checksum,
+                    availability,
+                    activity: None,
+                    status,
+                    groups,
+                })
             })?
             .collect::<Result<Vec<_>, _>>()?;
 

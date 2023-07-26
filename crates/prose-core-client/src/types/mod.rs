@@ -9,6 +9,7 @@ pub use page::Page;
 pub use presence::Presence;
 pub use prose_domain::*;
 pub use user_activity::UserActivity;
+pub use user_profile::{Address, UserProfile};
 
 mod account_settings;
 mod availability;
@@ -21,3 +22,4 @@ mod page;
 pub mod presence;
 pub mod roster;
 mod user_activity;
+mod user_profile;

@@ -3,18 +3,15 @@ use std::fmt::Debug;
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
-use microtype::Microtype;
 use tracing::{info, instrument};
 
-use prose_domain::UserProfile;
-use prose_xmpp::mods::{Profile, Roster};
-use prose_xmpp::stanza::avatar;
+use prose_xmpp::mods::Roster;
 use prose_xmpp::{mods, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::{ContactsCache, DataCache};
-use crate::types::{roster, AvatarMetadata, Contact};
-use crate::{domain_ext, CachePolicy};
+use crate::types::{roster, Contact, UserProfile};
+use crate::CachePolicy;
 
 use super::Client;
 
@@ -47,34 +44,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(None);
         }
 
-        let profile = domain_ext::UserProfile::try_from(vcard)?;
+        let profile = UserProfile::try_from(vcard)?;
 
         self.inner
             .data_cache
             .insert_user_profile(&from, &profile)
             .await?;
-        Ok(Some(profile.into_inner()))
-    }
-
-    #[cfg(feature = "native-app")]
-    #[instrument]
-    pub async fn load_avatar(
-        &self,
-        from: impl Into<BareJid> + Debug,
-        cache_policy: CachePolicy,
-    ) -> Result<Option<std::path::PathBuf>> {
-        let from = from.into();
-
-        let Some(metadata) = self.load_avatar_metadata(&from, cache_policy).await? else {
-            return Ok(None);
-        };
-
-        // TODO
-        // self.ctx
-        //     .load_and_cache_avatar_image(&from, &metadata, cache_policy)
-        //     .await
-
-        Ok(None)
+        Ok(Some(profile))
     }
 
     #[instrument]
@@ -117,55 +93,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .await?;
         }
 
-        let contacts: Vec<(Contact, Option<avatar::ImageId>)> =
-            self.inner.data_cache.load_contacts().await?;
-
-        Ok(contacts
-            .into_iter()
-            .map(|(mut contact, image_id)| {
-                if let Some(image_id) = image_id {
-                    contact.avatar = self
-                        .inner
-                        .avatar_cache
-                        .cached_avatar_image_url(&contact.jid, &image_id)
-                        .and_then(|path| path.into_os_string().into_string().ok())
-                }
-                contact
-            })
-            .collect())
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    #[instrument]
-    async fn load_avatar_metadata(
-        &self,
-        from: &BareJid,
-        cache_policy: CachePolicy,
-    ) -> Result<Option<AvatarMetadata>> {
-        if cache_policy != CachePolicy::ReloadIgnoringCacheData {
-            if let Some(metadata) = self.inner.data_cache.load_avatar_metadata(from).await? {
-                return Ok(Some(metadata.into()));
-            }
-        }
-
-        if cache_policy == CachePolicy::ReturnCacheDataDontLoad {
-            return Ok(None);
-        }
-
-        let profile = self.client.get_mod::<Profile>();
-        let metadata = profile
-            .load_latest_avatar_metadata(from.clone())
-            .await?
-            .map(Into::into);
-
-        let Some(metadata) = metadata else {
-            return Ok(None);
-        };
-        self.inner
-            .data_cache
-            .insert_avatar_metadata(from, &metadata)
-            .await?;
-        Ok(Some(metadata))
+        let contacts = self.inner.data_cache.load_contacts().await?;
+        Ok(contacts)
     }
 }

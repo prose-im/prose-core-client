@@ -1,3 +1,4 @@
+use crate::data_cache::data_cache::AccountCache;
 use async_trait::async_trait;
 use indexed_db_futures::prelude::*;
 use indexed_db_futures::web_sys::DomException;
@@ -21,6 +22,7 @@ pub(super) mod keys {
     pub const CHAT_STATE_STORE: &str = "chat_state";
     pub const DRAFTS_STORE: &str = "drafts";
     pub const USER_ACTIVITY_STORE: &str = "user_activity";
+    pub const AVATAR_STORE: &str = "avatar";
 
     pub mod settings {
         pub const ACCOUNT: &str = "account";
@@ -74,7 +76,7 @@ pub struct IndexedDBDataCache {
 
 impl IndexedDBDataCache {
     pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 2)?;
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 3)?;
 
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             let old_version = evt.old_version() as u32;
@@ -116,6 +118,10 @@ impl IndexedDBDataCache {
                 db.create_object_store(keys::USER_ACTIVITY_STORE)?;
             }
 
+            if old_version < 3 {
+                db.create_object_store(keys::AVATAR_STORE)?;
+            }
+
             Ok(())
         }));
 
@@ -130,7 +136,7 @@ impl IndexedDBDataCache {
 }
 
 #[async_trait(? Send)]
-impl DataCache for IndexedDBDataCache {
+impl AccountCache for IndexedDBDataCache {
     type Error = IndexedDBDataCacheError;
 
     async fn delete_all(&self) -> Result<()> {
@@ -160,3 +166,5 @@ impl DataCache for IndexedDBDataCache {
             .await
     }
 }
+
+impl DataCache for IndexedDBDataCache {}

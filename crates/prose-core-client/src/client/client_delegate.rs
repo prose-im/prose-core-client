@@ -20,6 +20,9 @@ pub enum ClientEvent {
     /// Infos about a contact have changed.
     ContactChanged { jid: BareJid },
 
+    /// The avatar of a user changed.
+    AvatarChanged { jid: BareJid },
+
     /// One or many messages were either received or sent.
     MessagesAppended {
         conversation: BareJid,

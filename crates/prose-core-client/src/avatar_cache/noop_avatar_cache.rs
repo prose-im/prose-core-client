@@ -1,40 +1,55 @@
-use std::path::PathBuf;
-
-use anyhow::Result;
+use async_trait::async_trait;
 use jid::BareJid;
+use thiserror::Error;
 
+use prose_xmpp::mods::AvatarData;
 use prose_xmpp::stanza::avatar;
+use prose_xmpp::stanza::avatar::ImageId;
 
 use crate::avatar_cache::AvatarCache;
+use crate::types::AvatarMetadata;
 
+#[derive(Default)]
 pub struct NoopAvatarCache {}
 
-impl Default for NoopAvatarCache {
-    fn default() -> Self {
-        NoopAvatarCache {}
-    }
-}
+#[derive(Error, Debug)]
+#[error(transparent)]
+pub struct NoopAvatarCacheError(#[from] anyhow::Error);
 
+type Result<T> = std::result::Result<T, NoopAvatarCacheError>;
+
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 impl AvatarCache for NoopAvatarCache {
-    #[cfg(feature = "native-app")]
-    fn cache_avatar_image(
+    type Image = ();
+    type Error = NoopAvatarCacheError;
+
+    async fn cache_avatar_image(
         &self,
         _jid: &BareJid,
-        _image: image::DynamicImage,
-        _metadata: &crate::types::AvatarMetadata,
-    ) -> Result<PathBuf> {
-        Ok(PathBuf::new())
+        _image: &AvatarData,
+        _metadata: &AvatarMetadata,
+    ) -> Result<()> {
+        Ok(())
     }
 
-    fn cached_avatar_image_url(
+    async fn has_cached_avatar_image(
+        &self,
+        _jid: &BareJid,
+        _image_checksum: &ImageId,
+    ) -> Result<bool> {
+        Ok(false)
+    }
+
+    async fn cached_avatar_image(
         &self,
         _jid: &BareJid,
         _image_checksum: &avatar::ImageId,
-    ) -> Option<PathBuf> {
-        None
+    ) -> Result<Option<Self::Image>> {
+        Ok(None)
     }
 
-    fn delete_all_cached_images(&self) -> Result<()> {
+    async fn delete_all_cached_images(&self) -> Result<()> {
         Ok(())
     }
 }

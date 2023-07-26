@@ -215,7 +215,7 @@ async fn save_avatar(client: &Client) -> Result<()> {
         .interact_text()
         .unwrap();
 
-    client.save_avatar(Path::new(path.trim())).await?;
+    client.save_avatar_from_url(Path::new(path.trim())).await?;
 
     Ok(())
 }
@@ -303,7 +303,10 @@ async fn load_contacts(client: &Client) -> Result<()> {
     "#,
             contact.jid,
             contact.name,
-            contact.avatar.unwrap_or("<not set>".to_string()),
+            contact
+                .avatar_id
+                .map(|id| id.as_ref().to_string())
+                .unwrap_or("<not set>".to_string()),
             contact.availability,
             format_opt(contact.status),
             contact.groups.join(", "),

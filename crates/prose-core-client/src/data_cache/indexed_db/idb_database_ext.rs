@@ -9,7 +9,7 @@ use super::cache::Result;
 
 #[async_trait(? Send)]
 pub trait IdbDatabaseExt {
-    async fn set_value<T: Serialize>(
+    async fn set_value<T: Serialize + ?Sized>(
         &self,
         store: impl AsRef<str>,
         key: impl AsRef<str>,
@@ -29,7 +29,7 @@ pub trait IdbDatabaseExt {
 
 #[async_trait(? Send)]
 impl IdbDatabaseExt for IdbDatabase {
-    async fn set_value<T: Serialize>(
+    async fn set_value<T: Serialize + ?Sized>(
         &self,
         store: impl AsRef<str>,
         key: impl AsRef<str>,
@@ -87,7 +87,7 @@ pub trait IdbObjectStoreExtGet {
 }
 
 pub trait IdbObjectStoreExtSet {
-    fn set_value<T: Serialize>(&self, key: impl AsRef<str>, value: &T) -> Result<()>;
+    fn set_value<T: Serialize + ?Sized>(&self, key: impl AsRef<str>, value: &T) -> Result<()>;
 }
 
 #[async_trait(? Send)]
@@ -119,7 +119,7 @@ impl IdbObjectStoreExtGet for IdbObjectStore<'_> {
 }
 
 impl IdbObjectStoreExtSet for IdbObjectStore<'_> {
-    fn set_value<T: Serialize>(&self, key: impl AsRef<str>, value: &T) -> Result<()> {
+    fn set_value<T: Serialize + ?Sized>(&self, key: impl AsRef<str>, value: &T) -> Result<()> {
         self.put_key_val(
             &JsValue::from_str(key.as_ref()),
             &JsValue::from_serde(value)?,

@@ -1,11 +1,13 @@
 use async_trait::async_trait;
 #[cfg(feature = "test-helpers")]
 use auto_impl::auto_impl;
+#[cfg(target_arch = "wasm32")]
+use auto_impl::auto_impl;
 use chrono::{DateTime, Utc};
 use jid::BareJid;
 
+use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{stanza_id, ChatState};
-use prose_xmpp::stanza::{avatar, message};
 use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::types::{
@@ -14,24 +16,32 @@ use crate::types::{
 };
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
-#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[async_trait]
-pub trait DataCache: ContactsCache + MessageCache + SendUnlessWasm + SyncUnlessWasm {
+pub trait DataCache:
+    AccountCache + ContactsCache + MessageCache + SendUnlessWasm + SyncUnlessWasm
+{
+}
+
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
+#[async_trait]
+pub trait AccountCache {
     type Error: std::error::Error + Send + Sync;
 
-    async fn delete_all(&self) -> Result<(), <Self as DataCache>::Error>;
+    async fn delete_all(&self) -> Result<(), <Self as AccountCache>::Error>;
 
     async fn save_account_settings(
         &self,
         settings: &AccountSettings,
-    ) -> Result<(), <Self as DataCache>::Error>;
+    ) -> Result<(), <Self as AccountCache>::Error>;
     async fn load_account_settings(
         &self,
-    ) -> Result<Option<AccountSettings>, <Self as DataCache>::Error>;
+    ) -> Result<Option<AccountSettings>, <Self as AccountCache>::Error>;
 }
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
-#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[async_trait]
 pub trait ContactsCache {
     type Error: std::error::Error + Send + Sync;
@@ -73,11 +83,11 @@ pub trait ContactsCache {
     ) -> Result<(), Self::Error>;
     async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>, Self::Error>;
 
-    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<avatar::ImageId>)>, Self::Error>;
+    async fn load_contacts(&self) -> Result<Vec<Contact>, Self::Error>;
 }
 
 #[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
-#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[async_trait]
 pub trait MessageCache {
     type Error: std::error::Error + Send + Sync;

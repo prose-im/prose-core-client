@@ -3,15 +3,15 @@ use chrono::{DateTime, Utc};
 use jid::BareJid;
 use thiserror::Error;
 
-use prose_domain::UserProfile;
-use prose_xmpp::stanza::avatar::ImageId;
 use prose_xmpp::stanza::message::{ChatState, Id};
 use prose_xmpp::SendUnlessWasm;
 
+use crate::data_cache::data_cache::AccountCache;
 use crate::data_cache::{ContactsCache, DataCache, MessageCache};
 use crate::types::roster::Item;
 use crate::types::{
     AccountSettings, AvatarMetadata, Contact, MessageLike, Page, Presence, UserActivity,
+    UserProfile,
 };
 
 #[derive(Error, Debug)]
@@ -20,13 +20,8 @@ pub struct NoopDataCacheError(#[from] anyhow::Error);
 
 type Result<T> = std::result::Result<T, NoopDataCacheError>;
 
+#[derive(Default)]
 pub struct NoopDataCache {}
-
-impl Default for NoopDataCache {
-    fn default() -> Self {
-        NoopDataCache {}
-    }
-}
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -91,7 +86,7 @@ impl ContactsCache for NoopDataCache {
         Ok(None)
     }
 
-    async fn load_contacts(&self) -> Result<Vec<(Contact, Option<ImageId>)>> {
+    async fn load_contacts(&self) -> Result<Vec<Contact>> {
         Ok(vec![])
     }
 }
@@ -155,7 +150,7 @@ impl MessageCache for NoopDataCache {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl DataCache for NoopDataCache {
+impl AccountCache for NoopDataCache {
     type Error = NoopDataCacheError;
 
     async fn delete_all(&self) -> Result<()> {
@@ -170,3 +165,5 @@ impl DataCache for NoopDataCache {
         Ok(None)
     }
 }
+
+impl DataCache for NoopDataCache {}

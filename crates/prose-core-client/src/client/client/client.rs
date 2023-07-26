@@ -96,7 +96,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn delete_cached_data(&self) -> Result<()> {
         self.inner.data_cache.delete_all().await?;
-        self.inner.avatar_cache.delete_all_cached_images()?;
+        self.inner.avatar_cache.delete_all_cached_images().await?;
         Ok(())
     }
 }

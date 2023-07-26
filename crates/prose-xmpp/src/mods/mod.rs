@@ -7,7 +7,7 @@ use xmpp_parsers::presence::Presence;
 pub use caps::Caps;
 pub use chat::Chat;
 pub use mam::MAM;
-pub use profile::Profile;
+pub use profile::{AvatarData, Profile};
 pub use roster::Roster;
 pub use status::Status;
 

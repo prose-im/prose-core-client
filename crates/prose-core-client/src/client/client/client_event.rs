@@ -12,10 +12,9 @@ use prose_xmpp::{mods, Event};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::domain_ext::UserProfile;
 use crate::types::message_like::{Payload, TimestampedMessage};
-use crate::types::{AvatarMetadata, MessageLike};
-use crate::{types, Client, ClientEvent};
+use crate::types::{AvatarMetadata, MessageLike, UserProfile};
+use crate::{types, CachePolicy, Client, ClientEvent};
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_event(&self, event: Event) {
@@ -141,19 +140,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .insert_avatar_metadata(&from, &metadata)
             .await?;
 
-        Ok(())
+        self.load_and_cache_avatar_image(&from, &metadata, CachePolicy::ReturnCacheDataElseLoad)
+            .await?;
 
-        // TODO: Fix this
-        // match ctx
-        //     .load_and_cache_avatar_image(&from, &metadata, CachePolicy::ReloadIgnoringCacheData)
-        //     .await
-        // {
-        //     Ok(path) => {
-        //         debug!("Finished downloading and caching image to {:?}", path);
-        //         ctx.send_event(ClientEvent::ContactChanged { jid: from });
-        //     }
-        //     Err(err) => error!("Failed downloading and caching image. {}", err),
-        // }
+        self.send_event(ClientEvent::AvatarChanged { jid: from });
+
+        Ok(())
     }
 
     async fn presence_did_change(&self, presence: Presence) -> Result<()> {

@@ -1,7 +1,4 @@
-use anyhow::Result;
-use base64::{engine::general_purpose, Engine as _};
 use serde::{Deserialize, Serialize};
-use sha1::{Digest, Sha1};
 
 use prose_xmpp::stanza::avatar;
 
@@ -26,22 +23,6 @@ impl AvatarMetadata {
             width,
             height,
         }
-    }
-}
-
-impl AvatarMetadata {
-    pub fn decode_base64_data(data: impl AsRef<[u8]>) -> Result<Vec<u8>> {
-        Ok(general_purpose::STANDARD.decode(data)?)
-    }
-
-    pub fn encode_image_data(data: impl AsRef<[u8]>) -> String {
-        general_purpose::STANDARD.encode(data)
-    }
-
-    pub fn generate_sha1_checksum(data: impl AsRef<[u8]>) -> String {
-        let mut hasher = Sha1::new();
-        hasher.update(data);
-        format!("{:x}", hasher.finalize())
     }
 }
 

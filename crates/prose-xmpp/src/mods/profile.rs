@@ -1,6 +1,8 @@
 use anyhow::Result;
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use jid::{BareJid, Jid};
 use minidom::Element;
+use std::borrow::Cow;
 use xmpp_parsers::hashes::Sha1HexAttribute;
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::presence::Presence;
@@ -12,13 +14,42 @@ use crate::client::ModuleContext;
 use crate::event::Event;
 use crate::mods::Module;
 use crate::ns;
+use crate::stanza::avatar::ImageId;
 use crate::stanza::VCard4;
 use crate::stanza::{avatar, PubSubMessage};
 use crate::util::RequestError;
+use sha1::{Digest, Sha1};
 
 #[derive(Default, Clone)]
 pub struct Profile {
     ctx: ModuleContext,
+}
+
+pub enum AvatarData {
+    Base64(String),
+    Data(Vec<u8>),
+}
+
+impl AvatarData {
+    pub fn data(&self) -> std::result::Result<Cow<Vec<u8>>, DecodeError> {
+        match self {
+            AvatarData::Base64(base64) => Ok(Cow::Owned(general_purpose::STANDARD.decode(base64)?)),
+            AvatarData::Data(data) => Ok(Cow::Borrowed(data)),
+        }
+    }
+
+    pub fn base64(&self) -> Cow<str> {
+        match self {
+            AvatarData::Base64(base64) => Cow::Borrowed(base64),
+            AvatarData::Data(data) => Cow::Owned(general_purpose::STANDARD.encode(data)),
+        }
+    }
+
+    pub fn generate_sha1_checksum(&self) -> std::result::Result<ImageId, DecodeError> {
+        let mut hasher = Sha1::new();
+        hasher.update(self.data()?.as_ref());
+        Ok(format!("{:x}", hasher.finalize()).into())
+    }
 }
 
 impl Module for Profile {
@@ -240,7 +271,7 @@ impl Profile {
         &self,
         from: impl Into<Jid>,
         image_id: &Sha1HexAttribute,
-    ) -> Result<Option<Vec<u8>>> {
+    ) -> Result<Option<AvatarData>> {
         let iq = Iq {
             from: None,
             to: Some(from.into()),
@@ -278,7 +309,7 @@ impl Profile {
             return Ok(None);
         };
 
-        Ok(Some(avatar::Data::try_from(payload)?.data))
+        Ok(Some(AvatarData::Base64(payload.text())))
     }
 
     pub async fn set_avatar_image(

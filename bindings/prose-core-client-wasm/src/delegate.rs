@@ -1,3 +1,4 @@
+use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent};
@@ -33,6 +34,9 @@ export interface ProseClientDelegate {
     /// Infos about a contact have changed.
     contactChanged(jid: BareJID): void
     
+    /// The avatar of a user changed.
+    avatarChanged(jid: BareJID): void
+    
     /// One or many messages were either received or sent.
     messagesAppended(conversation: BareJID, messageIDs: string[]): void
 
@@ -49,26 +53,44 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "ProseClientDelegate")]
     pub type JSDelegate;
 
-    #[wasm_bindgen(method, js_name = "clientConnected")]
-    fn client_connected(this: &JSDelegate);
+    #[wasm_bindgen(method, catch, js_name = "clientConnected")]
+    fn client_connected(this: &JSDelegate) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, js_name = "clientDisconnected")]
-    fn client_disconnected(this: &JSDelegate, error: Option<JSConnectionError>);
+    #[wasm_bindgen(method, catch, js_name = "clientDisconnected")]
+    fn client_disconnected(
+        this: &JSDelegate,
+        error: Option<JSConnectionError>,
+    ) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, js_name = "composingUsersChanged")]
-    fn composing_users_changed(this: &JSDelegate, conversation: BareJid);
+    #[wasm_bindgen(method, catch, js_name = "composingUsersChanged")]
+    fn composing_users_changed(this: &JSDelegate, conversation: BareJid) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, js_name = "contactChanged")]
-    fn contactChanged(this: &JSDelegate, jid: BareJid);
+    #[wasm_bindgen(method, catch, js_name = "contactChanged")]
+    fn contact_changed(this: &JSDelegate, jid: BareJid) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, js_name = "messagesAppended")]
-    fn messages_appended(this: &JSDelegate, conversation: BareJid, ids: Vec<JsValue>);
+    #[wasm_bindgen(method, catch, js_name = "avatarChanged")]
+    fn avatar_changed(this: &JSDelegate, jid: BareJid) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, js_name = "messagesUpdated")]
-    fn messages_updated(this: &JSDelegate, conversation: BareJid, ids: Vec<JsValue>);
+    #[wasm_bindgen(method, catch, js_name = "messagesAppended")]
+    fn messages_appended(
+        this: &JSDelegate,
+        conversation: BareJid,
+        ids: Vec<JsValue>,
+    ) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, js_name = "messagesDeleted")]
-    fn messages_deleted(this: &JSDelegate, conversation: BareJid, ids: Vec<JsValue>);
+    #[wasm_bindgen(method, catch, js_name = "messagesUpdated")]
+    fn messages_updated(
+        this: &JSDelegate,
+        conversation: BareJid,
+        ids: Vec<JsValue>,
+    ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "messagesDeleted")]
+    fn messages_deleted(
+        this: &JSDelegate,
+        conversation: BareJid,
+        ids: Vec<JsValue>,
+    ) -> Result<(), JsValue>;
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -118,35 +140,49 @@ impl JSValueConvertible for Vec<MessageId> {
 
 impl ClientDelegate for Delegate {
     fn handle_event(&self, event: ClientEvent) {
+        match self.handle_event_throwing(event) {
+            Ok(()) => (),
+            Err(val) => warn!(
+                "JSDelegate threw an error when handling an event: {:?}",
+                val
+            ),
+        }
+    }
+}
+
+impl Delegate {
+    fn handle_event_throwing(&self, event: ClientEvent) -> Result<(), JsValue> {
         match event {
             ClientEvent::ComposingUsersChanged { conversation } => {
-                self.inner.composing_users_changed(conversation.into())
+                self.inner.composing_users_changed(conversation.into())?
             }
             ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Connect,
-            } => self.inner.client_connected(),
+            } => self.inner.client_connected()?,
             ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Disconnect { error },
-            } => self.inner.client_disconnected(error.map(Into::into)),
-            ClientEvent::ContactChanged { jid } => self.inner.contactChanged(jid.into()),
+            } => self.inner.client_disconnected(error.map(Into::into))?,
+            ClientEvent::ContactChanged { jid } => self.inner.contact_changed(jid.into())?,
+            ClientEvent::AvatarChanged { jid } => self.inner.avatar_changed(jid.into())?,
             ClientEvent::MessagesAppended {
                 conversation,
                 message_ids,
             } => self
                 .inner
-                .messages_appended(conversation.into(), message_ids.into_js_array()),
+                .messages_appended(conversation.into(), message_ids.into_js_array())?,
             ClientEvent::MessagesUpdated {
                 conversation,
                 message_ids,
             } => self
                 .inner
-                .messages_updated(conversation.into(), message_ids.into_js_array()),
+                .messages_updated(conversation.into(), message_ids.into_js_array())?,
             ClientEvent::MessagesDeleted {
                 conversation,
                 message_ids,
             } => self
                 .inner
-                .messages_deleted(conversation.into(), message_ids.into_js_array()),
+                .messages_deleted(conversation.into(), message_ids.into_js_array())?,
         }
+        Ok(())
     }
 }
