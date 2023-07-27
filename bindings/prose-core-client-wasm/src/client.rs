@@ -59,6 +59,11 @@ impl Client {
         Ok(())
     }
 
+    pub async fn disconnect(&self) -> Result<()> {
+        self.client.disconnect().await;
+        Ok(())
+    }
+
     #[wasm_bindgen(js_name = "sendMessage")]
     pub async fn send_message(&self, to: &Jid, body: String) -> Result<()> {
         let to = jid::Jid::from(to.clone());
@@ -250,7 +255,7 @@ impl Client {
     #[wasm_bindgen(js_name = "saveAvatar")]
     pub async fn save_avatar(&self, image_data: &str, mime_type: &str) -> Result<()> {
         // Somehow converting the String from FileReader.readAsBinaryString via String::as_bytes()
-        // did not work. Maybe just the the Blob (e.g. via gloo-file/Blob)
+        // did not work. Maybe just the the Blob (e.g. via gloo-file/Blob)?
         let image_data = general_purpose::STANDARD
             .decode(image_data)
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?;
@@ -282,6 +287,15 @@ impl Client {
     pub async fn save_user_profile(&self, profile: &UserProfile) -> Result<()> {
         self.client
             .save_profile((profile.clone()).into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "deleteCachedData")]
+    pub async fn delete_cached_data(&self) -> Result<()> {
+        self.client
+            .delete_cached_data()
             .await
             .map_err(WasmError::from)?;
         Ok(())
