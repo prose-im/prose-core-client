@@ -82,6 +82,10 @@ impl ModuleContext {
         let fut = (self.inner.event_handler)(self.inner.clone().try_into().unwrap(), event);
         tokio::spawn(async move { fut.await });
     }
+
+    pub(crate) fn disconnect(&self) {
+        self.inner.disconnect();
+    }
 }
 
 pub(super) struct ModuleContextInner {
@@ -93,6 +97,14 @@ pub(super) struct ModuleContextInner {
     pub mod_futures: Mutex<Vec<ModFutureStateEntry>>,
     pub id_provider: Box<dyn IDProvider>,
     pub time_provider: Box<dyn TimeProvider>,
+}
+
+impl ModuleContextInner {
+    pub(crate) fn disconnect(&self) {
+        if let Some(conn) = self.connection.write().take() {
+            conn.disconnect()
+        }
+    }
 }
 
 pub(super) struct ModFutureStateEntry {

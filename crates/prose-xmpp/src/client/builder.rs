@@ -15,7 +15,7 @@ use crate::connector::{Connection, ConnectionError, ConnectionEventHandler, Conn
 use crate::deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 use crate::mods::AnyModule;
 use crate::util::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
-use crate::{Client, Event};
+use crate::{mods, Client, Event};
 
 pub struct UndefinedConnector {}
 pub struct UndefinedConnection {}
@@ -85,7 +85,13 @@ impl ClientBuilder {
     }
 
     pub fn build(self) -> Client {
-        let mods = Arc::new(self.mods);
+        let mut mods = self.mods;
+        mods.insert(
+            TypeId::of::<mods::Ping>(),
+            RwLock::new(Box::new(mods::Ping::default())),
+        );
+
+        let mods = Arc::new(mods);
 
         let context_inner = Arc::new(ModuleContextInner {
             connector_provider: self.connector_provider,

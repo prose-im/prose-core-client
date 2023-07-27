@@ -1,35 +1,41 @@
-// TODO!
+use anyhow::Result;
+use tracing::info;
+use xmpp_parsers::iq::Iq;
+use xmpp_parsers::ping;
 
-// use std::time::Duration;
-//
-// use crate::helpers::RequestError;
-// use tracing::info;
-// use xmpp_parsers::iq::Iq;
-// use xmpp_parsers::ping::Ping;
-//
-// use crate::modules::{Context, Module};
-//
-// pub(crate) struct Connection {}
-//
-// impl Connection {
-//     pub(crate) fn new() -> Self {
-//         Connection {}
-//     }
-// }
-//
-// impl Module for Connection {}
-//
-// impl Connection {
-//     pub fn send_ping(&self, ctx: &Context) -> Result<()> {
-//         ctx.send_iq_with_timeout_cb(
-//             Iq::from_get(ctx.generate_id(), Ping).with_from(ctx.jid.clone().into()),
-//             Duration::from_secs(5),
-//             |ctx, result| {
-//                 if let Err(RequestError::TimedOut) = result {
-//                     info!("Ping timed out. Disconnecting…");
-//                     ctx.disconnect();
-//                 }
-//             },
-//         )
-//     }
-// }
+use crate::client::ModuleContext;
+use crate::mods::Module;
+use crate::util::RequestError;
+
+#[derive(Default, Clone)]
+pub(crate) struct Ping {
+    ctx: ModuleContext,
+}
+
+impl Module for Ping {
+    fn register_with(&mut self, context: ModuleContext) {
+        self.ctx = context
+    }
+}
+
+impl Ping {
+    pub async fn send_ping(&self) -> Result<()> {
+        let result = self
+            .ctx
+            .send_iq(
+                Iq::from_get(self.ctx.generate_id(), ping::Ping)
+                    .with_from(self.ctx.full_jid().clone().into()),
+            )
+            .await;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(RequestError::TimedOut) => {
+                info!("Ping timed out. Disconnecting…");
+                self.ctx.disconnect();
+                Ok(())
+            }
+            Err(err) => Err(err.into()),
+        }
+    }
+}

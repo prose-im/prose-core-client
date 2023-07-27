@@ -6,11 +6,13 @@ use std::time::Duration;
 use anyhow::Result;
 use jid::FullJid;
 use minidom::Element;
+use tracing::warn;
 
 use crate::client::builder::ClientBuilder;
 use crate::client::module_context::ModuleContextInner;
 use crate::client::ModuleLookup;
 use crate::connector::{ConnectionError, ConnectionEvent};
+use crate::mods;
 use crate::mods::AnyModule;
 use crate::util::{ModuleFuturePoll, PinnedFuture, XMPPElement};
 
@@ -88,9 +90,7 @@ impl ClientInner {
     }
 
     fn disconnect(&self) {
-        if let Some(conn) = self.context.connection.write().take() {
-            conn.disconnect()
-        }
+        self.context.disconnect()
     }
 
     fn get_mod<M: AnyModule + Clone>(&self) -> M {
@@ -107,7 +107,13 @@ impl ClientInner {
                 Self::handle_stanza(&self.context, &self.mods, stanza)
             }
             ConnectionEvent::TimeoutTimer => Self::purge_expired_futures(&self.context),
-            ConnectionEvent::PingTimer => {}
+            ConnectionEvent::PingTimer => {
+                let ping = self.get_mod::<mods::Ping>();
+                match ping.send_ping().await {
+                    Ok(_) => (),
+                    Err(err) => warn!("Failed to send ping. {}", err),
+                }
+            }
         }
     }
 
