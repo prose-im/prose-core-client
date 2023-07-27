@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -8,6 +9,7 @@ use minidom::Element;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
+use crate::util::Interval;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
@@ -58,7 +60,7 @@ extern "C" {
 #[wasm_bindgen(js_name = "ProseConnectionEventHandler")]
 pub struct EventHandler {
     connection: Connection,
-    handler: ConnectionEventHandler,
+    handler: Rc<ConnectionEventHandler>,
 }
 
 pub struct Connector {
@@ -85,11 +87,30 @@ impl ConnectorTrait for Connector {
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
         let client = Rc::new(self.provider.provide_connection());
+        let event_handler = Rc::new(event_handler);
+
+        let ping_interval = {
+            let connection = Connection::new(client.clone());
+            let event_handler = event_handler.clone();
+
+            Interval::new(60_000, move || {
+                let fut = (event_handler)(&connection, ConnectionEvent::PingTimer);
+                spawn_local(async move { fut.await });
+            })
+        };
+
+        let timeout_interval = {
+            let connection = Connection::new(client.clone());
+            let event_handler = event_handler.clone();
+
+            Interval::new(5_000, move || {
+                let fut = (event_handler)(&connection, ConnectionEvent::TimeoutTimer);
+                spawn_local(async move { fut.await });
+            })
+        };
 
         let event_handler = EventHandler {
-            connection: Connection {
-                client: client.clone(),
-            },
+            connection: Connection::new(client.clone()),
             handler: event_handler,
         };
         client.set_event_handler(event_handler);
@@ -99,12 +120,28 @@ impl ConnectorTrait for Connector {
             .await
             .unwrap();
 
-        Ok(Box::new(Connection { client }))
+        Ok(Box::new(Connection {
+            client,
+            ping_interval: RefCell::new(Some(ping_interval)),
+            timeout_interval: RefCell::new(Some(timeout_interval)),
+        }))
     }
 }
 
 pub struct Connection {
     client: Rc<JSConnection>,
+    ping_interval: RefCell<Option<Interval>>,
+    timeout_interval: RefCell<Option<Interval>>,
+}
+
+impl Connection {
+    fn new(client: Rc<JSConnection>) -> Self {
+        Connection {
+            client,
+            ping_interval: Default::default(),
+            timeout_interval: Default::default(),
+        }
+    }
 }
 
 impl ConnectionTrait for Connection {
@@ -116,6 +153,8 @@ impl ConnectionTrait for Connection {
     }
 
     fn disconnect(&self) {
+        self.ping_interval.replace(None);
+        self.timeout_interval.replace(None);
         self.client.disconnect()
     }
 }
@@ -130,18 +169,6 @@ impl EventHandler {
                 error: Some(ConnectionError::Generic { msg: error }),
             },
         );
-        spawn_local(async move { fut.await })
-    }
-
-    #[wasm_bindgen(js_name = "handleTimeout")]
-    pub fn handle_timeout(&self) {
-        let fut = (self.handler)(&self.connection, ConnectionEvent::TimeoutTimer);
-        spawn_local(async move { fut.await })
-    }
-
-    #[wasm_bindgen(js_name = "handlePingTimeout")]
-    pub fn handle_ping_timeout(&self) {
-        let fut = (self.handler)(&self.connection, ConnectionEvent::PingTimer);
         spawn_local(async move { fut.await })
     }
 
