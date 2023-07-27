@@ -2,7 +2,7 @@ use crate::ns;
 use crate::util::ElementExt;
 use anyhow::Context;
 use anyhow::Result;
-use minidom::{Element, Node};
+use minidom::Element;
 use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Clone, Default)]
@@ -38,20 +38,14 @@ impl TryFrom<Element> for UserActivity {
 
 impl From<UserActivity> for Element {
     fn from(value: UserActivity) -> Self {
-        let mut builder = Element::builder("activity", ns::ACTIVITY);
-
-        if let Some(activity) = value.activity {
-            builder = builder.append(Element::from(activity))
-        }
-        if let Some(text) = value.text {
-            builder = builder.append(
-                Element::builder("text", ns::JABBER_CLIENT)
-                    .append(Node::Text(text))
-                    .build(),
+        Element::builder("activity", ns::ACTIVITY)
+            .append_all(value.activity)
+            .append_all(
+                value
+                    .text
+                    .map(|text| Element::builder("text", ns::JABBER_CLIENT).append(text)),
             )
-        }
-
-        builder.build()
+            .build()
     }
 }
 
@@ -88,25 +82,23 @@ impl TryFrom<Element> for Activity {
 
 impl From<Activity> for Element {
     fn from(value: Activity) -> Self {
-        let mut builder = Element::builder(value.general.to_string(), ns::ACTIVITY);
-
-        if let Some(specific) = value.specific {
-            builder = builder.append(Element::from(specific))
-        }
-
-        builder.build()
+        Element::builder(value.general.to_string(), ns::ACTIVITY)
+            .append_all(value.specific)
+            .build()
     }
 }
 
 impl From<activity::Specific> for Element {
     fn from(value: activity::Specific) -> Self {
-        let mut builder = Element::builder(value.to_string(), ns::JABBER_CLIENT);
-
-        if let activity::Specific::Other(Some(text)) = value {
-            builder = builder.append(Node::Text(text))
+        let text = if let activity::Specific::Other(Some(text)) = &value {
+            Some(text.clone())
+        } else {
+            None
         };
 
-        builder.build()
+        Element::builder(value.to_string(), ns::JABBER_CLIENT)
+            .append_all(text)
+            .build()
     }
 }
 
