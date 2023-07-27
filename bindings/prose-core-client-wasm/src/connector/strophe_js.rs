@@ -6,15 +6,18 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
+use thiserror::Error;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
+use web_sys::DomException;
 
-use crate::util::Interval;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
     Connector as ConnectorTrait,
 };
+
+use crate::util::Interval;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
@@ -48,13 +51,17 @@ extern "C" {
     fn set_event_handler(this: &JSConnection, handlers: EventHandler);
 
     #[wasm_bindgen(method, catch)]
-    async fn connect(this: &JSConnection, jid: String, password: String) -> Result<(), JsValue>;
+    async fn connect(
+        this: &JSConnection,
+        jid: String,
+        password: String,
+    ) -> Result<(), DomException>;
 
     #[wasm_bindgen(method)]
     fn disconnect(this: &JSConnection);
 
     #[wasm_bindgen(method, catch, js_name = "sendStanza")]
-    fn send_stanza(this: &JSConnection, stanza: String) -> Result<(), JsValue>;
+    fn send_stanza(this: &JSConnection, stanza: String) -> Result<(), DomException>;
 }
 
 #[wasm_bindgen(js_name = "ProseConnectionEventHandler")]
@@ -114,11 +121,10 @@ impl ConnectorTrait for Connector {
             handler: event_handler,
         };
         client.set_event_handler(event_handler);
-        // TODO: Handle error
         client
             .connect(jid.to_string(), password.to_string())
             .await
-            .unwrap();
+            .map_err(|err| JSConnectionError::from(err))?;
 
         Ok(Box::new(Connection {
             client,
@@ -146,9 +152,9 @@ impl Connection {
 
 impl ConnectionTrait for Connection {
     fn send_stanza(&self, stanza: Element) -> Result<()> {
-        // TODO: Handle result
-        self.client.send_stanza(String::from(&stanza)).unwrap();
-        // self.client.send_stanza(DomParser::new().unwrap());
+        self.client
+            .send_stanza(String::from(&stanza))
+            .map_err(|err| JSConnectionError::from(err))?;
         Ok(())
     }
 
@@ -181,5 +187,33 @@ impl EventHandler {
             ),
         );
         spawn_local(async move { fut.await })
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum JSConnectionError {
+    #[error("DomException {name} ({code}): {message}")]
+    DomException {
+        code: u16,
+        name: String,
+        message: String,
+    },
+}
+
+impl From<JSConnectionError> for ConnectionError {
+    fn from(value: JSConnectionError) -> Self {
+        ConnectionError::Generic {
+            msg: value.to_string(),
+        }
+    }
+}
+
+impl From<DomException> for JSConnectionError {
+    fn from(value: DomException) -> Self {
+        JSConnectionError::DomException {
+            code: value.code(),
+            name: value.name(),
+            message: value.message(),
+        }
     }
 }

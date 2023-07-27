@@ -1,4 +1,3 @@
-use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
