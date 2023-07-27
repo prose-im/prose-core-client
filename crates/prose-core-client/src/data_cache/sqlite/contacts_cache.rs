@@ -13,6 +13,7 @@ use crate::data_cache::ContactsCache;
 use crate::types::{
     roster, Address, Availability, AvatarMetadata, Contact, Presence, UserActivity, UserProfile,
 };
+use crate::util::concatenate_names;
 
 type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 
@@ -70,15 +71,17 @@ impl ContactsCache for SQLiteCache {
         let mut stmt = conn.prepare(
             r#"
             INSERT OR REPLACE INTO user_profile 
-                (jid, full_name, nickname, org, title, email, tel, url, locality, country, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (jid, first_name, last_name, nickname, org, role, title, email, tel, url, locality, country, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )?;
         stmt.execute(params![
             &jid.to_string(),
-            &profile.full_name,
+            &profile.first_name,
+            &profile.last_name,
             &profile.nickname,
             &profile.org,
+            &profile.role,
             &profile.title,
             &profile.email,
             &profile.tel,
@@ -95,7 +98,7 @@ impl ContactsCache for SQLiteCache {
 
         let mut stmt = conn.prepare(
             r#"
-            SELECT full_name, nickname, org, title, email, tel, url, locality, country 
+            SELECT first_name, last_name, nickname, org, role, title, email, tel, url, locality, country 
                 FROM user_profile 
                 WHERE jid = ? AND updated_at >= ?
            "#,
@@ -114,13 +117,15 @@ impl ContactsCache for SQLiteCache {
                 }
 
                 Ok(UserProfile {
-                    full_name: row.get(0)?,
-                    nickname: row.get(1)?,
-                    org: row.get(2)?,
-                    title: row.get(3)?,
-                    email: row.get(4)?,
-                    tel: row.get(5)?,
-                    url: row.get(6)?,
+                    first_name: row.get(0)?,
+                    last_name: row.get(1)?,
+                    nickname: row.get(2)?,
+                    org: row.get(3)?,
+                    role: row.get(4)?,
+                    title: row.get(5)?,
+                    email: row.get(6)?,
+                    tel: row.get(7)?,
+                    url: row.get(8)?,
                     address,
                 })
             })
@@ -250,7 +255,8 @@ impl ContactsCache for SQLiteCache {
             SELECT
                 roster_item.jid,
                 roster_item.groups, 
-                user_profile.full_name, 
+                user_profile.first_name,
+                user_profile.last_name, 
                 user_profile.nickname, 
                 avatar_metadata.checksum, 
                 COUNT(presence.jid) AS presence_count,
@@ -273,16 +279,17 @@ impl ContactsCache for SQLiteCache {
                     .split(",")
                     .map(Into::into)
                     .collect();
-                let full_name: Option<String> = row.get(2)?;
-                let nickname: Option<String> = row.get(3)?;
+                let first_name: Option<String> = row.get(2)?;
+                let last_name: Option<String> = row.get(3)?;
+                let nickname: Option<String> = row.get(4)?;
                 let checksum: Option<avatar::ImageId> =
-                    row.get::<_, Option<String>>(4)?.map(Into::into);
-                let presence_count: u32 = row.get(5)?;
+                    row.get::<_, Option<String>>(5)?.map(Into::into);
+                let presence_count: u32 = row.get(6)?;
                 let presence_kind: Option<presence::Type> =
-                    row.get::<_, Option<FromStrSql<_>>>(6)?.map(|o| o.0);
-                let presence_show: Option<presence::Show> =
                     row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
-                let status: Option<String> = row.get(8)?;
+                let presence_show: Option<presence::Show> =
+                    row.get::<_, Option<FromStrSql<_>>>(8)?.map(|o| o.0);
+                let status: Option<String> = row.get(9)?;
 
                 let availability = if presence_count > 0 {
                     Availability::from((presence_kind, presence_show))
@@ -292,7 +299,9 @@ impl ContactsCache for SQLiteCache {
 
                 Ok(Contact {
                     jid: jid.clone(),
-                    name: full_name.or(nickname).unwrap_or(jid.to_string()),
+                    name: concatenate_names(&first_name, &last_name)
+                        .or(nickname)
+                        .unwrap_or(jid.to_string()),
                     avatar_id: checksum,
                     availability,
                     activity: None,

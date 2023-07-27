@@ -113,13 +113,9 @@ impl Profile {
     pub async fn load_vcard(&self, from: impl Into<BareJid>) -> Result<Option<VCard4>> {
         let iq = Iq {
             from: None,
-            to: None,
+            to: Some(Jid::from(from.into())),
             id: self.ctx.generate_id(),
-            payload: IqType::Get(
-                Element::builder("vcard", ns::VCARD4)
-                    .attr("from", from.into().to_string())
-                    .build(),
-            ),
+            payload: IqType::Get(Element::builder("vcard", ns::VCARD4).build()),
         };
 
         let vcard = match self.ctx.send_iq(iq).await {

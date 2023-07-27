@@ -233,9 +233,11 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
 
     println!(
         r#"
-    Full Name: {}
+    First Name: {}
+    Last Name: {}
     Nickname: {}
     Org: {}
+    Role: {}
     Title: {}
     Email: {}
     Tel: {}
@@ -243,9 +245,11 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
     Locality: {}
     Country: {}
     "#,
-        format_opt(profile.full_name),
+        format_opt(profile.first_name),
+        format_opt(profile.last_name),
         format_opt(profile.nickname),
         format_opt(profile.org),
+        format_opt(profile.role),
         format_opt(profile.title),
         format_opt(profile.email),
         format_opt(profile.tel),
@@ -263,9 +267,11 @@ async fn update_user_profile(client: &Client, jid: BareJid) -> Result<()> {
         .await?
         .unwrap_or_default();
 
-    profile.full_name = prompt_opt_string("Full name", profile.full_name);
+    profile.first_name = prompt_opt_string("First name", profile.first_name);
+    profile.last_name = prompt_opt_string("Last name", profile.last_name);
     profile.nickname = prompt_opt_string("Nickname", profile.nickname);
     profile.org = prompt_opt_string("Org", profile.org);
+    profile.role = prompt_opt_string("Role", profile.role);
     profile.title = prompt_opt_string("Title", profile.title);
     profile.email = prompt_opt_string("Email", profile.email);
     profile.tel = prompt_opt_string("Tel", profile.tel);

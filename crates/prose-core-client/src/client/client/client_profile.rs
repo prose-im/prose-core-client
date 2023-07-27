@@ -7,6 +7,7 @@ use tracing::{info, instrument};
 use xmpp_parsers::hashes::Sha1HexAttribute;
 
 use prose_xmpp::mods::{AvatarData, Profile};
+use prose_xmpp::stanza::VCard4;
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
@@ -20,7 +21,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn save_profile(&self, user_profile: UserProfile) -> Result<()> {
         let profile = self.client.get_mod::<Profile>();
 
-        profile.publish_vcard(user_profile.clone().into()).await?;
+        let vcard = VCard4::from(user_profile.clone());
+
+        profile.set_vcard(vcard.clone()).await?;
+        profile.publish_vcard(vcard).await?;
 
         self.inner
             .data_cache

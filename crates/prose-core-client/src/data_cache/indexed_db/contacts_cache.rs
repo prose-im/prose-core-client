@@ -175,12 +175,13 @@ impl ContactsCache for IndexedDBDataCache {
                 Availability::Unavailable
             };
 
-            let full_name = user_profile.as_ref().and_then(|u| u.full_name.clone());
-            let nickname = user_profile.as_ref().and_then(|u| u.nickname.clone());
+            let name = user_profile
+                .as_ref()
+                .and_then(|profile| profile.full_name().or((&profile).nickname.clone()));
 
             let contact = Contact {
                 jid: parsed_jid.clone(),
-                name: full_name.or(nickname).unwrap_or(parsed_jid.to_string()),
+                name: name.unwrap_or(parsed_jid.to_string()),
                 avatar_id: avatar_metadata.map(|md| md.checksum),
                 availability,
                 activity: user_activity,

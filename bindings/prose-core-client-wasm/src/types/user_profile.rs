@@ -2,14 +2,15 @@ use prose_domain::Url;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct UserProfile(prose_core_client::types::UserProfile);
 
 #[wasm_bindgen]
+#[derive(Debug)]
 pub struct Address(prose_core_client::types::Address);
 
 #[wasm_bindgen]
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Job {
     title: Option<String>,
     role: Option<String>,
@@ -37,28 +38,22 @@ impl UserProfile {
 
     #[wasm_bindgen(getter, js_name = "firstName")]
     pub fn first_name(&self) -> Option<String> {
-        None
+        self.0.first_name.clone()
     }
 
     #[wasm_bindgen(setter, js_name = "firstName")]
-    pub fn set_first_name(&mut self, _first_name: Option<String>) {}
+    pub fn set_first_name(&mut self, first_name: Option<String>) {
+        self.0.first_name = first_name.clone()
+    }
 
     #[wasm_bindgen(getter, js_name = "lastName")]
     pub fn last_name(&self) -> Option<String> {
-        None
+        self.0.last_name.clone()
     }
 
     #[wasm_bindgen(setter, js_name = "lastName")]
-    pub fn set_last_name(&mut self, _last_name: Option<String>) {}
-
-    #[wasm_bindgen(getter, js_name = "fullName")]
-    pub fn full_name(&self) -> Option<String> {
-        self.0.full_name.clone()
-    }
-
-    #[wasm_bindgen(setter, js_name = "fullName")]
-    pub fn set_full_name(&mut self, full_name: Option<String>) {
-        self.0.full_name = full_name.clone()
+    pub fn set_last_name(&mut self, last_name: Option<String>) {
+        self.0.last_name = last_name.clone()
     }
 
     #[wasm_bindgen(getter)]
@@ -105,7 +100,7 @@ impl UserProfile {
     pub fn job(&self) -> Option<Job> {
         Some(Job {
             title: self.0.title.clone(),
-            role: None,
+            role: self.0.role.clone(),
             organization: self.0.org.clone(),
         })
     }
@@ -114,11 +109,13 @@ impl UserProfile {
     pub fn set_job(&mut self, job: Option<Job>) {
         let Some(job) = job.clone() else {
             self.0.title = None;
+            self.0.role = None;
             self.0.org = None;
             return;
         };
 
         self.0.title = job.title.clone();
+        self.0.role = job.role.clone();
         self.0.org = job.organization.clone();
     }
 

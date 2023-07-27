@@ -5,15 +5,17 @@ use xmpp_parsers::iq::IqSetPayload;
 use crate::ns;
 use crate::util::ElementExt;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct VCard4 {
     pub adr: Vec<Adr>,
     pub email: Vec<Email>,
     pub fn_: Vec<Fn_>,
+    pub n: Vec<Name>,
     pub impp: Vec<Impp>,
     pub nickname: Vec<Nickname>,
     pub note: Vec<Note>,
     pub org: Vec<Org>,
+    pub role: Vec<Role>,
     pub tel: Vec<Tel>,
     pub title: Vec<Title>,
     pub url: Vec<URL>,
@@ -21,28 +23,19 @@ pub struct VCard4 {
 
 impl VCard4 {
     pub fn new() -> Self {
-        VCard4 {
-            adr: vec![],
-            email: vec![],
-            fn_: vec![],
-            impp: vec![],
-            nickname: vec![],
-            note: vec![],
-            org: vec![],
-            tel: vec![],
-            title: vec![],
-            url: vec![],
-        }
+        VCard4::default()
     }
 
     pub fn is_empty(&self) -> bool {
         self.adr.is_empty()
             && self.email.is_empty()
             && self.fn_.is_empty()
+            && self.n.is_empty()
             && self.impp.is_empty()
             && self.nickname.is_empty()
             && self.note.is_empty()
             && self.org.is_empty()
+            && self.role.is_empty()
             && self.tel.is_empty()
             && self.title.is_empty()
             && self.url.is_empty()
@@ -54,6 +47,13 @@ impl IqSetPayload for VCard4 {}
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fn_ {
     pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Name {
+    pub surname: Option<String>,
+    pub given: Option<String>,
+    pub additional: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -71,7 +71,7 @@ pub struct URL {
     pub value: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Adr {
     pub code: Vec<String>,
     pub country: Vec<String>,
@@ -80,20 +80,6 @@ pub struct Adr {
     pub pobox: Vec<String>,
     pub region: Vec<String>,
     pub street: Vec<String>,
-}
-
-impl Adr {
-    pub fn new() -> Self {
-        Adr {
-            code: vec![],
-            country: vec![],
-            ext: vec![],
-            locality: vec![],
-            pobox: vec![],
-            region: vec![],
-            street: vec![],
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,6 +94,11 @@ pub struct Note {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Org {
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Role {
     pub value: String,
 }
 
@@ -134,6 +125,7 @@ impl TryFrom<Element> for VCard4 {
                 "fn" => vcard.fn_.push(Fn_ {
                     value: child.text_value()?,
                 }),
+                "n" => vcard.n.push(Name::try_from(child)?),
                 "nickname" => vcard.nickname.push(Nickname {
                     value: child.text_value()?,
                 }),
@@ -159,6 +151,9 @@ impl TryFrom<Element> for VCard4 {
                 "org" => vcard.org.push(Org {
                     value: child.text_value()?,
                 }),
+                "role" => vcard.role.push(Role {
+                    value: child.text_value()?,
+                }),
                 _ => (),
             }
         }
@@ -173,13 +168,58 @@ impl From<VCard4> for Element {
             .append_all(vcard.adr)
             .append_all_values(vcard.email, "email", "text", |v| v.value)
             .append_all_values(vcard.fn_, "fn", "text", |v| v.value)
+            .append_all(vcard.n)
             .append_all_values(vcard.impp, "impp", "uri", |v| v.value)
             .append_all_values(vcard.nickname, "nickname", "text", |v| v.value)
             .append_all_values(vcard.note, "note", "text", |v| v.value)
             .append_all_values(vcard.org, "org", "text", |v| v.value)
+            .append_all_values(vcard.role, "role", "text", |v| v.value)
             .append_all_values(vcard.title, "title", "text", |v| v.value)
             .append_all_values(vcard.tel, "tel", "text", |v| v.value)
             .append_all_values(vcard.url, "url", "uri", |v| v.value)
+            .build()
+    }
+}
+
+impl TryFrom<&Element> for Name {
+    type Error = anyhow::Error;
+
+    fn try_from(root: &Element) -> Result<Self, Self::Error> {
+        root.expect_is("n", ns::VCARD4)?;
+
+        let mut name = Name::default();
+
+        for child in root.children() {
+            match child.name() {
+                "surname" => name.surname = Some(child.text()),
+                "given" => name.given = Some(child.text()),
+                "additional" => name.additional = Some(child.text()),
+                _ => (),
+            }
+        }
+
+        Ok(name)
+    }
+}
+
+impl From<Name> for Element {
+    fn from(value: Name) -> Self {
+        Element::builder("n", ns::VCARD4)
+            .append_all(
+                value
+                    .given
+                    .map(|given| Element::builder("given", ns::VCARD4).append(given)),
+            )
+            .append_all(
+                value
+                    .surname
+                    .map(|surname| Element::builder("surname", ns::VCARD4).append(surname)),
+            )
+            .append_all(
+                value.additional.map(|additional| {
+                    Element::builder("additional", ns::VCARD4).append(additional)
+                }),
+            )
             .build()
     }
 }
@@ -188,7 +228,7 @@ impl TryFrom<&Element> for Adr {
     type Error = anyhow::Error;
 
     fn try_from(root: &Element) -> Result<Self, Self::Error> {
-        let mut adr = Adr::new();
+        let mut adr = Adr::default();
 
         for child in root.children() {
             match child.name() {
@@ -292,6 +332,10 @@ mod tests {
     fn test_deserialize_vcard() -> Result<()> {
         let xml = r#"<vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
           <fn><text>Valerian Saliou</text></fn>
+          <n>
+            <surname>Saliou</surname>
+            <given>Valerian</given>
+          </n>
           <nickname><text>Valerian</text></nickname>
           <nickname><text>Another nickname</text></nickname>
           <url>
@@ -319,6 +363,14 @@ mod tests {
             vcard.fn_,
             vec![Fn_ {
                 value: "Valerian Saliou".to_string()
+            }]
+        );
+        assert_eq!(
+            vcard.n,
+            vec![Name {
+                surname: Some("Saliou".to_string()),
+                given: Some("Valerian".to_string()),
+                additional: None,
             }]
         );
         assert_eq!(
@@ -390,6 +442,11 @@ mod tests {
             fn_: vec![Fn_ {
                 value: "Valerian Saliou".to_string(),
             }],
+            n: vec![Name {
+                surname: Some("Saliou".to_string()),
+                given: Some("Valerian".to_string()),
+                additional: None,
+            }],
             impp: vec![Impp {
                 value: "xmpp:valerian@prose.org".to_string(),
             }],
@@ -405,6 +462,7 @@ mod tests {
             org: vec![],
             tel: vec![],
             title: vec![],
+            role: vec![],
             url: vec![URL {
                 value: "https://prose.org/".to_string(),
             }],

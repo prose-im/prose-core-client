@@ -17,3 +17,4 @@ pub mod test_helpers;
 
 #[cfg(feature = "native-app")]
 mod bookmarks;
+mod util;
