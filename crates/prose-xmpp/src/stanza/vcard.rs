@@ -146,7 +146,9 @@ impl TryFrom<Element> for VCard4 {
                     value: child.text_value()?,
                 }),
                 "tel" => vcard.tel.push(Tel {
-                    value: child.text_value().or(child.uri_value())?,
+                    value: child.text_value().or(child
+                        .uri_value()
+                        .map(|uri| uri.strip_prefix("tel:").unwrap_or(&*uri).to_string()))?,
                 }),
                 "org" => vcard.org.push(Org {
                     value: child.text_value()?,
@@ -418,6 +420,26 @@ mod tests {
                 pobox: vec![],
                 region: vec![],
                 street: vec![],
+            }]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_remove_tel_prefix() -> Result<()> {
+        let xml = r#"<vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
+            <tel><uri>tel:+1-720-256-6756</uri></tel>
+        </vcard>
+        "#;
+
+        let elem = Element::from_str(xml)?;
+        let vcard = VCard4::try_from(elem)?;
+
+        assert_eq!(
+            vcard.tel,
+            vec![Tel {
+                value: "+1-720-256-6756".to_string()
             }]
         );
 
