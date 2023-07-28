@@ -223,7 +223,7 @@ async fn save_avatar(client: &Client) -> Result<()> {
 async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
     println!("Loading profile for {}…", jid);
     let profile = client
-        .load_profile(jid.clone(), CachePolicy::default())
+        .load_user_profile(jid.clone(), CachePolicy::default())
         .await?;
 
     let Some(profile) = profile else {
@@ -263,7 +263,7 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
 async fn update_user_profile(client: &Client, jid: BareJid) -> Result<()> {
     println!("Loading current profile…");
     let mut profile = client
-        .load_profile(jid, CachePolicy::default())
+        .load_user_profile(jid, CachePolicy::default())
         .await?
         .unwrap_or_default();
 

@@ -272,7 +272,7 @@ impl Client {
         let jid = jid::BareJid::from(jid.clone());
         let profile = self
             .client
-            .load_profile(jid, CachePolicy::ReturnCacheDataElseLoad)
+            .load_user_profile(jid, CachePolicy::ReturnCacheDataElseLoad)
             .await
             .map_err(WasmError::from)?;
 

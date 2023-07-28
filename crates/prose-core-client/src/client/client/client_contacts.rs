@@ -17,7 +17,7 @@ use super::Client;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     #[instrument]
-    pub async fn load_profile(
+    pub async fn load_user_profile(
         &self,
         from: impl Into<BareJid> + Debug,
         cache_policy: CachePolicy,
