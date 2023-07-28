@@ -98,8 +98,8 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
                 Feature::new(ns::RECEIPTS, false),
                 Feature::new(ns::VCARD4, false),
                 Feature::new(ns::VCARD4, true),
-                Feature::new(ns::ACTIVITY, false),
-                Feature::new(ns::ACTIVITY, true),
+                Feature::new(ns::USER_ACTIVITY, false),
+                Feature::new(ns::USER_ACTIVITY, true),
                 Feature::new(ns::TIME, false),
             ],
         );

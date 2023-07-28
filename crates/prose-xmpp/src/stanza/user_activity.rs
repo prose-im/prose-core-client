@@ -21,7 +21,7 @@ impl TryFrom<Element> for UserActivity {
     type Error = anyhow::Error;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
-        root.expect_is("activity", ns::ACTIVITY)?;
+        root.expect_is("activity", ns::USER_ACTIVITY)?;
 
         let mut user_activity = UserActivity::default();
 
@@ -38,7 +38,7 @@ impl TryFrom<Element> for UserActivity {
 
 impl From<UserActivity> for Element {
     fn from(value: UserActivity) -> Self {
-        Element::builder("activity", ns::ACTIVITY)
+        Element::builder("activity", ns::USER_ACTIVITY)
             .append_all(value.activity)
             .append_all(
                 value
@@ -82,7 +82,7 @@ impl TryFrom<Element> for Activity {
 
 impl From<Activity> for Element {
     fn from(value: Activity) -> Self {
-        Element::builder(value.general.to_string(), ns::ACTIVITY)
+        Element::builder(value.general.to_string(), ns::USER_ACTIVITY)
             .append_all(value.specific)
             .build()
     }

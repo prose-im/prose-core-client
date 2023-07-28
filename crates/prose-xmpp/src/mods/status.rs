@@ -39,7 +39,7 @@ impl Status {
         };
 
         match node.0.as_ref() {
-            ns::ACTIVITY => {
+            ns::USER_ACTIVITY => {
                 let Some(item) = items.first() else {
                     return Ok(());
                 };
@@ -77,7 +77,7 @@ impl Status {
             self.ctx.generate_id(),
             PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
-                    node: NodeName(ns::ACTIVITY.to_string()),
+                    node: NodeName(ns::USER_ACTIVITY.to_string()),
                     items: vec![pubsub::pubsub::Item(pubsub::Item {
                         id: Some(pubsub::ItemId(self.ctx.bare_jid().to_string())),
                         publisher: None,
