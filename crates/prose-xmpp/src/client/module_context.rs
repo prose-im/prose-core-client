@@ -4,6 +4,7 @@ use std::sync::{Arc, Weak};
 use std::time::SystemTime;
 
 use anyhow::Result;
+use chrono::{DateTime, Local};
 use jid::{BareJid, FullJid};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
@@ -70,6 +71,10 @@ impl ModuleContext {
 
     pub(crate) fn generate_id(&self) -> String {
         self.inner.id_provider.new_id()
+    }
+
+    pub(crate) fn timestamp(&self) -> DateTime<Local> {
+        self.inner.time_provider.now()
     }
 
     #[cfg(target_arch = "wasm32")]

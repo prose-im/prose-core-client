@@ -1,5 +1,6 @@
 use anyhow::Result;
 use base64::{engine::general_purpose, DecodeError, Engine as _};
+use chrono::{DateTime, FixedOffset};
 use jid::{BareJid, Jid};
 use minidom::Element;
 use std::borrow::Cow;
@@ -19,6 +20,7 @@ use crate::stanza::VCard4;
 use crate::stanza::{avatar, PubSubMessage};
 use crate::util::RequestError;
 use sha1::{Digest, Sha1};
+use xmpp_parsers::time::{TimeQuery, TimeResult};
 
 #[derive(Default, Clone)]
 pub struct Profile {
@@ -66,6 +68,26 @@ impl Module for Profile {
         for event in pubsub.events.iter() {
             self.handle_pubsub_event(&pubsub.from, event)?
         }
+        Ok(())
+    }
+
+    fn handle_iq_stanza(&self, stanza: &Iq) -> Result<()> {
+        let IqType::Get(payload) = &stanza.payload else {
+            return Ok(());
+        };
+
+        // Respond to XEP-0202: Entity Time request
+        if payload.is("time", ns::TIME) {
+            let mut response = Iq::from_result(
+                stanza.id.clone(),
+                Some(TimeResult(xmpp_parsers::date::DateTime(
+                    self.ctx.timestamp().into(),
+                ))),
+            );
+            response.to = stanza.from.clone();
+            return self.ctx.send_stanza(response);
+        }
+
         Ok(())
     }
 }
@@ -334,5 +356,21 @@ impl Profile {
 
         self.ctx.send_iq(iq).await?;
         Ok(())
+    }
+
+    /// XEP-0202: Entity Time
+    /// https://xmpp.org/extensions/xep-0202.html
+    /// TODO: This needs a FullJid to work properly.
+    pub async fn load_entity_time(&self, from: impl Into<Jid>) -> Result<DateTime<FixedOffset>> {
+        let response = self
+            .ctx
+            .send_iq(Iq::from_get(self.ctx.generate_id(), TimeQuery).with_to(from.into()))
+            .await?;
+
+        let Some(response) = response else {
+            return Err(RequestError::UnexpectedResponse.into());
+        };
+
+        Ok(TimeResult::try_from(response)?.0 .0)
     }
 }
