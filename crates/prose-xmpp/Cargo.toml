@@ -17,6 +17,7 @@ crate-type = ["staticlib", "rlib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
+chrono = { workspace = true, features = ["clock"] }
 jid = { workspace = true }
 minidom = { workspace = true }
 parking_lot = { workspace = true }

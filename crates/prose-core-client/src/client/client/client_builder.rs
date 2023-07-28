@@ -30,7 +30,7 @@ impl ClientBuilder<UndefinedDataCache, UndefinedAvatarCache> {
             builder: XMPPClient::builder(),
             data_cache: UndefinedDataCache {},
             avatar_cache: UndefinedAvatarCache {},
-            time_provider: Arc::new(SystemTimeProvider::new()),
+            time_provider: Arc::new(SystemTimeProvider::default()),
             delegate: None,
         }
     }
@@ -100,6 +100,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
                 Feature::new(ns::VCARD4, true),
                 Feature::new(ns::ACTIVITY, false),
                 Feature::new(ns::ACTIVITY, true),
+                Feature::new(ns::TIME, false),
             ],
         );
 

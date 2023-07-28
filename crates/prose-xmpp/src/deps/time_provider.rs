@@ -1,27 +1,22 @@
+use chrono::{DateTime, Local};
 use std::ops::Deref;
 use std::sync::Arc;
-use std::time::SystemTime;
 
 pub trait TimeProvider: Send + Sync {
-    fn now(&self) -> SystemTime;
+    fn now(&self) -> DateTime<Local>;
 }
 
+#[derive(Default)]
 pub struct SystemTimeProvider {}
 
-impl SystemTimeProvider {
-    pub fn new() -> Self {
-        SystemTimeProvider {}
-    }
-}
-
 impl TimeProvider for SystemTimeProvider {
-    fn now(&self) -> SystemTime {
-        SystemTime::now()
+    fn now(&self) -> DateTime<Local> {
+        Local::now()
     }
 }
 
 impl TimeProvider for Arc<dyn TimeProvider> {
-    fn now(&self) -> SystemTime {
+    fn now(&self) -> DateTime<Local> {
         self.deref().now()
     }
 }

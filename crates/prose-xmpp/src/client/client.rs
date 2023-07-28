@@ -1,7 +1,7 @@
 use std::any::TypeId;
 use std::sync::Arc;
 use std::task::Waker;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use jid::FullJid;
@@ -153,7 +153,7 @@ impl ClientInner {
     }
 
     fn purge_expired_futures(ctx: &ModuleContextInner) {
-        let now = ctx.time_provider.now();
+        let now: SystemTime = ctx.time_provider.now().into();
         let mut wakers = Vec::<Waker>::new();
         let mut idx = 0;
 

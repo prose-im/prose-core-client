@@ -4,6 +4,7 @@ pub use deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 pub use event::Event;
 pub use stanza::ns;
 pub use util::{SendUnlessWasm, SyncUnlessWasm};
+pub use xmpp_parsers::date::DateTime;
 
 pub mod client;
 pub mod connector;

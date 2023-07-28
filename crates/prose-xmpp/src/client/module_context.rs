@@ -37,7 +37,7 @@ impl ModuleContext {
     ) -> impl Future<Output = Result<U, RequestError>> {
         self.inner.mod_futures.lock().push(ModFutureStateEntry {
             state: future.state.clone(),
-            timestamp: self.inner.time_provider.now(),
+            timestamp: self.inner.time_provider.now().into(),
         });
 
         if let Err(err) = self.send_stanza(iq) {
@@ -123,7 +123,7 @@ impl Default for ModuleContext {
                 mods: Default::default(),
                 mod_futures: Default::default(),
                 id_provider: Box::new(UUIDProvider::new()),
-                time_provider: Box::new(SystemTimeProvider::new()),
+                time_provider: Box::new(SystemTimeProvider::default()),
             }),
         }
     }

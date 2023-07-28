@@ -34,7 +34,7 @@ impl ClientBuilder {
             connector_provider: Box::new(|| Box::new(UndefinedConnector {})),
             mods: Default::default(),
             id_provider: Box::new(UUIDProvider::new()),
-            time_provider: Box::new(SystemTimeProvider::new()),
+            time_provider: Box::new(SystemTimeProvider::default()),
             event_handler: Box::new(|_, _| Box::pin(async {}) as PinnedFuture<_>),
         }
     }

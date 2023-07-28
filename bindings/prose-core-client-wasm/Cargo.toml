@@ -11,6 +11,7 @@ crate-type = ["cdylib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
+chrono = { workspace = true }
 console_error_panic_hook = "0.1"
 jid = { workspace = true }
 js-sys = { workspace = true }

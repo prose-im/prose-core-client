@@ -1,10 +1,9 @@
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    BareJid, BareJidArray, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray,
-    StringArray, UserProfile,
+    BareJid, BareJidArray, Contact, ContactsArray, DateTime, FullJid, IntoJSArray, Jid,
+    MessagesArray, StringArray, UserProfile,
 };
-use crate::util::WasmTimeProvider;
 use base64::{engine::general_purpose, Engine as _};
 use microtype::Microtype;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
@@ -39,7 +38,6 @@ impl Client {
                 .set_connector_provider(Connector::provider(connection_provider))
                 .set_data_cache(cache.clone())
                 .set_avatar_cache(cache)
-                .set_time_provider(WasmTimeProvider::default())
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .build(),
         };
