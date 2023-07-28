@@ -1,5 +1,7 @@
 pub use xmpp_parsers::ns::*;
 
+// See all at: https://xmpp.org/registrar/namespaces.html
+
 /// XEP-0292: vCard4 Over XMPP
 pub const VCARD4: &str = "urn:ietf:params:xml:ns:vcard-4.0";
 
@@ -23,3 +25,6 @@ pub const HINTS: &str = "urn:xmpp:hints";
 
 /// XEP-0108: User Activity
 pub const USER_ACTIVITY: &str = "http://jabber.org/protocol/activity";
+
+/// XEP-0012: Last Activity
+pub const LAST_ACTIVITY: &str = "jabber:iq:last";

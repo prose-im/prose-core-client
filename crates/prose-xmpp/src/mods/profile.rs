@@ -16,8 +16,9 @@ use crate::event::Event;
 use crate::mods::Module;
 use crate::ns;
 use crate::stanza::avatar::ImageId;
-use crate::stanza::VCard4;
+use crate::stanza::last_activity::LastActivityResponse;
 use crate::stanza::{avatar, PubSubMessage};
+use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::RequestError;
 use sha1::{Digest, Sha1};
 use xmpp_parsers::time::{TimeQuery, TimeResult};
@@ -372,5 +373,21 @@ impl Profile {
         };
 
         Ok(TimeResult::try_from(response)?.0 .0)
+    }
+
+    /// XEP-0012: Last Activity
+    /// https://xmpp.org/extensions/xep-0012.html
+    /// TODO: This needs a FullJid to work properly.
+    pub async fn load_last_activity(&self, from: impl Into<Jid>) -> Result<LastActivityResponse> {
+        let response = self
+            .ctx
+            .send_iq(Iq::from_get(self.ctx.generate_id(), LastActivityRequest).with_to(from.into()))
+            .await?;
+
+        let Some(response) = response else {
+            return Err(RequestError::UnexpectedResponse.into());
+        };
+
+        Ok(LastActivityResponse::try_from(response)?)
     }
 }
