@@ -129,7 +129,6 @@ impl ContactsCache for IndexedDBDataCache {
                 keys::ROSTER_ITEMS_STORE,
                 keys::PRESENCE_STORE,
                 keys::USER_ACTIVITY_STORE,
-                keys::AVATAR_METADATA_STORE,
             ],
             IdbTransactionMode::Readonly,
         )?;
@@ -138,7 +137,6 @@ impl ContactsCache for IndexedDBDataCache {
         let user_profile_store = tx.object_store(keys::USER_PROFILE_STORE)?;
         let presence_store = tx.object_store(keys::PRESENCE_STORE)?;
         let activity_store = tx.object_store(keys::USER_ACTIVITY_STORE)?;
-        let avatar_metadata_store = tx.object_store(keys::AVATAR_METADATA_STORE)?;
 
         let jids = roster_items_store.get_all_keys()?.await?;
         let mut contacts = vec![];
@@ -162,9 +160,6 @@ impl ContactsCache for IndexedDBDataCache {
                 .await?;
             let presence = presence_store.get_value::<Presence>(&jid_str).await?;
             let user_activity = activity_store.get_value::<UserActivity>(&jid_str).await?;
-            let avatar_metadata = avatar_metadata_store
-                .get_value::<AvatarMetadata>(&jid_str)
-                .await?;
 
             let availability = if let Some(presence) = &presence {
                 Availability::from((
@@ -182,7 +177,6 @@ impl ContactsCache for IndexedDBDataCache {
             let contact = Contact {
                 jid: parsed_jid.clone(),
                 name: name.unwrap_or(parsed_jid.to_string()),
-                avatar_id: avatar_metadata.map(|md| md.checksum),
                 availability,
                 activity: user_activity,
                 status: presence.and_then(|p| p.status),

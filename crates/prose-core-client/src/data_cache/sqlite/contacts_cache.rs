@@ -4,7 +4,6 @@ use jid::BareJid;
 use rusqlite::{params, OptionalExtension};
 use xmpp_parsers::presence;
 
-use prose_xmpp::stanza::avatar;
 use prose_xmpp::stanza::message::ChatState;
 
 use crate::data_cache::sqlite::cache::SQLiteCacheError;
@@ -257,8 +256,7 @@ impl ContactsCache for SQLiteCache {
                 roster_item.groups, 
                 user_profile.first_name,
                 user_profile.last_name, 
-                user_profile.nickname, 
-                avatar_metadata.checksum, 
+                user_profile.nickname,
                 COUNT(presence.jid) AS presence_count,
                 presence.type, 
                 presence.show, 
@@ -282,14 +280,12 @@ impl ContactsCache for SQLiteCache {
                 let first_name: Option<String> = row.get(2)?;
                 let last_name: Option<String> = row.get(3)?;
                 let nickname: Option<String> = row.get(4)?;
-                let checksum: Option<avatar::ImageId> =
-                    row.get::<_, Option<String>>(5)?.map(Into::into);
-                let presence_count: u32 = row.get(6)?;
+                let presence_count: u32 = row.get(5)?;
                 let presence_kind: Option<presence::Type> =
-                    row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
+                    row.get::<_, Option<FromStrSql<_>>>(6)?.map(|o| o.0);
                 let presence_show: Option<presence::Show> =
-                    row.get::<_, Option<FromStrSql<_>>>(8)?.map(|o| o.0);
-                let status: Option<String> = row.get(9)?;
+                    row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
+                let status: Option<String> = row.get(8)?;
 
                 let availability = if presence_count > 0 {
                     Availability::from((presence_kind, presence_show))
@@ -302,7 +298,6 @@ impl ContactsCache for SQLiteCache {
                     name: concatenate_names(&first_name, &last_name)
                         .or(nickname)
                         .unwrap_or(jid.to_string()),
-                    avatar_id: checksum,
                     availability,
                     activity: None,
                     status,
