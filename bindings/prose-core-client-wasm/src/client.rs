@@ -1,8 +1,8 @@
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    BareJid, BareJidArray, Contact, ContactsArray, DateTime, FullJid, IntoJSArray, Jid,
-    MessagesArray, StringArray, UserProfile,
+    BareJid, BareJidArray, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray,
+    StringArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
 use microtype::Microtype;
@@ -297,5 +297,16 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "loadUserMetadata")]
+    pub async fn load_user_metadata(&self, jid: &BareJid) -> Result<UserMetadata> {
+        let jid = jid::BareJid::from(jid.clone());
+        let metadata = self
+            .client
+            .load_user_metadata(&jid)
+            .await
+            .map_err(WasmError::from)?;
+        Ok(metadata.into())
     }
 }

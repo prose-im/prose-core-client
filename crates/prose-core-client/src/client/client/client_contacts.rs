@@ -5,12 +5,12 @@ use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use tracing::{info, instrument};
 
-use prose_xmpp::mods::Roster;
+use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::{mods, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::{ContactsCache, DataCache};
-use crate::types::{roster, Contact, UserProfile};
+use crate::types::{roster, user_metadata, Contact, UserMetadata, UserProfile};
 use crate::CachePolicy;
 
 use super::Client;
@@ -51,6 +51,26 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .insert_user_profile(&from, &profile)
             .await?;
         Ok(Some(profile))
+    }
+
+    #[instrument]
+    // TODO: This should require a FullJid so that a UserMetadata can be loaded per resource/entity/session.
+    pub async fn load_user_metadata(&self, from: &BareJid) -> Result<UserMetadata> {
+        let profile = self.client.get_mod::<Profile>();
+
+        let entity_time = profile.load_entity_time(from.clone()).await?;
+        let last_activity = profile.load_last_activity(from.clone()).await?;
+        let now = self.inner.time_provider.now().with_timezone(&Utc);
+
+        let metadata = UserMetadata {
+            local_time: Some(entity_time),
+            last_activity: Some(user_metadata::LastActivity {
+                timestamp: now - Duration::seconds(last_activity.seconds as i64),
+                status: last_activity.status.clone(),
+            }),
+        };
+
+        Ok(metadata)
     }
 
     #[instrument]
