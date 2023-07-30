@@ -302,17 +302,12 @@ async fn load_contacts(client: &Client) -> Result<()> {
             r#"
     Jid: {}
     Name: {}
-    Avatar: {}
     Availability: {}
     Status: {}
     Groups: {}
     "#,
             contact.jid,
             contact.name,
-            contact
-                .avatar_id
-                .map(|id| id.as_ref().to_string())
-                .unwrap_or("<not set>".to_string()),
             contact.availability,
             format_opt(contact.status),
             contact.groups.join(", "),
