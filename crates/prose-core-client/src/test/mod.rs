@@ -7,11 +7,12 @@ use std::sync::Arc;
 
 pub use incrementing_id_provider::IncrementingIDProvider;
 pub use message_builder::MessageBuilder;
-use prose_domain::Availability;
-use prose_xmpp::test_helpers::TestConnection;
-use prose_xmpp::IDProvider;
+use prose_xmpp::{test, IDProvider};
 
-use crate::{Client, ClientBuilder, NoopAvatarCache, SQLiteCache};
+use crate::types::Availability;
+use crate::{
+    avatar_cache::NoopAvatarCache, data_cache::sqlite::SQLiteCache, Client, ClientBuilder,
+};
 
 mod incrementing_id_provider;
 mod message_builder;
@@ -61,7 +62,7 @@ impl DateTimeTestAdditions for Utc {
 
 pub struct ConnectedClient {
     pub client: Client<Arc<SQLiteCache>, NoopAvatarCache>,
-    pub connection: Arc<TestConnection>,
+    pub connection: Arc<test::Connection>,
     pub data_cache: Arc<SQLiteCache>,
     pub id_provider: Arc<IncrementingIDProvider>,
 }
@@ -69,14 +70,14 @@ pub struct ConnectedClient {
 #[async_trait(?Send)]
 impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
     async fn connected_client() -> Result<ConnectedClient> {
-        let connection = TestConnection::new();
-        let connection_clone = connection.clone();
+        let connection = Arc::new(test::Connection::default());
         let id_provider = Arc::new(IncrementingIDProvider::new());
         let data_cache = Arc::new(SQLiteCache::in_memory_cache());
 
-        let client = ClientBuilder::<SQLiteCache, NoopAvatarCache>::new()
-            .set_connector_provider(Box::new(move || connection_clone.connector()))
+        let client = ClientBuilder::new()
+            .set_connector_provider(test::Connector::provider(connection.clone()))
             .set_data_cache(data_cache.clone())
+            .set_avatar_cache(NoopAvatarCache::default())
             .set_id_provider(id_provider.clone() as Arc<dyn IDProvider>)
             .build();
 

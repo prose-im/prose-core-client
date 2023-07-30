@@ -23,9 +23,9 @@ pub trait DataCache:
 {
 }
 
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 pub trait AccountCache {
     type Error: std::error::Error + Send + Sync;
 
@@ -40,9 +40,9 @@ pub trait AccountCache {
     ) -> Result<Option<AccountSettings>, <Self as AccountCache>::Error>;
 }
 
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 pub trait ContactsCache {
     type Error: std::error::Error + Send + Sync;
 
@@ -86,9 +86,9 @@ pub trait ContactsCache {
     async fn load_contacts(&self) -> Result<Vec<Contact>, Self::Error>;
 }
 
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
 pub trait MessageCache {
     type Error: std::error::Error + Send + Sync;
 

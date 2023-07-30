@@ -8,7 +8,7 @@ use prose_domain::{Message, MessageId, Reaction, StanzaId};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
 
-use crate::test_helpers::{BareJidTestAdditions, DateTimeTestAdditions};
+use crate::test::{BareJidTestAdditions, DateTimeTestAdditions};
 use crate::types::message_like::Payload;
 use crate::types::MessageLike;
 

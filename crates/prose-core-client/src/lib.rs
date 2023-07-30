@@ -13,7 +13,7 @@ pub(crate) mod domain_ext;
 pub mod types;
 
 #[cfg(feature = "test-helpers")]
-pub mod test_helpers;
+pub mod test;
 
 #[cfg(feature = "native-app")]
 mod bookmarks;

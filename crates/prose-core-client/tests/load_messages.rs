@@ -3,13 +3,13 @@ use chrono::Utc;
 use jid::BareJid;
 use xmpp_parsers::iq::Iq;
 
-use prose_core_client::test_helpers::{
+use prose_core_client::test::{
     BareJidTestAdditions, ClientTestAdditions, ConnectedClient, DateTimeTestAdditions,
     MessageBuilder,
 };
-use prose_core_client::{Client, MessageCache};
+use prose_core_client::{data_cache::MessageCache, Client};
 use prose_xmpp::stanza::message::mam;
-use prose_xmpp::test_helpers::StrExt;
+use prose_xmpp::test::StrExt;
 
 #[tokio::test]
 async fn test_loads_latest_messages_with_empty_cache() -> Result<()> {
@@ -71,14 +71,16 @@ async fn test_loads_latest_messages_with_partial_cache() -> Result<()> {
         ..
     } = Client::connected_client().await?;
 
-    data_cache.insert_messages(vec![
-        &MessageBuilder::new_with_index(1)
-            .set_timestamp(Utc::test_timestamp_adding(1))
-            .build_message_like(),
-        &MessageBuilder::new_with_index(2)
-            .set_timestamp(Utc::test_timestamp_adding(2))
-            .build_message_like(),
-    ])?;
+    data_cache
+        .insert_messages(vec![
+            &MessageBuilder::new_with_index(1)
+                .set_timestamp(Utc::test_timestamp_adding(1))
+                .build_message_like(),
+            &MessageBuilder::new_with_index(2)
+                .set_timestamp(Utc::test_timestamp_adding(2))
+                .build_message_like(),
+        ])
+        .await?;
 
     connection.set_stanza_handler(move |_| {
         vec![

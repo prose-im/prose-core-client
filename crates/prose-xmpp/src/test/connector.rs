@@ -17,12 +17,12 @@ pub struct Connector {
 }
 
 impl Connector {
-    pub fn provider() -> ConnectorProvider {
-        || {
+    pub fn provider(connection: Arc<Connection>) -> ConnectorProvider {
+        Box::new(move || {
             Box::new(Connector {
-                connection: Default::default(),
+                connection: connection.clone(),
             })
-        }
+        })
     }
 }
 
