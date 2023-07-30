@@ -303,13 +303,11 @@ async fn load_contacts(client: &Client) -> Result<()> {
     Jid: {}
     Name: {}
     Availability: {}
-    Status: {}
     Groups: {}
     "#,
             contact.jid,
             contact.name,
             contact.availability,
-            format_opt(contact.status),
             contact.groups.join(", "),
         );
     }
