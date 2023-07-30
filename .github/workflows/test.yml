@@ -45,5 +45,8 @@ jobs:
       - name: Test code
         run: cargo test --features test
 
+      - name: Test code
+        run: cargo xtask ci wasm
+
       - name: Check code style
         run: cargo fmt -- --check
