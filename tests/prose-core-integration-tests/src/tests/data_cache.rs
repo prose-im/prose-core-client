@@ -11,7 +11,7 @@ use xmpp_parsers::presence::Show;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 #[cfg(not(target_arch = "wasm32"))]
 use prose_core_client::data_cache::sqlite::{Connection, SQLiteCache};
-use prose_core_client::data_cache::{ContactsCache, DataCache, MessageCache};
+use prose_core_client::data_cache::{AccountCache, ContactsCache, MessageCache};
 use prose_core_client::types::message_like::Payload;
 use prose_core_client::types::roster::Subscription;
 use prose_core_client::types::{
@@ -108,27 +108,20 @@ async fn test_presence() -> Result<()> {
         .await?;
 
     assert_eq!(
-        cache
-            .load_contacts()
-            .await?
-            .into_iter()
-            .map(|c| c.0)
-            .collect::<Vec<_>>(),
+        cache.load_contacts().await?.into_iter().collect::<Vec<_>>(),
         vec![
             Contact {
                 jid: jid_a.clone(),
                 name: jid_a.to_string(),
-                avatar: None,
                 availability: Availability::Unavailable,
-                status: None,
+                activity: None,
                 groups: vec![String::from("")],
             },
             Contact {
                 jid: jid_b.clone(),
                 name: jid_b.to_string(),
-                avatar: None,
                 availability: Availability::Available,
-                status: None,
+                activity: None,
                 groups: vec![String::from("")],
             }
         ]
@@ -146,27 +139,20 @@ async fn test_presence() -> Result<()> {
         )
         .await?;
     assert_eq!(
-        cache
-            .load_contacts()
-            .await?
-            .into_iter()
-            .map(|c| c.0)
-            .collect::<Vec<_>>(),
+        cache.load_contacts().await?.into_iter().collect::<Vec<_>>(),
         vec![
             Contact {
                 jid: jid_a.clone(),
                 name: jid_a.to_string(),
-                avatar: None,
                 availability: Availability::DoNotDisturb,
-                status: Some(String::from("AFK!")),
+                activity: None,
                 groups: vec![String::from("")],
             },
             Contact {
                 jid: jid_b.clone(),
                 name: jid_b.to_string(),
-                avatar: None,
                 availability: Availability::Available,
-                status: None,
+                activity: None,
                 groups: vec![String::from("")],
             }
         ]

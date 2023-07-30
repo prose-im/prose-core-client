@@ -179,7 +179,6 @@ impl ContactsCache for IndexedDBDataCache {
                 name: name.unwrap_or(parsed_jid.to_string()),
                 availability,
                 activity: user_activity,
-                status: presence.and_then(|p| p.status),
                 groups: if roster_item.groups.is_empty() {
                     vec!["".to_string()]
                 } else {

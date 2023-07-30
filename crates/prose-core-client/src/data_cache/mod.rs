@@ -1,4 +1,4 @@
-pub use data_cache::{ContactsCache, DataCache, MessageCache};
+pub use data_cache::{AccountCache, ContactsCache, DataCache, MessageCache};
 pub use noop_data_cache::NoopDataCache;
 
 mod data_cache;

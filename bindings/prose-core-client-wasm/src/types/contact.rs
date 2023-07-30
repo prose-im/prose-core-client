@@ -44,11 +44,6 @@ impl Contact {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn status(&self) -> Option<String> {
-        self.0.status.clone()
-    }
-
-    #[wasm_bindgen(getter)]
     pub fn activity(&self) -> Option<UserActivity> {
         self.0
             .activity

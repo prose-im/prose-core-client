@@ -9,6 +9,5 @@ pub struct Contact {
     pub name: String,
     pub availability: Availability,
     pub activity: Option<UserActivity>,
-    pub status: Option<String>,
     pub groups: Vec<String>,
 }

@@ -259,8 +259,7 @@ impl ContactsCache for SQLiteCache {
                 user_profile.nickname,
                 COUNT(presence.jid) AS presence_count,
                 presence.type, 
-                presence.show, 
-                presence.status
+                presence.show
             FROM roster_item
             LEFT JOIN user_profile ON roster_item.jid = user_profile.jid
             LEFT JOIN avatar_metadata ON roster_item.jid = avatar_metadata.jid
@@ -285,7 +284,6 @@ impl ContactsCache for SQLiteCache {
                     row.get::<_, Option<FromStrSql<_>>>(6)?.map(|o| o.0);
                 let presence_show: Option<presence::Show> =
                     row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
-                let status: Option<String> = row.get(8)?;
 
                 let availability = if presence_count > 0 {
                     Availability::from((presence_kind, presence_show))
@@ -300,7 +298,6 @@ impl ContactsCache for SQLiteCache {
                         .unwrap_or(jid.to_string()),
                     availability,
                     activity: None,
-                    status,
                     groups,
                 })
             })?
