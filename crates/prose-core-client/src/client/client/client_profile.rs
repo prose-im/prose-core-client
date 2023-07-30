@@ -122,7 +122,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(path)
     }
 
-    #[cfg(feature = "native-app")]
+    #[cfg(not(target_arch = "wasm32"))]
     #[instrument]
     pub async fn save_avatar_from_url(&self, image_path: &std::path::Path) -> Result<()> {
         use crate::avatar_cache::fs_avatar_cache::IMAGE_OUTPUT_FORMAT;

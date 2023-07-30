@@ -42,4 +42,5 @@ tokio-xmpp = { git = "https://gitlab.com/xmpp-rs/xmpp-rs.git", rev = "f9d4419513
 uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics"] }
 
 [features]
-test-helpers = []
+default = []
+test = []

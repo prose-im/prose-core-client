@@ -18,7 +18,7 @@ crate-type = ["staticlib"]
 anyhow = { workspace = true }
 chrono = { workspace = true }
 jid = { workspace = true }
-prose-core-client = { path = "../../crates/prose-core-client", features = ["native-app"] }
+prose-core-client = { path = "../../crates/prose-core-client" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 thiserror = { workspace = true }
 tracing = { workspace = true }

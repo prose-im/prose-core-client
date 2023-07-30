@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-#[cfg(feature = "test-helpers")]
+#[cfg(feature = "test")]
 use auto_impl::auto_impl;
 #[cfg(target_arch = "wasm32")]
 use auto_impl::auto_impl;
@@ -15,7 +15,7 @@ use crate::types::{
     UserProfile,
 };
 
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(feature = "test", auto_impl(Arc))]
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[async_trait]
 pub trait DataCache:
@@ -25,7 +25,7 @@ pub trait DataCache:
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(feature = "test", auto_impl(Arc))]
 pub trait AccountCache {
     type Error: std::error::Error + Send + Sync;
 
@@ -42,7 +42,7 @@ pub trait AccountCache {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(feature = "test", auto_impl(Arc))]
 pub trait ContactsCache {
     type Error: std::error::Error + Send + Sync;
 
@@ -88,7 +88,7 @@ pub trait ContactsCache {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(feature = "test-helpers", auto_impl(Arc))]
+#[cfg_attr(feature = "test", auto_impl(Arc))]
 pub trait MessageCache {
     type Error: std::error::Error + Send + Sync;
 

@@ -13,5 +13,5 @@ pub mod mods;
 pub mod stanza;
 mod util;
 
-#[cfg(feature = "test-helpers")]
+#[cfg(feature = "test")]
 pub mod test;

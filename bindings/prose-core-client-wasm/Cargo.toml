@@ -17,7 +17,7 @@ jid = { workspace = true }
 js-sys = { workspace = true }
 microtype = { workspace = true }
 minidom = { workspace = true }
-prose-core-client = { path = "../../crates/prose-core-client", features = ["js"] }
+prose-core-client = { path = "../../crates/prose-core-client" }
 prose-domain = { path = "../../crates/prose-domain" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }

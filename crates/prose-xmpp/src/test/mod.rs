@@ -1,4 +1,4 @@
-#[cfg(feature = "test-helpers")]
+#[cfg(feature = "test")]
 pub use connector::{Connection, Connector};
 
 mod connector;
