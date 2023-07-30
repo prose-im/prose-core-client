@@ -29,7 +29,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 caps::Event::DiscoInfoQuery { from, id, node } => {
                     self.did_receive_disco_info_query(from, id, node).await
                 }
-                caps::Event::CapsPresence { .. } => Ok(()),
+                caps::Event::Caps { .. } => Ok(()),
             },
 
             Event::Chat(event) => match event {

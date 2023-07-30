@@ -21,7 +21,7 @@ pub enum Event {
         id: String,
         node: String,
     },
-    CapsPresence {
+    Caps {
         from: Jid,
         caps: xmpp_parsers::caps::Caps,
     },
@@ -40,11 +40,10 @@ impl Module for Caps {
             return Ok(());
         };
 
-        self.ctx
-            .schedule_event(ClientEvent::Caps(Event::CapsPresence {
-                from: from.clone(),
-                caps: xmpp_parsers::caps::Caps::try_from(caps.clone())?,
-            }));
+        self.ctx.schedule_event(ClientEvent::Caps(Event::Caps {
+            from: from.clone(),
+            caps: xmpp_parsers::caps::Caps::try_from(caps.clone())?,
+        }));
         Ok(())
     }
 
