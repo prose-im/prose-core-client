@@ -28,8 +28,8 @@ parking_lot = "0.12"
 serde = "1.0"
 serde_json = "1.0"
 sha1 = "0.10"
-strum = "0.24"
-strum_macros = "0.24"
+strum = "0.25"
+strum_macros = "0.25"
 thiserror = "1.0"
 tokio = { version = "1.26" }
 tracing = { version = "0.1" }
