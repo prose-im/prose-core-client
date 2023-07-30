@@ -14,9 +14,9 @@ use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
 use crate::ns;
+use crate::stanza::avatar;
 use crate::stanza::avatar::ImageId;
 use crate::stanza::last_activity::LastActivityResponse;
-use crate::stanza::{avatar, PubSubMessage};
 use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::RequestError;
 use sha1::{Digest, Sha1};
@@ -71,13 +71,6 @@ impl Module for Profile {
         self.ctx = context;
     }
 
-    fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
-        for event in pubsub.events.iter() {
-            self.handle_pubsub_event(&pubsub.from, event)?
-        }
-        Ok(())
-    }
-
     fn handle_iq_stanza(&self, stanza: &Iq) -> Result<()> {
         let IqType::Get(payload) = &stanza.payload else {
             return Ok(());
@@ -97,9 +90,7 @@ impl Module for Profile {
 
         Ok(())
     }
-}
 
-impl Profile {
     fn handle_pubsub_event(&self, from: &Jid, event: &PubSubEvent) -> Result<()> {
         let PubSubEvent::PublishedItems { node, items } = event else {
             return Ok(());

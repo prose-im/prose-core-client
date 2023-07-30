@@ -1,8 +1,10 @@
 use std::any::Any;
 
 use anyhow::Result;
+use jid::Jid;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::Presence;
+use xmpp_parsers::pubsub::PubSubEvent;
 
 pub use caps::Caps;
 pub use chat::Chat;
@@ -40,6 +42,13 @@ pub trait Module: Any + SendUnlessWasm + SyncUnlessWasm {
         }
     }
 
+    fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
+        for event in pubsub.events.iter() {
+            self.handle_pubsub_event(&pubsub.from, event)?
+        }
+        Ok(())
+    }
+
     fn handle_presence_stanza(&self, _stanza: &Presence) -> Result<()> {
         Ok(())
     }
@@ -49,7 +58,7 @@ pub trait Module: Any + SendUnlessWasm + SyncUnlessWasm {
     fn handle_iq_stanza(&self, _stanza: &Iq) -> Result<()> {
         Ok(())
     }
-    fn handle_pubsub_message(&self, _pubsub: &PubSubMessage) -> Result<()> {
+    fn handle_pubsub_event(&self, _from: &Jid, _event: &PubSubEvent) -> Result<()> {
         Ok(())
     }
 }

@@ -1,6 +1,6 @@
 use crate::client::ModuleContext;
 use crate::mods::Module;
-use crate::stanza::{PubSubMessage, UserActivity};
+use crate::stanza::UserActivity;
 use crate::{ns, Event as ClientEvent};
 use anyhow::Result;
 use jid::Jid;
@@ -34,15 +34,6 @@ impl Module for Status {
         Ok(())
     }
 
-    fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
-        for event in pubsub.events.iter() {
-            self.handle_pubsub_event(&pubsub.from, event)?
-        }
-        Ok(())
-    }
-}
-
-impl Status {
     fn handle_pubsub_event(&self, from: &Jid, event: &PubSubEvent) -> Result<()> {
         let PubSubEvent::PublishedItems { node, items } = event else {
             return Ok(());
