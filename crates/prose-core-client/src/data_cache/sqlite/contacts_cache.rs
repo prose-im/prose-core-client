@@ -205,10 +205,30 @@ impl ContactsCache for SQLiteCache {
 
     async fn insert_user_activity(
         &self,
-        _jid: &BareJid,
-        _user_activity: &Option<UserActivity>,
+        jid: &BareJid,
+        user_activity: &Option<UserActivity>,
     ) -> Result<(), Self::Error> {
-        todo!()
+        let conn = &*self.conn.lock().unwrap();
+
+        let Some(user_activity) = user_activity else {
+            conn.execute(
+                "DELETE FROM user_activity WHERE jid = ?",
+                params![jid.to_string()],
+            )?;
+            return Ok(());
+        };
+
+        let mut stmt = conn.prepare(
+            "INSERT OR REPLACE INTO user_activity \
+                (jid, emoji, status) \
+                VALUES (?, ?, ?)",
+        )?;
+        stmt.execute(params![
+            &jid.to_string(),
+            user_activity.emoji,
+            user_activity.status
+        ])?;
+        Ok(())
     }
 
     async fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()> {
@@ -259,11 +279,14 @@ impl ContactsCache for SQLiteCache {
                 user_profile.nickname,
                 COUNT(presence.jid) AS presence_count,
                 presence.type, 
-                presence.show
+                presence.show, 
+                user_activity.emoji, 
+                user_activity.status
             FROM roster_item
             LEFT JOIN user_profile ON roster_item.jid = user_profile.jid
             LEFT JOIN avatar_metadata ON roster_item.jid = avatar_metadata.jid
             LEFT JOIN presence ON roster_item.jid = presence.jid
+            LEFT JOIN user_activity ON roster_item.jid = user_activity.jid
             GROUP BY roster_item.jid;
             "#,
         )?;
@@ -284,11 +307,19 @@ impl ContactsCache for SQLiteCache {
                     row.get::<_, Option<FromStrSql<_>>>(6)?.map(|o| o.0);
                 let presence_show: Option<presence::Show> =
                     row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
+                let emoji: Option<String> = row.get(8)?;
+                let status: Option<String> = row.get(9)?;
 
                 let availability = if presence_count > 0 {
                     Availability::from((presence_kind, presence_show))
                 } else {
                     Availability::Unavailable
+                };
+
+                let activity = if let Some(emoji) = emoji {
+                    Some(UserActivity { emoji, status })
+                } else {
+                    None
                 };
 
                 Ok(Contact {
@@ -297,7 +328,7 @@ impl ContactsCache for SQLiteCache {
                         .or(nickname)
                         .unwrap_or(jid.to_string()),
                     availability,
-                    activity: None,
+                    activity,
                     groups,
                 })
             })?

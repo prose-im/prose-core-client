@@ -16,6 +16,7 @@ use prose_core_client::types::message_like::Payload;
 use prose_core_client::types::roster::Subscription;
 use prose_core_client::types::{
     presence, roster, AccountSettings, Availability, Contact, MessageLike, Page, Presence,
+    UserActivity,
 };
 use prose_xmpp::stanza::message;
 #[cfg(not(target_arch = "wasm32"))]
@@ -102,8 +103,18 @@ async fn test_presence() -> Result<()> {
             &Presence {
                 kind: None,
                 show: None,
-                status: None,
+                status: Some("Should be ignored".to_string()),
             },
+        )
+        .await?;
+
+    cache
+        .insert_user_activity(
+            &jid_b,
+            &Some(UserActivity {
+                emoji: "🍰".to_string(),
+                status: Some("Baking cake".to_string()),
+            }),
         )
         .await?;
 
@@ -121,23 +132,28 @@ async fn test_presence() -> Result<()> {
                 jid: jid_b.clone(),
                 name: jid_b.to_string(),
                 availability: Availability::Available,
-                activity: None,
+                activity: Some(UserActivity {
+                    emoji: "🍰".to_string(),
+                    status: Some("Baking cake".to_string()),
+                }),
                 groups: vec![String::from("")],
             }
         ]
     );
 
-    // And for good measure insert some non-empty values
     cache
         .insert_presence(
             &jid_a,
             &Presence {
                 kind: None,
                 show: Some(presence::Show(Show::Dnd)),
-                status: Some(String::from("AFK!")),
+                status: None,
             },
         )
         .await?;
+
+    cache.insert_user_activity(&jid_b, &None).await?;
+
     assert_eq!(
         cache.load_contacts().await?.into_iter().collect::<Vec<_>>(),
         vec![

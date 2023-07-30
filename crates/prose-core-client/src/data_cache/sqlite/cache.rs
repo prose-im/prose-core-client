@@ -44,6 +44,7 @@ impl SQLiteCache {
         Self::run_migrations(&mut conn)?;
         Self::create_temporary_presence_table(&conn)?;
         Self::create_temporary_chat_state_table(&conn)?;
+        Self::create_temporary_user_activity_table(&conn)?;
 
         Ok(SQLiteCache {
             conn: Mutex::new(conn),
@@ -127,6 +128,19 @@ impl SQLiteCache {
                 "jid" TEXT PRIMARY KEY NOT NULL,
                 "state" TEXT NOT NULL, 
                 "updated_at" DATETIME NOT NULL
+            );"#,
+            [],
+        )?;
+        Ok(())
+    }
+
+    fn create_temporary_user_activity_table(conn: &Connection) -> Result<()> {
+        conn.execute(
+            r#"
+            CREATE TEMPORARY TABLE "user_activity" (
+                "jid" TEXT PRIMARY KEY NOT NULL,
+                "emoji" TEXT NOT NULL, 
+                "status" TEXT
             );"#,
             [],
         )?;
