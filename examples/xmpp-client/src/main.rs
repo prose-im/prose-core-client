@@ -29,7 +29,7 @@ async fn main() -> Result<()> {
     info!("Connected.");
 
     client
-        .get_mod::<Profile>()
+        .get_mod::<Status>()
         .send_presence(Some(Show::Chat), None)?;
 
     tokio::select! {
