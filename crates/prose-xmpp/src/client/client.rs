@@ -153,11 +153,11 @@ impl ClientInner {
     }
 
     fn purge_expired_futures(ctx: &ModuleContextInner) {
+        let mut pending_futures = ctx.mod_futures.lock();
+
         let now: SystemTime = ctx.time_provider.now().into();
         let mut wakers = Vec::<Waker>::new();
         let mut idx = 0;
-
-        let mut pending_futures = ctx.mod_futures.lock();
 
         while idx < pending_futures.len() {
             if now.duration_since(pending_futures[idx].timestamp).unwrap() < TIMEOUT_DURATION {
