@@ -6,13 +6,12 @@ use minidom::Element;
 use std::borrow::Cow;
 use xmpp_parsers::hashes::Sha1HexAttribute;
 use xmpp_parsers::iq::{Iq, IqType};
-use xmpp_parsers::presence::Presence;
 use xmpp_parsers::pubsub;
 use xmpp_parsers::pubsub::pubsub::Items;
 use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
 
 use crate::client::ModuleContext;
-use crate::event::Event;
+use crate::event::Event as ClientEvent;
 use crate::mods::Module;
 use crate::ns;
 use crate::stanza::avatar::ImageId;
@@ -26,6 +25,18 @@ use xmpp_parsers::time::{TimeQuery, TimeResult};
 #[derive(Default, Clone)]
 pub struct Profile {
     ctx: ModuleContext,
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    Vcard {
+        from: Jid,
+        vcard: VCard4,
+    },
+    AvatarMetadata {
+        from: Jid,
+        metadata: avatar::Metadata,
+    },
 }
 
 pub enum AvatarData {
@@ -58,11 +69,6 @@ impl AvatarData {
 impl Module for Profile {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context;
-    }
-
-    fn handle_presence_stanza(&self, stanza: &Presence) -> Result<()> {
-        self.ctx.schedule_event(Event::Presence(stanza.clone()));
-        Ok(())
     }
 
     fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
@@ -108,10 +114,10 @@ impl Profile {
                     return Ok(());
                 };
                 let vcard = VCard4::try_from(payload.clone())?;
-                self.ctx.schedule_event(Event::Vcard {
+                self.ctx.schedule_event(ClientEvent::Profile(Event::Vcard {
                     from: from.clone(),
                     vcard,
-                });
+                }));
             }
             ns::AVATAR_METADATA => {
                 let Some(item) = items.first() else {
@@ -121,10 +127,11 @@ impl Profile {
                     return Ok(());
                 };
                 let metadata = avatar::Metadata::try_from(payload.clone())?;
-                self.ctx.schedule_event(Event::AvatarMetadata {
-                    from: from.clone(),
-                    metadata,
-                });
+                self.ctx
+                    .schedule_event(ClientEvent::Profile(Event::AvatarMetadata {
+                        from: from.clone(),
+                        metadata,
+                    }));
             }
             _ => (),
         }

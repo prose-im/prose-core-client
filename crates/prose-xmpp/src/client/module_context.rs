@@ -77,15 +77,8 @@ impl ModuleContext {
         self.inner.time_provider.now()
     }
 
-    #[cfg(target_arch = "wasm32")]
     pub(crate) fn schedule_event(&self, event: Event) {
-        let fut = (self.inner.event_handler)(self.inner.clone().try_into().unwrap(), event);
-        wasm_bindgen_futures::spawn_local(async move { fut.await });
-    }
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn schedule_event(&self, event: Event) {
-        let fut = (self.inner.event_handler)(self.inner.clone().try_into().unwrap(), event);
-        tokio::spawn(async move { fut.await });
+        self.inner.clone().schedule_event(event)
     }
 
     pub(crate) fn disconnect(&self) {
@@ -105,6 +98,17 @@ pub(super) struct ModuleContextInner {
 }
 
 impl ModuleContextInner {
+    #[cfg(target_arch = "wasm32")]
+    pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
+        let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
+        wasm_bindgen_futures::spawn_local(async move { fut.await });
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
+        let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
+        tokio::spawn(async move { fut.await });
+    }
+
     pub(crate) fn disconnect(&self) {
         if let Some(conn) = self.connection.write().take() {
             conn.disconnect()

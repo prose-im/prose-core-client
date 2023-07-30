@@ -1,7 +1,7 @@
 use crate::client::ModuleContext;
 use crate::mods::Module;
 use crate::stanza::{PubSubMessage, UserActivity};
-use crate::{ns, Event};
+use crate::{ns, Event as ClientEvent};
 use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::iq::Iq;
@@ -14,13 +14,23 @@ pub struct Status {
     ctx: ModuleContext,
 }
 
+#[derive(Debug, Clone)]
+pub enum Event {
+    Presence(Presence),
+    UserActivity {
+        from: Jid,
+        user_activity: UserActivity,
+    },
+}
+
 impl Module for Status {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context;
     }
 
     fn handle_presence_stanza(&self, stanza: &Presence) -> Result<()> {
-        self.ctx.schedule_event(Event::Presence(stanza.clone()));
+        self.ctx
+            .schedule_event(ClientEvent::Status(Event::Presence(stanza.clone())));
         Ok(())
     }
 
@@ -47,10 +57,11 @@ impl Status {
                     return Ok(());
                 };
                 let user_activity = UserActivity::try_from(payload.clone())?;
-                self.ctx.schedule_event(Event::UserActivity {
-                    from: from.clone(),
-                    user_activity,
-                });
+                self.ctx
+                    .schedule_event(ClientEvent::Status(Event::UserActivity {
+                        from: from.clone(),
+                        user_activity,
+                    }));
             }
             _ => (),
         }

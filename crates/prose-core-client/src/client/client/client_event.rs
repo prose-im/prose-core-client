@@ -6,9 +6,10 @@ use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
+use prose_xmpp::mods::{caps, chat, profile, status};
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
-use prose_xmpp::{mods, Event};
+use prose_xmpp::{client, mods, Event};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
@@ -19,30 +20,44 @@ use crate::{types, CachePolicy, Client, ClientEvent};
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_event(&self, event: Event) {
         let result = match event {
-            Event::Connected => Ok(()),
-            Event::Disconnected { .. } => Ok(()),
-            Event::DiscoInfoQuery { from, id, node } => {
-                self.did_receive_disco_info_query(from, id, node).await
-            }
-            Event::CapsPresence { .. } => Ok(()),
-            Event::Message(message) => {
-                self.did_receive_message(ReceivedMessage::Message(message))
-                    .await
-            }
-            Event::Carbon(carbon) => {
-                self.did_receive_message(ReceivedMessage::Carbon(carbon))
-                    .await
-            }
-            Event::Sent(message) => self.did_send_message(message).await,
-            Event::Vcard { from, vcard } => self.vcard_did_change(from, vcard).await,
-            Event::AvatarMetadata { from, metadata } => {
-                self.avatar_metadata_did_change(from, metadata).await
-            }
-            Event::Presence(presence) => self.presence_did_change(presence).await,
-            Event::UserActivity {
-                from,
-                user_activity,
-            } => self.user_activity_did_change(from, user_activity).await,
+            Event::Client(event) => match event {
+                client::Event::Connected => Ok(()),
+                client::Event::Disconnected { .. } => Ok(()),
+            },
+
+            Event::Caps(event) => match event {
+                caps::Event::DiscoInfoQuery { from, id, node } => {
+                    self.did_receive_disco_info_query(from, id, node).await
+                }
+                caps::Event::CapsPresence { .. } => Ok(()),
+            },
+
+            Event::Chat(event) => match event {
+                chat::Event::Message(message) => {
+                    self.did_receive_message(ReceivedMessage::Message(message))
+                        .await
+                }
+                chat::Event::Carbon(carbon) => {
+                    self.did_receive_message(ReceivedMessage::Carbon(carbon))
+                        .await
+                }
+                chat::Event::Sent(message) => self.did_send_message(message).await,
+            },
+
+            Event::Profile(event) => match event {
+                profile::Event::Vcard { from, vcard } => self.vcard_did_change(from, vcard).await,
+                profile::Event::AvatarMetadata { from, metadata } => {
+                    self.avatar_metadata_did_change(from, metadata).await
+                }
+            },
+
+            Event::Status(event) => match event {
+                status::Event::Presence(presence) => self.presence_did_change(presence).await,
+                status::Event::UserActivity {
+                    from,
+                    user_activity,
+                } => self.user_activity_did_change(from, user_activity).await,
+            },
         };
 
         if let Err(err) = result {

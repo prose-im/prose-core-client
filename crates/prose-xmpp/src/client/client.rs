@@ -10,11 +10,12 @@ use tracing::warn;
 
 use crate::client::builder::ClientBuilder;
 use crate::client::module_context::ModuleContextInner;
-use crate::client::ModuleLookup;
+use crate::client::{Event, ModuleLookup};
 use crate::connector::{ConnectionError, ConnectionEvent};
 use crate::mods;
 use crate::mods::AnyModule;
 use crate::util::{ModuleFuturePoll, PinnedFuture, XMPPElement};
+use crate::Event as ClientEvent;
 
 #[derive(Clone)]
 pub struct Client {
@@ -86,6 +87,10 @@ impl ClientInner {
             }
         }
 
+        self.context
+            .clone()
+            .schedule_event(ClientEvent::Client(Event::Connected));
+
         Ok(())
     }
 
@@ -102,7 +107,10 @@ impl ClientInner {
 
     async fn handle_event(self: Arc<Self>, event: ConnectionEvent) {
         match event {
-            ConnectionEvent::Disconnected { .. } => {}
+            ConnectionEvent::Disconnected { error } => self
+                .context
+                .clone()
+                .schedule_event(ClientEvent::Client(Event::Disconnected { error })),
             ConnectionEvent::Stanza(stanza) => {
                 Self::handle_stanza(&self.context, &self.mods, stanza)
             }

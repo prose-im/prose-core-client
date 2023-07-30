@@ -4,7 +4,7 @@ use xmpp_parsers::carbons;
 use xmpp_parsers::iq::Iq;
 
 use crate::client::ModuleContext;
-use crate::event::Event;
+use crate::event::Event as ClientEvent;
 use crate::mods::Module;
 use crate::stanza::message;
 use crate::stanza::message::chat_marker::Received;
@@ -23,6 +23,13 @@ pub enum Carbon {
 #[derive(Default, Clone)]
 pub struct Chat {
     ctx: ModuleContext,
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    Message(Message),
+    Carbon(Carbon),
+    Sent(Message),
 }
 
 impl Module for Chat {
@@ -45,9 +52,10 @@ impl Module for Chat {
             // CVE-2017-5589
             // https://rt-solutions.de/en/cve-2017-5589_xmpp_carbons/
             if stanza.from == Some(Jid::Bare(self.ctx.bare_jid())) {
-                self.ctx.schedule_event(Event::Carbon(Carbon::Received(
-                    received_carbon.forwarded.clone(),
-                )));
+                self.ctx
+                    .schedule_event(ClientEvent::Chat(Event::Carbon(Carbon::Received(
+                        received_carbon.forwarded.clone(),
+                    ))));
             }
             return Ok(());
         }
@@ -58,12 +66,15 @@ impl Module for Chat {
             // https://rt-solutions.de/en/cve-2017-5589_xmpp_carbons/
             if stanza.from == Some(self.ctx.bare_jid().into()) {
                 self.ctx
-                    .schedule_event(Event::Carbon(Carbon::Sent(sent_carbon.forwarded.clone())));
+                    .schedule_event(ClientEvent::Chat(Event::Carbon(Carbon::Sent(
+                        sent_carbon.forwarded.clone(),
+                    ))));
             }
             return Ok(());
         }
 
-        self.ctx.schedule_event(Event::Message(stanza.clone()));
+        self.ctx
+            .schedule_event(ClientEvent::Chat(Event::Message(stanza.clone())));
 
         Ok(())
     }
@@ -173,7 +184,8 @@ impl Chat {
 
 impl Chat {
     fn send_message_stanza(&self, message: Message) -> Result<()> {
-        self.ctx.schedule_event(Event::Sent(message.clone()));
+        self.ctx
+            .schedule_event(ClientEvent::Chat(Event::Sent(message.clone())));
         self.ctx.send_stanza(message)
     }
 }

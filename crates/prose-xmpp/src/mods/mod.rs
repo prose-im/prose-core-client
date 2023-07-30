@@ -16,13 +16,13 @@ use crate::client::ModuleContext;
 use crate::stanza::{Message, PubSubMessage};
 use crate::util::{SendUnlessWasm, SyncUnlessWasm, XMPPElement};
 
-mod caps;
+pub mod caps;
 pub mod chat;
-mod mam;
-mod ping;
-mod profile;
-mod roster;
-mod status;
+pub mod mam;
+pub mod ping;
+pub mod profile;
+pub mod roster;
+pub mod status;
 
 pub trait Module: Any + SendUnlessWasm + SyncUnlessWasm {
     fn register_with(&mut self, context: ModuleContext);

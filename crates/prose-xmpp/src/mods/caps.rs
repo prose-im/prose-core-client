@@ -6,12 +6,25 @@ use xmpp_parsers::presence::Presence;
 use xmpp_parsers::{disco, ns, presence};
 
 use crate::client::ModuleContext;
-use crate::event::Event;
+use crate::event::Event as ClientEvent;
 use crate::mods::Module;
 
 #[derive(Default, Clone)]
 pub struct Caps {
     ctx: ModuleContext,
+}
+
+#[derive(Debug, Clone)]
+pub enum Event {
+    DiscoInfoQuery {
+        from: Jid,
+        id: String,
+        node: String,
+    },
+    CapsPresence {
+        from: Jid,
+        caps: xmpp_parsers::caps::Caps,
+    },
 }
 
 impl Module for Caps {
@@ -27,10 +40,11 @@ impl Module for Caps {
             return Ok(());
         };
 
-        self.ctx.schedule_event(Event::CapsPresence {
-            from: from.clone(),
-            caps: xmpp_parsers::caps::Caps::try_from(caps.clone())?,
-        });
+        self.ctx
+            .schedule_event(ClientEvent::Caps(Event::CapsPresence {
+                from: from.clone(),
+                caps: xmpp_parsers::caps::Caps::try_from(caps.clone())?,
+            }));
         Ok(())
     }
 
@@ -49,11 +63,12 @@ impl Module for Caps {
             return Ok(());
         };
 
-        self.ctx.schedule_event(Event::DiscoInfoQuery {
-            from: from.clone(),
-            id: stanza.id.clone(),
-            node,
-        });
+        self.ctx
+            .schedule_event(ClientEvent::Caps(Event::DiscoInfoQuery {
+                from: from.clone(),
+                id: stanza.id.clone(),
+                node,
+            }));
 
         Ok(())
     }
