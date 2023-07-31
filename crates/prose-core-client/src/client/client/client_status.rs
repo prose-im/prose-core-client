@@ -11,13 +11,9 @@ use super::Client;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     #[instrument]
-    pub async fn set_availability(
-        &self,
-        availability: Availability,
-        status: Option<&str>,
-    ) -> Result<()> {
+    pub async fn set_availability(&self, availability: Availability) -> Result<()> {
         let status_mod = self.client.get_mod::<Status>();
-        status_mod.send_presence(Some(availability.try_into()?), status)
+        status_mod.send_presence(Some(availability.try_into()?), None)
     }
 
     #[instrument]

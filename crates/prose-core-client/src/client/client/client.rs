@@ -54,7 +54,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         jid: &FullJid,
         password: impl AsRef<str>,
         availability: Availability,
-        status: Option<&str>,
     ) -> Result<(), ConnectionError> {
         self.client.connect(jid, password).await?;
 
@@ -74,7 +73,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let status_mod = self.client.get_mod::<Status>();
         status_mod
-            .send_presence(Some(show), status)
+            .send_presence(Some(show), None)
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;

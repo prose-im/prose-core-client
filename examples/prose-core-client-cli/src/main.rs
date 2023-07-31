@@ -39,9 +39,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
     let (jid, password) = load_credentials();
 
     println!("Connecting to server…");
-    client
-        .connect(&jid, password, Availability::Away, None)
-        .await?;
+    client.connect(&jid, password, Availability::Away).await?;
     println!("Connected.");
 
     Ok((jid.into(), client))

@@ -52,7 +52,7 @@ impl Client {
         status: Option<String>,
     ) -> Result<(), ConnectionError> {
         self.client
-            .connect(&self.jid, password, availability, status.as_deref())
+            .connect(&self.jid, password, availability)
             .await?;
         Ok(())
     }
