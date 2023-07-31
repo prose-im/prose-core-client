@@ -1,5 +1,5 @@
 pub use contact::Contact;
-pub use jid::{BareJid, FullJid, Jid};
+pub use jid::BareJid;
 pub use js_array::*;
 pub use message::Message;
 pub use user_metadata::UserMetadata;

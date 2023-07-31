@@ -1,13 +1,13 @@
 use crate::connector::{Connector, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    BareJid, BareJidArray, Contact, ContactsArray, FullJid, IntoJSArray, Jid, MessagesArray,
+    Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, MessagesArray,
     StringArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
 use microtype::Microtype;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
-use prose_core_client::types::{Availability, UserActivity};
+use prose_core_client::types::UserActivity;
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
 use prose_domain::{Emoji, MessageId};
 use std::rc::Rc;
@@ -45,13 +45,18 @@ impl Client {
         Ok(client)
     }
 
-    pub async fn connect(&self, jid: &FullJid, password: &str) -> Result<()> {
-        let jid = jid::FullJid::from(jid.clone());
+    pub async fn connect(&self, jid: &BareJid, password: &str) -> Result<()> {
+        // TODO: Generate and store resource.
+        let jid = jid::FullJid {
+            node: jid.node.clone(),
+            domain: jid.domain.clone(),
+            resource: "web".to_string(),
+        };
 
         info!("Connect {} - {}", jid, password);
 
         self.client
-            .connect(&jid, password, Availability::Available, None)
+            .connect(&jid, password, Availability::Available)
             .await?;
 
         Ok(())
@@ -63,8 +68,8 @@ impl Client {
     }
 
     #[wasm_bindgen(js_name = "sendMessage")]
-    pub async fn send_message(&self, to: &Jid, body: String) -> Result<()> {
-        let to = jid::Jid::from(to.clone());
+    pub async fn send_message(&self, to: &BareJid, body: String) -> Result<()> {
+        let to = jid::BareJid::from(to.clone());
 
         info!("Sending message to {}…", to);
 
@@ -80,13 +85,13 @@ impl Client {
     #[wasm_bindgen(js_name = "updateMessage")]
     pub async fn update_message(
         &self,
-        conversation: &Jid,
+        conversation: &BareJid,
         message_id: &str,
         body: String,
     ) -> Result<()> {
         self.client
             .update_message(
-                jid::Jid::from(conversation.clone()),
+                jid::BareJid::from(conversation.clone()),
                 message_id.into(),
                 body,
             )
@@ -98,9 +103,9 @@ impl Client {
     /// XEP-0424: Message Retraction
     /// https://xmpp.org/extensions/xep-0424.html
     #[wasm_bindgen(js_name = "retractMessage")]
-    pub async fn retract_message(&self, conversation: &Jid, message_id: &str) -> Result<()> {
+    pub async fn retract_message(&self, conversation: &BareJid, message_id: &str) -> Result<()> {
         self.client
-            .retract_message(jid::Jid::from(conversation.clone()), message_id.into())
+            .retract_message(jid::BareJid::from(conversation.clone()), message_id.into())
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -111,11 +116,11 @@ impl Client {
     #[wasm_bindgen(js_name = "setUserIsComposing")]
     pub async fn set_user_is_composing(
         &self,
-        conversation: &Jid,
+        conversation: &BareJid,
         is_composing: bool,
     ) -> Result<()> {
         self.client
-            .set_user_is_composing(jid::Jid::from(conversation.clone()), is_composing)
+            .set_user_is_composing(jid::BareJid::from(conversation.clone()), is_composing)
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -148,11 +153,11 @@ impl Client {
     #[wasm_bindgen(js_name = "loadComposingUsersInConversation")]
     pub async fn load_composing_users_in_conversation(
         &self,
-        conversation: &Jid,
+        conversation: &BareJid,
     ) -> Result<BareJidArray> {
         let user_jids = self
             .client
-            .load_composing_users(&jid::BareJid::from(conversation.bare()))
+            .load_composing_users(&jid::BareJid::from(conversation.clone()))
             .await
             .map_err(WasmError::from)?
             .into_iter()
