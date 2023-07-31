@@ -86,7 +86,6 @@ impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
                 &FullJid::from_str(&format!("{}/test", BareJid::ours()))?,
                 "",
                 Availability::Available,
-                None,
             )
             .await?;
 
