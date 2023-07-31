@@ -1,4 +1,4 @@
-pub use contact::Contact;
+pub use contact::{Availability, Contact};
 pub use jid::BareJid;
 pub use js_array::*;
 pub use message::Message;

@@ -208,14 +208,8 @@ impl Client {
         Ok(text)
     }
 
-    pub async fn set_availability(
-        &self,
-        availability: Availability,
-        status: Option<String>,
-    ) -> Result<(), ClientError> {
-        self.client
-            .set_availability(availability, status.as_deref())
-            .await?;
+    pub async fn set_availability(&self, availability: Availability) -> Result<(), ClientError> {
+        self.client.set_availability(availability).await?;
         Ok(())
     }
 

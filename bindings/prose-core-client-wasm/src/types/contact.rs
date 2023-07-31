@@ -23,6 +23,17 @@ pub enum Availability {
     Away = 3,
 }
 
+impl From<Availability> for ProseAvailability {
+    fn from(value: Availability) -> Self {
+        match value {
+            Availability::Available => ProseAvailability::Available,
+            Availability::Unavailable => ProseAvailability::Unavailable,
+            Availability::DoNotDisturb => ProseAvailability::DoNotDisturb,
+            Availability::Away => ProseAvailability::Away,
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub struct UserActivity(ProseUserActivity);
 

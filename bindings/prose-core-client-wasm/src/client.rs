@@ -45,7 +45,12 @@ impl Client {
         Ok(client)
     }
 
-    pub async fn connect(&self, jid: &BareJid, password: &str) -> Result<()> {
+    pub async fn connect(
+        &self,
+        jid: &BareJid,
+        password: &str,
+        availability: Availability,
+    ) -> Result<()> {
         // TODO: Generate and store resource.
         let jid = jid::FullJid {
             node: jid.node.clone(),
@@ -56,7 +61,7 @@ impl Client {
         info!("Connect {} - {}", jid, password);
 
         self.client
-            .connect(&jid, password, Availability::Available)
+            .connect(&jid, password, availability.into())
             .await?;
 
         Ok(())
@@ -313,5 +318,16 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(metadata.into())
+    }
+
+    /// XMPP: Instant Messaging and Presence
+    /// https://xmpp.org/rfcs/rfc6121.html#presence
+    #[wasm_bindgen(js_name = "setAvailability")]
+    pub async fn set_availability(&self, availability: Availability) -> Result<()> {
+        self.client
+            .set_availability(availability.into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
     }
 }
