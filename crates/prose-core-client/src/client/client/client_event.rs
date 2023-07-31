@@ -2,7 +2,6 @@ use anyhow::Result;
 use chrono::Utc;
 use jid::{BareJid, Jid};
 use tracing::{debug, error};
-use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
@@ -164,11 +163,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn presence_did_change(&self, presence: Presence) -> Result<()> {
-        if presence.type_ == presence::Type::None {
-            return Ok(());
-        }
-
-        let Some(from) = presence.from else {
+        let Some(from) = presence.from.clone() else {
             return Ok(());
         };
 
@@ -176,14 +171,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         self.inner
             .data_cache
-            .insert_presence(
-                &jid,
-                &types::Presence {
-                    kind: Some(presence.type_.clone().into()),
-                    show: presence.show.as_ref().map(|s| s.clone().into()),
-                    status: presence.statuses.first_key_value().map(|kv| kv.1.clone()),
-                },
-            )
+            .insert_presence(&jid, &types::Presence::from(presence))
             .await?;
 
         self.send_event(ClientEvent::ContactChanged { jid });

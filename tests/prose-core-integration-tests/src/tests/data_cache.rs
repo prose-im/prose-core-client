@@ -174,6 +174,40 @@ async fn test_presence() -> Result<()> {
         ]
     );
 
+    let presence = xmpp_parsers::presence::Presence {
+        from: Some(jid_a.clone().into()),
+        to: None,
+        id: None,
+        // Test Type::None which xmpp_parsers cannot deserialize itself from a string
+        type_: xmpp_parsers::presence::Type::None,
+        show: Some(xmpp_parsers::presence::Show::Chat),
+        statuses: Default::default(),
+        priority: 0,
+        payloads: vec![],
+    };
+
+    cache.insert_presence(&jid_a, &presence.into()).await?;
+
+    assert_eq!(
+        cache.load_contacts().await?.into_iter().collect::<Vec<_>>(),
+        vec![
+            Contact {
+                jid: jid_a.clone(),
+                name: jid_a.to_string(),
+                availability: Availability::Available,
+                activity: None,
+                groups: vec![String::from("")],
+            },
+            Contact {
+                jid: jid_b.clone(),
+                name: jid_b.to_string(),
+                availability: Availability::Available,
+                activity: None,
+                groups: vec![String::from("")],
+            }
+        ]
+    );
+
     Ok(())
 }
 

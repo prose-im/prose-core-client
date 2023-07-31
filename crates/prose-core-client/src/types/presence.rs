@@ -13,15 +13,17 @@ pub struct Presence {
 pub struct Type(pub presence::Type);
 pub struct Show(pub presence::Show);
 
-impl From<presence::Type> for Type {
-    fn from(value: presence::Type) -> Self {
-        Type(value)
-    }
-}
-
-impl From<presence::Show> for Show {
-    fn from(value: presence::Show) -> Self {
-        Show(value)
+impl From<presence::Presence> for Presence {
+    fn from(value: presence::Presence) -> Self {
+        Presence {
+            kind: if value.type_ == presence::Type::None {
+                None
+            } else {
+                Some(Type(value.type_))
+            },
+            show: value.show.map(|v| Show(v)),
+            status: value.statuses.first_key_value().map(|v| v.1.clone()),
+        }
     }
 }
 
@@ -30,7 +32,7 @@ impl ToString for Type {
         use presence::Type;
 
         match self.0 {
-            Type::None => "",
+            Type::None => unreachable!(),
             Type::Error => "error",
             Type::Probe => "probe",
             Type::Subscribe => "subscribe",

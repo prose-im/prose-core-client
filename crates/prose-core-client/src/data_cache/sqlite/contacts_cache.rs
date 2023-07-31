@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use rusqlite::{params, OptionalExtension};
-use xmpp_parsers::presence;
 
 use prose_xmpp::stanza::message::ChatState;
 
@@ -10,7 +9,8 @@ use crate::data_cache::sqlite::cache::SQLiteCacheError;
 use crate::data_cache::sqlite::{FromStrSql, SQLiteCache};
 use crate::data_cache::ContactsCache;
 use crate::types::{
-    roster, Address, Availability, AvatarMetadata, Contact, Presence, UserActivity, UserProfile,
+    presence, roster, Address, Availability, AvatarMetadata, Contact, Presence, UserActivity,
+    UserProfile,
 };
 use crate::util::concatenate_names;
 
@@ -311,7 +311,7 @@ impl ContactsCache for SQLiteCache {
                 let status: Option<String> = row.get(9)?;
 
                 let availability = if presence_count > 0 {
-                    Availability::from((presence_kind, presence_show))
+                    Availability::from((presence_kind.map(|v| v.0), presence_show.map(|v| v.0)))
                 } else {
                     Availability::Unavailable
                 };
