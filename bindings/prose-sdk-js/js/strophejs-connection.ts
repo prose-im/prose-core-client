@@ -16,6 +16,7 @@ class StropheJSConnection implements ProseConnection {
       "wss://chat.prose.org/websocket/",
       { protocol: "wss" }
     );
+    this.__connection.maxRetries = 0;
     this.__connection.rawInput = data => {
       //console.log("RECV", data);
       if (this.__eventHandler) {
@@ -36,6 +37,7 @@ class StropheJSConnection implements ProseConnection {
           console.log("Strophe is disconnecting.");
         } else if (status === Strophe.Status.DISCONNECTED) {
           console.log("Strophe is disconnected.");
+          this.__eventHandler.handleDisconnect(null);
         } else if (status === Strophe.Status.CONNECTED) {
           console.log("Strophe is connected.");
           resolve();

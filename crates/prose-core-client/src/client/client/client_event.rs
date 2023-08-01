@@ -14,14 +14,24 @@ use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
 use crate::types::message_like::{Payload, TimestampedMessage};
 use crate::types::{AvatarMetadata, MessageLike, UserProfile};
-use crate::{types, CachePolicy, Client, ClientEvent};
+use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_event(&self, event: Event) {
         let result = match event {
             Event::Client(event) => match event {
-                client::Event::Connected => Ok(()),
-                client::Event::Disconnected { .. } => Ok(()),
+                client::Event::Connected => {
+                    self.send_event(ClientEvent::ConnectionStatusChanged {
+                        event: ConnectionEvent::Connect,
+                    });
+                    Ok(())
+                }
+                client::Event::Disconnected { error } => {
+                    self.send_event(ClientEvent::ConnectionStatusChanged {
+                        event: ConnectionEvent::Disconnect { error },
+                    });
+                    Ok(())
+                }
             },
 
             Event::Caps(event) => match event {
@@ -93,9 +103,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     fn send_event_for_message(&self, conversation: &BareJid, message: &MessageLike) {
-        let Some(delegate) = &self.inner.delegate else {
+        if self.inner.delegate.is_none() {
             return;
-        };
+        }
 
         let event = if let Some(ref target) = message.target {
             if message.payload == Payload::Retraction {

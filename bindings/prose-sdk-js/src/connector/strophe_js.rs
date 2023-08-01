@@ -171,11 +171,11 @@ impl ConnectionTrait for Connection {
 #[wasm_bindgen(js_class = "ProseConnectionEventHandler")]
 impl EventHandler {
     #[wasm_bindgen(js_name = "handleDisconnect")]
-    pub fn handle_disconnect(&self, error: String) {
+    pub fn handle_disconnect(&self, error: Option<String>) {
         let fut = (self.handler)(
             &self.connection,
             ConnectionEvent::Disconnected {
-                error: Some(ConnectionError::Generic { msg: error }),
+                error: error.map(|error| ConnectionError::Generic { msg: error }),
             },
         );
         spawn_local(async move { fut.await })
