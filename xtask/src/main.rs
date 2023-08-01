@@ -9,7 +9,7 @@ pub(crate) mod paths {
     pub const TESTS: &str = "tests";
 
     pub mod bindings {
-        pub const WASM: &str = "prose-core-client-wasm";
+        pub const WASM: &str = "prose-sdk-js";
     }
     pub mod tests {
         pub const INTEGRATION: &str = "prose-core-integration-tests";
