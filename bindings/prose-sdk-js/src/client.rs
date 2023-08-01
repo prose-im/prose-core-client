@@ -1,4 +1,4 @@
-use crate::connector::{Connector, JSConnectionProvider};
+use crate::connector::{Connector, JSConnectionConfig, JSConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, MessagesArray,
@@ -11,6 +11,7 @@ use prose_core_client::types::UserActivity;
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
 use prose_domain::{Emoji, MessageId};
 use std::rc::Rc;
+use std::time::Duration;
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
@@ -20,6 +21,41 @@ type Result<T, E = JsError> = std::result::Result<T, E>;
 #[error(transparent)]
 pub struct WasmError(#[from] anyhow::Error);
 
+#[derive(Debug, PartialEq, Clone)]
+#[wasm_bindgen(js_name = "ProseClientConfig")]
+pub struct ClientConfig {
+    /// Defines the frequency in which Pings are sent (in seconds). Useful for debugging
+    /// disconnect/reconnect scenarios. Default is 60s.
+    #[wasm_bindgen(js_name = "pingInterval")]
+    pub ping_interval: u32,
+
+    /// Defines if received stanzas should be logged to the console.
+    #[wasm_bindgen(js_name = "logReceivedStanzas")]
+    pub log_received_stanzas: bool,
+
+    /// Defines if sent stanzas should be logged to the console.
+    #[wasm_bindgen(js_name = "logSentStanzas")]
+    pub log_sent_stanzas: bool,
+}
+
+#[wasm_bindgen(js_class = "ProseClientConfig")]
+impl ClientConfig {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+impl Default for ClientConfig {
+    fn default() -> Self {
+        ClientConfig {
+            ping_interval: 60,
+            log_received_stanzas: false,
+            log_sent_stanzas: false,
+        }
+    }
+}
+
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
     client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>,
@@ -27,12 +63,16 @@ pub struct Client {
 
 #[wasm_bindgen(js_class = "ProseClient")]
 impl Client {
-    pub async fn init(delegate: JSDelegate) -> Result<Client> {
+    pub async fn init(delegate: JSDelegate, config: Option<ClientConfig>) -> Result<Client> {
         let cache = Rc::new(IndexedDBDataCache::new().await?);
+        let config = config.unwrap_or_default();
 
         let client = Client {
             client: ClientBuilder::new()
-                .set_connector_provider(Connector::provider(JSConnectionProvider::new()))
+                .set_connector_provider(Connector::provider(
+                    JSConnectionProvider::new(config.clone().into()),
+                    Duration::from_secs(config.ping_interval as u64),
+                ))
                 .set_data_cache(cache.clone())
                 .set_avatar_cache(cache)
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
@@ -332,5 +372,14 @@ impl Client {
 impl From<ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>> for Client {
     fn from(client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>) -> Self {
         Client { client }
+    }
+}
+
+impl From<ClientConfig> for JSConnectionConfig {
+    fn from(value: ClientConfig) -> Self {
+        let config = JSConnectionConfig::new();
+        config.set_log_received_stanzas(value.log_received_stanzas);
+        config.set_log_sent_stanzas(value.log_sent_stanzas);
+        return config;
     }
 }

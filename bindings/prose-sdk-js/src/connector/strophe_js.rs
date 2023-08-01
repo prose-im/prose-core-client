@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -39,10 +40,21 @@ extern "C" {
     pub type JSConnectionProvider;
 
     #[wasm_bindgen(constructor)]
-    pub fn new() -> JSConnectionProvider;
+    pub fn new(config: JSConnectionConfig) -> JSConnectionProvider;
 
     #[wasm_bindgen(method, js_name = "provideConnection")]
     pub fn provide_connection(this: &JSConnectionProvider) -> JSConnection;
+
+    pub type JSConnectionConfig;
+
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> JSConnectionConfig;
+
+    #[wasm_bindgen(method, js_name = "setLogReceivedStanzas")]
+    pub fn set_log_received_stanzas(this: &JSConnectionConfig, flag: bool);
+
+    #[wasm_bindgen(method, js_name = "setLogSentStanzas")]
+    pub fn set_log_sent_stanzas(this: &JSConnectionConfig, flag: bool);
 }
 
 #[wasm_bindgen]
@@ -75,14 +87,16 @@ pub struct EventHandler {
 
 pub struct Connector {
     provider: Rc<JSConnectionProvider>,
+    ping_interval: Duration,
 }
 
 impl Connector {
-    pub fn provider(provider: JSConnectionProvider) -> ConnectorProvider {
+    pub fn provider(provider: JSConnectionProvider, ping_interval: Duration) -> ConnectorProvider {
         let provider = Rc::new(provider);
         Box::new(move || {
             Box::new(Connector {
                 provider: provider.clone(),
+                ping_interval,
             })
         })
     }
@@ -103,7 +117,7 @@ impl ConnectorTrait for Connector {
             let connection = Connection::new(client.clone());
             let event_handler = event_handler.clone();
 
-            Interval::new(60_000, move || {
+            Interval::new(self.ping_interval.as_millis() as u32, move || {
                 let fut = (event_handler)(&connection, ConnectionEvent::PingTimer);
                 spawn_local(async move { fut.await });
             })

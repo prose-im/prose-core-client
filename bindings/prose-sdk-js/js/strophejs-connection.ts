@@ -1,24 +1,47 @@
 // @ts-nocheck
 
 import { Strophe } from "strophe.js";
+
+export class JSConnectionConfig {
+  private __logReceivedStanzas: boolean
+  private __logSentStanzas: boolean
+
+  setLogReceivedStanzas(flag: boolean) {
+    this.__logReceivedStanzas = flag;
+  }
+
+  setLogSentStanzas(flag: boolean): void {
+    this.__logSentStanzas = flag;
+  }
+}
 export class JSConnectionProvider implements ProseConnectionProvider {
+  private readonly __config: JSConnectionConfig
+
+  constructor(config: JSConnectionConfig) {
+    this.__config = config;
+  }
+
   provideConnection(): ProseConnection {
-    return new StropheJSConnection();
+    return new StropheJSConnection(this.__config);
   }
 }
 
 class StropheJSConnection implements ProseConnection {
+  private readonly __config: JSConnectionConfig
   private readonly __connection: Strophe.Connection;
   private __eventHandler?: ProseConnectionEventHandler;
 
-  constructor() {
+  constructor(config: JSConnectionConfig) {
+    this.__config = config;
     this.__connection = new Strophe.Connection(
       "wss://chat.prose.org/websocket/",
       { protocol: "wss" }
     );
     this.__connection.maxRetries = 0;
     this.__connection.rawInput = data => {
-      //console.log("RECV", data);
+      if (this.__config.logReceivedStanzas) {
+        console.debug("(in)", data);
+      }
       if (this.__eventHandler) {
         this.__eventHandler.handleStanza(data);
       }
@@ -54,7 +77,10 @@ class StropheJSConnection implements ProseConnection {
   }
 
   sendStanza(stanza: string) {
-    console.log("Sending stanza", stanza);
+    if (this.__config.logSentStanzas) {
+      console.debug("(out)", stanza);
+    }
+
     const element = new DOMParser().parseFromString(
       stanza,
       "text/xml"
