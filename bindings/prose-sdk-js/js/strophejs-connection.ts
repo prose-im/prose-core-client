@@ -3,15 +3,15 @@
 import { Strophe } from "strophe.js";
 
 export class JSConnectionConfig {
-  private __logReceivedStanzas: boolean
-  private __logSentStanzas: boolean
+  logReceivedStanzas: boolean
+  logSentStanzas: boolean
 
   setLogReceivedStanzas(flag: boolean) {
-    this.__logReceivedStanzas = flag;
+    this.logReceivedStanzas = flag;
   }
 
   setLogSentStanzas(flag: boolean): void {
-    this.__logSentStanzas = flag;
+    this.logSentStanzas = flag;
   }
 }
 export class JSConnectionProvider implements ProseConnectionProvider {
@@ -40,7 +40,7 @@ class StropheJSConnection implements ProseConnection {
     this.__connection.maxRetries = 0;
     this.__connection.rawInput = data => {
       if (this.__config.logReceivedStanzas) {
-        console.debug("(in)", data);
+        console.info("(in)", data);
       }
       if (this.__eventHandler) {
         this.__eventHandler.handleStanza(data);
@@ -64,9 +64,6 @@ class StropheJSConnection implements ProseConnection {
         } else if (status === Strophe.Status.CONNECTED) {
           console.log("Strophe is connected.");
           resolve();
-
-          //connection.addHandler(onMessage, null, 'message', null, null,  null);
-          //connection.send($pres().tree());
         }
       });
     });
@@ -78,7 +75,7 @@ class StropheJSConnection implements ProseConnection {
 
   sendStanza(stanza: string) {
     if (this.__config.logSentStanzas) {
-      console.debug("(out)", stanza);
+      console.info("(out)", stanza);
     }
 
     const element = new DOMParser().parseFromString(
