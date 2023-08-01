@@ -85,7 +85,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let Some(delegate) = &self.inner.delegate else {
             return;
         };
-        delegate.handle_event(event);
+        let client = Client {
+            client: self.client.clone(),
+            inner: self.inner.clone(),
+        };
+        delegate.handle_event(client, event);
     }
 
     fn send_event_for_message(&self, conversation: &BareJid, message: &MessageLike) {
@@ -111,7 +115,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 message_ids: vec![message.id.as_ref().into()],
             }
         };
-        delegate.handle_event(event)
+        self.send_event(event)
     }
 
     async fn vcard_did_change(&self, from: Jid, vcard: VCard4) -> Result<()> {

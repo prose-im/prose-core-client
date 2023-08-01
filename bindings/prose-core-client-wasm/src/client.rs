@@ -328,3 +328,9 @@ impl Client {
         Ok(())
     }
 }
+
+impl From<ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>> for Client {
+    fn from(client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>) -> Self {
+        Client { client }
+    }
+}

@@ -21,7 +21,7 @@ pub struct ClientBuilder<D, A> {
     data_cache: D,
     avatar_cache: A,
     time_provider: Arc<dyn TimeProvider>,
-    delegate: Option<Box<dyn ClientDelegate>>,
+    delegate: Option<Box<dyn ClientDelegate<D, A>>>,
 }
 
 impl ClientBuilder<UndefinedDataCache, UndefinedAvatarCache> {
@@ -43,7 +43,7 @@ impl<A> ClientBuilder<UndefinedDataCache, A> {
             data_cache,
             avatar_cache: self.avatar_cache,
             time_provider: self.time_provider,
-            delegate: self.delegate,
+            delegate: None,
         }
     }
 }
@@ -55,7 +55,7 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
             data_cache: self.data_cache,
             avatar_cache,
             time_provider: self.time_provider,
-            delegate: self.delegate,
+            delegate: None,
         }
     }
 }
@@ -63,11 +63,6 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
 impl<D, A> ClientBuilder<D, A> {
     pub fn set_connector_provider(mut self, connector_provider: ConnectorProvider) -> Self {
         self.builder = self.builder.set_connector_provider(connector_provider);
-        self
-    }
-
-    pub fn set_delegate(mut self, delegate: Option<Box<dyn ClientDelegate>>) -> Self {
-        self.delegate = delegate;
         self
     }
 
@@ -83,6 +78,11 @@ impl<D, A> ClientBuilder<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
+    pub fn set_delegate(mut self, delegate: Option<Box<dyn ClientDelegate<D, A>>>) -> Self {
+        self.delegate = delegate;
+        self
+    }
+
     pub fn build(self) -> Client<D, A> {
         let caps = Capabilities::new(
             "Prose",

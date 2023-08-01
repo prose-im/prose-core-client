@@ -20,6 +20,7 @@ pub enum ClientError {
     NotConnected,
 }
 
+#[derive(Clone)]
 pub struct Client<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub(super) client: XMPPClient,
     pub(super) inner: Arc<ClientInner<D, A>>,
@@ -30,7 +31,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub data_cache: D,
     pub avatar_cache: A,
     pub time_provider: Arc<dyn TimeProvider>,
-    pub delegate: Option<Box<dyn ClientDelegate>>,
+    pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {

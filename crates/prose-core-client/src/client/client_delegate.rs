@@ -1,5 +1,8 @@
 use jid::BareJid;
 
+use crate::avatar_cache::AvatarCache;
+use crate::data_cache::DataCache;
+use crate::Client;
 use prose_domain::MessageId;
 use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
 
@@ -42,6 +45,6 @@ pub enum ClientEvent {
     },
 }
 
-pub trait ClientDelegate: SendUnlessWasm + SyncUnlessWasm {
-    fn handle_event(&self, event: ClientEvent);
+pub trait ClientDelegate<D: DataCache, A: AvatarCache>: SendUnlessWasm + SyncUnlessWasm {
+    fn handle_event(&self, client: Client<D, A>, event: ClientEvent);
 }
