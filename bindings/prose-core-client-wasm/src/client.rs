@@ -27,15 +27,12 @@ pub struct Client {
 
 #[wasm_bindgen(js_class = "ProseClient")]
 impl Client {
-    pub async fn init(
-        connection_provider: JSConnectionProvider,
-        delegate: JSDelegate,
-    ) -> Result<Client> {
+    pub async fn init(delegate: JSDelegate) -> Result<Client> {
         let cache = Rc::new(IndexedDBDataCache::new().await?);
 
         let client = Client {
             client: ClientBuilder::new()
-                .set_connector_provider(Connector::provider(connection_provider))
+                .set_connector_provider(Connector::provider(JSConnectionProvider::new()))
                 .set_data_cache(cache.clone())
                 .set_avatar_cache(cache)
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))

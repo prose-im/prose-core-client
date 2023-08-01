@@ -33,10 +33,13 @@ export interface ProseConnection {
 }
 "#;
 
-#[wasm_bindgen]
+#[wasm_bindgen(module = "/js/strophejs-connection.js")]
 extern "C" {
-    #[wasm_bindgen(typescript_type = "ProseConnectionProvider")]
+    #[wasm_bindgen(typescript_type = "StropheJSConnectionProvider")]
     pub type JSConnectionProvider;
+
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> JSConnectionProvider;
 
     #[wasm_bindgen(method, js_name = "provideConnection")]
     pub fn provide_connection(this: &JSConnectionProvider) -> JSConnection;

@@ -65,6 +65,8 @@ enum WasmPackTarget {
 }
 
 fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
+    compile_typescript(sh)?;
+
     let mut sh_args: Vec<&str> = vec![];
     let wasm_pack_cmd: &str;
 
@@ -105,6 +107,20 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
             "RUSTFLAGS",
             "-C panic=abort -C codegen-units=1 -C opt-level=z",
         )
+        .run()?;
+
+    Ok(())
+}
+
+fn compile_typescript(sh: &Shell) -> Result<()> {
+    cmd!(sh, "tsc")
+        .args([
+            "--target",
+            "esnext",
+            "--moduleResolution",
+            "node",
+            "js/strophejs-connection.ts",
+        ])
         .run()?;
 
     Ok(())
