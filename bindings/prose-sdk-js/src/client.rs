@@ -95,8 +95,6 @@ impl Client {
             resource: "web".to_string(),
         };
 
-        info!("Connect {} - {}", jid, password);
-
         self.client
             .connect(&jid, password, availability.into())
             .await?;
@@ -258,7 +256,6 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
 
-        info!("Found {} messages.", messages.len());
         Ok(messages.into())
     }
 

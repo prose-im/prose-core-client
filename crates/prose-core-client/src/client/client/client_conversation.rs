@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use anyhow::{format_err, Result};
 use jid::{BareJid, Jid};
 use microtype::Microtype;
-use tracing::{debug, info, instrument};
+use tracing::{debug, instrument};
 use xmpp_parsers::mam::Complete;
 
 use prose_domain::{Emoji, Message, MessageId};
@@ -41,7 +41,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let since: Option<message::Id> = since.into().map(|id| id.as_ref().into());
 
         let mut messages = if let Some(since) = &since {
-            info!(
+            debug!(
                 "Loading messages in conversation {} after {} from local cache…",
                 from, since
             );
@@ -50,7 +50,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .load_messages_after(from, since, Some(MESSAGE_PAGE_SIZE))
                 .await?
         } else {
-            info!(
+            debug!(
                 "Loading last page of messages in conversation {} from local cache…",
                 from
             );
@@ -62,7 +62,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .unwrap_or_else(|| vec![])
         };
 
-        info!("Found {} messages in local cache.", messages.len());
+        debug!("Found {} messages in local cache.", messages.len());
 
         // We take either the stanza_id of the last cached message or the first stanza_id that is
         // followed by a local message for which we don't know the stanza_id yet. This way we're
@@ -77,7 +77,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         };
 
         if load_from_server {
-            info!("Loading messages from server since {:?}…", stanza_id);
+            debug!("Loading messages from server since {:?}…", stanza_id);
 
             let mam = self.client.get_mod::<MAM>();
             let result = mam
@@ -90,7 +90,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .map(|msg| MessageLike::try_from(msg))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            info!("Found {} messages. Saving to cache…", remote_messages.len());
+            debug!("Found {} messages. Saving to cache…", remote_messages.len());
             self.inner
                 .data_cache
                 .insert_messages(remote_messages.iter())
@@ -127,7 +127,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
             messages.append(&mut remote_messages);
         } else {
-            info!("Skipping server round trip.")
+            debug!("Skipping server round trip.")
         }
 
         Ok(Message::reducing_messages(messages))
@@ -162,7 +162,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .load_messages_before(from, Some(&before), MESSAGE_PAGE_SIZE)
             .await?
         {
-            info!("Returning cached messages for conversation {}…", from);
+            debug!("Returning cached messages for conversation {}…", from);
             return self
                 .enriching_messages_from_cache(from, cached_messages)
                 .await;
@@ -177,7 +177,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             ));
         };
 
-        info!("Loading messages for conversation {}…", from);
+        debug!("Loading messages for conversation {}…", from);
         let mam = self.client.get_mod::<MAM>();
         let (messages, fin) = mam
             .load_messages_in_chat(from, &stanza_id, None, Some(MESSAGE_PAGE_SIZE as usize))

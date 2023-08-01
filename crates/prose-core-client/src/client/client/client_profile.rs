@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use jid::BareJid;
-use tracing::{info, instrument};
+use tracing::{debug, instrument};
 use xmpp_parsers::hashes::Sha1HexAttribute;
 
 use prose_xmpp::mods::{AvatarData, Profile};
@@ -86,14 +86,14 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             height,
         );
 
-        info!("Uploading avatar…");
+        debug!("Uploading avatar…");
         let profile = self.client.get_mod::<Profile>();
 
         profile
             .set_avatar_image(&metadata.checksum, image_data.base64())
             .await?;
 
-        info!("Uploading avatar metadata…");
+        debug!("Uploading avatar metadata…");
         profile
             .set_avatar_metadata(
                 image_data_len,
@@ -106,13 +106,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let jid = jid::BareJid::from(self.connected_jid()?);
 
-        info!("Caching avatar metadata");
+        debug!("Caching avatar metadata");
         self.inner
             .data_cache
             .insert_avatar_metadata(&jid, &metadata)
             .await?;
 
-        info!("Caching image locally…");
+        debug!("Caching image locally…");
         let path = self
             .inner
             .avatar_cache
@@ -133,11 +133,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         use std::time::Instant;
 
         let now = Instant::now();
-        info!("Opening & resizing image at {:?}…", image_path);
+        debug!("Opening & resizing image at {:?}…", image_path);
 
         let img =
             image::open(image_path)?.thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);
-        info!(
+        debug!(
             "Opening image & resizing finished after {:.2?}",
             now.elapsed()
         );
@@ -169,7 +169,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .has_cached_avatar_image(&from, &metadata.checksum)
                 .await?
             {
-                info!("Found cached image for {}", from);
+                debug!("Found cached image for {}", from);
                 return Ok(());
             }
         }

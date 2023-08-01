@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
-use tracing::{info, instrument};
+use tracing::{debug, instrument};
 
 use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::{mods, TimeProvider};
@@ -26,7 +26,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         if cache_policy != CachePolicy::ReloadIgnoringCacheData {
             if let Some(cached_profile) = self.inner.data_cache.load_user_profile(&from).await? {
-                info!("Found cached profile for {}", from);
+                debug!("Found cached profile for {}", from);
                 return Ok(Some(cached_profile));
             }
         }
