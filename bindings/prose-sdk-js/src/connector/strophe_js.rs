@@ -209,12 +209,8 @@ impl EventHandler {
 
 #[derive(Error, Debug)]
 pub enum JSConnectionError {
-    #[error("DomException {name} ({code}): {message}")]
-    DomException {
-        code: u16,
-        name: String,
-        message: String,
-    },
+    #[error("DomException {name}: {message}")]
+    DomException { name: String, message: String },
 }
 
 impl From<JSConnectionError> for ConnectionError {
@@ -228,7 +224,6 @@ impl From<JSConnectionError> for ConnectionError {
 impl From<DomException> for JSConnectionError {
     fn from(value: DomException) -> Self {
         JSConnectionError::DomException {
-            code: value.code(),
             name: value.name(),
             message: value.message(),
         }

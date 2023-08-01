@@ -38,12 +38,8 @@ pub(super) mod keys {
 
 #[derive(Error, Debug)]
 pub enum IndexedDBDataCacheError {
-    #[error("DomException {name} ({code}): {message}")]
-    DomException {
-        code: u16,
-        name: String,
-        message: String,
-    },
+    #[error("DomException {name}: {message}")]
+    DomException { name: String, message: String },
 
     #[error(transparent)]
     JSON(#[from] serde_json::error::Error),
@@ -61,7 +57,6 @@ pub enum IndexedDBDataCacheError {
 impl From<DomException> for IndexedDBDataCacheError {
     fn from(value: DomException) -> Self {
         IndexedDBDataCacheError::DomException {
-            code: value.code(),
             name: value.name(),
             message: value.message(),
         }
