@@ -60,7 +60,7 @@ class StropheJSConnection implements ProseConnection {
           console.log("Strophe is disconnecting.");
         } else if (status === Strophe.Status.DISCONNECTED) {
           console.log("Strophe is disconnected.");
-          this.__eventHandler.handleDisconnect(null);
+          setTimeout(() => this.__eventHandler.handleDisconnect(null));
         } else if (status === Strophe.Status.CONNECTED) {
           console.log("Strophe is connected.");
           resolve();
