@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
-use std::time::Duration;
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -12,6 +11,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::DomException;
 
+use crate::client::ClientConfig;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
@@ -23,7 +23,7 @@ use crate::util::Interval;
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
 export interface ProseConnectionProvider {
-    provideConnection(): ProseConnection
+    provideConnection(config: ClientConfig): ProseConnection
 }
 
 export interface ProseConnection {
@@ -34,27 +34,14 @@ export interface ProseConnection {
 }
 "#;
 
-#[wasm_bindgen(module = "/js/strophejs-connection.js")]
+#[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(typescript_type = "StropheJSConnectionProvider")]
-    pub type JSConnectionProvider;
-
-    #[wasm_bindgen(constructor)]
-    pub fn new(config: JSConnectionConfig) -> JSConnectionProvider;
+    #[wasm_bindgen]
+    pub type ProseConnectionProvider;
 
     #[wasm_bindgen(method, js_name = "provideConnection")]
-    pub fn provide_connection(this: &JSConnectionProvider) -> JSConnection;
-
-    pub type JSConnectionConfig;
-
-    #[wasm_bindgen(constructor)]
-    pub fn new() -> JSConnectionConfig;
-
-    #[wasm_bindgen(method, js_name = "setLogReceivedStanzas")]
-    pub fn set_log_received_stanzas(this: &JSConnectionConfig, flag: bool);
-
-    #[wasm_bindgen(method, js_name = "setLogSentStanzas")]
-    pub fn set_log_sent_stanzas(this: &JSConnectionConfig, flag: bool);
+    pub fn provide_connection(this: &ProseConnectionProvider, config: ClientConfig)
+        -> JSConnection;
 }
 
 #[wasm_bindgen]
@@ -86,17 +73,18 @@ pub struct EventHandler {
 }
 
 pub struct Connector {
-    provider: Rc<JSConnectionProvider>,
-    ping_interval: Duration,
+    provider: Rc<ProseConnectionProvider>,
+    config: ClientConfig,
 }
 
 impl Connector {
-    pub fn provider(provider: JSConnectionProvider, ping_interval: Duration) -> ConnectorProvider {
+    pub fn provider(provider: ProseConnectionProvider, config: ClientConfig) -> ConnectorProvider {
         let provider = Rc::new(provider);
+
         Box::new(move || {
             Box::new(Connector {
                 provider: provider.clone(),
-                ping_interval,
+                config: config.clone(),
             })
         })
     }
@@ -110,14 +98,14 @@ impl ConnectorTrait for Connector {
         password: &str,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
-        let client = Rc::new(self.provider.provide_connection());
+        let client = Rc::new(self.provider.provide_connection(self.config.clone()));
         let event_handler = Rc::new(event_handler);
 
         let ping_interval = {
             let connection = Connection::new(client.clone());
             let event_handler = event_handler.clone();
 
-            Interval::new(self.ping_interval.as_millis() as u32, move || {
+            Interval::new(self.config.ping_interval * 1000, move || {
                 let fut = (event_handler)(&connection, ConnectionEvent::PingTimer);
                 spawn_local(async move { fut.await });
             })

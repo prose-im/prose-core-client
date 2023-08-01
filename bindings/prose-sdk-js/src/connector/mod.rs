@@ -1,3 +1,3 @@
-pub use strophe_js::{Connector, JSConnectionConfig, JSConnectionProvider};
+pub use strophe_js::{Connector, ProseConnectionProvider};
 
 mod strophe_js;

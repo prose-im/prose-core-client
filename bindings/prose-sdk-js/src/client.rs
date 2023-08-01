@@ -1,4 +1,4 @@
-use crate::connector::{Connector, JSConnectionConfig, JSConnectionProvider};
+use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, MessagesArray,
@@ -11,7 +11,6 @@ use prose_core_client::types::UserActivity;
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
 use prose_domain::{Emoji, MessageId};
 use std::rc::Rc;
-use std::time::Duration;
 use tracing::info;
 use wasm_bindgen::prelude::*;
 
@@ -63,16 +62,17 @@ pub struct Client {
 
 #[wasm_bindgen(js_class = "ProseClient")]
 impl Client {
-    pub async fn init(delegate: JSDelegate, config: Option<ClientConfig>) -> Result<Client> {
+    pub async fn init(
+        connection_provider: ProseConnectionProvider,
+        delegate: JSDelegate,
+        config: Option<ClientConfig>,
+    ) -> Result<Client> {
         let cache = Rc::new(IndexedDBDataCache::new().await?);
         let config = config.unwrap_or_default();
 
         let client = Client {
             client: ClientBuilder::new()
-                .set_connector_provider(Connector::provider(
-                    JSConnectionProvider::new(config.clone().into()),
-                    Duration::from_secs(config.ping_interval as u64),
-                ))
+                .set_connector_provider(Connector::provider(connection_provider, config))
                 .set_data_cache(cache.clone())
                 .set_avatar_cache(cache)
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
@@ -369,14 +369,5 @@ impl Client {
 impl From<ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>> for Client {
     fn from(client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>) -> Self {
         Client { client }
-    }
-}
-
-impl From<ClientConfig> for JSConnectionConfig {
-    fn from(value: ClientConfig) -> Self {
-        let config = JSConnectionConfig::new();
-        config.set_log_received_stanzas(value.log_received_stanzas);
-        config.set_log_sent_stanzas(value.log_sent_stanzas);
-        return config;
     }
 }

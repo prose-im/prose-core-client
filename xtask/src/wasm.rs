@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 use std::env;
-use std::fs::OpenOptions;
-use std::io::{BufReader, Seek, SeekFrom};
 use std::path::Path;
 use std::str::FromStr;
 
@@ -40,7 +38,6 @@ impl Args {
         match self.cmd {
             Command::Build { dev } => {
                 sh.remove_path("pkg")?;
-                compile_typescript(&sh)?;
                 run_wasm_pack(
                     &sh,
                     WasmPackCommand::Build {
@@ -48,8 +45,7 @@ impl Args {
                         dev,
                         target: WasmPackTarget::Web,
                     },
-                )?;
-                fix_package_json(&sh)
+                )
             }
             Command::Publish {} => publish(&sh).await,
         }
@@ -132,41 +128,10 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
     Ok(())
 }
 
-fn compile_typescript(sh: &Shell) -> Result<()> {
-    cmd!(sh, "tsc")
-        .args([
-            "--target",
-            "esnext",
-            "--moduleResolution",
-            "node",
-            "js/strophejs-connection.ts",
-        ])
-        .run()?;
-
-    Ok(())
-}
-
-fn fix_package_json(sh: &Shell) -> Result<()> {
-    let file_path = sh.current_dir().join("pkg").join("package.json");
-
-    let mut opts = OpenOptions::new();
-    opts.read(true).write(true);
-    let mut file = opts.open(&file_path)?;
-
-    let mut package: PackageJson = serde_json::from_reader(BufReader::new(&file))?;
-    package.files.push("snippets/*".to_string());
-    package.browser = Some(package.module.clone());
-    file.seek(SeekFrom::Start(0))?;
-    serde_json::to_writer_pretty(&file, &package)?;
-
-    Ok(())
-}
-
 async fn publish(sh: &Shell) -> Result<()> {
     let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
 
     sh.remove_path("pkg")?;
-    compile_typescript(sh)?;
     run_wasm_pack(
         &sh,
         WasmPackCommand::Build {
@@ -175,7 +140,6 @@ async fn publish(sh: &Shell) -> Result<()> {
             target: WasmPackTarget::Web,
         },
     )?;
-    fix_package_json(&sh)?;
     run_wasm_pack(&sh, WasmPackCommand::Pack)?;
 
     let manifest = sh.read_file("Cargo.toml")?;
