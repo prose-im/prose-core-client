@@ -1,10 +1,14 @@
+use std::collections::HashMap;
 use std::env;
+use std::fs::OpenOptions;
+use std::io::{BufReader, Seek, SeekFrom};
 use std::path::Path;
 use std::str::FromStr;
 
 use crate::paths;
 use anyhow::{anyhow, Result};
 use octocrab::Octocrab;
+use serde::{Deserialize, Serialize};
 use url::Url;
 use xshell::{cmd, Shell};
 
@@ -34,14 +38,19 @@ impl Args {
         sh.change_dir(Path::new(paths::BINDINGS).join(paths::bindings::WASM));
 
         match self.cmd {
-            Command::Build { dev } => run_wasm_pack(
-                &sh,
-                WasmPackCommand::Build {
-                    release: !dev,
-                    dev,
-                    target: WasmPackTarget::Web,
-                },
-            ),
+            Command::Build { dev } => {
+                sh.remove_path("pkg")?;
+                compile_typescript(&sh)?;
+                run_wasm_pack(
+                    &sh,
+                    WasmPackCommand::Build {
+                        release: !dev,
+                        dev,
+                        target: WasmPackTarget::Web,
+                    },
+                )?;
+                fix_package_json(&sh)
+            }
             Command::Publish {} => publish(&sh).await,
         }
     }
@@ -64,9 +73,20 @@ enum WasmPackTarget {
     NoModules,
 }
 
-fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
-    compile_typescript(sh)?;
+#[derive(Debug, Deserialize, Serialize)]
+struct PackageJson {
+    name: String,
+    version: String,
+    files: Vec<String>,
+    module: String,
+    browser: Option<String>,
+    types: String,
+    #[serde(rename = "sideEffects")]
+    side_effects: Vec<String>,
+    dependencies: HashMap<String, String>,
+}
 
+fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
     let mut sh_args: Vec<&str> = vec![];
     let wasm_pack_cmd: &str;
 
@@ -126,9 +146,27 @@ fn compile_typescript(sh: &Shell) -> Result<()> {
     Ok(())
 }
 
+fn fix_package_json(sh: &Shell) -> Result<()> {
+    let file_path = sh.current_dir().join("pkg").join("package.json");
+
+    let mut opts = OpenOptions::new();
+    opts.read(true).write(true);
+    let mut file = opts.open(&file_path)?;
+
+    let mut package: PackageJson = serde_json::from_reader(BufReader::new(&file))?;
+    package.files.push("snippets/*".to_string());
+    package.browser = Some(package.module.clone());
+    file.seek(SeekFrom::Start(0))?;
+    serde_json::to_writer_pretty(&file, &package)?;
+
+    Ok(())
+}
+
 async fn publish(sh: &Shell) -> Result<()> {
     let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
 
+    sh.remove_path("pkg")?;
+    compile_typescript(sh)?;
     run_wasm_pack(
         &sh,
         WasmPackCommand::Build {
@@ -137,6 +175,7 @@ async fn publish(sh: &Shell) -> Result<()> {
             target: WasmPackTarget::Web,
         },
     )?;
+    fix_package_json(&sh)?;
     run_wasm_pack(&sh, WasmPackCommand::Pack)?;
 
     let manifest = sh.read_file("Cargo.toml")?;
