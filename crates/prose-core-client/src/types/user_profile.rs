@@ -2,7 +2,7 @@ use crate::util::concatenate_names;
 use anyhow::Result;
 use prose_xmpp::stanza::{vcard, VCard4};
 use serde::{Deserialize, Serialize};
-use url::Url;
+pub use url::Url;
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
 pub struct Address {

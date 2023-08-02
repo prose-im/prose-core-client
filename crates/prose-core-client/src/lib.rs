@@ -9,7 +9,6 @@ pub use client::{
 pub mod avatar_cache;
 mod client;
 pub mod data_cache;
-pub(crate) mod domain_ext;
 pub mod types;
 
 #[cfg(feature = "test")]

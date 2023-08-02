@@ -1,4 +1,4 @@
-use prose_domain::Url;
+use prose_core_client::types::Url;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

@@ -7,8 +7,8 @@ use wasm_bindgen::prelude::*;
 use prose_core_client::avatar_cache::AvatarCache;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::data_cache::DataCache;
+use prose_core_client::types::MessageId;
 use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent};
-use prose_domain::MessageId;
 use prose_xmpp::ConnectionError;
 
 use crate::client::Client;
@@ -155,7 +155,9 @@ trait JSValueConvertible {
 
 impl JSValueConvertible for Vec<MessageId> {
     fn into_js_array(self) -> Vec<JsValue> {
-        self.into_iter().map(|id| JsValue::from(id.0)).collect()
+        self.into_iter()
+            .map(|id| JsValue::from(id.into_inner()))
+            .collect()
     }
 }
 

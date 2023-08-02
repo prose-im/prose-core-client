@@ -5,11 +5,9 @@ use crate::types::{
     StringArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
-use microtype::Microtype;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
-use prose_core_client::types::UserActivity;
+use prose_core_client::types::{MessageId, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
-use prose_domain::{Emoji, MessageId};
 use std::rc::Rc;
 use tracing::info;
 use wasm_bindgen::prelude::*;
@@ -225,7 +223,7 @@ impl Client {
         since: Option<String>,
         load_from_server: bool,
     ) -> Result<MessagesArray> {
-        let since = since.map(|id| MessageId(id));
+        let since: Option<MessageId> = since.map(|id| id.into());
         let from = jid::BareJid::from(from.clone());
 
         let messages = self
@@ -247,7 +245,7 @@ impl Client {
 
         let message_ids: Vec<MessageId> = Vec::<String>::try_from(message_ids)?
             .into_iter()
-            .map(|id| MessageId(id))
+            .map(|id| MessageId::from(id))
             .collect();
 
         let messages = self
@@ -271,8 +269,8 @@ impl Client {
         self.client
             .toggle_reaction_to_message(
                 jid::BareJid::from(conversation.clone()),
-                MessageId::new(id.into()),
-                Emoji::new(emoji.into()),
+                id.into(),
+                emoji.into(),
             )
             .await
             .map_err(WasmError::from)?;

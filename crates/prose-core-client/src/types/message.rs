@@ -1,16 +1,40 @@
+use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-
-use prose_domain::{Message, Reaction};
+use jid::BareJid;
+use prose_xmpp::stanza::message;
+use prose_xmpp::stanza::message::stanza_id;
+pub use prose_xmpp::stanza::message::Emoji;
+use serde::{Deserialize, Serialize};
 
 use crate::types::message_like::Payload;
 use crate::types::MessageLike;
 
-pub trait MessageExt {
-    fn reducing_messages(messages: impl IntoIterator<Item = MessageLike>) -> Vec<Message>;
+pub type MessageId = message::Id;
+pub type StanzaId = stanza_id::Id;
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Reaction {
+    pub emoji: Emoji,
+    pub from: Vec<BareJid>,
 }
 
-impl MessageExt for Message {
-    fn reducing_messages(messages: impl IntoIterator<Item = MessageLike>) -> Vec<Message> {
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Message {
+    pub id: MessageId,
+    pub stanza_id: Option<StanzaId>,
+    pub from: BareJid,
+    pub body: String,
+    pub timestamp: DateTime<Utc>,
+    pub is_read: bool,
+    pub is_edited: bool,
+    pub is_delivered: bool,
+    pub reactions: Vec<Reaction>,
+}
+
+impl Message {
+    pub(crate) fn reducing_messages(
+        messages: impl IntoIterator<Item = MessageLike>,
+    ) -> Vec<Message> {
         let mut messages_map = IndexMap::new();
         let mut modifiers: Vec<MessageLike> = vec![];
 
@@ -18,8 +42,8 @@ impl MessageExt for Message {
             match msg.payload {
                 Payload::Message { body } => {
                     let message = Message {
-                        id: msg.id.as_ref().into(),
-                        stanza_id: msg.stanza_id.map(|id| id.as_ref().into()),
+                        id: msg.id.clone(),
+                        stanza_id: msg.stanza_id,
                         from: msg.from,
                         body,
                         timestamp: msg.timestamp.into(),

@@ -1,10 +1,11 @@
 use jid::BareJid;
 
+use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
+
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
+use crate::types::MessageId;
 use crate::Client;
-use prose_domain::MessageId;
-use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
 
 #[derive(Debug)]
 pub enum ConnectionEvent {

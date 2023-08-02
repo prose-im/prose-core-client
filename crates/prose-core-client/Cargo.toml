@@ -16,10 +16,8 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 indexmap = "2.0.0"
-jid = { workspace = true }
-microtype = { workspace = true }
+jid = { workspace = true, features = ["serde"] }
 once_cell = { workspace = true }
-prose-domain = { path = "../prose-domain" }
 prose-xmpp = { path = "../prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
 sha1 = { workspace = true }
@@ -27,7 +25,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
-url = { workspace = true }
+url = { workspace = true, features = ["serde"] }
 uuid = { workspace = true }
 xmpp-parsers = { workspace = true }
 

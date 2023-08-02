@@ -15,10 +15,8 @@ chrono = { workspace = true }
 console_error_panic_hook = "0.1"
 jid = { workspace = true }
 js-sys = { workspace = true }
-microtype = { workspace = true }
 minidom = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client" }
-prose-domain = { path = "../../crates/prose-domain" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

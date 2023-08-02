@@ -2,19 +2,16 @@ use std::fmt::Debug;
 
 use anyhow::{format_err, Result};
 use jid::{BareJid, Jid};
-use microtype::Microtype;
 use tracing::{debug, instrument};
 use xmpp_parsers::mam::Complete;
 
-use prose_domain::{Emoji, Message, MessageId};
 use prose_xmpp::mods::{Chat, MAM};
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::ChatState;
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::domain_ext::MessageExt;
-use crate::types::{MessageLike, Page};
+use crate::types::{Emoji, Message, MessageId, MessageLike, Page};
 
 use super::Client;
 

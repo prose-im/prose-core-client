@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 use super::{BareJid, BareJidArray, ReactionsArray};
 
 #[wasm_bindgen]
-pub struct Message(prose_domain::Message);
+pub struct Message(prose_core_client::types::Message);
 
 #[wasm_bindgen]
 pub struct Reaction {
@@ -94,16 +94,16 @@ impl Reaction {
     }
 }
 
-impl From<prose_domain::Message> for Message {
-    fn from(value: prose_domain::Message) -> Self {
+impl From<prose_core_client::types::Message> for Message {
+    fn from(value: prose_core_client::types::Message) -> Self {
         Message(value)
     }
 }
 
-impl From<prose_domain::Reaction> for Reaction {
-    fn from(value: prose_domain::Reaction) -> Self {
+impl From<prose_core_client::types::Reaction> for Reaction {
+    fn from(value: prose_core_client::types::Reaction) -> Self {
         Reaction {
-            emoji: value.emoji.0,
+            emoji: value.emoji.into_inner(),
             from: value.from.into_iter().map(Into::into).collect(),
         }
     }

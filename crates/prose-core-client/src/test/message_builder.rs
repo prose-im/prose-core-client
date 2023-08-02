@@ -4,13 +4,12 @@ use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::{date, mam, Element};
 
-use prose_domain::{Message, MessageId, Reaction, StanzaId};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
 
 use crate::test::{BareJidTestAdditions, DateTimeTestAdditions};
 use crate::types::message_like::Payload;
-use crate::types::MessageLike;
+use crate::types::{Message, MessageId, MessageLike, Reaction, StanzaId};
 
 pub struct MessageBuilder {
     id: MessageId,
@@ -66,8 +65,8 @@ impl MessageBuilder {
 
     pub fn build_message_like(self) -> MessageLike {
         MessageLike {
-            id: self.id.0.into(),
-            stanza_id: self.stanza_id.map(|id| id.0.into()),
+            id: self.id,
+            stanza_id: self.stanza_id,
             target: None,
             to: self.to,
             from: self.from,
@@ -90,7 +89,7 @@ impl MessageBuilder {
                     }),
                     stanza: Some(Box::new(
                         prose_xmpp::stanza::Message::new()
-                            .set_id(self.id.0.into())
+                            .set_id(self.id)
                             .set_type(MessageType::Chat)
                             .set_to(self.to)
                             .set_from(self.from)
