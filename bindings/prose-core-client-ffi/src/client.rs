@@ -1,6 +1,8 @@
+use prose_core_client::data_cache::sqlite::SQLiteCache;
 use prose_core_client::types::AccountSettings;
 use prose_core_client::{
-    CachePolicy, Client as ProseClient, ClientBuilder, ClientDelegate, FsAvatarCache, SQLiteCache,
+    CachePolicy, Client as ProseClient, ClientBuilder, ClientDelegate as ProseClientDelegate,
+    ClientEvent, FsAvatarCache,
 };
 use prose_xmpp::ConnectionError;
 use std::fs;
@@ -11,6 +13,10 @@ use crate::{
     Availability, BareJid, ClientError, Contact, Emoji, FullJid, Message, MessageId, MessagesPage,
     UserProfile,
 };
+
+pub trait ClientDelegate: Send + Sync {
+    fn handle_event(&self, event: ClientEvent);
+}
 
 pub struct Client {
     jid: FullJid,
@@ -27,6 +33,10 @@ impl Client {
         let cache_dir = Path::new(&cache_dir).join(bare_jid.to_string());
         info!("Caching data at {:?}", cache_dir);
         fs::create_dir_all(&cache_dir).map_err(anyhow::Error::new)?;
+
+        let delegate = delegate.map(|d| {
+            Box::new(DelegateWrapper(d)) as Box<dyn ProseClientDelegate<SQLiteCache, FsAvatarCache>>
+        });
 
         Ok(Client {
             jid,
@@ -49,7 +59,6 @@ impl Client {
         &self,
         password: String,
         availability: Availability,
-        status: Option<String>,
     ) -> Result<(), ConnectionError> {
         self.client
             .connect(&self.jid, password, availability)
@@ -99,7 +108,7 @@ impl Client {
     }
 
     pub async fn save_avatar(&self, image_path: PathBuf) -> Result<(), ClientError> {
-        self.client.save_avatar(&image_path).await?;
+        self.client.save_avatar_from_url(&image_path).await?;
         Ok(())
     }
 
@@ -224,5 +233,13 @@ impl Client {
     ) -> Result<(), ClientError> {
         self.client.save_account_settings(&settings).await?;
         Ok(())
+    }
+}
+
+struct DelegateWrapper(Box<dyn ClientDelegate>);
+
+impl ProseClientDelegate<SQLiteCache, FsAvatarCache> for DelegateWrapper {
+    fn handle_event(&self, _client: ProseClient<SQLiteCache, FsAvatarCache>, event: ClientEvent) {
+        self.0.handle_event(event)
     }
 }

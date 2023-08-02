@@ -1,17 +1,16 @@
 use std::path::Path;
 pub use std::path::PathBuf;
 
-use chrono::NaiveDateTime;
+use chrono::{DateTime as ChronoDateTime, NaiveDateTime, Utc};
 pub use jid::{BareJid, FullJid, JidParseError};
 
+use prose_core_client::types::Page;
 pub use prose_core_client::types::{
     AccountSettings, Address, Availability, Contact, Emoji, Message, MessageId, Reaction, StanzaId,
-    Url, UserProfile,
+    Url, UserActivity, UserProfile,
 };
-use prose_core_client::types::{DateTime as ChronoDateTime, Page, Utc};
 pub use prose_core_client::{
-    AccountBookmark, AccountBookmarksClient, CachePolicy, ClientDelegate, ClientEvent,
-    ConnectionEvent,
+    AccountBookmark, AccountBookmarksClient, CachePolicy, ClientEvent, ConnectionEvent,
 };
 pub use prose_xmpp::ConnectionError;
 
@@ -83,7 +82,7 @@ impl UniffiCustomTypeConverter for MessageId {
     }
 
     fn from_custom(obj: Self) -> Self::Builtin {
-        obj.0
+        obj.into_inner()
     }
 }
 
@@ -95,7 +94,7 @@ impl UniffiCustomTypeConverter for StanzaId {
     }
 
     fn from_custom(obj: Self) -> Self::Builtin {
-        obj.0
+        obj.into_inner()
     }
 }
 
@@ -107,7 +106,7 @@ impl UniffiCustomTypeConverter for Emoji {
     }
 
     fn from_custom(obj: Self) -> Self::Builtin {
-        obj.0
+        obj.into_inner()
     }
 }
 

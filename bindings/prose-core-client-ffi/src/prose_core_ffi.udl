@@ -60,6 +60,7 @@ interface ClientEvent {
     ComposingUsersChanged(BareJid conversation);
     ConnectionStatusChanged(ConnectionEvent event);
     ContactChanged(BareJid jid);
+    AvatarChanged(BareJid jid);
     MessagesAppended(BareJid conversation, sequence<MessageId> message_ids);
     MessagesUpdated(BareJid conversation, sequence<MessageId> message_ids);
     MessagesDeleted(BareJid conversation, sequence<MessageId> message_ids);
@@ -109,12 +110,16 @@ enum Availability {
     "Away",
 };
 
+dictionary UserActivity {
+    string emoji;
+    string? status;
+};
+
 dictionary Contact {
     BareJid jid;
     string name;
-    PathBuf? avatar;
     Availability availability;
-    string? status;
+    UserActivity? activity;
     sequence<string> groups;
 };
 
@@ -124,9 +129,11 @@ dictionary Address {
 };
 
 dictionary UserProfile {
-    string? full_name;
+    string? first_name;
+    string? last_name;
     string? nickname;
     string? org;
+    string? role;
     string? title;
     string? email;
     string? tel;
