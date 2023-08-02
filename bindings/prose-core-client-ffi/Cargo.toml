@@ -1,0 +1,29 @@
+[package]
+name = "prose_core_ffi"
+version = "0.1.0"
+description = "Prose core XMPP client FFIs."
+license = "MPL-2.0"
+edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client"
+repository = "https://github.com/prose-im/prose-core-client.git"
+keywords = ["xmpp", "xmpp-client", "library"]
+categories = ["network-programming"]
+authors = ["Marc Bauer <mb@nesium.com>"]
+
+[lib]
+name = "prose_core_ffi"
+crate-type = ["staticlib"]
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+jid = { workspace = true }
+prose-core-client = { path = "../../crates/prose-core-client" }
+prose-xmpp = { path = "../../crates/prose-xmpp" }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uniffi = { workspace = true, features = ["cli"] }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }

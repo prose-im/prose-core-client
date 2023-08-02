@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
@@ -23,8 +23,8 @@ jobs:
           components: rustfmt
           override: true
 
-      - name: Install build headers
-        run: sudo apt-get install libstrophe-dev
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version
@@ -43,7 +43,13 @@ jobs:
         run: cargo build
 
       - name: Test code
-        run: cargo test --features test-helpers
+        run: cargo test --features test
+
+      - name: Run integration tests
+        run: cargo test --package prose-core-integration-tests
+
+      - name: Run Wasm integration tests
+        run: cargo xtask ci wasm
 
       - name: Check code style
         run: cargo fmt -- --check

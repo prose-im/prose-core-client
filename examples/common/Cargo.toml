@@ -1,0 +1,13 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+dotenvy = "0.15"
+jid = "0.9"
+tracing = { workspace = true }
+tracing-oslog = "0.1.2"
+tracing-subscriber = { workspace = true }

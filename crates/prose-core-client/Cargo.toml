@@ -1,0 +1,59 @@
+[package]
+name = "prose-core-client"
+version = "0.1.0"
+description = "Prose core XMPP client manager and protocols."
+readme = "README.md"
+license = "MPL-2.0"
+edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client"
+repository = "https://github.com/prose-im/prose-core-client.git"
+keywords = ["xmpp", "xmpp-client", "library"]
+categories = ["network-programming"]
+authors = ["Valerian Saliou <valerian@valeriansaliou.name>"]
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+base64 = { workspace = true }
+indexmap = "2.0.0"
+jid = { workspace = true, features = ["serde"] }
+once_cell = { workspace = true }
+prose-xmpp = { path = "../prose-xmpp" }
+serde = { workspace = true, features = ["derive"] }
+sha1 = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true, features = ["serde"] }
+uuid = { workspace = true }
+xmpp-parsers = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { workspace = true, features = ["serde"] }
+deadpool-sqlite = "0.5"
+either = { version = "1.8" }
+image = {version = "0.24.5" }
+rusqlite = { version = "0.28.0", features = ["chrono", "url", "trace"] }
+serde_json = { workspace = true }
+tempfile = { version = "3.5.0" }
+# Test
+auto_impl = { version = "1.1.0", optional = true }
+tokio = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+auto_impl = { version = "1.1.0" }
+chrono = { workspace = true, features = ["serde", "wasmbind"] }
+gloo-utils = { version = "0.1", features = ["serde"] }
+indexed_db_futures = "0.3"
+js-sys = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = ["build"] }
+
+[features]
+default = []
+test = ["prose-xmpp/test", "dep:auto_impl", "dep:tokio", "tokio/macros", "dep:auto_impl"]

@@ -1,0 +1,152 @@
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Poll, Waker};
+
+use anyhow::Result;
+use minidom::Element;
+use parking_lot::Mutex;
+use xmpp_parsers::iq::IqType;
+
+use crate::util::module_future_state::{ModuleFuturePoll, ModuleFutureState};
+use crate::util::request_error::RequestError;
+use crate::util::XMPPElement;
+
+pub(crate) enum ElementReducerPoll {
+    Pending,
+    Ready,
+}
+
+type ElementReducer<T> = fn(&mut T, &XMPPElement) -> Result<ElementReducerPoll, RequestError>;
+type ResultTransformer<T, U> = fn(T) -> U;
+
+pub(crate) struct RequestFuture<T: Send, U> {
+    pub(crate) state: Arc<Mutex<ReducerFutureState<T, U>>>,
+}
+
+pub(crate) struct IQReducerState {
+    request_id: String,
+    element: Option<Element>,
+}
+
+impl RequestFuture<IQReducerState, Option<Element>> {
+    pub fn new_iq_request(id: impl Into<String>) -> Self {
+        RequestFuture::new(
+            IQReducerState {
+                request_id: id.into(),
+                element: None,
+            },
+            |state, element| {
+                let XMPPElement::IQ(iq) = element else {
+                    return Ok(ElementReducerPoll::Pending);
+                };
+
+                if iq.id != state.request_id {
+                    return Ok(ElementReducerPoll::Pending);
+                }
+
+                match &iq.payload {
+                    IqType::Result(payload) => {
+                        state.element = payload.clone();
+                        Ok(ElementReducerPoll::Ready)
+                    }
+                    IqType::Error(err) => Err(RequestError::XMPP { err: err.clone() }),
+                    IqType::Get(_) | IqType::Set(_) => Err(RequestError::UnexpectedResponse),
+                }
+            },
+            |state| state.element,
+        )
+    }
+}
+
+impl<T: Send, U> RequestFuture<T, U> {
+    pub fn new(
+        initial_value: T,
+        reducer: ElementReducer<T>,
+        transformer: ResultTransformer<T, U>,
+    ) -> Self {
+        RequestFuture {
+            state: Arc::new(Mutex::new(ReducerFutureState {
+                reducer,
+                transformer,
+                value: Some(initial_value),
+                result: None,
+                waker: None,
+            })),
+        }
+    }
+
+    pub fn failed(err: RequestError) -> Self {
+        RequestFuture {
+            state: Arc::new(Mutex::new(ReducerFutureState {
+                reducer: |_, _| unreachable!(),
+                transformer: |_| unreachable!(),
+                value: None,
+                result: Some(Err(err)),
+                waker: None,
+            })),
+        }
+    }
+}
+
+pub(crate) struct ReducerFutureState<T, U> {
+    reducer: ElementReducer<T>,
+    transformer: ResultTransformer<T, U>,
+    value: Option<T>,
+    result: Option<Result<(), RequestError>>,
+    waker: Option<Waker>,
+}
+
+impl<T: Send, U> ModuleFutureState for ReducerFutureState<T, U> {
+    fn handle_element(&mut self, element: &XMPPElement) -> ModuleFuturePoll {
+        if self.result.is_some() {
+            return ModuleFuturePoll::Ready(self.waker.take());
+        }
+
+        let mut value = self
+            .value
+            .take()
+            .expect("Promise has been fulfilled already");
+        let result = (self.reducer)(&mut value, element);
+        self.value.replace(value);
+
+        match result {
+            Err(err) => {
+                self.result = Some(Err(err));
+                ModuleFuturePoll::Ready(self.waker.take())
+            }
+            Ok(ElementReducerPoll::Ready) => {
+                self.result = Some(Ok(()));
+                ModuleFuturePoll::Ready(self.waker.take())
+            }
+            Ok(ElementReducerPoll::Pending) => ModuleFuturePoll::Pending,
+        }
+    }
+
+    fn fail_with_timeout(&mut self) -> Option<Waker> {
+        self.result = Some(Err(RequestError::TimedOut));
+        self.waker.take()
+    }
+}
+
+impl<T: Send, U> Future for RequestFuture<T, U> {
+    type Output = Result<U, RequestError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        let mut state = self.state.lock();
+
+        let Some(result) = state.result.take() else {
+            state.waker = Some(cx.waker().clone());
+            return Poll::Pending;
+        };
+
+        let value = (state.transformer)(
+            state
+                .value
+                .take()
+                .expect("Promise has been fulfilled already"),
+        );
+
+        Poll::Ready(result.map(|_| value))
+    }
+}

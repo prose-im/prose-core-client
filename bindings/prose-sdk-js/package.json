@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "strophe.js": "1.6.x"
+  },
+  "devDependencies": {
+    "@types/strophe.js": "1.2.x"
+  }
+}

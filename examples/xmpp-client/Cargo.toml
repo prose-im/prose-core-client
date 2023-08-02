@@ -1,0 +1,14 @@
+[package]
+name = "xmpp-client"
+version = "0.1.0"
+edition = "2021"
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+anyhow = { workspace = true }
+common = { path = "../common" }
+futures = { workspace = true }
+prose-xmpp = { path = "../../crates/prose-xmpp" }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }

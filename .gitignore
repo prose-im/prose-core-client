@@ -5,5 +5,4 @@
 target
 Cargo.lock
 
-scripts/run_local.sh
 .env
