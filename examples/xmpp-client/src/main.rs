@@ -3,7 +3,7 @@ use futures::FutureExt;
 use tracing::info;
 
 use common::{enable_debug_logging, load_credentials, Level};
-use prose_xmpp::mods::{Chat, Profile, Status};
+use prose_xmpp::mods::{chat, Chat, Profile, Status};
 use prose_xmpp::stanza::presence::Show;
 use prose_xmpp::{connector, Client, Event};
 
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
 type Connector = connector::xmpp_rs::Connector;
 
 async fn handle_event(client: Client, event: Event) -> Result<()> {
-    let Event::Message(message) = event else {
+    let Event::Chat(chat::Event::Message(message)) = event else {
         return Ok(());
     };
 
