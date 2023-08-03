@@ -20,6 +20,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust-toolchain }}
+          target: wasm32-unknown-unknown
           components: rustfmt
           override: true
 
