@@ -39,8 +39,14 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ matrix.rust-toolchain }}
 
-      - name: Build code
+      - name: Build crates
         run: cargo build
+
+      - name: Build prose-sdk-js
+        run: cargo build --package prose-sdk-js --target wasm32-unknown-unknown
+
+      - name: Build prose-sdk-ffi
+        run: build --package prose_core_ffi
 
       - name: Test code
         run: cargo test --features test
