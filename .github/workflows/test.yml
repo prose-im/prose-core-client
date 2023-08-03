@@ -47,7 +47,7 @@ jobs:
         run: cargo build --package prose-sdk-js --target wasm32-unknown-unknown
 
       - name: Build prose-sdk-ffi
-        run: cargo build --package prose_core_ffi
+        run: cargo build --package prose-sdk-ffi
 
       - name: Test code
         run: cargo test --features test
