@@ -1,5 +1,5 @@
 [bindings.swift]
-cdylib_name = "prose_core_ffi"
+cdylib_name = "prose-sdk-ffi"
 module_name = "ProseCoreFFI"
 
 [bindings.swift.custom_types.PathBuf]

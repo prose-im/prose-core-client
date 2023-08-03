@@ -1,5 +1,5 @@
 [package]
-name = "prose_core_ffi"
+name = "prose-sdk-ffi"
 version = "0.1.0"
 description = "Prose core XMPP client FFIs."
 license = "MPL-2.0"
@@ -11,7 +11,7 @@ categories = ["network-programming"]
 authors = ["Marc Bauer <mb@nesium.com>"]
 
 [lib]
-name = "prose_core_ffi"
+name = "prose_sdk_ffi"
 crate-type = ["staticlib"]
 
 [dependencies]

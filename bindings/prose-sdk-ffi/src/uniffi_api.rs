@@ -128,4 +128,4 @@ pub mod uniffi_types {
     };
 }
 
-uniffi::include_scaffolding!("prose_core_ffi");
+uniffi::include_scaffolding!("prose_sdk_ffi");
