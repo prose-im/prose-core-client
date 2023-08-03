@@ -135,7 +135,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         };
 
-        let from = BareJid::from(from);
+        let from = from.into_bare();
 
         self.inner
             .data_cache
@@ -161,7 +161,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         };
 
-        let from = BareJid::from(from);
+        let from = from.into_bare();
 
         self.inner
             .data_cache
@@ -181,7 +181,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         };
 
-        let jid = BareJid::from(from);
+        let jid = from.into_bare();
 
         self.inner
             .data_cache
@@ -193,7 +193,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn user_activity_did_change(&self, from: Jid, user_activity: UserActivity) -> Result<()> {
-        let jid = BareJid::from(from);
+        let jid = from.into_bare();
 
         let user_activity = types::UserActivity::try_from(user_activity).ok();
 
@@ -229,7 +229,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
                 chat_state = Some(ChatStateEvent {
                     state: state.clone(),
-                    from: BareJid::from(from.clone()),
+                    from: from.to_bare(),
                 });
             }
         }

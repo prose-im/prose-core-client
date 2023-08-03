@@ -5,7 +5,7 @@ use std::time::SystemTime;
 
 use anyhow::Result;
 use chrono::{DateTime, Local};
-use jid::{BareJid, FullJid};
+use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
 use xmpp_parsers::iq::Iq;
@@ -63,10 +63,14 @@ impl ModuleContext {
             .read()
             .as_ref()
             .map(Clone::clone)
-            .unwrap_or(FullJid::new("placeholder", "prose.org", "lib"))
+            .unwrap_or(FullJid::from_parts(
+                Some(&NodePart::new("placeholder").unwrap()),
+                &DomainPart::new("prose.org").unwrap(),
+                &ResourcePart::new("lib").unwrap(),
+            ))
     }
     pub(crate) fn bare_jid(&self) -> BareJid {
-        self.full_jid().into()
+        Jid::Full(self.full_jid()).into_bare()
     }
 
     pub(crate) fn generate_id(&self) -> String {

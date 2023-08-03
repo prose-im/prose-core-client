@@ -38,7 +38,7 @@ wasm-bindgen-futures = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 futures = { workspace = true }
 tokio = { workspace = true, features = ["sync", "signal"] }
-tokio-xmpp = { git = "https://gitlab.com/xmpp-rs/xmpp-rs.git", rev = "f9d44195133fa6b9bfd006ae3e2cd3d13210679a" }
+tokio-xmpp = { workspace = true }
 uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics"] }
 
 [features]

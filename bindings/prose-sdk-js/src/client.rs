@@ -5,6 +5,7 @@ use crate::types::{
     StringArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
+use jid::{DomainPart, NodePart, ResourcePart};
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::types::{MessageId, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
@@ -87,11 +88,15 @@ impl Client {
         availability: Availability,
     ) -> Result<()> {
         // TODO: Generate and store resource.
-        let jid = jid::FullJid {
-            node: jid.node.clone(),
-            domain: jid.domain.clone(),
-            resource: "web".to_string(),
-        };
+        let jid = jid::FullJid::from_parts(
+            jid.node
+                .as_ref()
+                .map(|node| NodePart::new(node))
+                .transpose()?
+                .as_ref(),
+            &DomainPart::new(&jid.domain)?,
+            &ResourcePart::new("web").unwrap(),
+        );
 
         self.client
             .connect(&jid, password, availability.into())

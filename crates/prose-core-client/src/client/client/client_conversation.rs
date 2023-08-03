@@ -309,8 +309,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         id: MessageId,
         emoji: Emoji,
     ) -> Result<()> {
-        let current_user = BareJid::from(self.connected_jid()?);
-        let conversation = BareJid::from(conversation.into());
+        let current_user = self.connected_jid()?.into_bare();
+        let conversation = conversation.into().into_bare();
         let message_id = message::Id::from(id.into_inner());
         let message = self.load_message(&conversation, &message_id).await?;
         let mut emoji_found = false;

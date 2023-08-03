@@ -1,5 +1,5 @@
 use base64::DecodeError;
-use jid::JidParseError;
+use jid::Error as JidParseError;
 use strum::ParseError;
 
 #[derive(Debug, thiserror::Error)]

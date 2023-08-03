@@ -1,7 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, FixedOffset, TimeZone, Utc};
-use jid::{BareJid, FullJid};
+use jid::{BareJid, DomainPart, FullJid, NodePart};
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -34,17 +34,17 @@ pub trait ClientTestAdditions {
 
 impl BareJidTestAdditions for BareJid {
     fn ours() -> BareJid {
-        BareJid {
-            node: Some("test".to_string()),
-            domain: "prose.org".to_string(),
-        }
+        BareJid::from_parts(
+            Some(&NodePart::new("test").unwrap()),
+            &DomainPart::new("prose.org").unwrap(),
+        )
     }
 
     fn theirs() -> BareJid {
-        BareJid {
-            node: Some("friend".to_string()),
-            domain: "prose.org".to_string(),
-        }
+        BareJid::from_parts(
+            Some(&NodePart::new("friend").unwrap()),
+            &DomainPart::new("prose.org").unwrap(),
+        )
     }
 }
 

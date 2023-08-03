@@ -1,4 +1,5 @@
 use core::str::FromStr;
+use jid::{DomainPart, NodePart};
 
 use wasm_bindgen::prelude::*;
 
@@ -46,17 +47,20 @@ impl BareJid {
 impl From<jid::BareJid> for BareJid {
     fn from(value: jid::BareJid) -> Self {
         BareJid {
-            node: value.node,
-            domain: value.domain,
+            node: value.node().map(|s| s.to_string()),
+            domain: value.domain().to_string(),
         }
     }
 }
 
 impl From<BareJid> for jid::BareJid {
     fn from(value: BareJid) -> Self {
-        jid::BareJid {
-            node: value.node,
-            domain: value.domain,
-        }
+        jid::BareJid::from_parts(
+            value
+                .node
+                .map(|node| NodePart::new(&node).unwrap())
+                .as_ref(),
+            &DomainPart::new(&value.domain).unwrap(),
+        )
     }
 }

@@ -45,7 +45,7 @@ pub enum IndexedDBDataCacheError {
     JSON(#[from] serde_json::error::Error),
 
     #[error(transparent)]
-    JID(#[from] jid::JidParseError),
+    JID(#[from] jid::Error),
 
     #[error("Invalid DB Key")]
     InvalidDBKey,

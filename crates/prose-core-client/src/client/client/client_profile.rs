@@ -28,7 +28,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         self.inner
             .data_cache
-            .insert_user_profile(&self.connected_jid()?.into(), &user_profile)
+            .insert_user_profile(&self.connected_jid()?.into_bare(), &user_profile)
             .await?;
 
         Ok(())
@@ -40,7 +40,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         profile.delete_vcard().await?;
         self.inner
             .data_cache
-            .delete_user_profile(&self.connected_jid()?.into())
+            .delete_user_profile(&self.connected_jid()?.into_bare())
             .await?;
         Ok(())
     }
@@ -104,7 +104,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             )
             .await?;
 
-        let jid = jid::BareJid::from(self.connected_jid()?);
+        let jid = self.connected_jid()?.into_bare();
 
         debug!("Caching avatar metadata");
         self.inner
