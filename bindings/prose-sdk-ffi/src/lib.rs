@@ -2,8 +2,10 @@ use prose_core_client::avatar_cache::fs_avatar_cache::FsAvatarCacheError;
 use prose_core_client::data_cache::sqlite::SQLiteCacheError;
 pub use uniffi_api::*;
 
+mod account_bookmarks_client;
 mod client;
 mod logger;
+mod types;
 mod uniffi_api;
 
 #[derive(thiserror::Error, Debug)]

@@ -17,7 +17,7 @@ typedef i64 DateTime;
 
 interface Client {
     [Throws=ClientError]
-    constructor(FullJid jid, string cache_dir, ClientDelegate? delegate);
+    constructor(JID jid, string cache_dir, ClientDelegate? delegate);
 };
 
 callback interface ClientDelegate {
@@ -30,11 +30,11 @@ interface AccountBookmarksClient {
     [Throws=ClientError]
     sequence<AccountBookmark> load_bookmarks();
     [Throws=ClientError]
-    void add_bookmark([ByRef] BareJid jid, boolean select_bookmark);
+    void add_bookmark([ByRef] JID jid, boolean select_bookmark);
     [Throws=ClientError]
-    void remove_bookmark([ByRef] BareJid jid);
+    void remove_bookmark([ByRef] JID jid);
     [Throws=ClientError]
-    void select_bookmark([ByRef] BareJid jid);
+    void select_bookmark([ByRef] JID jid);
 };
 
 enum LogLevel {
@@ -57,13 +57,13 @@ enum CachePolicy {
 
 [Enum]
 interface ClientEvent {
-    ComposingUsersChanged(BareJid conversation);
+    ComposingUsersChanged(JID conversation);
     ConnectionStatusChanged(ConnectionEvent event);
-    ContactChanged(BareJid jid);
-    AvatarChanged(BareJid jid);
-    MessagesAppended(BareJid conversation, sequence<MessageId> message_ids);
-    MessagesUpdated(BareJid conversation, sequence<MessageId> message_ids);
-    MessagesDeleted(BareJid conversation, sequence<MessageId> message_ids);
+    ContactChanged(JID jid);
+    AvatarChanged(JID jid);
+    MessagesAppended(JID conversation, sequence<MessageId> message_ids);
+    MessagesUpdated(JID conversation, sequence<MessageId> message_ids);
+    MessagesDeleted(JID conversation, sequence<MessageId> message_ids);
 };
 
 [Enum]
@@ -79,13 +79,7 @@ interface ConnectionError {
   Generic(string msg);
 };
 
-dictionary FullJid {
-  string? node;
-  string domain;
-  string resource;
-};
-
-dictionary BareJid {
+dictionary JID {
   string? node;
   string domain;
 };
@@ -97,10 +91,39 @@ interface ClientError {
 
 [Error]
 enum JidParseError {
-  "NoDomain",
-  "NoResource",
-  "EmptyNode",
-  "EmptyResource",
+    /// Happens when the node is empty, that is the string starts with a @.
+    "NodeEmpty",
+
+    /// Happens when there is no domain, that is either the string is empty,
+    /// starts with a /, or contains the @/ sequence.
+    "DomainEmpty",
+
+    /// Happens when the resource is empty, that is the string ends with a /.
+    "ResourceEmpty",
+
+    /// Happens when the localpart is longer than 1023 bytes.
+    "NodeTooLong",
+
+    /// Happens when the domain is longer than 1023 bytes.
+    "DomainTooLong",
+
+    /// Happens when the resource is longer than 1023 bytes.
+    "ResourceTooLong",
+
+    /// Happens when the localpart is invalid according to nodeprep.
+    "NodePrep",
+
+    /// Happens when the domain is invalid according to nameprep.
+    "NamePrep",
+
+    /// Happens when the resource is invalid according to resourceprep.
+    "ResourcePrep",
+
+    /// Happens when there is no resource, that is string contains no /.
+    "ResourceMissingInFullJid",
+
+    /// Happens when parsing a bare JID and there is a resource.
+    "ResourceInBareJid",
 };
 
 enum Availability {
@@ -116,7 +139,7 @@ dictionary UserActivity {
 };
 
 dictionary Contact {
-    BareJid jid;
+    JID jid;
     string name;
     Availability availability;
     UserActivity? activity;
@@ -141,25 +164,8 @@ dictionary UserProfile {
     Address? address;
 };
 
-dictionary Reaction {
-    Emoji emoji;
-    sequence<BareJid> from;
-};
-
-dictionary Message {
-    MessageId id;
-    StanzaId? stanza_id;
-    BareJid from;
-    string body;
-    DateTime timestamp;
-    boolean is_read;
-    boolean is_edited;
-    boolean is_delivered;
-    sequence<Reaction> reactions;
-};
-
 dictionary AccountBookmark {
-    BareJid jid;
+    JID jid;
     boolean is_selected;
 };
 

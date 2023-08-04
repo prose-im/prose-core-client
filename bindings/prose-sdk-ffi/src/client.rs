@@ -1,36 +1,34 @@
+use jid::BareJid;
 use prose_core_client::data_cache::sqlite::SQLiteCache;
 use prose_core_client::types::AccountSettings;
 use prose_core_client::{
     CachePolicy, Client as ProseClient, ClientBuilder, ClientDelegate as ProseClientDelegate,
-    ClientEvent, FsAvatarCache,
+    FsAvatarCache,
 };
 use prose_xmpp::ConnectionError;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tracing::info;
 
-use crate::{
-    Availability, BareJid, ClientError, Contact, Emoji, FullJid, Message, MessageId, MessagesPage,
-    UserProfile,
-};
+use crate::types::{ClientEvent, Message, MessagesPage, JID};
+use crate::{Availability, ClientError, Contact, Emoji, MessageId, UserProfile};
 
 pub trait ClientDelegate: Send + Sync {
     fn handle_event(&self, event: ClientEvent);
 }
 
 pub struct Client {
-    jid: FullJid,
+    jid: JID,
     client: ProseClient<SQLiteCache, FsAvatarCache>,
 }
 
 impl Client {
     pub fn new(
-        jid: FullJid,
+        jid: JID,
         cache_dir: String,
         delegate: Option<Box<dyn ClientDelegate>>,
     ) -> Result<Self, ClientError> {
-        let bare_jid: BareJid = jid.clone().into();
-        let cache_dir = Path::new(&cache_dir).join(bare_jid.to_string());
+        let cache_dir = Path::new(&cache_dir).join(jid.to_string());
         info!("Caching data at {:?}", cache_dir);
         fs::create_dir_all(&cache_dir).map_err(anyhow::Error::new)?;
 
@@ -51,7 +49,7 @@ impl Client {
 
 #[uniffi::export]
 impl Client {
-    pub fn jid(&self) -> FullJid {
+    pub fn jid(&self) -> JID {
         self.jid.clone()
     }
 
@@ -60,8 +58,11 @@ impl Client {
         password: String,
         availability: Availability,
     ) -> Result<(), ConnectionError> {
+        // TODO: Generate and store resource.
+        let full_jid = self.jid.to_full_jid_with_resource("macOS").unwrap();
+
         self.client
-            .connect(&self.jid, password, availability)
+            .connect(&full_jid, password, availability)
             .await?;
         Ok(())
     }
@@ -76,12 +77,12 @@ impl Client {
         cache_policy: CachePolicy,
     ) -> Result<Vec<Contact>, ClientError> {
         let items = self.client.load_contacts(cache_policy).await?;
-        Ok(items)
+        Ok(items.into_iter().map(Into::into).collect())
     }
 
     pub async fn load_profile(
         &self,
-        from: BareJid,
+        from: JID,
         cache_policy: CachePolicy,
     ) -> Result<Option<UserProfile>, ClientError> {
         let profile = self.client.load_user_profile(from, cache_policy).await?;
@@ -100,7 +101,7 @@ impl Client {
 
     pub async fn load_avatar(
         &self,
-        from: BareJid,
+        from: JID,
         cache_policy: CachePolicy,
     ) -> Result<Option<PathBuf>, ClientError> {
         let path = self.client.load_avatar(from, cache_policy).await?;
@@ -114,106 +115,113 @@ impl Client {
 
     pub async fn load_latest_messages(
         &self,
-        from: BareJid,
+        from: JID,
         since: Option<MessageId>,
         load_from_server: bool,
     ) -> Result<Vec<Message>, ClientError> {
         let messages = self
             .client
-            .load_latest_messages(&from, since.as_ref(), load_from_server)
+            .load_latest_messages(&from.into(), since.as_ref(), load_from_server)
             .await?;
-        Ok(messages)
+        Ok(messages.into_iter().map(Into::into).collect())
     }
 
     pub async fn load_messages_before(
         &self,
-        from: BareJid,
+        from: JID,
         before: MessageId,
     ) -> Result<MessagesPage, ClientError> {
-        let page = self.client.load_messages_before(&from, &before).await?;
+        let page = self
+            .client
+            .load_messages_before(&from.into(), &before)
+            .await?;
         Ok(page.into())
     }
 
     pub async fn load_messages_with_ids(
         &self,
-        conversation: BareJid,
+        conversation: JID,
         ids: Vec<MessageId>,
     ) -> Result<Vec<Message>, ClientError> {
         let messages = self
             .client
-            .load_messages_with_ids(&conversation, &ids)
+            .load_messages_with_ids(&conversation.into(), &ids)
             .await?;
-        Ok(messages)
+        Ok(messages.into_iter().map(Into::into).collect())
     }
 
-    pub async fn send_message(&self, to: BareJid, body: String) -> Result<(), ClientError> {
-        self.client.send_message(to, body).await?;
+    pub async fn send_message(&self, to: JID, body: String) -> Result<(), ClientError> {
+        self.client.send_message(BareJid::from(to), body).await?;
         Ok(())
     }
 
     pub async fn update_message(
         &self,
-        conversation: BareJid,
+        conversation: JID,
         id: MessageId,
         body: String,
     ) -> Result<(), ClientError> {
-        self.client.update_message(conversation, id, body).await?;
+        self.client
+            .update_message(BareJid::from(conversation), id, body)
+            .await?;
         Ok(())
     }
 
     pub async fn toggle_reaction_to_message(
         &self,
-        conversation: BareJid,
+        conversation: JID,
         id: MessageId,
         emoji: Emoji,
     ) -> Result<(), ClientError> {
         self.client
-            .toggle_reaction_to_message(conversation, id, emoji)
+            .toggle_reaction_to_message(BareJid::from(conversation), id, emoji)
             .await?;
         Ok(())
     }
 
     pub async fn retract_message(
         &self,
-        conversation: BareJid,
+        conversation: JID,
         id: MessageId,
     ) -> Result<(), ClientError> {
-        self.client.retract_message(conversation, id).await?;
+        self.client
+            .retract_message(BareJid::from(conversation), id)
+            .await?;
         Ok(())
     }
 
     pub async fn set_user_is_composing(
         &self,
-        conversation: BareJid,
+        conversation: JID,
         is_composing: bool,
     ) -> Result<(), ClientError> {
         self.client
-            .set_user_is_composing(conversation, is_composing)
+            .set_user_is_composing(BareJid::from(conversation), is_composing)
             .await?;
         Ok(())
     }
 
-    pub async fn load_composing_users(
-        &self,
-        conversation: BareJid,
-    ) -> Result<Vec<BareJid>, ClientError> {
-        let users = self.client.load_composing_users(&conversation).await?;
-        Ok(users)
+    pub async fn load_composing_users(&self, conversation: JID) -> Result<Vec<JID>, ClientError> {
+        let users = self
+            .client
+            .load_composing_users(&conversation.into())
+            .await?;
+        Ok(users.into_iter().map(Into::into).collect())
     }
 
     pub async fn save_draft(
         &self,
-        conversation: BareJid,
+        conversation: JID,
         text: Option<String>,
     ) -> Result<(), ClientError> {
         self.client
-            .save_draft(&conversation, text.as_deref())
+            .save_draft(&conversation.into(), text.as_deref())
             .await?;
         Ok(())
     }
 
-    pub async fn load_draft(&self, conversation: BareJid) -> Result<Option<String>, ClientError> {
-        let text = self.client.load_draft(&conversation).await?;
+    pub async fn load_draft(&self, conversation: JID) -> Result<Option<String>, ClientError> {
+        let text = self.client.load_draft(&conversation.into()).await?;
         Ok(text)
     }
 
@@ -239,7 +247,11 @@ impl Client {
 struct DelegateWrapper(Box<dyn ClientDelegate>);
 
 impl ProseClientDelegate<SQLiteCache, FsAvatarCache> for DelegateWrapper {
-    fn handle_event(&self, _client: ProseClient<SQLiteCache, FsAvatarCache>, event: ClientEvent) {
-        self.0.handle_event(event)
+    fn handle_event(
+        &self,
+        _client: ProseClient<SQLiteCache, FsAvatarCache>,
+        event: prose_core_client::ClientEvent,
+    ) {
+        self.0.handle_event(event.into())
     }
 }

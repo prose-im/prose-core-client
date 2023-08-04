@@ -1,4 +1,4 @@
-use crate::SendUnlessWasm;
+use crate::{SendUnlessWasm, SyncUnlessWasm};
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
@@ -24,7 +24,7 @@ pub type ConnectionEventHandler =
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait Connector: SendUnlessWasm {
+pub trait Connector: SendUnlessWasm + SyncUnlessWasm {
     async fn connect(
         &self,
         jid: &FullJid,

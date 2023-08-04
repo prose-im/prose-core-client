@@ -1,35 +1,54 @@
+use chrono::{NaiveDateTime, Utc};
 use std::path::Path;
 pub use std::path::PathBuf;
 
-use chrono::{DateTime as ChronoDateTime, NaiveDateTime, Utc};
-pub use jid::{BareJid, FullJid, JidParseError};
+pub use jid::{BareJid, Error as JidParseError, FullJid};
 
-use prose_core_client::types::Page;
 pub use prose_core_client::types::{
-    AccountSettings, Address, Availability, Contact, Emoji, Message, MessageId, Reaction, StanzaId,
-    Url, UserActivity, UserProfile,
+    AccountSettings, Address, Availability, Emoji, MessageId, StanzaId, Url, UserActivity,
+    UserProfile,
 };
-pub use prose_core_client::{
-    AccountBookmark, AccountBookmarksClient, CachePolicy, ClientEvent, ConnectionEvent,
-};
+pub use prose_core_client::{CachePolicy, ConnectionEvent};
 pub use prose_xmpp::ConnectionError;
 
-pub use crate::{client::*, logger::*, ClientError};
+pub use crate::types::{AccountBookmark, ClientEvent, Contact, DateTime, JID};
+pub use crate::{
+    account_bookmarks_client::AccountBookmarksClient, client::*, logger::*, ClientError,
+};
 
-pub type DateTime = ChronoDateTime<Utc>;
+impl UniffiCustomTypeConverter for MessageId {
+    type Builtin = String;
 
-#[derive(uniffi::Record)]
-pub struct MessagesPage {
-    pub messages: Vec<Message>,
-    pub is_complete: bool,
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(val.into())
+    }
+
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.into_inner()
+    }
 }
 
-impl From<Page<Message>> for MessagesPage {
-    fn from(value: Page<Message>) -> Self {
-        MessagesPage {
-            messages: value.items,
-            is_complete: value.is_complete,
-        }
+impl UniffiCustomTypeConverter for StanzaId {
+    type Builtin = String;
+
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(val.into())
+    }
+
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.into_inner()
+    }
+}
+
+impl UniffiCustomTypeConverter for Emoji {
+    type Builtin = String;
+
+    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
+        Ok(val.into())
+    }
+
+    fn from_custom(obj: Self) -> Self::Builtin {
+        obj.into_inner()
     }
 }
 
@@ -74,57 +93,12 @@ impl UniffiCustomTypeConverter for DateTime {
     }
 }
 
-impl UniffiCustomTypeConverter for MessageId {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(val.into())
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.into_inner()
-    }
-}
-
-impl UniffiCustomTypeConverter for StanzaId {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(val.into())
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.into_inner()
-    }
-}
-
-impl UniffiCustomTypeConverter for Emoji {
-    type Builtin = String;
-
-    fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
-        Ok(val.into())
-    }
-
-    fn from_custom(obj: Self) -> Self::Builtin {
-        obj.into_inner()
-    }
-}
-
-#[uniffi::export]
-pub fn parse_jid(jid: String) -> Result<BareJid, JidParseError> {
-    jid.parse::<BareJid>()
-}
-
-#[uniffi::export]
-pub fn format_jid(jid: BareJid) -> String {
-    jid.to_string()
-}
-
 pub mod uniffi_types {
     pub use crate::{
-        client::Client, AccountSettings, Availability, BareJid, CachePolicy, ClientError,
-        ConnectionError, Contact, Emoji, FullJid, JidParseError, Message, MessageId, MessagesPage,
-        PathBuf, StanzaId, Url, UserProfile,
+        client::Client,
+        types::{parse_jid, AccountBookmark, DateTime, Message, MessagesPage, Reaction, JID},
+        AccountSettings, Availability, CachePolicy, ClientError, ConnectionError, Contact, Emoji,
+        FullJid, JidParseError, MessageId, PathBuf, StanzaId, Url, UserProfile,
     };
 }
 
