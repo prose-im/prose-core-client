@@ -5,9 +5,9 @@
 
 use std::collections::HashMap;
 use std::env;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::io::Write;
 
 use crate::paths;
 use anyhow::{anyhow, Result};
@@ -135,7 +135,6 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
 }
 
 async fn run_release_github(
-    sh: &Shell,
     github_token: &str,
     version: &str,
     filename: &str,
@@ -200,7 +199,9 @@ fn run_release_npm(sh: &Shell, npm_token: &str, file_path: &PathBuf) -> Result<(
 
     let mut npmrc_file = std::fs::File::create(&npmrc_path).expect("npmrc file create failed");
 
-    npmrc_file.write_all(format!("//registry.npmjs.org/:_authToken={}", npm_token).as_bytes()).expect("write failed");
+    npmrc_file
+        .write_all(format!("//registry.npmjs.org/:_authToken={}", npm_token).as_bytes())
+        .expect("write failed");
 
     // Publish release to NPM
     let npm_command = cmd!(sh, "npm publish --userconfig={npmrc_path} {file_path}").run();
@@ -260,7 +261,7 @@ async fn publish(sh: &Shell) -> Result<()> {
         .join(&filename);
 
     // Upload release archive to GitHub
-    run_release_github(sh, &github_token, &version, &filename, &file_path).await?;
+    run_release_github(&github_token, &version, &filename, &file_path).await?;
 
     // Upload release archive to NPM
     run_release_npm(sh, &npm_token, &file_path)?;
