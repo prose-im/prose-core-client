@@ -1,6 +1,6 @@
 # prose-core-client
 
-[![Test and Build](https://github.com/prose-im/prose-core-client/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/prose-im/prose-core-client/actions/workflows/test.yml)
+[![Test and Build](https://github.com/prose-im/prose-core-client/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/prose-im/prose-core-client/actions/workflows/test.yml) [![Build and Release](https://github.com/prose-im/prose-core-client/actions/workflows/build.yml/badge.svg)](https://github.com/prose-im/prose-core-client/actions/workflows/build.yml)
 
 **Prose core XMPP client manager and protocols.**
 

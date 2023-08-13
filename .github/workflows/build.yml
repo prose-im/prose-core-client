@@ -1,0 +1,53 @@
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+name: Build and Release
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        rust-toolchain: [nightly]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ matrix.rust-toolchain }}
+          target: wasm32-unknown-unknown
+          components: rustfmt
+          override: true
+
+      - name: Install NodeJS
+        uses: actions/setup-node@v1
+        with:
+          node-version: 20.x
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify versions
+        run: rustc --version && rustup --version && cargo --version && node --version && npm --version && node -p process.versions.v8
+
+      - name: Cache build context
+        id: cache-cargo
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.rust-toolchain }}
+
+      - name: Release package
+        run: cargo xtask wasm-pack publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
