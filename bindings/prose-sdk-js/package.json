@@ -1,7 +1,7 @@
 {
   "name": "@prose-im/prose-sdk-js",
   "description": "Prose JavaScript SDK",
-  "version": "0.1.12",
+  "version": "0.0.0",
   "homepage": "https://github.com/prose-im/prose-core-client/tree/master/bindings/prose-sdk-js",
   "license": "MPL-2.0",
   "engines": {
