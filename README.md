@@ -8,16 +8,16 @@ Copyright 2022, Prose Foundation - Released under the [Mozilla Public License 2.
 
 _Tested at Rust version: `rustc 1.71.1 (eb26296b5 2023-08-03)`_
 
-## Foreign Function Interfaces (FFIs)
+## SDKs
 
-The Prose core client library is built in Rust. To communicate with its implementers, it exposes FFIs (for Foreign Function Interfaces) in various programming languages.
+The Prose core client library is built in Rust. To communicate with its implementers, it exports SDKs in various programming languages.
 
 The supported programming languages are listed below:
 
-* Swift
+* Swift (FFIs)
 * JavaScript (WebAssembly)
 
-FFIs are built using the `bindings` libraries contained in this project.
+SDKs are built using the `bindings` packages contained in this project.
 
 ## License
 
