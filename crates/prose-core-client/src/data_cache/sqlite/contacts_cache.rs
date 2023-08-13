@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
@@ -48,8 +53,8 @@ impl ContactsCache for SQLiteCache {
         {
             let mut stmt = trx.prepare(
                 r#"
-            INSERT OR REPLACE INTO roster_item 
-                (jid, subscription, groups) 
+            INSERT OR REPLACE INTO roster_item
+                (jid, subscription, groups)
                 VALUES (?1, ?2, ?3)
             "#,
             )?;
@@ -69,7 +74,7 @@ impl ContactsCache for SQLiteCache {
         let conn = &*self.conn.lock().unwrap();
         let mut stmt = conn.prepare(
             r#"
-            INSERT OR REPLACE INTO user_profile 
+            INSERT OR REPLACE INTO user_profile
                 (jid, first_name, last_name, nickname, org, role, title, email, tel, url, locality, country, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
@@ -97,8 +102,8 @@ impl ContactsCache for SQLiteCache {
 
         let mut stmt = conn.prepare(
             r#"
-            SELECT first_name, last_name, nickname, org, role, title, email, tel, url, locality, country 
-                FROM user_profile 
+            SELECT first_name, last_name, nickname, org, role, title, email, tel, url, locality, country
+                FROM user_profile
                 WHERE jid = ? AND updated_at >= ?
            "#,
         )?;
@@ -165,7 +170,7 @@ impl ContactsCache for SQLiteCache {
 
         let mut stmt = conn.prepare(
             r#"
-            SELECT mime_type, checksum, width, height, updated_at 
+            SELECT mime_type, checksum, width, height, updated_at
                 FROM avatar_metadata
                 WHERE jid = ? AND updated_at >= ?
            "#,
@@ -273,14 +278,14 @@ impl ContactsCache for SQLiteCache {
             r#"
             SELECT
                 roster_item.jid,
-                roster_item.groups, 
+                roster_item.groups,
                 user_profile.first_name,
-                user_profile.last_name, 
+                user_profile.last_name,
                 user_profile.nickname,
                 COUNT(presence.jid) AS presence_count,
-                presence.type, 
-                presence.show, 
-                user_activity.emoji, 
+                presence.type,
+                presence.show,
+                user_activity.emoji,
                 user_activity.status
             FROM roster_item
             LEFT JOIN user_profile ON roster_item.jid = user_profile.jid

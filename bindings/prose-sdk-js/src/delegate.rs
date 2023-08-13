@@ -1,3 +1,8 @@
+// prose-core-client/prose-sdk-js
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use alloc::rc::Rc;
 use std::marker::PhantomData;
 
@@ -29,7 +34,7 @@ export type ConnectionGenericError = {
     message: string;
 }
 
-export type ConnectionError = ConnectionTimedOutError | ConnectionInvalidCredentialsError | ConnectionGenericError; 
+export type ConnectionError = ConnectionTimedOutError | ConnectionInvalidCredentialsError | ConnectionGenericError;
 
 export interface ProseClientDelegate {
     clientConnected(): void
@@ -37,19 +42,19 @@ export interface ProseClientDelegate {
 
     /// A user in `conversation` started or stopped typing.
     composingUsersChanged(client: ProseClient, conversation: JID): void
-    
+
     /// Infos about a contact have changed.
     contactChanged(client: ProseClient, jid: JID): void
-    
+
     /// The avatar of a user changed.
     avatarChanged(client: ProseClient, jid: JID): void
-    
+
     /// One or many messages were either received or sent.
     messagesAppended(client: ProseClient, conversation: JID, messageIDs: string[]): void
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
     messagesUpdated(client: ProseClient, conversation: JID, messageIDs: string[]): void
-    
+
     /// A message was deleted.
     messagesDeleted(client: ProseClient, conversation: JID, messageIDs: string[]): void
 }

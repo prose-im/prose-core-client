@@ -1,3 +1,8 @@
+// prose-core-client/prose-sdk-ffi
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use prose_core_client::avatar_cache::fs_avatar_cache::FsAvatarCacheError;
 use prose_core_client::data_cache::sqlite::SQLiteCacheError;
 pub use uniffi_api::*;

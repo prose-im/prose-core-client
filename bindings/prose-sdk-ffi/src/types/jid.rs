@@ -1,3 +1,8 @@
+// prose-core-client/prose-sdk-ffi
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use jid::{BareJid, DomainPart, Error as JidParseError, FullJid, NodePart, ResourcePart};
 
 #[derive(Debug, Clone, PartialEq)]

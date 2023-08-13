@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 macro_rules! id_string {
     ($t:ident) => {
         #[derive(Debug, Eq, PartialEq, Hash, Clone, serde::Serialize, serde::Deserialize)]

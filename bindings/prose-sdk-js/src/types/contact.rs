@@ -1,3 +1,8 @@
+// prose-core-client/prose-sdk-js
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use crate::types::{IntoJSStringArray, StringArray};
 use prose_core_client::types::{
     Availability as ProseAvailability, Contact as ProseContact, UserActivity as ProseUserActivity,

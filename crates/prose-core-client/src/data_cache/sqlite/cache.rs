@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 // TODO: Look into SQLite thread safety
 // https://github.com/rusqlite/rusqlite/issues/393#user-content-fn-threads-d6886dc9aa33e26f0bb48e6eddf5854d
 // https://sqlite.org/threadsafe.html
@@ -112,8 +117,8 @@ impl SQLiteCache {
             r#"
             CREATE TEMPORARY TABLE "presence" (
                 "jid" TEXT PRIMARY KEY NOT NULL,
-                "type" TEXT, 
-                "show" TEXT, 
+                "type" TEXT,
+                "show" TEXT,
                 "status" TEXT
             );"#,
             [],
@@ -126,7 +131,7 @@ impl SQLiteCache {
             r#"
             CREATE TEMPORARY TABLE "chat_states" (
                 "jid" TEXT PRIMARY KEY NOT NULL,
-                "state" TEXT NOT NULL, 
+                "state" TEXT NOT NULL,
                 "updated_at" DATETIME NOT NULL
             );"#,
             [],
@@ -139,7 +144,7 @@ impl SQLiteCache {
             r#"
             CREATE TEMPORARY TABLE "user_activity" (
                 "jid" TEXT PRIMARY KEY NOT NULL,
-                "emoji" TEXT NOT NULL, 
+                "emoji" TEXT NOT NULL,
                 "status" TEXT
             );"#,
             [],

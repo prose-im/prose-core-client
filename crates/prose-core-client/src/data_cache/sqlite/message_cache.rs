@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use async_trait::async_trait;
 use either::Either;
 use jid::BareJid;
@@ -28,7 +33,7 @@ impl MessageCache for SQLiteCache {
             let mut stmt = trx.prepare(
         r#"
                 INSERT OR REPLACE INTO messages
-                    (`id`, `stanza_id`, `target`, `to`, `from`, `timestamp`, `payload`, `is_first_message`) 
+                    (`id`, `stanza_id`, `target`, `to`, `from`, `timestamp`, `payload`, `is_first_message`)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 "#,
       )?;
@@ -95,15 +100,15 @@ impl MessageCache for SQLiteCache {
         let sql = format!(
             r#"
             SELECT
-              `id`, 
-              `stanza_id`, 
-              `target`, 
-              `to`, 
-              `from`, 
-              `timestamp`, 
-              `payload`, 
+              `id`,
+              `stanza_id`,
+              `target`,
+              `to`,
+              `from`,
+              `timestamp`,
+              `payload`,
               `is_first_message`
-            FROM messages  
+            FROM messages
             WHERE {} AND (`to` = ? OR `from` = ?)
             ORDER BY `timestamp` ASC, `rowid` ASC
            "#,
@@ -136,13 +141,13 @@ impl MessageCache for SQLiteCache {
         let mut sql = String::from(
             r#"
             SELECT
-              `id`, 
-              `stanza_id`, 
-              `target`, 
-              `to`, 
-              `from`, 
-              `timestamp`, 
-              `payload`, 
+              `id`,
+              `stanza_id`,
+              `target`,
+              `to`,
+              `from`,
+              `timestamp`,
+              `payload`,
               `is_first_message`
             FROM messages
             WHERE (`to` = ?1 OR `from` = ?1)
@@ -157,7 +162,7 @@ impl MessageCache for SQLiteCache {
             sql.push_str(
                 r#"
                 AND `id` != ?3
-                AND `timestamp` <= (SELECT timestamp FROM messages WHERE id = ?3) 
+                AND `timestamp` <= (SELECT timestamp FROM messages WHERE id = ?3)
              "#,
             );
             params.push(&older_than.as_ref());

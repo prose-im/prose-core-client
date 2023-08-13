@@ -1,3 +1,8 @@
+// prose-core-client
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use avatar_cache::fs_avatar_cache::FsAvatarCache;
 #[cfg(not(target_arch = "wasm32"))]
