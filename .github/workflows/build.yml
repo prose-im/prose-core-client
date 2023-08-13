@@ -46,7 +46,7 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ matrix.rust-toolchain }}
 
-      - name: Release package
+      - name: Release prose-sdk-js
         run: cargo xtask wasm-pack publish
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
