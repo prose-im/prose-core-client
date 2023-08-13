@@ -5,8 +5,9 @@
 
 use std::collections::HashMap;
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::io::Write;
 
 use crate::paths;
 use anyhow::{anyhow, Result};
@@ -133,30 +134,26 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
     Ok(())
 }
 
-async fn publish(sh: &Shell) -> Result<()> {
-    let token = std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
+async fn run_release_github(
+    sh: &Shell,
+    github_token: &str,
+    version: &str,
+    filename: &str,
+    file_path: &PathBuf,
+) -> Result<()> {
+    println!("Uploading release to GitHub…");
 
-    sh.remove_path("pkg")?;
-    run_wasm_pack(
-        &sh,
-        WasmPackCommand::Build {
-            release: true,
-            dev: false,
-            target: WasmPackTarget::Web,
-        },
-    )?;
-    run_wasm_pack(&sh, WasmPackCommand::Pack)?;
+    // Read archive metas & contents
+    let file_size = std::fs::metadata(file_path)?.len();
+    let file = tokio::fs::File::open(file_path).await?;
+    let stream = tokio_util::codec::FramedRead::new(file, tokio_util::codec::BytesCodec::new());
+    let body = reqwest::Body::wrap_stream(stream);
+    let client = reqwest::Client::builder().build()?;
 
-    let manifest = sh.read_file("Cargo.toml")?;
-    let version = manifest
-        .split_once("version = \"")
-        .and_then(|it| it.1.split_once('\"'))
-        .map(|it| it.0)
-        .ok_or_else(|| anyhow::format_err!("can't find version field in the manifest"))?;
-
-    let octocrab = Octocrab::builder().personal_token(token.clone()).build()?;
-
-    let release = octocrab
+    // Create GitHub release
+    let github_release = Octocrab::builder()
+        .personal_token(github_token.to_string())
+        .build()?
         .repos(GH_OWNER, GH_REPO)
         .releases()
         .create(version)
@@ -167,43 +164,106 @@ async fn publish(sh: &Shell) -> Result<()> {
         .send()
         .await?;
 
-    let filename = format!("{}-{}-{}.tgz", NPM_SCOPE, paths::bindings::WASM, version);
+    let stripped_upload_url = github_release
+        .upload_url
+        .strip_suffix("{?name,label}")
+        .unwrap_or(&github_release.upload_url);
+
+    let mut release_upload_url = Url::from_str(stripped_upload_url)?;
+    release_upload_url.set_query(Some(format!("{}={}", "name", filename).as_str()));
+
+    let github_response = client
+        .post(release_upload_url.as_str())
+        .header("Content-Type", "application/octet-stream")
+        .header("Authorization", format!("token {}", github_token))
+        .header("Content-Length", file_size.to_string())
+        .body(body)
+        .send()
+        .await?;
+
+    if github_response.status().is_success() {
+        println!("Upload to GitHub complete");
+
+        Ok(())
+    } else {
+        println!("Upload to GitHub failed");
+
+        Err(anyhow!("{}", github_response.text().await?))
+    }
+}
+
+fn run_release_npm(sh: &Shell, npm_token: &str, file_path: &PathBuf) -> Result<()> {
+    println!("Publishing release to NPM…");
+
+    // Prepare '.npmrc' configuration
+    let npmrc_path = env::current_dir()?.join(".npmrc");
+
+    let mut npmrc_file = std::fs::File::create(&npmrc_path).expect("npmrc file create failed");
+
+    npmrc_file.write_all(format!("//registry.npmjs.org/:_authToken={}", npm_token).as_bytes()).expect("write failed");
+
+    // Publish release to NPM
+    let npm_command = cmd!(sh, "npm publish --userconfig={npmrc_path} {file_path}").run();
+
+    // Cleanup '.npmrc' configuration
+    std::fs::remove_file(&npmrc_path).expect("could not remove file");
+
+    match npm_command {
+        Ok(_) => {
+            println!("Release to NPM complete");
+
+            Ok(())
+        }
+        Err(err) => {
+            println!("Release to NPM failed");
+
+            Err(anyhow!("{}", err))
+        }
+    }
+}
+
+async fn publish(sh: &Shell) -> Result<()> {
+    // Read tokens from environment
+    let github_token =
+        std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
+    let npm_token = std::env::var("NPM_TOKEN").expect("NPM_TOKEN env variable is required");
+
+    // Build & pack archive contents
+    sh.remove_path("pkg")?;
+
+    run_wasm_pack(
+        &sh,
+        WasmPackCommand::Build {
+            release: true,
+            dev: false,
+            target: WasmPackTarget::Web,
+        },
+    )?;
+    run_wasm_pack(&sh, WasmPackCommand::Pack)?;
+
+    // Read package details
+    let version = sh
+        .read_file("Cargo.toml")?
+        .split_once("version = \"")
+        .and_then(|it| it.1.split_once('\"'))
+        .map(|it| it.0)
+        .ok_or_else(|| anyhow::format_err!("can't find version field in the manifest"))?
+        .to_owned();
+
+    // Generate archive file name
+    let filename = format!("{}-{}-{}.tgz", NPM_SCOPE, paths::bindings::WASM, &version);
+
     let file_path = env::current_dir()?
         .join(paths::BINDINGS)
         .join(paths::bindings::WASM)
         .join("pkg")
         .join(&filename);
 
-    let stripped_upload_url = release
-        .upload_url
-        .strip_suffix("{?name,label}")
-        .unwrap_or(&release.upload_url);
+    // Upload release archive to GitHub
+    run_release_github(sh, &github_token, &version, &filename, &file_path).await?;
 
-    let mut release_upload_url = Url::from_str(stripped_upload_url)?;
-    release_upload_url.set_query(Some(format!("{}={}", "name", filename).as_str()));
+    // Upload release archive to NPM
+    run_release_npm(sh, &npm_token, &file_path)?;
 
-    let file_size = std::fs::metadata(&file_path)?.len();
-    let file = tokio::fs::File::open(&file_path).await?;
-    let stream = tokio_util::codec::FramedRead::new(file, tokio_util::codec::BytesCodec::new());
-    let body = reqwest::Body::wrap_stream(stream);
-
-    println!("Uploading file…");
-
-    let client = reqwest::Client::builder().build()?;
-
-    let response = client
-        .post(release_upload_url.as_str())
-        .header("Content-Type", "application/octet-stream")
-        .header("Authorization", format!("token {}", token))
-        .header("Content-Length", file_size.to_string())
-        .body(body)
-        .send()
-        .await?;
-
-    if response.status().is_success() {
-        println!("Upload complete");
-        Ok(())
-    } else {
-        Err(anyhow!("{}", response.text().await?))
-    }
+    Ok(())
 }
