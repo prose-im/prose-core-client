@@ -50,7 +50,7 @@ jobs:
         run: cargo build --package prose-sdk-ffi
 
       - name: Build examples
-        run: cargo build --package
+        run: cargo build --package prose-core-client-cli --package xmpp-client
 
       - name: Test code
         run: cargo test --features test
