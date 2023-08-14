@@ -88,11 +88,13 @@ async fn test_presence() -> Result<()> {
         .insert_roster_items(&[
             roster::Item {
                 jid: jid_a.clone(),
+                name: Some("User A".to_string()),
                 subscription: Subscription::Both,
                 groups: vec![],
             },
             roster::Item {
                 jid: jid_b.clone(),
+                name: None,
                 subscription: Subscription::Both,
                 groups: vec![],
             },
@@ -128,20 +130,20 @@ async fn test_presence() -> Result<()> {
         vec![
             Contact {
                 jid: jid_a.clone(),
-                name: jid_a.to_string(),
+                name: "User A".to_string(),
                 availability: Availability::Unavailable,
                 activity: None,
-                groups: vec![String::from("")],
+                groups: vec![],
             },
             Contact {
                 jid: jid_b.clone(),
-                name: jid_b.to_string(),
+                name: "B".to_string(),
                 availability: Availability::Available,
                 activity: Some(UserActivity {
                     emoji: "🍰".to_string(),
                     status: Some("Baking cake".to_string()),
                 }),
-                groups: vec![String::from("")],
+                groups: vec![],
             }
         ]
     );
@@ -164,17 +166,17 @@ async fn test_presence() -> Result<()> {
         vec![
             Contact {
                 jid: jid_a.clone(),
-                name: jid_a.to_string(),
+                name: "User A".to_string(),
                 availability: Availability::DoNotDisturb,
                 activity: None,
-                groups: vec![String::from("")],
+                groups: vec![],
             },
             Contact {
                 jid: jid_b.clone(),
-                name: jid_b.to_string(),
+                name: "B".to_string(),
                 availability: Availability::Available,
                 activity: None,
-                groups: vec![String::from("")],
+                groups: vec![],
             }
         ]
     );
@@ -198,17 +200,17 @@ async fn test_presence() -> Result<()> {
         vec![
             Contact {
                 jid: jid_a.clone(),
-                name: jid_a.to_string(),
+                name: "User A".to_string(),
                 availability: Availability::Available,
                 activity: None,
-                groups: vec![String::from("")],
+                groups: vec![],
             },
             Contact {
                 jid: jid_b.clone(),
-                name: jid_b.to_string(),
+                name: "B".to_string(),
                 availability: Availability::Available,
                 activity: None,
-                groups: vec![String::from("")],
+                groups: vec![],
             }
         ]
     );

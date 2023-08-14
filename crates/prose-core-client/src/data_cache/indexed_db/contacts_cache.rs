@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::str::FromStr;
-
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use indexed_db_futures::prelude::*;
@@ -150,7 +148,6 @@ impl ContactsCache for IndexedDBDataCache {
             let jid_str = jid
                 .as_string()
                 .ok_or(IndexedDBDataCacheError::InvalidDBKey)?;
-            let parsed_jid = BareJid::from_str(&jid_str)?;
 
             let roster_item = roster_items_store
                 .get_value::<roster::Item>(&jid_str)
@@ -166,31 +163,19 @@ impl ContactsCache for IndexedDBDataCache {
             let presence = presence_store.get_value::<Presence>(&jid_str).await?;
             let user_activity = activity_store.get_value::<UserActivity>(&jid_str).await?;
 
-            let availability = if let Some(presence) = &presence {
+            let availability = presence.map(|presence| {
                 Availability::from((
                     presence.kind.as_ref().map(|v| v.0.clone()),
                     presence.show.as_ref().map(|v| v.0.clone()),
                 ))
-            } else {
-                Availability::Unavailable
-            };
+            });
 
-            let name = user_profile
-                .as_ref()
-                .and_then(|profile| profile.full_name().or((&profile).nickname.clone()));
-
-            let contact = Contact {
-                jid: parsed_jid.clone(),
-                name: name.unwrap_or(parsed_jid.to_string()),
+            contacts.push(Contact::from((
+                roster_item,
+                user_profile,
                 availability,
-                activity: user_activity,
-                groups: if roster_item.groups.is_empty() {
-                    vec!["".to_string()]
-                } else {
-                    roster_item.groups
-                },
-            };
-            contacts.push(contact)
+                user_activity,
+            )))
         }
 
         Ok(contacts)

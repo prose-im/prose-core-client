@@ -5,6 +5,10 @@
 
 use std::ops::Deref;
 
+pub use string_ext::StringExt;
+
+mod string_ext;
+
 pub fn concatenate_names(
     first_name: &Option<String>,
     last_name: &Option<String>,

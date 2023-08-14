@@ -17,7 +17,6 @@ use crate::types::{
     presence, roster, Address, Availability, AvatarMetadata, Contact, Presence, UserActivity,
     UserProfile,
 };
-use crate::util::concatenate_names;
 
 type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
 
@@ -54,13 +53,14 @@ impl ContactsCache for SQLiteCache {
             let mut stmt = trx.prepare(
                 r#"
             INSERT OR REPLACE INTO roster_item
-                (jid, subscription, groups)
-                VALUES (?1, ?2, ?3)
+                (jid, name, subscription, groups)
+                VALUES (?1, ?2, ?3, ?4)
             "#,
             )?;
             for item in items {
                 stmt.execute((
                     &item.jid.to_string(),
+                    &item.name,
                     &item.subscription.to_string(),
                     &item.groups.join(","),
                 ))?;
@@ -278,6 +278,8 @@ impl ContactsCache for SQLiteCache {
             r#"
             SELECT
                 roster_item.jid,
+                roster_item.name,
+                roster_item.subscription,
                 roster_item.groups,
                 user_profile.first_name,
                 user_profile.last_name,
@@ -298,44 +300,51 @@ impl ContactsCache for SQLiteCache {
 
         let contacts = stmt
             .query_map([], |row| {
-                let jid = row.get::<_, FromStrSql<BareJid>>(0)?.0;
-                let groups: Vec<String> = row
-                    .get::<_, String>(1)?
-                    .split(",")
-                    .map(Into::into)
-                    .collect();
-                let first_name: Option<String> = row.get(2)?;
-                let last_name: Option<String> = row.get(3)?;
-                let nickname: Option<String> = row.get(4)?;
-                let presence_count: u32 = row.get(5)?;
+                let groups_str: String = row.get(3)?;
+
+                let roster_item = roster::Item {
+                    jid: row.get::<_, FromStrSql<BareJid>>(0)?.0,
+                    name: row.get(1)?,
+                    subscription: row.get::<_, FromStrSql<roster::Subscription>>(2)?.0,
+                    groups: (!groups_str.is_empty())
+                        .then(|| groups_str.split(",").map(Into::into).collect())
+                        .unwrap_or(vec![]),
+                };
+
+                let user_profile = Some(UserProfile {
+                    first_name: row.get(4)?,
+                    last_name: row.get(5)?,
+                    nickname: row.get(6)?,
+                    org: None,
+                    role: None,
+                    title: None,
+                    email: None,
+                    tel: None,
+                    url: None,
+                    address: None,
+                });
+
+                let presence_count: u32 = row.get(7)?;
                 let presence_kind: Option<presence::Type> =
-                    row.get::<_, Option<FromStrSql<_>>>(6)?.map(|o| o.0);
+                    row.get::<_, Option<FromStrSql<_>>>(8)?.map(|o| o.0);
                 let presence_show: Option<presence::Show> =
-                    row.get::<_, Option<FromStrSql<_>>>(7)?.map(|o| o.0);
-                let emoji: Option<String> = row.get(8)?;
-                let status: Option<String> = row.get(9)?;
+                    row.get::<_, Option<FromStrSql<_>>>(9)?.map(|o| o.0);
 
-                let availability = if presence_count > 0 {
+                let availability = (presence_count > 0).then(|| {
                     Availability::from((presence_kind.map(|v| v.0), presence_show.map(|v| v.0)))
-                } else {
-                    Availability::Unavailable
-                };
+                });
 
-                let activity = if let Some(emoji) = emoji {
-                    Some(UserActivity { emoji, status })
-                } else {
-                    None
-                };
+                let emoji: Option<String> = row.get(10)?;
+                let status: Option<String> = row.get(11)?;
 
-                Ok(Contact {
-                    jid: jid.clone(),
-                    name: concatenate_names(&first_name, &last_name)
-                        .or(nickname)
-                        .unwrap_or(jid.to_string()),
+                let activity = emoji.map(|emoji| UserActivity { emoji, status });
+
+                Ok(Contact::from((
+                    roster_item,
+                    user_profile,
                     availability,
                     activity,
-                    groups,
-                })
+                )))
             })?
             .collect::<Result<Vec<_>, _>>()?;
 
