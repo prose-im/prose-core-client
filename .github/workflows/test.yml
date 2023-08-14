@@ -49,6 +49,9 @@ jobs:
       - name: Build prose-sdk-ffi
         run: cargo build --package prose-sdk-ffi
 
+      - name: Build examples
+        run: cargo build --package
+
       - name: Test code
         run: cargo test --features test
 
