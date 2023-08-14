@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::time::Instant;
 
 use dotenvy;
-use jid::{BareJid, FullJid};
+use jid::{BareJid, DomainPart, FullJid, NodePart, ResourcePart};
 use tracing::metadata::LevelFilter;
 pub use tracing::Level;
 use tracing_oslog::OsLogger;
@@ -31,11 +31,15 @@ pub fn load_credentials() -> (FullJid, String) {
 
     if let (Some(account_jid), Some(account_password)) = (jid_arg, password_arg) {
         return (
-            FullJid {
-                domain: account_jid.domain,
-                node: account_jid.node,
-                resource: format!("cli-{}", Instant::now().elapsed().as_nanos()),
-            },
+            FullJid::from_parts(
+                account_jid
+                    .node()
+                    .map(|node| NodePart::new(&node).unwrap())
+                    .as_ref(),
+                &DomainPart::new(account_jid.domain()).unwrap(),
+                &ResourcePart::new(&format!("cli-{}", Instant::now().elapsed().as_nanos()))
+                    .unwrap(),
+            ),
             account_password.to_string(),
         );
     }

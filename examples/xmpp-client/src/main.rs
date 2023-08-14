@@ -68,7 +68,7 @@ async fn handle_event(client: Client, event: Event) -> Result<()> {
     let chat = client.get_mod::<Chat>();
 
     let name = profile
-        .load_vcard(from.clone())
+        .load_vcard(from.to_bare())
         .await?
         .map(|vcard| vcard.fn_)
         .and_then(|fn_| fn_.first().map(|fn_| fn_.value.clone()))

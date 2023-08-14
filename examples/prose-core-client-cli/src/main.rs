@@ -47,7 +47,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
     client.connect(&jid, password, Availability::Away).await?;
     println!("Connected.");
 
-    Ok((jid.into(), client))
+    Ok((jid.into_bare(), client))
 }
 
 fn select_command() -> Selection {

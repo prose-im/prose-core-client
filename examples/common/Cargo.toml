@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 dotenvy = "0.15"
-jid = "0.9"
+jid = { workspace = true }
 tracing = { workspace = true }
 tracing-oslog = "0.1.2"
 tracing-subscriber = { workspace = true }
