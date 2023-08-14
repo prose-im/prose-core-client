@@ -79,6 +79,11 @@ impl Contact {
         self.0.group.clone().into()
     }
 
+    #[wasm_bindgen(getter, js_name = "isMe")]
+    pub fn is_me(&self) -> bool {
+        self.0.is_me
+    }
+
     // pub avatar: Option<String>,
 }
 

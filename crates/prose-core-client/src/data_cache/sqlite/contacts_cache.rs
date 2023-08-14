@@ -53,8 +53,8 @@ impl ContactsCache for SQLiteCache {
             let mut stmt = trx.prepare(
                 r#"
             INSERT OR REPLACE INTO roster_item
-                (`jid`, `name`, `subscription`, `group`)
-                VALUES (?1, ?2, ?3, ?4)
+                (`jid`, `name`, `subscription`, `group`, `is_me`)
+                VALUES (?1, ?2, ?3, ?4, ?5)
             "#,
             )?;
             for item in items {
@@ -63,6 +63,7 @@ impl ContactsCache for SQLiteCache {
                     &item.name,
                     &item.subscription.to_string(),
                     &item.group.to_string(),
+                    &item.is_me,
                 ))?;
             }
         }
@@ -281,6 +282,7 @@ impl ContactsCache for SQLiteCache {
                 roster_item.name,
                 roster_item.subscription,
                 roster_item.`group`,
+                roster_item.is_me,
                 user_profile.first_name,
                 user_profile.last_name,
                 user_profile.nickname,
@@ -305,12 +307,13 @@ impl ContactsCache for SQLiteCache {
                     name: row.get(1)?,
                     subscription: row.get::<_, FromStrSql<roster::Subscription>>(2)?.0,
                     group: row.get::<_, FromStrSql<roster::Group>>(3)?.0,
+                    is_me: row.get(4)?,
                 };
 
                 let user_profile = Some(UserProfile {
-                    first_name: row.get(4)?,
-                    last_name: row.get(5)?,
-                    nickname: row.get(6)?,
+                    first_name: row.get(5)?,
+                    last_name: row.get(6)?,
+                    nickname: row.get(7)?,
                     org: None,
                     role: None,
                     title: None,
@@ -320,18 +323,18 @@ impl ContactsCache for SQLiteCache {
                     address: None,
                 });
 
-                let presence_count: u32 = row.get(7)?;
+                let presence_count: u32 = row.get(8)?;
                 let presence_kind: Option<presence::Type> =
-                    row.get::<_, Option<FromStrSql<_>>>(8)?.map(|o| o.0);
-                let presence_show: Option<presence::Show> =
                     row.get::<_, Option<FromStrSql<_>>>(9)?.map(|o| o.0);
+                let presence_show: Option<presence::Show> =
+                    row.get::<_, Option<FromStrSql<_>>>(10)?.map(|o| o.0);
 
                 let availability = (presence_count > 0).then(|| {
                     Availability::from((presence_kind.map(|v| v.0), presence_show.map(|v| v.0)))
                 });
 
-                let emoji: Option<String> = row.get(10)?;
-                let status: Option<String> = row.get(11)?;
+                let emoji: Option<String> = row.get(11)?;
+                let status: Option<String> = row.get(12)?;
 
                 let activity = emoji.map(|emoji| UserActivity { emoji, status });
 
