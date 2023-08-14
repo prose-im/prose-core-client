@@ -4,7 +4,16 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::JID;
-use prose_core_client::types::{Availability, Contact as ProseContact, UserActivity};
+use prose_core_client::types::{
+    roster::Group as CoreGroup, Availability, Contact as CoreContact, UserActivity,
+};
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Group {
+    Favorite,
+    Team,
+    Other,
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Contact {
@@ -12,17 +21,27 @@ pub struct Contact {
     pub name: String,
     pub availability: Availability,
     pub activity: Option<UserActivity>,
-    pub groups: Vec<String>,
+    pub group: Group,
 }
 
-impl From<ProseContact> for Contact {
-    fn from(value: ProseContact) -> Self {
+impl From<CoreContact> for Contact {
+    fn from(value: CoreContact) -> Self {
         Contact {
             jid: value.jid.into(),
             name: value.name,
             availability: value.availability,
             activity: value.activity,
-            groups: value.groups,
+            group: value.group.into(),
+        }
+    }
+}
+
+impl From<CoreGroup> for Group {
+    fn from(value: CoreGroup) -> Self {
+        match value {
+            CoreGroup::Favorite => Group::Favorite,
+            CoreGroup::Team => Group::Team,
+            CoreGroup::Other => Group::Other,
         }
     }
 }

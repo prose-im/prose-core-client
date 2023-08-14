@@ -16,7 +16,7 @@ pub use prose_core_client::types::{
 pub use prose_core_client::{CachePolicy, ConnectionEvent};
 pub use prose_xmpp::ConnectionError;
 
-pub use crate::types::{AccountBookmark, ClientEvent, Contact, DateTime, JID};
+pub use crate::types::{AccountBookmark, ClientEvent, Contact, DateTime, Group, JID};
 pub use crate::{
     account_bookmarks_client::AccountBookmarksClient, client::*, logger::*, ClientError,
 };

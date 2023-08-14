@@ -133,6 +133,12 @@ enum Availability {
     "Away",
 };
 
+enum Group {
+    "Favorite",
+    "Team",
+    "Other",
+};
+
 dictionary UserActivity {
     string emoji;
     string? status;
@@ -143,7 +149,7 @@ dictionary Contact {
     string name;
     Availability availability;
     UserActivity? activity;
-    sequence<string> groups;
+    Group group;
 };
 
 dictionary Address {
