@@ -3,19 +3,19 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::types::{IntoJSStringArray, StringArray};
 use prose_core_client::types::{
-    Availability as ProseAvailability, Contact as ProseContact, UserActivity as ProseUserActivity,
+    roster::Group as CoreGroup, Availability as CoreAvailability, Contact as CoreContact,
+    UserActivity as CoreUserActivity,
 };
 use wasm_bindgen::prelude::*;
 
 use super::BareJid;
 
 #[wasm_bindgen]
-pub struct Contact(ProseContact);
+pub struct Contact(CoreContact);
 
-impl From<ProseContact> for Contact {
-    fn from(value: ProseContact) -> Self {
+impl From<CoreContact> for Contact {
+    fn from(value: CoreContact) -> Self {
         Contact(value)
     }
 }
@@ -28,19 +28,26 @@ pub enum Availability {
     Away = 3,
 }
 
-impl From<Availability> for ProseAvailability {
+#[wasm_bindgen]
+pub enum Group {
+    Favorite = "favorite",
+    Team = "team",
+    Other = "other",
+}
+
+impl From<Availability> for CoreAvailability {
     fn from(value: Availability) -> Self {
         match value {
-            Availability::Available => ProseAvailability::Available,
-            Availability::Unavailable => ProseAvailability::Unavailable,
-            Availability::DoNotDisturb => ProseAvailability::DoNotDisturb,
-            Availability::Away => ProseAvailability::Away,
+            Availability::Available => CoreAvailability::Available,
+            Availability::Unavailable => CoreAvailability::Unavailable,
+            Availability::DoNotDisturb => CoreAvailability::DoNotDisturb,
+            Availability::Away => CoreAvailability::Away,
         }
     }
 }
 
 #[wasm_bindgen]
-pub struct UserActivity(ProseUserActivity);
+pub struct UserActivity(CoreUserActivity);
 
 #[wasm_bindgen]
 impl Contact {
@@ -68,8 +75,8 @@ impl Contact {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn groups(&self) -> StringArray {
-        self.0.groups.iter().collect_into_js_string_array()
+    pub fn group(&self) -> Group {
+        self.0.group.clone().into()
     }
 
     // pub avatar: Option<String>,
@@ -79,7 +86,7 @@ impl Contact {
 impl UserActivity {
     #[wasm_bindgen(constructor)]
     pub fn new(icon: &str, status: Option<String>) -> Self {
-        UserActivity(ProseUserActivity {
+        UserActivity(CoreUserActivity {
             emoji: icon.to_string(),
             status: status.clone(),
         })
@@ -96,13 +103,23 @@ impl UserActivity {
     }
 }
 
-impl From<ProseAvailability> for Availability {
-    fn from(value: ProseAvailability) -> Self {
+impl From<CoreAvailability> for Availability {
+    fn from(value: CoreAvailability) -> Self {
         match value {
-            ProseAvailability::Available => Availability::Available,
-            ProseAvailability::Unavailable => Availability::Unavailable,
-            ProseAvailability::DoNotDisturb => Availability::DoNotDisturb,
-            ProseAvailability::Away => Availability::Away,
+            CoreAvailability::Available => Availability::Available,
+            CoreAvailability::Unavailable => Availability::Unavailable,
+            CoreAvailability::DoNotDisturb => Availability::DoNotDisturb,
+            CoreAvailability::Away => Availability::Away,
+        }
+    }
+}
+
+impl From<CoreGroup> for Group {
+    fn from(value: CoreGroup) -> Self {
+        match value {
+            CoreGroup::Favorite => Group::Favorite,
+            CoreGroup::Team => Group::Team,
+            CoreGroup::Other => Group::Other,
         }
     }
 }

@@ -97,13 +97,14 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 return Ok(vec![]);
             }
 
+            let connected_jid = self.connected_jid()?.to_bare();
             let roster = self.client.get_mod::<Roster>();
             let roster_items = roster
                 .load_roster()
                 .await?
                 .items
                 .into_iter()
-                .map(roster::Item::from)
+                .map(|item| roster::Item::from((&connected_jid, item)))
                 .collect::<Vec<roster::Item>>();
 
             self.inner

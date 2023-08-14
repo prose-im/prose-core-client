@@ -53,7 +53,7 @@ impl ContactsCache for SQLiteCache {
             let mut stmt = trx.prepare(
                 r#"
             INSERT OR REPLACE INTO roster_item
-                (jid, name, subscription, groups)
+                (`jid`, `name`, `subscription`, `group`)
                 VALUES (?1, ?2, ?3, ?4)
             "#,
             )?;
@@ -62,7 +62,7 @@ impl ContactsCache for SQLiteCache {
                     &item.jid.to_string(),
                     &item.name,
                     &item.subscription.to_string(),
-                    &item.groups.join(","),
+                    &item.group.to_string(),
                 ))?;
             }
         }
@@ -280,7 +280,7 @@ impl ContactsCache for SQLiteCache {
                 roster_item.jid,
                 roster_item.name,
                 roster_item.subscription,
-                roster_item.groups,
+                roster_item.`group`,
                 user_profile.first_name,
                 user_profile.last_name,
                 user_profile.nickname,
@@ -300,15 +300,11 @@ impl ContactsCache for SQLiteCache {
 
         let contacts = stmt
             .query_map([], |row| {
-                let groups_str: String = row.get(3)?;
-
                 let roster_item = roster::Item {
                     jid: row.get::<_, FromStrSql<BareJid>>(0)?.0,
                     name: row.get(1)?,
                     subscription: row.get::<_, FromStrSql<roster::Subscription>>(2)?.0,
-                    groups: (!groups_str.is_empty())
-                        .then(|| groups_str.split(",").map(Into::into).collect())
-                        .unwrap_or(vec![]),
+                    group: row.get::<_, FromStrSql<roster::Group>>(3)?.0,
                 };
 
                 let user_profile = Some(UserProfile {

@@ -18,7 +18,7 @@ use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::data_cache::sqlite::{Connection, SQLiteCache};
 use prose_core_client::data_cache::{AccountCache, ContactsCache, MessageCache};
 use prose_core_client::types::message_like::Payload;
-use prose_core_client::types::roster::Subscription;
+use prose_core_client::types::roster::{Group, Subscription};
 use prose_core_client::types::{
     presence, roster, AccountSettings, Availability, Contact, MessageLike, Page, Presence,
     UserActivity,
@@ -90,13 +90,13 @@ async fn test_presence() -> Result<()> {
                 jid: jid_a.clone(),
                 name: Some("User A".to_string()),
                 subscription: Subscription::Both,
-                groups: vec![],
+                group: Group::Other,
             },
             roster::Item {
                 jid: jid_b.clone(),
                 name: None,
                 subscription: Subscription::Both,
-                groups: vec![],
+                group: Group::Favorite,
             },
         ])
         .await?;
@@ -133,7 +133,7 @@ async fn test_presence() -> Result<()> {
                 name: "User A".to_string(),
                 availability: Availability::Unavailable,
                 activity: None,
-                groups: vec![],
+                group: Group::Other,
             },
             Contact {
                 jid: jid_b.clone(),
@@ -143,7 +143,7 @@ async fn test_presence() -> Result<()> {
                     emoji: "🍰".to_string(),
                     status: Some("Baking cake".to_string()),
                 }),
-                groups: vec![],
+                group: Group::Favorite,
             }
         ]
     );
@@ -169,14 +169,14 @@ async fn test_presence() -> Result<()> {
                 name: "User A".to_string(),
                 availability: Availability::DoNotDisturb,
                 activity: None,
-                groups: vec![],
+                group: Group::Other,
             },
             Contact {
                 jid: jid_b.clone(),
                 name: "B".to_string(),
                 availability: Availability::Available,
                 activity: None,
-                groups: vec![],
+                group: Group::Favorite,
             }
         ]
     );
@@ -203,14 +203,14 @@ async fn test_presence() -> Result<()> {
                 name: "User A".to_string(),
                 availability: Availability::Available,
                 activity: None,
-                groups: vec![],
+                group: Group::Other,
             },
             Contact {
                 jid: jid_b.clone(),
                 name: "B".to_string(),
                 availability: Availability::Available,
                 activity: None,
-                groups: vec![],
+                group: Group::Favorite,
             }
         ]
     );

@@ -76,7 +76,7 @@ pub struct IndexedDBDataCache {
 
 impl IndexedDBDataCache {
     pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 3)?;
+        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 4)?;
 
         db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
             let old_version = evt.old_version() as u32;
@@ -120,6 +120,11 @@ impl IndexedDBDataCache {
 
             if old_version < 3 {
                 db.create_object_store(keys::AVATAR_STORE)?;
+            }
+
+            if old_version < 4 {
+                db.delete_object_store(keys::ROSTER_ITEMS_STORE)?;
+                db.create_object_store(keys::ROSTER_ITEMS_STORE)?;
             }
 
             Ok(())

@@ -15,7 +15,7 @@ pub struct Contact {
     pub name: String,
     pub availability: Availability,
     pub activity: Option<UserActivity>,
-    pub groups: Vec<String>,
+    pub group: roster::Group,
 }
 
 impl
@@ -51,7 +51,7 @@ impl
             name,
             availability: value.2.unwrap_or(Availability::Unavailable),
             activity: value.3,
-            groups: value.0.groups,
+            group: value.0.group,
         }
     }
 }
