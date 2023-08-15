@@ -5,10 +5,11 @@
 
 use anyhow::Result;
 use insta::assert_snapshot;
-use prose_core_client::test::{ClientTestAdditions, ConnectedClient};
+use prose_core_client::test::{ClientTestAdditions, ConnectedClient, ConstantTimeProvider};
 use prose_core_client::{jid_str, Client};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::ping::Ping;
+use xmpp_parsers::time::TimeQuery;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_handles_ping() -> Result<()> {
@@ -23,6 +24,25 @@ async fn test_handles_ping() -> Result<()> {
     assert_eq!(sent_stanzas.len(), 1);
     assert_snapshot!(sent_stanzas[0], @r###"
         <iq xmlns='jabber:client' id="req-id" to="prose.org" type="result"/>
+    "###);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_handles_entity_time_query() -> Result<()> {
+    let ConnectedClient { connection, .. } =
+        Client::connected_client_with_time_provider(ConstantTimeProvider::ymd(2023, 08, 15))
+            .await?;
+
+    connection
+        .receive_stanza(Iq::from_get("req-id", TimeQuery).with_from(jid_str!("prose.org")))
+        .await;
+
+    let sent_stanzas = connection.sent_stanza_strings();
+    assert_eq!(sent_stanzas.len(), 1);
+    assert_snapshot!(sent_stanzas[0], @r###"
+        <iq xmlns='jabber:client' id="req-id" to="prose.org" type="result"><time xmlns='urn:xmpp:time'><tzo>+00:00</tzo><utc>2023-08-15T00:00:00Z</utc></time></iq>
     "###);
 
     Ok(())
