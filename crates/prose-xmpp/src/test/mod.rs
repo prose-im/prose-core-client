@@ -12,9 +12,12 @@ pub trait StrExt {
     fn to_xml_result_string(&self) -> String;
 }
 
-impl StrExt for &str {
+impl<T> StrExt for T
+where
+    T: AsRef<str>,
+{
     fn to_xml_result_string(&self) -> String {
-        let mut result = self.to_string();
+        let mut result = self.as_ref().to_string();
         result.retain(|c| c != '\n' && c != '\t');
         result.replace("  ", "")
     }
