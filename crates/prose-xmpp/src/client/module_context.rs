@@ -9,7 +9,7 @@ use std::sync::{Arc, Weak};
 use std::time::SystemTime;
 
 use anyhow::Result;
-use chrono::{DateTime, Local};
+use chrono::{DateTime, FixedOffset};
 use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
@@ -82,7 +82,7 @@ impl ModuleContext {
         self.inner.id_provider.new_id()
     }
 
-    pub(crate) fn timestamp(&self) -> DateTime<Local> {
+    pub(crate) fn timestamp(&self) -> DateTime<FixedOffset> {
         self.inner.time_provider.now()
     }
 
