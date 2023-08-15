@@ -88,9 +88,18 @@ impl Connection {
     pub fn reset(&self) {
         self.inner.sent_stanzas.lock().clear()
     }
+
+    pub async fn receive_stanza(&self, stanza: impl Into<Element>) {
+        let guard = self.inner.event_handler.read();
+        let event_handler = guard.as_ref().expect("No event handler registered");
+        let conn = Connection {
+            inner: self.inner.clone(),
+        };
+        (event_handler)(&conn, ConnectionEvent::Stanza(stanza.into())).await
+    }
 }
 
-impl ConnectionTrait for Arc<Connection> {
+impl ConnectionTrait for Connection {
     fn send_stanza(&self, stanza: Element) -> Result<()> {
         let responses = if let Some(handler) = self.inner.stanza_handler.lock().as_mut() {
             (handler)(&stanza)
@@ -100,7 +109,9 @@ impl ConnectionTrait for Arc<Connection> {
 
         if let Some(event_handler) = &*self.inner.event_handler.read() {
             for response in responses {
-                let conn = self.clone();
+                let conn = Connection {
+                    inner: self.inner.clone(),
+                };
                 let fut = (event_handler)(&conn, ConnectionEvent::Stanza(response));
 
                 tokio::spawn(async move { fut.await });
@@ -112,4 +123,14 @@ impl ConnectionTrait for Arc<Connection> {
     }
 
     fn disconnect(&self) {}
+}
+
+impl ConnectionTrait for Arc<Connection> {
+    fn send_stanza(&self, stanza: Element) -> Result<()> {
+        self.as_ref().send_stanza(stanza)
+    }
+
+    fn disconnect(&self) {
+        self.as_ref().disconnect()
+    }
 }
