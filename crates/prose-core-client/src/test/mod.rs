@@ -10,15 +10,17 @@ use jid::{BareJid, DomainPart, FullJid, NodePart};
 use std::str::FromStr;
 use std::sync::Arc;
 
+pub use constant_time_provider::ConstantTimeProvider;
 pub use incrementing_id_provider::IncrementingIDProvider;
 pub use message_builder::MessageBuilder;
-use prose_xmpp::{test, IDProvider};
+use prose_xmpp::{test, IDProvider, SystemTimeProvider, TimeProvider};
 
 use crate::types::Availability;
 use crate::{
     avatar_cache::NoopAvatarCache, data_cache::sqlite::SQLiteCache, Client, ClientBuilder,
 };
 
+mod constant_time_provider;
 mod incrementing_id_provider;
 mod message_builder;
 
@@ -42,6 +44,9 @@ macro_rules! jid_str {
 #[async_trait(?Send)]
 pub trait ClientTestAdditions {
     async fn connected_client() -> Result<ConnectedClient>;
+    async fn connected_client_with_time_provider<T: TimeProvider + 'static>(
+        time_provider: T,
+    ) -> Result<ConnectedClient>;
 }
 
 impl BareJidTestAdditions for BareJid {
@@ -82,6 +87,12 @@ pub struct ConnectedClient {
 #[async_trait(?Send)]
 impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
     async fn connected_client() -> Result<ConnectedClient> {
+        Self::connected_client_with_time_provider(SystemTimeProvider::default()).await
+    }
+
+    async fn connected_client_with_time_provider<T: TimeProvider + 'static>(
+        time_provider: T,
+    ) -> Result<ConnectedClient> {
         let connection = Arc::new(test::Connection::default());
         let id_provider = Arc::new(IncrementingIDProvider::new());
         let data_cache = Arc::new(SQLiteCache::in_memory_cache());
@@ -91,6 +102,7 @@ impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
             .set_data_cache(data_cache.clone())
             .set_avatar_cache(NoopAvatarCache::default())
             .set_id_provider(id_provider.clone() as Arc<dyn IDProvider>)
+            .set_time_provider(time_provider)
             .build();
 
         client
