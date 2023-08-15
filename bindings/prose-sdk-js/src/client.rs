@@ -12,7 +12,7 @@ use crate::types::{
 use base64::{engine::general_purpose, Engine as _};
 use jid::{DomainPart, NodePart, ResourcePart};
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
-use prose_core_client::types::{MessageId, UserActivity};
+use prose_core_client::types::{MessageId, SoftwareVersion, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
 use std::rc::Rc;
 use tracing::info;
@@ -39,6 +39,15 @@ pub struct ClientConfig {
     /// Defines if sent stanzas should be logged to the console.
     #[wasm_bindgen(js_name = "logSentStanzas")]
     pub log_sent_stanzas: bool,
+
+    #[wasm_bindgen(skip)]
+    pub client_name: String,
+
+    #[wasm_bindgen(skip)]
+    pub client_version: String,
+
+    #[wasm_bindgen(skip)]
+    pub client_os: Option<String>,
 }
 
 #[wasm_bindgen(js_class = "ProseClientConfig")]
@@ -46,6 +55,36 @@ impl ClientConfig {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         Default::default()
+    }
+
+    #[wasm_bindgen(getter, js_name = "clientName")]
+    pub fn client_name(&self) -> String {
+        self.client_name.clone()
+    }
+
+    #[wasm_bindgen(setter, js_name = "clientName")]
+    pub fn set_client_name(&mut self, client_name: String) {
+        self.client_name = client_name.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "clientVersion")]
+    pub fn client_version(&self) -> String {
+        self.client_version.clone()
+    }
+
+    #[wasm_bindgen(setter, js_name = "clientVersion")]
+    pub fn set_client_version(&mut self, client_version: String) {
+        self.client_version = client_version.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "clientOS")]
+    pub fn client_os(&self) -> Option<String> {
+        self.client_os.clone()
+    }
+
+    #[wasm_bindgen(setter, js_name = "clientOS")]
+    pub fn set_client_os(&mut self, client_os: Option<String>) {
+        self.client_os = client_os.clone()
     }
 }
 
@@ -55,6 +94,9 @@ impl Default for ClientConfig {
             ping_interval: 60,
             log_received_stanzas: false,
             log_sent_stanzas: false,
+            client_name: env!("CARGO_PKG_NAME").to_string(),
+            client_version: env!("CARGO_PKG_VERSION").to_string(),
+            client_os: None,
         }
     }
 }
@@ -74,12 +116,19 @@ impl Client {
         let cache = Rc::new(IndexedDBDataCache::new().await?);
         let config = config.unwrap_or_default();
 
+        let software_version = SoftwareVersion {
+            name: config.client_name.clone(),
+            version: config.client_version.clone(),
+            os: config.client_os.clone(),
+        };
+
         let client = Client {
             client: ClientBuilder::new()
                 .set_connector_provider(Connector::provider(connection_provider, config))
                 .set_data_cache(cache.clone())
                 .set_avatar_cache(cache)
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
+                .set_software_version(software_version)
                 .build(),
         };
 
