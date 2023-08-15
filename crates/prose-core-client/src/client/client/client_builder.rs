@@ -15,7 +15,7 @@ use prose_xmpp::{
 use crate::avatar_cache::AvatarCache;
 use crate::client::client::client::ClientInner;
 use crate::data_cache::DataCache;
-use crate::types::{Capabilities, Feature};
+use crate::types::{Capabilities, Feature, SoftwareVersion};
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedDataCache {}
@@ -26,6 +26,7 @@ pub struct ClientBuilder<D, A> {
     data_cache: D,
     avatar_cache: A,
     time_provider: Arc<dyn TimeProvider>,
+    software_version: SoftwareVersion,
     delegate: Option<Box<dyn ClientDelegate<D, A>>>,
 }
 
@@ -36,6 +37,7 @@ impl ClientBuilder<UndefinedDataCache, UndefinedAvatarCache> {
             data_cache: UndefinedDataCache {},
             avatar_cache: UndefinedAvatarCache {},
             time_provider: Arc::new(SystemTimeProvider::default()),
+            software_version: SoftwareVersion::default(),
             delegate: None,
         }
     }
@@ -48,6 +50,7 @@ impl<A> ClientBuilder<UndefinedDataCache, A> {
             data_cache,
             avatar_cache: self.avatar_cache,
             time_provider: self.time_provider,
+            software_version: self.software_version,
             delegate: None,
         }
     }
@@ -60,6 +63,7 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
             data_cache: self.data_cache,
             avatar_cache,
             time_provider: self.time_provider,
+            software_version: self.software_version,
             delegate: None,
         }
     }
@@ -78,6 +82,11 @@ impl<D, A> ClientBuilder<D, A> {
 
     pub fn set_time_provider<T: TimeProvider + 'static>(mut self, time_provider: T) -> Self {
         self.time_provider = Arc::new(time_provider);
+        self
+    }
+
+    pub fn set_software_version(mut self, software_version: SoftwareVersion) -> Self {
+        self.software_version = software_version;
         self
     }
 }
@@ -106,6 +115,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
                 Feature::new(ns::USER_ACTIVITY, false),
                 Feature::new(ns::USER_ACTIVITY, true),
                 Feature::new(ns::TIME, false),
+                Feature::new(ns::VERSION, false),
             ],
         );
 
@@ -114,6 +124,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             data_cache: self.data_cache,
             avatar_cache: self.avatar_cache,
             time_provider: self.time_provider.clone(),
+            software_version: self.software_version,
             delegate: self.delegate,
         });
 

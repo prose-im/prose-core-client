@@ -25,6 +25,7 @@ enum Request {
     Ping { from: Jid, id: String },
     DiscoInfo { from: Jid, id: String, node: String },
     EntityTime { from: Jid, id: String },
+    SoftwareVersion { from: Jid, id: String },
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
@@ -78,6 +79,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 }
                 profile::Event::EntityTimeQuery { from, id } => {
                     self.handle_request(Request::EntityTime { from, id }).await
+                }
+                profile::Event::SoftwareVersionQuery { from, id } => {
+                    self.handle_request(Request::SoftwareVersion { from, id })
+                        .await
                 }
             },
 
@@ -242,6 +247,16 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 let profile = self.client.get_mod::<mods::Profile>();
                 profile
                     .send_entity_time_response(self.inner.time_provider.now(), from, id)
+                    .await?
+            }
+            Request::SoftwareVersion { from, id } => {
+                let profile = self.client.get_mod::<mods::Profile>();
+                profile
+                    .send_software_version_response(
+                        self.inner.software_version.clone().into(),
+                        from,
+                        id,
+                    )
                     .await?
             }
         }

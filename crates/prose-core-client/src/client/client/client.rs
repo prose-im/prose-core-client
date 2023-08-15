@@ -17,7 +17,7 @@ use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::{AccountSettings, Availability, Capabilities};
+use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::ClientDelegate;
 
 #[derive(Debug, thiserror::Error, Display)]
@@ -36,6 +36,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub data_cache: D,
     pub avatar_cache: A,
     pub time_provider: Arc<dyn TimeProvider>,
+    pub software_version: SoftwareVersion,
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
 }
 

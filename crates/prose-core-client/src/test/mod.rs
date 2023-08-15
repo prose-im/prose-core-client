@@ -15,7 +15,7 @@ pub use incrementing_id_provider::IncrementingIDProvider;
 pub use message_builder::MessageBuilder;
 use prose_xmpp::{test, IDProvider, SystemTimeProvider, TimeProvider};
 
-use crate::types::Availability;
+use crate::types::{Availability, SoftwareVersion};
 use crate::{
     avatar_cache::NoopAvatarCache, data_cache::sqlite::SQLiteCache, Client, ClientBuilder,
 };
@@ -103,6 +103,11 @@ impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
             .set_avatar_cache(NoopAvatarCache::default())
             .set_id_provider(id_provider.clone() as Arc<dyn IDProvider>)
             .set_time_provider(time_provider)
+            .set_software_version(SoftwareVersion {
+                name: "prose-test-client".to_string(),
+                version: "1.2.3".to_string(),
+                os: Some("unknown os".to_string()),
+            })
             .build();
 
         client

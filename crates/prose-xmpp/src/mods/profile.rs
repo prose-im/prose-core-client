@@ -26,6 +26,7 @@ use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::RequestError;
 use sha1::{Digest, Sha1};
 use xmpp_parsers::time::{TimeQuery, TimeResult};
+use xmpp_parsers::version::{VersionQuery, VersionResult};
 
 #[derive(Default, Clone)]
 pub struct Profile {
@@ -42,7 +43,13 @@ pub enum Event {
         from: Jid,
         metadata: avatar::Metadata,
     },
+    /// XEP-0202: Entity Time
     EntityTimeQuery {
+        from: Jid,
+        id: String,
+    },
+    /// XEP-0092: Software Version
+    SoftwareVersionQuery {
         from: Jid,
         id: String,
     },
@@ -92,6 +99,15 @@ impl Module for Profile {
             };
             self.ctx
                 .schedule_event(ClientEvent::Profile(Event::EntityTimeQuery {
+                    from: from.clone(),
+                    id: stanza.id.clone(),
+                }))
+        } else if payload.is("query", ns::VERSION) {
+            let Some(from) = &stanza.from else {
+                bail!("Missing 'from' in software version request.")
+            };
+            self.ctx
+                .schedule_event(ClientEvent::Profile(Event::SoftwareVersionQuery {
                     from: from.clone(),
                     id: stanza.id.clone(),
                 }))
@@ -412,5 +428,33 @@ impl Profile {
         )
         .with_to(to);
         return self.ctx.send_stanza(response);
+    }
+
+    /// XEP-0092: Software Version
+    /// https://xmpp.org/extensions/xep-0092.html
+    /// TODO: This needs a FullJid to work properly.
+    pub async fn load_software_version(&self, from: impl Into<Jid>) -> Result<VersionResult> {
+        let response = self
+            .ctx
+            .send_iq(Iq::from_get(self.ctx.generate_id(), VersionQuery).with_to(from.into()))
+            .await?;
+
+        let Some(response) = response else {
+            return Err(RequestError::UnexpectedResponse.into());
+        };
+
+        Ok(VersionResult::try_from(response)?)
+    }
+
+    /// XEP-0092: Software Version
+    /// https://xmpp.org/extensions/xep-0092.html
+    pub async fn send_software_version_response(
+        &self,
+        software_version: VersionResult,
+        to: Jid,
+        id: impl AsRef<str>,
+    ) -> Result<()> {
+        self.ctx
+            .send_stanza(Iq::from_result(id.as_ref(), Some(software_version)).with_to(to))
     }
 }
