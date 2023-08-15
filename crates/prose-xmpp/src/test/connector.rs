@@ -9,7 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 
 use crate::client::ConnectorProvider;
 use crate::connector::{
@@ -39,7 +39,7 @@ impl ConnectorTrait for Connector {
         _password: &str,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
-        *self.connection.inner.event_handler.lock() = Some(event_handler);
+        *self.connection.inner.event_handler.write() = Some(event_handler);
         Ok(Box::new(self.connection.clone()))
     }
 }
@@ -55,7 +55,7 @@ pub struct Connection {
 struct ConnectionInner {
     sent_stanzas: Mutex<Vec<Element>>,
     stanza_handler: Mutex<Option<Box<SentStanzaHandler>>>,
-    event_handler: Mutex<Option<ConnectionEventHandler>>,
+    event_handler: RwLock<Option<ConnectionEventHandler>>,
 }
 
 impl Connection {
@@ -98,7 +98,7 @@ impl ConnectionTrait for Arc<Connection> {
             vec![]
         };
 
-        if let Some(event_handler) = &*self.inner.event_handler.lock() {
+        if let Some(event_handler) = &*self.inner.event_handler.read() {
             for response in responses {
                 let conn = self.clone();
                 let fut = (event_handler)(&conn, ConnectionEvent::Stanza(response));
