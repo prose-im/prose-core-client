@@ -13,7 +13,7 @@ use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::mods::{caps, chat, ping, profile, status};
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
-use prose_xmpp::{client, mods, Event};
+use prose_xmpp::{client, mods, Event, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
@@ -24,6 +24,7 @@ use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
 enum Request {
     Ping { from: Jid, id: String },
     DiscoInfo { from: Jid, id: String, node: String },
+    EntityTime { from: Jid, id: String },
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
@@ -74,6 +75,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 profile::Event::Vcard { from, vcard } => self.vcard_did_change(from, vcard).await,
                 profile::Event::AvatarMetadata { from, metadata } => {
                     self.avatar_metadata_did_change(from, metadata).await
+                }
+                profile::Event::EntityTimeQuery { from, id } => {
+                    self.handle_request(Request::EntityTime { from, id }).await
                 }
             },
 
@@ -232,6 +236,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             Request::DiscoInfo { from, id, node: _ } => {
                 let caps = self.client.get_mod::<mods::Caps>();
                 caps.send_disco_info_query_response(from, id, (&self.inner.caps).into())
+                    .await?
+            }
+            Request::EntityTime { from, id } => {
+                let profile = self.client.get_mod::<mods::Profile>();
+                profile
+                    .send_entity_time_response(self.inner.time_provider.now(), from, id)
                     .await?
             }
         }

@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use chrono::{DateTime, FixedOffset};
 use jid::{BareJid, Jid};
@@ -41,6 +41,10 @@ pub enum Event {
     AvatarMetadata {
         from: Jid,
         metadata: avatar::Metadata,
+    },
+    EntityTimeQuery {
+        from: Jid,
+        id: String,
     },
 }
 
@@ -83,14 +87,14 @@ impl Module for Profile {
 
         // Respond to XEP-0202: Entity Time request
         if payload.is("time", ns::TIME) {
-            let mut response = Iq::from_result(
-                stanza.id.clone(),
-                Some(TimeResult(xmpp_parsers::date::DateTime(
-                    self.ctx.timestamp().into(),
-                ))),
-            );
-            response.to = stanza.from.clone();
-            return self.ctx.send_stanza(response);
+            let Some(from) = &stanza.from else {
+                bail!("Missing 'from' in entity time request.")
+            };
+            self.ctx
+                .schedule_event(ClientEvent::Profile(Event::EntityTimeQuery {
+                    from: from.clone(),
+                    id: stanza.id.clone(),
+                }))
         }
 
         Ok(())
@@ -392,5 +396,21 @@ impl Profile {
         };
 
         Ok(LastActivityResponse::try_from(response)?)
+    }
+
+    /// XEP-0202: Entity Time
+    /// https://xmpp.org/extensions/xep-0202.html
+    pub async fn send_entity_time_response(
+        &self,
+        time: DateTime<FixedOffset>,
+        to: Jid,
+        id: impl AsRef<str>,
+    ) -> Result<()> {
+        let response = Iq::from_result(
+            id.as_ref(),
+            Some(TimeResult(xmpp_parsers::date::DateTime(time))),
+        )
+        .with_to(to);
+        return self.ctx.send_stanza(response);
     }
 }
