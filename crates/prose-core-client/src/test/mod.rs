@@ -32,6 +32,13 @@ pub trait DateTimeTestAdditions {
     fn test_timestamp_adding(seconds: u32) -> DateTime<FixedOffset>;
 }
 
+#[macro_export]
+macro_rules! jid_str {
+    ($jid:expr) => {
+        $jid.parse::<jid::Jid>().unwrap()
+    };
+}
+
 #[async_trait(?Send)]
 pub trait ClientTestAdditions {
     async fn connected_client() -> Result<ConnectedClient>;
