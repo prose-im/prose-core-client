@@ -30,9 +30,9 @@ pub enum Availability {
 
 #[wasm_bindgen]
 pub enum Group {
-    Favorite = "favorite",
-    Team = "team",
-    Other = "other",
+    Favorite = 0,
+    Team = 1,
+    Other = 2,
 }
 
 impl From<Availability> for CoreAvailability {
