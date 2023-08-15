@@ -10,7 +10,7 @@ use tracing::{debug, error};
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::mods::{caps, chat, profile, status};
+use prose_xmpp::mods::{caps, chat, ping, profile, status};
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{client, mods, Event};
@@ -20,6 +20,11 @@ use crate::data_cache::DataCache;
 use crate::types::message_like::{Payload, TimestampedMessage};
 use crate::types::{AvatarMetadata, MessageLike, UserProfile};
 use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
+
+enum Request {
+    Ping { from: Jid, id: String },
+    DiscoInfo { from: Jid, id: String, node: String },
+}
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_event(&self, event: Event) {
@@ -41,7 +46,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
             Event::Caps(event) => match event {
                 caps::Event::DiscoInfoQuery { from, id, node } => {
-                    self.did_receive_disco_info_query(from, id, node).await
+                    self.handle_request(Request::DiscoInfo { from, id, node })
+                        .await
                 }
                 caps::Event::Caps { .. } => Ok(()),
             },
@@ -56,6 +62,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                         .await
                 }
                 chat::Event::Sent(message) => self.did_send_message(message).await,
+            },
+
+            Event::Ping(event) => match event {
+                ping::Event::Ping { from, id } => {
+                    self.handle_request(Request::Ping { from, id }).await
+                }
             },
 
             Event::Profile(event) => match event {
@@ -211,15 +223,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
-    async fn did_receive_disco_info_query(
-        &self,
-        from: Jid,
-        id: String,
-        _node: String,
-    ) -> Result<()> {
-        let caps = self.client.get_mod::<mods::Caps>();
-        caps.send_disco_info_query_response(from, id, (&self.inner.caps).into())
-            .await
+    async fn handle_request(&self, request: Request) -> Result<()> {
+        match request {
+            Request::Ping { from, id } => {
+                let ping = self.client.get_mod::<mods::Ping>();
+                ping.send_pong(from, id).await?
+            }
+            Request::DiscoInfo { from, id, node: _ } => {
+                let caps = self.client.get_mod::<mods::Caps>();
+                caps.send_disco_info_query_response(from, id, (&self.inner.caps).into())
+                    .await?
+            }
+        }
+        Ok(())
     }
 
     async fn did_receive_message(&self, message: ReceivedMessage) -> Result<()> {

@@ -14,7 +14,7 @@ use xmpp_parsers::pubsub::PubSubEvent;
 pub use caps::Caps;
 pub use chat::Chat;
 pub use mam::MAM;
-pub(crate) use ping::Ping;
+pub use ping::Ping;
 pub use profile::{AvatarData, Profile};
 pub use roster::Roster;
 pub use status::Status;
