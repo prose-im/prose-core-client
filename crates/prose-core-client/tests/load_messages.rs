@@ -11,7 +11,7 @@ use prose_core_client::{data_cache::MessageCache, Client};
 use prose_xmpp::stanza::message::mam;
 use prose_xmpp::test::StrExt;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_loads_latest_messages_with_empty_cache() -> Result<()> {
     let ConnectedClient {
         client, connection, ..
@@ -62,7 +62,7 @@ async fn test_loads_latest_messages_with_empty_cache() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_loads_latest_messages_with_partial_cache() -> Result<()> {
     let ConnectedClient {
         client,

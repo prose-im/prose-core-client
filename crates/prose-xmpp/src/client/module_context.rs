@@ -112,10 +112,18 @@ impl ModuleContextInner {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
         wasm_bindgen_futures::spawn_local(async move { fut.await });
     }
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(all(not(target_arch = "wasm32"), not(feature = "test")))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
         tokio::spawn(async move { fut.await });
+    }
+
+    #[cfg(feature = "test")]
+    pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
+        tokio::task::block_in_place(move || {
+            let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
+            tokio::runtime::Handle::current().block_on(async move { fut.await });
+        });
     }
 
     pub(crate) fn disconnect(&self) {
