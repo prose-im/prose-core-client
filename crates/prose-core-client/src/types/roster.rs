@@ -48,10 +48,10 @@ impl From<(&BareJid, roster::Item)> for Item {
             .groups
             .first()
             .map(|group| {
-                if group.0 == Group::Favorite.to_string() {
-                    return Group::Favorite;
+                match group.0.as_str() {
+                    "Favorite" => Group::Favorite,
+                    _ => default_group
                 }
-                default_group
             })
             .unwrap_or(default_group);
 
