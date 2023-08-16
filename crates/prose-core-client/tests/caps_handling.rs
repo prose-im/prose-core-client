@@ -8,12 +8,16 @@ use insta::assert_snapshot;
 use jid::{BareJid, FullJid};
 use prose_core_client::avatar_cache::NoopAvatarCache;
 use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::test::{BareJidTestAdditions, IncrementingIDProvider};
+use prose_core_client::test::{
+    BareJidTestAdditions, ClientTestAdditions, ConnectedClient, IncrementingIDProvider,
+};
 use prose_core_client::types::{Availability, SoftwareVersion};
-use prose_core_client::ClientBuilder;
+use prose_core_client::{Client, ClientBuilder};
 use prose_xmpp::{test, SystemTimeProvider};
 use std::str::FromStr;
 use std::sync::Arc;
+
+// Snapshots will need to be updated if/when caps features change…
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_start_sequence() -> Result<()> {
@@ -42,6 +46,21 @@ async fn test_start_sequence() -> Result<()> {
         .await?;
 
     assert_snapshot!(connection.sent_stanza_strings().join("\n\n"));
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_sends_caps_when_changing_availability() -> Result<()> {
+    let ConnectedClient {
+        client, connection, ..
+    } = Client::connected_client().await?;
+
+    client.set_availability(Availability::DoNotDisturb).await?;
+
+    let sent_stanzas = connection.sent_stanza_strings();
+    assert_eq!(sent_stanzas.len(), 1);
+    assert_snapshot!(sent_stanzas[0]);
 
     Ok(())
 }

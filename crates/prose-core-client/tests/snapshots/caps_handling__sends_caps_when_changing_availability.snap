@@ -1,0 +1,6 @@
+---
+source: crates/prose-core-client/tests/caps_handling.rs
+assertion_line: 63
+expression: "sent_stanzas[0]"
+---
+<presence xmlns='jabber:client'><show>dnd</show><c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="sha-1" ver="aHR0cHM6Ly93d3cucHJvc2Uub3Jn"/></presence>
