@@ -68,11 +68,19 @@ impl Module for Status {
 impl Status {
     /// XMPP: Instant Messaging and Presence
     /// https://xmpp.org/rfcs/rfc6121.html#presence
-    pub fn send_presence(&self, show: Option<presence::Show>, status: Option<&str>) -> Result<()> {
+    pub fn send_presence(
+        &self,
+        show: Option<presence::Show>,
+        status: Option<&str>,
+        caps: Option<xmpp_parsers::caps::Caps>,
+    ) -> Result<()> {
         let mut presence = Presence::new(presence::Type::None);
         presence.show = show;
         if let Some(status) = status {
             presence.set_status("", status);
+        }
+        if let Some(caps) = caps {
+            presence.add_payload(caps)
         }
         self.ctx.send_stanza(presence)
     }
