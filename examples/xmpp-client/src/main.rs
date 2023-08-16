@@ -35,7 +35,7 @@ async fn main() -> Result<()> {
 
     client
         .get_mod::<Status>()
-        .send_presence(Some(Show::Chat), None)?;
+        .send_presence(Some(Show::Chat), None, None)?;
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {
