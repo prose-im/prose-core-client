@@ -22,10 +22,23 @@ use crate::types::{AvatarMetadata, MessageLike, UserProfile};
 use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
 
 enum Request {
-    Ping { from: Jid, id: String },
-    DiscoInfo { from: Jid, id: String, node: String },
-    EntityTime { from: Jid, id: String },
-    SoftwareVersion { from: Jid, id: String },
+    Ping {
+        from: Jid,
+        id: String,
+    },
+    DiscoInfo {
+        from: Jid,
+        id: String,
+        node: Option<String>,
+    },
+    EntityTime {
+        from: Jid,
+        id: String,
+    },
+    SoftwareVersion {
+        from: Jid,
+        id: String,
+    },
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {

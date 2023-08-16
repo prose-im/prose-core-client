@@ -99,22 +99,23 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
 
     pub fn build(self) -> Client<D, A> {
         let caps = Capabilities::new(
-            "Prose",
+            self.software_version.name.clone(),
             "https://www.prose.org",
             vec![
                 Feature::new(ns::AVATAR_DATA, false),
                 Feature::new(ns::AVATAR_METADATA, false),
                 Feature::new(ns::AVATAR_METADATA, true),
                 Feature::new(ns::CHATSTATES, false),
+                Feature::new(ns::DISCO_INFO, false),
                 Feature::new(ns::PING, false),
                 Feature::new(ns::PUBSUB, false),
                 Feature::new(ns::PUBSUB, true),
                 Feature::new(ns::RECEIPTS, false),
-                Feature::new(ns::VCARD4, false),
-                Feature::new(ns::VCARD4, true),
+                Feature::new(ns::TIME, false),
                 Feature::new(ns::USER_ACTIVITY, false),
                 Feature::new(ns::USER_ACTIVITY, true),
-                Feature::new(ns::TIME, false),
+                Feature::new(ns::VCARD4, false),
+                Feature::new(ns::VCARD4, true),
                 Feature::new(ns::VERSION, false),
             ],
         );

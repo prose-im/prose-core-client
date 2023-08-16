@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use jid::Jid;
 use xmpp_parsers::disco::DiscoInfoQuery;
 use xmpp_parsers::iq::{Iq, IqType};
@@ -24,7 +24,7 @@ pub enum Event {
     DiscoInfoQuery {
         from: Jid,
         id: String,
-        node: String,
+        node: Option<String>,
     },
     Caps {
         from: Jid,
@@ -63,15 +63,15 @@ impl Module for Caps {
 
         let query = DiscoInfoQuery::try_from(payload.clone())?;
 
-        let (Some(node), Some(from)) = (query.node, &stanza.from) else {
-            return Ok(());
+        let Some(from) = &stanza.from else {
+            bail!("Missing 'from' in disco request.")
         };
 
         self.ctx
             .schedule_event(ClientEvent::Caps(Event::DiscoInfoQuery {
                 from: from.clone(),
                 id: stanza.id.clone(),
-                node,
+                node: query.node,
             }));
 
         Ok(())
