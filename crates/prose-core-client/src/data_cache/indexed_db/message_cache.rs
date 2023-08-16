@@ -47,7 +47,7 @@ impl MessageCache for IndexedDBDataCache {
 
         for message in messages {
             if idx
-                .get_key(&JsValue::from_str(message.id.as_ref()))?
+                .get_key(&JsValue::from_str(message.id.id().as_ref()))?
                 .await?
                 .is_none()
             {
@@ -96,7 +96,7 @@ impl MessageCache for IndexedDBDataCache {
 
                 for message in found_messages {
                     if let Some(newer_than_id) = *newer_than_id {
-                        if &message.id == newer_than_id {
+                        if message.id.id() == newer_than_id {
                             continue;
                         }
                     }
@@ -191,7 +191,7 @@ impl MessageCache for IndexedDBDataCache {
         loop {
             let message: MessageLike = cursor.value().into_serde()?;
 
-            if Some(&message.id) != older_than
+            if Some(message.id.id()) != older_than
                 && (&message.from == conversation || &message.to == conversation)
             {
                 messages.push(IdbMessage {
@@ -258,7 +258,7 @@ impl MessageCache for IndexedDBDataCache {
         loop {
             let message: MessageLike = cursor.value().into_serde()?;
 
-            if &message.id != newer_than
+            if message.id.id() != newer_than
                 && (&message.from == conversation || &message.to == conversation)
             {
                 messages.push(IdbMessage {

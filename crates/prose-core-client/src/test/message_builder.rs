@@ -13,7 +13,7 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
 
 use crate::test::{BareJidTestAdditions, DateTimeTestAdditions};
-use crate::types::message_like::Payload;
+use crate::types::message_like::{MessageLikeId, Payload};
 use crate::types::{Message, MessageId, MessageLike, Reaction, StanzaId};
 
 pub struct MessageBuilder {
@@ -56,7 +56,7 @@ impl MessageBuilder {
 impl MessageBuilder {
     pub fn build_message(self) -> Message {
         Message {
-            id: self.id,
+            id: Some(self.id),
             stanza_id: self.stanza_id,
             from: self.from,
             body: self.body,
@@ -70,7 +70,7 @@ impl MessageBuilder {
 
     pub fn build_message_like(self) -> MessageLike {
         MessageLike {
-            id: self.id,
+            id: MessageLikeId::new(Some(self.id)),
             stanza_id: self.stanza_id,
             target: None,
             to: self.to,

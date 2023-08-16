@@ -25,7 +25,7 @@ pub struct Reaction {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
-    pub id: MessageId,
+    pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
     pub from: BareJid,
     pub body: String,
@@ -46,8 +46,10 @@ impl Message {
         for msg in messages.into_iter() {
             match msg.payload {
                 Payload::Message { body } => {
+                    let message_id = msg.id.clone();
+
                     let message = Message {
-                        id: msg.id.clone(),
+                        id: message_id.into_original_id(),
                         stanza_id: msg.stanza_id,
                         from: msg.from,
                         body,
@@ -57,7 +59,7 @@ impl Message {
                         is_delivered: false,
                         reactions: vec![],
                     };
-                    messages_map.insert(msg.id, Some(message));
+                    messages_map.insert(msg.id.id().clone(), Some(message));
                 }
                 _ => modifiers.push(msg),
             }
@@ -225,7 +227,7 @@ mod tests {
         assert_eq!(
             reduced_message,
             Message {
-                id: "1".into(),
+                id: Some("1".into()),
                 stanza_id: None,
                 from: BareJid::from_str("b@prose.org").unwrap(),
                 body: "Hello World".to_string(),

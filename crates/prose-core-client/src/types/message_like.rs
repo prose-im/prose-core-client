@@ -7,6 +7,8 @@ use anyhow::Result;
 use chrono::{DateTime, FixedOffset};
 use jid::BareJid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
+use xmpp_parsers::Element;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
@@ -19,7 +21,7 @@ use crate::types::error::StanzaParseError;
 /// handled differently.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MessageLike {
-    pub id: message::Id,
+    pub id: MessageLikeId,
     pub stanza_id: Option<stanza_id::Id>,
     pub target: Option<message::Id>,
     pub to: BareJid,
@@ -27,6 +29,50 @@ pub struct MessageLike {
     pub timestamp: DateTime<FixedOffset>,
     pub payload: Payload,
     pub is_first_message: bool,
+}
+
+/// A ID that can act as a placeholder in the rare cases when a message doesn't have an ID. Since
+/// our DataCache backends require some ID for each message we simply generate one.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct MessageLikeId(message::Id);
+
+impl MessageLikeId {
+    pub fn new(id: Option<message::Id>) -> Self {
+        if let Some(id) = id {
+            return MessageLikeId(id);
+        }
+        return MessageLikeId(format!("!!{}", Uuid::new_v4().to_string()).into());
+    }
+
+    /// Returns either the original message ID or the generated one.
+    pub fn id(&self) -> &message::Id {
+        &self.0
+    }
+
+    /// Returns the original message ID or None if we contain a generated ID.
+    pub fn into_original_id(self) -> Option<message::Id> {
+        if self.0.as_ref().starts_with("!!") {
+            return None;
+        }
+        return Some(self.0);
+    }
+}
+
+impl std::str::FromStr for MessageLikeId {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(MessageLikeId(s.to_string().into()))
+    }
+}
+
+impl<T> From<T> for MessageLikeId
+where
+    T: Into<String>,
+{
+    fn from(s: T) -> MessageLikeId {
+        MessageLikeId(message::Id::from(s.into()))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -80,10 +126,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
     fn try_from(envelope: TimestampedMessage<Message>) -> Result<Self> {
         let msg = envelope.message;
 
-        let id = msg
-            .id
-            .as_ref()
-            .ok_or(StanzaParseError::missing_attribute("id"))?;
+        let id = MessageLikeId::new(msg.id.clone());
         let stanza_id = &msg.stanza_id;
         let from = msg
             .from
@@ -104,7 +147,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
         } = TargetedPayload::try_from(&msg)?;
 
         Ok(MessageLike {
-            id: id.clone(),
+            id,
             stanza_id: stanza_id.as_ref().map(|s| s.id.clone()),
             target: refs,
             to: to.to_bare(),
@@ -144,9 +187,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             payload,
         } = TargetedPayload::try_from(&message)?;
 
-        let id = message
-            .id
-            .ok_or(StanzaParseError::missing_attribute("id"))?;
+        let id = MessageLikeId::new(message.id);
         let to = message
             .to
             .ok_or(StanzaParseError::missing_attribute("to"))?;

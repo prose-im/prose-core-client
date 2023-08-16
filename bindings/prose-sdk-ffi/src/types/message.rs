@@ -19,7 +19,7 @@ pub struct Reaction {
 
 #[derive(uniffi::Record)]
 pub struct Message {
-    pub id: MessageId,
+    pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
     pub from: JID,
     pub body: String,

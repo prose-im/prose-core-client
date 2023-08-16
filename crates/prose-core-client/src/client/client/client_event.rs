@@ -169,7 +169,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         } else {
             ClientEvent::MessagesAppended {
                 conversation: conversation.clone(),
-                message_ids: vec![message.id.as_ref().into()],
+                message_ids: vec![message.id.id().as_ref().into()],
             }
         };
         self.send_event(event)
@@ -365,8 +365,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         }
 
-        let chat = self.client.get_mod::<mods::Chat>();
-        chat.mark_message_received(message.id.clone(), message.from)?;
+        if let Some(message_id) = message.id.into_original_id() {
+            let chat = self.client.get_mod::<mods::Chat>();
+            chat.mark_message_received(message_id, message.from)?;
+        }
 
         Ok(())
     }

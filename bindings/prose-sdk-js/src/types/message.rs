@@ -22,13 +22,13 @@ pub struct Reaction {
 #[wasm_bindgen]
 impl Message {
     #[wasm_bindgen(getter)]
-    pub fn id(&self) -> String {
-        self.0.id.to_string()
+    pub fn id(&self) -> Option<String> {
+        self.0.id.as_ref().map(|id| id.to_string())
     }
 
     #[wasm_bindgen(setter)]
-    pub fn set_id(&mut self, id: &str) {
-        self.0.id = id.to_string().into()
+    pub fn set_id(&mut self, id: Option<String>) {
+        self.0.id = id.clone().map(Into::into)
     }
 
     #[wasm_bindgen(getter, js_name = "archiveId")]

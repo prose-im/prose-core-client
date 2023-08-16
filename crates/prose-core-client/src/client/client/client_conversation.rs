@@ -206,7 +206,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .iter()
             .map(|msg| match MessageLike::try_from(msg) {
                 Ok(mut msg) => {
-                    msg.is_first_message = Some(&msg.id) == oldest_message_id.as_ref();
+                    msg.is_first_message = Some(msg.id.id()) == oldest_message_id.as_ref();
                     Ok(msg)
                 }
                 Err(err) => Err(err),
@@ -382,8 +382,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         conversation: &BareJid,
         page: Page<MessageLike>,
     ) -> Result<Page<Message>> {
-        let message_ids = page.items.iter().map(|m| m.id.clone()).collect::<Vec<_>>();
-        let last_message_id = &page.items.last().unwrap().id;
+        let message_ids = page
+            .items
+            .iter()
+            .map(|m| m.id.id().clone())
+            .collect::<Vec<_>>();
+        let last_message_id = page.items.last().unwrap().id.id();
         let modifiers = self
             .inner
             .data_cache

@@ -325,12 +325,12 @@ async fn load_messages(client: &Client) -> Result<()> {
     }
 
     let messages = client.load_latest_messages(&jid, None, true).await?;
-    let mut oldest_message_id: Option<MessageId> = messages.last().map(|msg| msg.id.clone());
+    let mut oldest_message_id: Option<MessageId> = messages.last().and_then(|msg| msg.id.clone());
     print_messages(&messages);
 
     while let Some(message_id) = oldest_message_id {
         let page = client.load_messages_before(&jid, &message_id).await?;
-        oldest_message_id = page.items.last().map(|msg| msg.id.clone());
+        oldest_message_id = page.items.last().and_then(|msg| msg.id.clone());
         print_messages(&page.items);
     }
 

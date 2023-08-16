@@ -15,6 +15,7 @@ use prose_xmpp::stanza::message::stanza_id;
 use crate::data_cache::sqlite::cache::SQLiteCacheError;
 use crate::data_cache::sqlite::{repeat_vars, FromStrSql, SQLiteCache};
 use crate::data_cache::MessageCache;
+use crate::types::message_like::MessageLikeId;
 use crate::types::{MessageLike, Page};
 
 type Result<T, E = SQLiteCacheError> = std::result::Result<T, E>;
@@ -39,7 +40,7 @@ impl MessageCache for SQLiteCache {
       )?;
             for msg in messages {
                 stmt.execute(params![
-                    msg.id.to_string(),
+                    msg.id.id().to_string(),
                     msg.stanza_id.as_ref().map(|id| id.to_string()),
                     msg.target.as_ref().map(|t| t.to_string()),
                     msg.to.to_string(),
@@ -315,7 +316,7 @@ impl TryFrom<&rusqlite::Row<'_>> for MessageLike {
 
     fn try_from(row: &rusqlite::Row<'_>) -> rusqlite::Result<Self> {
         Ok(MessageLike {
-            id: row.get::<_, FromStrSql<message::Id>>(0)?.0,
+            id: row.get::<_, FromStrSql<MessageLikeId>>(0)?.0,
             stanza_id: row
                 .get::<_, Option<FromStrSql<stanza_id::Id>>>(1)?
                 .map(|val| val.0),
