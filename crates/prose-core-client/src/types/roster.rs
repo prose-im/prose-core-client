@@ -18,7 +18,7 @@ pub enum Subscription {
     Remove,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Display, EnumString)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize, Display, EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub enum Group {
     Favorite,
@@ -37,6 +37,12 @@ pub struct Item {
 
 impl From<(&BareJid, roster::Item)> for Item {
     fn from(value: (&BareJid, roster::Item)) -> Self {
+        let default_group = if value.1.jid.domain() == value.0.domain() {
+            Group::Team
+        } else {
+            Group::Other
+        };
+
         let group = value
             .1
             .groups
@@ -45,12 +51,9 @@ impl From<(&BareJid, roster::Item)> for Item {
                 if group.0 == Group::Favorite.to_string() {
                     return Group::Favorite;
                 }
-                if value.1.jid.domain() == value.0.domain() {
-                    return Group::Team;
-                }
-                Group::Other
+                default_group
             })
-            .unwrap_or(Group::Other);
+            .unwrap_or(default_group);
 
         Item {
             jid: value.1.jid,
