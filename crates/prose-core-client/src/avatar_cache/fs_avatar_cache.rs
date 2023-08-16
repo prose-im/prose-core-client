@@ -18,7 +18,7 @@ use prose_xmpp::stanza::avatar;
 use crate::avatar_cache::{AvatarCache, MAX_IMAGE_DIMENSIONS};
 use crate::types::AvatarMetadata;
 
-pub const IMAGE_OUTPUT_FORMAT: ImageOutputFormat = ImageOutputFormat::Jpeg(80);
+pub const IMAGE_OUTPUT_FORMAT: ImageOutputFormat = ImageOutputFormat::Jpeg(94);
 pub const IMAGE_OUTPUT_MIME_TYPE: &str = "image/jpeg";
 
 pub struct FsAvatarCache {

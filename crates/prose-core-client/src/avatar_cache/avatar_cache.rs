@@ -14,7 +14,7 @@ use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::types::AvatarMetadata;
 
-pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (600, 600);
+pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (400, 400);
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send), auto_impl(Rc))]
 #[async_trait]
