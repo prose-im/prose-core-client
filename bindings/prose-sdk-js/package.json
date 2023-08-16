@@ -1,31 +1,4 @@
 {
-  "name": "@prose-im/prose-sdk-js",
-  "description": "Prose JavaScript SDK",
-  "version": "0.0.0",
-  "homepage": "https://github.com/prose-im/prose-core-client/tree/master/bindings/prose-sdk-js",
-  "license": "MPL-2.0",
-  "engines": {
-    "node": ">= 20",
-    "npm": ">= 9"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/prose-im/prose-core-client.git"
-  },
-  "bugs": {
-    "url": "https://github.com/prose-im/prose-core-client/issues"
-  },
-  "licenses": [
-    {
-      "type": "MPL-2.0",
-      "url": "https://github.com/prose-im/prose-core-client/blob/master/LICENSE.md"
-    }
-  ],
-  "author": {
-    "name": "Prose Messaging",
-    "email": "contact@prose.org",
-    "url": "https://prose.org/"
-  },
   "dependencies": {
     "strophe.js": "1.6.x"
   },

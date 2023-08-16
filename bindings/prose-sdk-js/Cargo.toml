@@ -1,7 +1,13 @@
 [package]
 name = "prose-sdk-js"
 version = "0.1.18"
+description = "Prose JavaScript SDK"
+readme = "README.md"
+license = "MPL-2.0"
 edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client/tree/master/bindings/prose-sdk-js"
+repository = "https://github.com/prose-im/prose-core-client.git"
+authors = ["Prose Foundation <dev@prose.org>"]
 rust-version.workspace = true
 
 [lib]
