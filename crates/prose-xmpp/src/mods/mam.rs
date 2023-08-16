@@ -39,8 +39,12 @@ impl MAM {
         let query_id = mam::QueryId(self.ctx.generate_id());
         let id = self.ctx.generate_id();
 
-        let before = before.into();
-        let after = after.into();
+        let mut before = before.into().map(ToString::to_string);
+        let after = after.into().map(ToString::to_string);
+
+        if before.is_none() && after.is_none() {
+            before = Some("".to_string())
+        }
 
         let iq = Iq::from_set(
             id.clone(),
@@ -54,8 +58,8 @@ impl MAM {
                 )),
                 set: Some(SetQuery {
                     max: max_count.into(),
-                    after: after.map(|id| id.to_string()),
-                    before: before.map(|id| id.to_string()),
+                    after,
+                    before,
                     index: None,
                 }),
             },
