@@ -227,9 +227,20 @@ impl TryFrom<&Message> for TargetedPayload {
             });
         }
 
-        Err(anyhow::format_err!(
-            "Failed to interpret message {:?}",
-            message
-        ))
+        let fallback = TargetedPayload {
+            target: None,
+            payload: Payload::Message {
+                body: format!(
+                    "Failed to interpret message {}",
+                    String::from(&Element::from(message.clone()))
+                ),
+            },
+        };
+        Ok(fallback)
+
+        // Err(anyhow::format_err!(
+        //     "Failed to interpret message {:?}",
+        //     message
+        // ))
     }
 }
