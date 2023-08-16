@@ -100,7 +100,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
     pub fn build(self) -> Client<D, A> {
         let caps = Capabilities::new(
             self.software_version.name.clone(),
-            "https://www.prose.org",
+            "https://prose.org",
             vec![
                 Feature::new(ns::AVATAR_DATA, false),
                 Feature::new(ns::AVATAR_METADATA, false),
