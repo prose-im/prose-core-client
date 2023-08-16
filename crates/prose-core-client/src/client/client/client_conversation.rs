@@ -30,107 +30,24 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         since: impl Into<Option<&MessageId>> + Debug,
         load_from_server: bool,
     ) -> Result<Vec<Message>> {
-        // TODO: See comment below
-        // It's possible that newly loaded messages affect already visible ones in the client. In
-        // this case we'll need to generate the appropriate `ClientEvent`s.
+        debug!("Loading messages from server…");
 
-        // TODO: See comment below
-        // It might also be possible that we do not receive the absolute last message from the
-        // server if more than MESSAGE_PAGE_SIZE messages were sent since the last message we've
-        // seen. In that case we need to compare the fin element's last id with the stanza id of
-        // the last message to see if we've received it. Otherwise we'll need
+        let mam = self.client.get_mod::<MAM>();
+        let result = mam
+            .load_messages_in_chat(from, None, None, Some(MESSAGE_PAGE_SIZE as usize))
+            .await?;
 
-        let since: Option<message::Id> = since.into().map(|id| id.as_ref().into());
+        let messages = result
+            .0
+            .iter()
+            .map(|msg| MessageLike::try_from(msg))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let mut messages = if let Some(since) = &since {
-            debug!(
-                "Loading messages in conversation {} after {} from local cache…",
-                from, since
-            );
-            self.inner
-                .data_cache
-                .load_messages_after(from, since, Some(MESSAGE_PAGE_SIZE))
-                .await?
-        } else {
-            debug!(
-                "Loading last page of messages in conversation {} from local cache…",
-                from
-            );
-            self.inner
-                .data_cache
-                .load_messages_before(from, None, MESSAGE_PAGE_SIZE)
-                .await?
-                .map(|page| page.items)
-                .unwrap_or_else(|| vec![])
-        };
-
-        debug!("Found {} messages in local cache.", messages.len());
-
-        // We take either the stanza_id of the last cached message or the first stanza_id that is
-        // followed by a local message for which we don't know the stanza_id yet. This way we're
-        // syncing up with the server.
-        let stanza_id = 'outer: loop {
-            for (l, r) in messages.iter().zip(messages.iter().skip(1)) {
-                if let (Some(l), None) = (&l.stanza_id, &r.stanza_id) {
-                    break 'outer Some(l);
-                }
-            }
-            break messages.last().and_then(|m| m.stanza_id.as_ref());
-        };
-
-        if load_from_server {
-            debug!("Loading messages from server since {:?}…", stanza_id);
-
-            let mam = self.client.get_mod::<MAM>();
-            let result = mam
-                .load_messages_in_chat(from, None, stanza_id, Some(MESSAGE_PAGE_SIZE as usize))
-                .await?;
-
-            let mut remote_messages = result
-                .0
-                .iter()
-                .map(|msg| MessageLike::try_from(msg))
-                .collect::<Result<Vec<_>, _>>()?;
-
-            debug!("Found {} messages. Saving to cache…", remote_messages.len());
-            self.inner
-                .data_cache
-                .insert_messages(remote_messages.iter())
-                .await?;
-
-            // Remove all messages from the tail of the local messages including the message that
-            // matches the first message returned from the server so that we don't have any
-            // duplicates but the latest remote data in our vec.
-            //
-            // Local Remote
-            //   1
-            //   2
-            //   3     3
-            //   4     4
-            //   5     5
-
-            if let Some(first_remote_message_id) = remote_messages.first().map(|m| &m.id) {
-                let cutoff_idx = messages.iter().rev().enumerate().find_map(|(idx, msg)| {
-                    if &msg.id == first_remote_message_id {
-                        Some(messages.len() - idx - 1)
-                    } else {
-                        None
-                    }
-                });
-
-                if let Some(cutoff_idx) = cutoff_idx {
-                    debug!(
-                        "Truncating local messages to messages before {:?} at index {:?}",
-                        first_remote_message_id, cutoff_idx
-                    );
-                    messages.truncate(cutoff_idx);
-                }
-            }
-
-            messages.append(&mut remote_messages);
-        } else {
-            debug!("Skipping server round trip.")
-        }
+        debug!("Found {} messages. Saving to cache…", messages.len());
+        self.inner
+            .data_cache
+            .insert_messages(messages.iter())
+            .await?;
 
         Ok(Message::reducing_messages(messages))
     }
