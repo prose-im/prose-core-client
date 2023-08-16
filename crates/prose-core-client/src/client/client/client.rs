@@ -64,13 +64,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     ) -> Result<(), ConnectionError> {
         self.client.connect(jid, password).await?;
 
-        let caps = self.client.get_mod::<Caps>();
-        // Send caps before the configured availability since that would otherwise override it
-        caps.publish_capabilities((&self.inner.caps).into())
-            .map_err(|err| ConnectionError::Generic {
-                msg: err.to_string(),
-            })?;
-
         let show: xmpp_parsers::presence::Show =
             availability
                 .try_into()
@@ -80,7 +73,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let status_mod = self.client.get_mod::<Status>();
         status_mod
-            .send_presence(Some(show), None)
+            .send_presence(Some(show), None, Some((&self.inner.caps).into()))
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;

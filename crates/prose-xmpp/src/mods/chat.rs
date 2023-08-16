@@ -42,10 +42,6 @@ impl Module for Chat {
         self.ctx = context
     }
 
-    fn handle_connect(&self) -> Result<()> {
-        self.set_message_carbons_enabled(true)
-    }
-
     fn handle_message_stanza(&self, stanza: &Message) -> Result<()> {
         // Ignore MAM messages.
         if stanza.archived_message.is_some() {

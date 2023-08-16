@@ -1,0 +1,8 @@
+---
+source: crates/prose-core-client/tests/caps_handling.rs
+assertion_line: 48
+expression: "connection.sent_stanza_strings().join(\"\\n\\n\")"
+---
+<presence xmlns='jabber:client'><show>chat</show><c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="sha-1" ver="aHR0cHM6Ly9wcm9zZS5vcmc="/></presence>
+
+<iq xmlns='jabber:client' id="id-1" type="set"><enable xmlns='urn:xmpp:carbons:2'/></iq>
