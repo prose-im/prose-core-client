@@ -53,6 +53,11 @@ pub enum Event {
         from: Jid,
         id: String,
     },
+    /// XEP-0012: Last Activity
+    LastActivityQuery {
+        from: Jid,
+        id: String,
+    },
 }
 
 pub enum AvatarData {
@@ -108,6 +113,15 @@ impl Module for Profile {
             };
             self.ctx
                 .schedule_event(ClientEvent::Profile(Event::SoftwareVersionQuery {
+                    from: from.clone(),
+                    id: stanza.id.clone(),
+                }))
+        } else if payload.is("query", ns::LAST_ACTIVITY) {
+            let Some(from) = &stanza.from else {
+                bail!("Missing 'from' in last activity request.")
+            };
+            self.ctx
+                .schedule_event(ClientEvent::Profile(Event::LastActivityQuery {
                     from: from.clone(),
                     id: stanza.id.clone(),
                 }))
@@ -456,5 +470,20 @@ impl Profile {
     ) -> Result<()> {
         self.ctx
             .send_stanza(Iq::from_result(id.as_ref(), Some(software_version)).with_to(to))
+    }
+
+    /// XEP-0012: Last Activity
+    /// https://xmpp.org/extensions/xep-0012.html
+    pub async fn send_last_activity_response(
+        &self,
+        seconds: u64,
+        status: Option<String>,
+        to: Jid,
+        id: impl AsRef<str>,
+    ) -> Result<()> {
+        self.ctx.send_stanza(
+            Iq::from_result(id.as_ref(), Some(LastActivityResponse { seconds, status }))
+                .with_to(to),
+        )
     }
 }

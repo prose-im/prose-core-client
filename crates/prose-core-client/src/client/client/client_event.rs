@@ -39,6 +39,10 @@ enum Request {
         from: Jid,
         id: String,
     },
+    LastActivity {
+        from: Jid,
+        id: String,
+    },
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
@@ -95,6 +99,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 }
                 profile::Event::SoftwareVersionQuery { from, id } => {
                     self.handle_request(Request::SoftwareVersion { from, id })
+                        .await
+                }
+                profile::Event::LastActivityQuery { from, id } => {
+                    self.handle_request(Request::LastActivity { from, id })
                         .await
                 }
             },
@@ -270,6 +278,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                         from,
                         id,
                     )
+                    .await?
+            }
+            Request::LastActivity { from, id } => {
+                let profile = self.client.get_mod::<mods::Profile>();
+                profile
+                    .send_last_activity_response(0, None, from, id)
                     .await?
             }
         }

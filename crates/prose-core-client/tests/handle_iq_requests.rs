@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 use insta::assert_snapshot;
 use prose_core_client::test::{ClientTestAdditions, ConnectedClient, ConstantTimeProvider};
 use prose_core_client::{jid_str, Client};
+use prose_xmpp::stanza::LastActivityRequest;
 use xmpp_parsers::disco::{DiscoInfoQuery, DiscoInfoResult};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::ping::Ping;
@@ -93,6 +94,25 @@ async fn test_handles_disco_request() -> Result<()> {
 
     let request = DiscoInfoResult::try_from(payload)?;
     assert!(request.features.len() > 0);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_handles_last_activity_request() -> Result<()> {
+    let ConnectedClient { connection, .. } = Client::connected_client().await?;
+
+    connection
+        .receive_stanza(
+            Iq::from_get("req-id", LastActivityRequest).with_from(jid_str!("client@prose.org")),
+        )
+        .await;
+
+    let sent_stanzas = connection.sent_stanza_strings();
+    assert_eq!(sent_stanzas.len(), 1);
+    assert_snapshot!(sent_stanzas[0], @r###"
+        <iq xmlns='jabber:client' id="req-id" to="client@prose.org" type="result"><query xmlns='jabber:iq:last' seconds="0"/></iq>
+    "###);
 
     Ok(())
 }
