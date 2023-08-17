@@ -291,7 +291,6 @@ impl ContactsCache for SQLiteCache {
                 user_activity.status
             FROM roster_item
             LEFT JOIN user_profile ON roster_item.jid = user_profile.jid
-            LEFT JOIN avatar_metadata ON roster_item.jid = avatar_metadata.jid
             LEFT JOIN presence ON roster_item.jid = presence.jid
             LEFT JOIN user_activity ON roster_item.jid = user_activity.jid
             GROUP BY roster_item.jid;
