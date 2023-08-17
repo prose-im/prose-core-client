@@ -33,3 +33,6 @@ pub const USER_ACTIVITY: &str = "http://jabber.org/protocol/activity";
 
 /// XEP-0012: Last Activity
 pub const LAST_ACTIVITY: &str = "jabber:iq:last";
+
+/// XEP-0444: Message Reactions
+pub const REACTIONS: &str = "urn:xmpp:reactions:0";
