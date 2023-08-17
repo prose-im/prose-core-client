@@ -91,14 +91,12 @@ async fn test_presence() -> Result<()> {
                 name: Some("User A".to_string()),
                 subscription: Subscription::Both,
                 group: Group::Other,
-                is_me: true,
             },
             roster::Item {
                 jid: jid_b.clone(),
                 name: None,
                 subscription: Subscription::Both,
                 group: Group::Favorite,
-                is_me: false,
             },
         ])
         .await?;
@@ -136,7 +134,6 @@ async fn test_presence() -> Result<()> {
                 availability: Availability::Unavailable,
                 activity: None,
                 group: Group::Other,
-                is_me: true
             },
             Contact {
                 jid: jid_b.clone(),
@@ -147,7 +144,6 @@ async fn test_presence() -> Result<()> {
                     status: Some("Baking cake".to_string()),
                 }),
                 group: Group::Favorite,
-                is_me: false
             }
         ]
     );
@@ -174,7 +170,6 @@ async fn test_presence() -> Result<()> {
                 availability: Availability::DoNotDisturb,
                 activity: None,
                 group: Group::Other,
-                is_me: true
             },
             Contact {
                 jid: jid_b.clone(),
@@ -182,7 +177,6 @@ async fn test_presence() -> Result<()> {
                 availability: Availability::Available,
                 activity: None,
                 group: Group::Favorite,
-                is_me: false
             }
         ]
     );
@@ -210,7 +204,6 @@ async fn test_presence() -> Result<()> {
                 availability: Availability::Available,
                 activity: None,
                 group: Group::Other,
-                is_me: true
             },
             Contact {
                 jid: jid_b.clone(),
@@ -218,7 +211,6 @@ async fn test_presence() -> Result<()> {
                 availability: Availability::Available,
                 activity: None,
                 group: Group::Favorite,
-                is_me: false
             }
         ]
     );

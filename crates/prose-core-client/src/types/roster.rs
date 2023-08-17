@@ -32,7 +32,6 @@ pub struct Item {
     pub name: Option<String>,
     pub subscription: Subscription,
     pub group: Group,
-    pub is_me: bool,
 }
 
 impl From<(&BareJid, roster::Item)> for Item {
@@ -58,7 +57,6 @@ impl From<(&BareJid, roster::Item)> for Item {
             name: value.1.name,
             subscription: value.1.subscription.into(),
             group,
-            is_me: false,
         }
     }
 }

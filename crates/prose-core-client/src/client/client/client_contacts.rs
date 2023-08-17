@@ -15,7 +15,6 @@ use prose_xmpp::{mods, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::{ContactsCache, DataCache};
-use crate::types::roster::{Group, Subscription};
 use crate::types::{roster, user_metadata, Contact, UserMetadata, UserProfile};
 use crate::CachePolicy;
 
@@ -100,22 +99,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
             let connected_jid = self.connected_jid()?.to_bare();
             let roster = self.client.get_mod::<Roster>();
-            let mut roster_items = roster
+            let roster_items = roster
                 .load_roster()
                 .await?
                 .items
                 .into_iter()
                 .map(|item| roster::Item::from((&connected_jid, item)))
                 .collect::<Vec<roster::Item>>();
-
-            // Add an item for our current user
-            roster_items.push(roster::Item {
-                jid: connected_jid.clone(),
-                name: None,
-                subscription: Subscription::Both,
-                group: Group::Team,
-                is_me: true,
-            });
 
             self.inner
                 .data_cache

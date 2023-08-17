@@ -16,7 +16,6 @@ pub struct Contact {
     pub availability: Availability,
     pub activity: Option<UserActivity>,
     pub group: roster::Group,
-    pub is_me: bool,
 }
 
 impl
@@ -53,7 +52,6 @@ impl
             availability: value.2.unwrap_or(Availability::Unavailable),
             activity: value.3,
             group: value.0.group,
-            is_me: value.0.is_me,
         }
     }
 }

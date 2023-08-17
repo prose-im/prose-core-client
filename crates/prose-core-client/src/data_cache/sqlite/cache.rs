@@ -109,7 +109,7 @@ impl AccountCache for SQLiteCache {
 
 impl DataCache for SQLiteCache {}
 
-const DATABASE_VERSION: u8 = 8;
+const DATABASE_VERSION: u8 = 7;
 
 impl SQLiteCache {
     fn create_temporary_presence_table(conn: &Connection) -> Result<()> {
@@ -205,13 +205,6 @@ impl SQLiteCache {
                 conn,
                 include_str!("../../../migrations/007_limit_roster_item_to_single_group.sql"),
                 7,
-            )?;
-        }
-        if version < 8 {
-            Self::run_migration(
-                conn,
-                include_str!("../../../migrations/008_add_is_me_to_roster_item.sql"),
-                8,
             )?;
         }
 
