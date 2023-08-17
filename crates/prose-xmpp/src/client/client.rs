@@ -11,7 +11,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use jid::FullJid;
 use minidom::Element;
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::client::builder::ClientBuilder;
 use crate::client::module_context::ModuleContextInner;
@@ -131,8 +131,12 @@ impl ClientInner {
     }
 
     fn handle_stanza(ctx: &ModuleContextInner, mods: &ModuleLookup, stanza: Element) {
-        let Some(elem) = XMPPElement::try_from(stanza).ok() else {
-            return;
+        let elem = match XMPPElement::try_from(stanza) {
+            Ok(elem) => elem,
+            Err(err) => {
+                error!("Failed to parse stanza. {}", err);
+                return;
+            }
         };
 
         let mut wakers = Vec::<Waker>::new();
@@ -156,7 +160,7 @@ impl ClientInner {
 
         for (_, m) in mods.iter() {
             if let Err(err) = m.read().handle_element(&elem) {
-                println!("Encountered error in module {}", err);
+                error!("Encountered error in module {}", err);
             }
         }
 
