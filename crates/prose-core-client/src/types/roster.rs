@@ -47,11 +47,9 @@ impl From<(&BareJid, roster::Item)> for Item {
             .1
             .groups
             .first()
-            .map(|group| {
-                match group.0.as_str() {
-                    "Favorite" => Group::Favorite,
-                    _ => default_group
-                }
+            .map(|group| match group.0.as_str() {
+                "Favorite" => Group::Favorite,
+                _ => default_group,
             })
             .unwrap_or(default_group);
 
