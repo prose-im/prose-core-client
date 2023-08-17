@@ -142,6 +142,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             time_provider: self.time_provider.clone(),
             software_version: self.software_version,
             delegate: self.delegate,
+            presences: Default::default(),
         });
 
         let event_inner = inner.clone();

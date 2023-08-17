@@ -228,13 +228,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         };
 
-        let jid = from.into_bare();
+        let jid = from.to_bare();
 
+        // Update user presences with the received one and retrieve the new highest presence…
+        let highest_presence = self.update_presence(&from, presence.into());
+
+        // …update the cache…
         self.inner
             .data_cache
-            .insert_presence(&jid, &types::Presence::from(presence))
+            .insert_presence(&jid, &highest_presence)
             .await?;
 
+        // …and finally let our delegate know.
         self.send_event(ClientEvent::ContactChanged { jid });
         Ok(())
     }
@@ -387,5 +392,16 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         self.send_event_for_message(&message.to, &message);
 
         Ok(())
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    /// Updates the presences for `from` and returns the new highest presence.
+    fn update_presence(&self, from: &Jid, presence: types::Presence) -> types::Presence {
+        let mut map = self.inner.presences.write();
+        map.update_presence(&from, presence.into());
+        map.get_highest_presence(&from.to_bare())
+            .map(|entry| entry.presence.clone())
+            .unwrap_or(types::Presence::unavailable())
     }
 }

@@ -59,9 +59,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     #[instrument]
-    // TODO: This should require a FullJid so that a UserMetadata can be loaded per resource/entity/session.
     pub async fn load_user_metadata(&self, from: &BareJid) -> Result<UserMetadata> {
         let profile = self.client.get_mod::<Profile>();
+
+        let from = self.inner.resolve_to_full_jid(from);
 
         let entity_time = profile.load_entity_time(from.clone()).await?;
         let last_activity = profile.load_last_activity(from.clone()).await?;

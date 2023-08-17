@@ -18,6 +18,7 @@ base64 = { workspace = true }
 indexmap = "2.0.0"
 jid = { workspace = true, features = ["serde"] }
 once_cell = { workspace = true }
+parking_lot = { workspace = true }
 prose-xmpp = { path = "../prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
 sha1 = { workspace = true }

@@ -398,7 +398,6 @@ impl Profile {
 
     /// XEP-0202: Entity Time
     /// https://xmpp.org/extensions/xep-0202.html
-    /// TODO: This needs a FullJid to work properly.
     pub async fn load_entity_time(&self, from: impl Into<Jid>) -> Result<DateTime<FixedOffset>> {
         let response = self
             .ctx
@@ -414,7 +413,6 @@ impl Profile {
 
     /// XEP-0012: Last Activity
     /// https://xmpp.org/extensions/xep-0012.html
-    /// TODO: This needs a FullJid to work properly.
     pub async fn load_last_activity(&self, from: impl Into<Jid>) -> Result<LastActivityResponse> {
         let response = self
             .ctx
@@ -446,7 +444,6 @@ impl Profile {
 
     /// XEP-0092: Software Version
     /// https://xmpp.org/extensions/xep-0092.html
-    /// TODO: This needs a FullJid to work properly.
     pub async fn load_software_version(&self, from: impl Into<Jid>) -> Result<VersionResult> {
         let response = self
             .ctx

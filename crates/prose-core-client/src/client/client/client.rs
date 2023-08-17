@@ -7,7 +7,8 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use anyhow::Result;
-use jid::FullJid;
+use jid::{BareJid, FullJid, Jid};
+use parking_lot::RwLock;
 use strum_macros::Display;
 use tracing::instrument;
 
@@ -17,7 +18,7 @@ use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
+use crate::types::{AccountSettings, Availability, Capabilities, PresenceMap, SoftwareVersion};
 use crate::ClientDelegate;
 
 #[derive(Debug, thiserror::Error, Display)]
@@ -38,6 +39,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub time_provider: Arc<dyn TimeProvider>,
     pub software_version: SoftwareVersion,
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
+    pub presences: RwLock<PresenceMap>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
@@ -123,5 +125,23 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub async fn query_server_features(&self) -> Result<()> {
         let caps = self.client.get_mod::<Caps>();
         caps.query_server_features().await
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> ClientInner<D, A> {
+    /// Tries to resolve `jid` to a FullJid by appending the available resource with the highest
+    /// priority. If no available resource is found, returns `jid` as a `Jid`.
+    pub(super) fn resolve_to_full_jid(&self, jid: &BareJid) -> Jid {
+        let presences = self.presences.read();
+        let Some(resource) = presences
+            .get_highest_presence(jid)
+            .and_then(|entry| entry.resource.as_deref())
+        else {
+            return Jid::Bare(jid.clone());
+        };
+        return jid
+            .with_resource_str(resource)
+            .map(Jid::Full)
+            .unwrap_or(Jid::Bare(jid.clone()));
     }
 }

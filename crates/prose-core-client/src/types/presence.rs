@@ -5,17 +5,39 @@
 
 use std::str::FromStr;
 
+use crate::types::Availability;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use xmpp_parsers::presence;
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq, Debug)]
 pub struct Presence {
     pub kind: Option<Type>,
     pub show: Option<Show>,
     pub status: Option<String>,
+    pub priority: i8,
 }
 
+impl Presence {
+    pub fn availability(&self) -> Availability {
+        Availability::from((
+            self.kind.as_ref().map(|kind| kind.0.clone()),
+            self.show.as_ref().map(|show| show.0.clone()),
+        ))
+    }
+
+    pub fn unavailable() -> Self {
+        Presence {
+            kind: Some(Type(presence::Type::Unavailable)),
+            show: None,
+            status: None,
+            priority: 0,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
 pub struct Type(pub presence::Type);
+#[derive(Clone, PartialEq, Debug)]
 pub struct Show(pub presence::Show);
 
 impl From<presence::Presence> for Presence {
@@ -28,6 +50,7 @@ impl From<presence::Presence> for Presence {
             },
             show: value.show.map(|v| Show(v)),
             status: value.statuses.first_key_value().map(|v| v.1.clone()),
+            priority: value.priority,
         }
     }
 }
