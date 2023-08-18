@@ -9,7 +9,7 @@ use base64::{engine::general_purpose, Engine as _};
 use sha1::{Digest, Sha1};
 use xmpp_parsers::hashes::{Algo, Hash};
 
-pub type Namespace = String;
+pub type Namespace = &'static str;
 
 #[derive(Clone, Debug)]
 pub struct Capabilities {
@@ -51,28 +51,21 @@ pub struct Identity {
 }
 
 #[derive(Clone, Debug)]
-pub struct Feature {
-    pub var: Namespace,
-    pub notify: bool,
-}
-
-impl Feature {
-    pub fn new(var: impl Into<Namespace>, notify: bool) -> Self {
-        Feature {
-            var: var.into(),
-            notify,
-        }
-    }
+pub enum Feature {
+    Name(Namespace),
+    Notify(Namespace),
 }
 
 impl Display for Feature {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}{}",
-            self.var.to_string(),
-            if self.notify { "+notify" } else { "" },
-        )
+        match self {
+            Self::Name(namespace) => {
+                write!(f, "{}", namespace)
+            }
+            Self::Notify(namespace) => {
+                write!(f, "{}+notify", namespace)
+            }
+        }
     }
 }
 
