@@ -18,7 +18,8 @@ use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::{AccountSettings, Availability, Capabilities, PresenceMap, SoftwareVersion};
+use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
+use crate::util::PresenceMap;
 use crate::ClientDelegate;
 
 #[derive(Debug, thiserror::Error, Display)]

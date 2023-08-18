@@ -5,8 +5,10 @@
 
 use std::ops::Deref;
 
-pub use string_ext::StringExt;
+pub(crate) use presence_map::PresenceMap;
+pub(crate) use string_ext::StringExt;
 
+mod presence_map;
 mod string_ext;
 
 pub fn concatenate_names(
