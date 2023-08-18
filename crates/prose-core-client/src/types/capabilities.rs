@@ -5,7 +5,6 @@
 
 use std::fmt::{Display, Formatter};
 
-use base64::{engine::general_purpose, Engine as _};
 use sha1::{Digest, Sha1};
 use xmpp_parsers::hashes::{Algo, Hash};
 
@@ -17,7 +16,6 @@ pub struct Capabilities {
     pub identity: Identity,
     pub features: Vec<Feature>,
     pub ver_string: String,
-    pub ver_hash: String,
 }
 
 impl Capabilities {
@@ -30,19 +28,17 @@ impl Capabilities {
             category: "client".to_string(),
             kind: "pc".to_string(),
             name: client_name.into(),
-            lang: "".to_string(),
+            lang: "en".to_string(),
         };
         let features: Vec<Feature> = features.into_iter().collect();
 
         let ver_string = Capabilities::ver_string(&identity, features.iter());
-        let ver_hash = Capabilities::ver_hash(&ver_string);
 
         Capabilities {
             node: client_website.into(),
             identity,
             features,
             ver_string,
-            ver_hash,
         }
     }
 }
@@ -94,18 +90,12 @@ impl Capabilities {
 
         string
     }
-
-    fn ver_hash(ver_string: &str) -> String {
-        let mut hasher = Sha1::new();
-        hasher.update(ver_string.as_bytes());
-        general_purpose::STANDARD.encode(hasher.finalize())
-    }
 }
 
 impl From<&Capabilities> for xmpp_parsers::disco::DiscoInfoResult {
     fn from(value: &Capabilities) -> Self {
         xmpp_parsers::disco::DiscoInfoResult {
-            node: Some(format!("{}#{}", value.node, value.ver_hash)),
+            node: None,
             identities: vec![(&value.identity).into()],
             features: value.features.iter().map(Into::into).collect(),
             extensions: vec![],
@@ -116,10 +106,10 @@ impl From<&Capabilities> for xmpp_parsers::disco::DiscoInfoResult {
 impl From<&Capabilities> for xmpp_parsers::caps::Caps {
     fn from(value: &Capabilities) -> Self {
         xmpp_parsers::caps::Caps::new(
-            "sha-1",
+            value.node.clone(),
             Hash {
                 algo: Algo::Sha_1,
-                hash: value.node.as_bytes().to_vec(),
+                hash: Sha1::digest(value.ver_string.as_bytes()).to_vec()
             },
         )
     }
@@ -130,7 +120,7 @@ impl From<&Identity> for xmpp_parsers::disco::Identity {
         xmpp_parsers::disco::Identity {
             category: value.category.clone(),
             type_: value.kind.clone(),
-            lang: None,
+            lang: Some(value.lang.clone()),
             name: Some(value.name.clone()),
         }
     }
@@ -151,7 +141,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_ver_hash_exodus() {
+    fn test_ver_string_exodus() {
         let caps = Capabilities::new(
             "Exodus 0.9.1",
             "http://code.google.com/p/exodus",
@@ -163,12 +153,11 @@ mod tests {
             ],
         );
 
-        assert_eq!(caps.ver_string, "client/pc//Exodus 0.9.1<http://jabber.org/protocol/caps<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/disco#items<http://jabber.org/protocol/muc<");
-        assert_eq!(caps.ver_hash, "QgayPKawpkPSDYmwT/WM94uAlu0=");
+        assert_eq!(caps.ver_string, "client/pc/en/Exodus 0.9.1<http://jabber.org/protocol/caps<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/disco#items<http://jabber.org/protocol/muc<");
     }
 
     #[test]
-    fn test_ver_hash_prose() {
+    fn test_ver_string_prose() {
         let caps = Capabilities::new(
             "Prose",
             "https://prose.org",
@@ -206,7 +195,6 @@ mod tests {
             ],
         );
 
-        assert_eq!(caps.ver_string, "client/pc//Prose<http://jabber.org/protocol/activity<http://jabber.org/protocol/activity+notify<http://jabber.org/protocol/caps<http://jabber.org/protocol/chatstates<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/pubsub<http://jabber.org/protocol/pubsub#event<http://jabber.org/protocol/pubsub+notify<http://jabber.org/protocol/rsm<jabber:client<jabber:iq:last<jabber:iq:roster<jabber:iq:version<urn:ietf:params:xml:ns:vcard-4.0<urn:ietf:params:xml:ns:vcard-4.0+notify<urn:xmpp:avatar:data<urn:xmpp:avatar:metadata<urn:xmpp:avatar:metadata+notify<urn:xmpp:chat-markers:0<urn:xmpp:delay<urn:xmpp:fallback:0<urn:xmpp:fasten:0<urn:xmpp:hints<urn:xmpp:mam:2<urn:xmpp:message-correct:0<urn:xmpp:message-retract:0<urn:xmpp:ping<urn:xmpp:reactions:0<urn:xmpp:receipts<urn:xmpp:time<");
-        assert_eq!(caps.ver_hash, "sRBqzSCojJAWaLc+Y9S2On19bjg=");
+        assert_eq!(caps.ver_string, "client/pc/en/Prose<http://jabber.org/protocol/activity<http://jabber.org/protocol/activity+notify<http://jabber.org/protocol/caps<http://jabber.org/protocol/chatstates<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/pubsub<http://jabber.org/protocol/pubsub#event<http://jabber.org/protocol/pubsub+notify<http://jabber.org/protocol/rsm<jabber:client<jabber:iq:last<jabber:iq:roster<jabber:iq:version<urn:ietf:params:xml:ns:vcard-4.0<urn:ietf:params:xml:ns:vcard-4.0+notify<urn:xmpp:avatar:data<urn:xmpp:avatar:metadata<urn:xmpp:avatar:metadata+notify<urn:xmpp:chat-markers:0<urn:xmpp:delay<urn:xmpp:fallback:0<urn:xmpp:fasten:0<urn:xmpp:hints<urn:xmpp:mam:2<urn:xmpp:message-correct:0<urn:xmpp:message-retract:0<urn:xmpp:ping<urn:xmpp:reactions:0<urn:xmpp:receipts<urn:xmpp:time<");
     }
 }
