@@ -111,6 +111,7 @@ async fn test_presence() -> Result<()> {
                 kind: None,
                 show: None,
                 status: Some("Should be ignored".to_string()),
+                priority: 0,
             },
         )
         .await?;
@@ -155,6 +156,7 @@ async fn test_presence() -> Result<()> {
                 kind: None,
                 show: Some(presence::Show(Show::Dnd)),
                 status: None,
+                priority: 0,
             },
         )
         .await?;
