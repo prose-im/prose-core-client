@@ -151,10 +151,10 @@ mod tests {
             "Exodus 0.9.1",
             "",
             vec![
-                Feature::new(ns::MUC, false),
-                Feature::new(ns::CAPS, false),
-                Feature::new(ns::DISCO_ITEMS, false),
-                Feature::new(ns::DISCO_INFO, false),
+                Feature::Name(ns::MUC),
+                Feature::Name(ns::CAPS),
+                Feature::Name(ns::DISCO_ITEMS),
+                Feature::Name(ns::DISCO_INFO),
             ],
         );
 
