@@ -71,10 +71,7 @@ impl Display for Feature {
 }
 
 impl Capabilities {
-    fn ver_string<'a>(
-        identity: &Identity,
-        features: impl Iterator<Item = &'a Feature>,
-    ) -> String {
+    fn ver_string<'a>(identity: &Identity, features: impl Iterator<Item = &'a Feature>) -> String {
         let mut string = format!(
             "{}/{}/{}/{}<",
             identity.category, identity.kind, identity.lang, identity.name
@@ -109,7 +106,7 @@ impl From<&Capabilities> for xmpp_parsers::caps::Caps {
             value.node.clone(),
             Hash {
                 algo: Algo::Sha_1,
-                hash: Sha1::digest(value.ver_string.as_bytes()).to_vec()
+                hash: Sha1::digest(value.ver_string.as_bytes()).to_vec(),
             },
         )
     }
