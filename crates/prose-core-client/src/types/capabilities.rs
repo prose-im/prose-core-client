@@ -30,7 +30,7 @@ impl Capabilities {
             category: "client".to_string(),
             kind: "pc".to_string(),
             name: client_name.into(),
-            lang: "en".to_string(),
+            lang: "".to_string(),
         };
         let features: Vec<Feature> = features.into_iter().collect();
 
@@ -163,8 +163,8 @@ mod tests {
             ],
         );
 
-        assert_eq!(caps.ver_string, "client/pc/en/Exodus 0.9.1<http://jabber.org/protocol/caps<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/disco#items<http://jabber.org/protocol/muc<");
-        assert_eq!(caps.ver_hash, "P0yYsh3UL9xwD/EPgkK6u5Fsa5A=");
+        assert_eq!(caps.ver_string, "client/pc//Exodus 0.9.1<http://jabber.org/protocol/caps<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/disco#items<http://jabber.org/protocol/muc<");
+        assert_eq!(caps.ver_hash, "QgayPKawpkPSDYmwT/WM94uAlu0=");
     }
 
     #[test]
@@ -206,7 +206,7 @@ mod tests {
             ],
         );
 
-        assert_eq!(caps.ver_string, "client/pc/en/Prose<http://jabber.org/protocol/activity<http://jabber.org/protocol/activity+notify<http://jabber.org/protocol/caps<http://jabber.org/protocol/chatstates<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/pubsub<http://jabber.org/protocol/pubsub#event<http://jabber.org/protocol/pubsub+notify<http://jabber.org/protocol/rsm<jabber:client<jabber:iq:last<jabber:iq:roster<jabber:iq:version<urn:ietf:params:xml:ns:vcard-4.0<urn:ietf:params:xml:ns:vcard-4.0+notify<urn:xmpp:avatar:data<urn:xmpp:avatar:metadata<urn:xmpp:avatar:metadata+notify<urn:xmpp:chat-markers:0<urn:xmpp:delay<urn:xmpp:fallback:0<urn:xmpp:fasten:0<urn:xmpp:hints<urn:xmpp:mam:2<urn:xmpp:message-correct:0<urn:xmpp:message-retract:0<urn:xmpp:ping<urn:xmpp:reactions:0<urn:xmpp:receipts<urn:xmpp:time<");
-        assert_eq!(caps.ver_hash, "Oslk/IqOlraX9ZosbeRbqA0IegA=");
+        assert_eq!(caps.ver_string, "client/pc//Prose<http://jabber.org/protocol/activity<http://jabber.org/protocol/activity+notify<http://jabber.org/protocol/caps<http://jabber.org/protocol/chatstates<http://jabber.org/protocol/disco#info<http://jabber.org/protocol/pubsub<http://jabber.org/protocol/pubsub#event<http://jabber.org/protocol/pubsub+notify<http://jabber.org/protocol/rsm<jabber:client<jabber:iq:last<jabber:iq:roster<jabber:iq:version<urn:ietf:params:xml:ns:vcard-4.0<urn:ietf:params:xml:ns:vcard-4.0+notify<urn:xmpp:avatar:data<urn:xmpp:avatar:metadata<urn:xmpp:avatar:metadata+notify<urn:xmpp:chat-markers:0<urn:xmpp:delay<urn:xmpp:fallback:0<urn:xmpp:fasten:0<urn:xmpp:hints<urn:xmpp:mam:2<urn:xmpp:message-correct:0<urn:xmpp:message-retract:0<urn:xmpp:ping<urn:xmpp:reactions:0<urn:xmpp:receipts<urn:xmpp:time<");
+        assert_eq!(caps.ver_hash, "sRBqzSCojJAWaLc+Y9S2On19bjg=");
     }
 }
