@@ -11,6 +11,7 @@ use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::Presence;
 use xmpp_parsers::pubsub::PubSubEvent;
 
+pub use bookmark::Bookmark;
 pub use caps::Caps;
 pub use chat::Chat;
 pub use mam::MAM;
@@ -23,6 +24,7 @@ use crate::client::ModuleContext;
 use crate::stanza::{Message, PubSubMessage};
 use crate::util::{SendUnlessWasm, SyncUnlessWasm, XMPPElement};
 
+pub mod bookmark;
 pub mod caps;
 pub mod chat;
 pub mod mam;

@@ -8,6 +8,7 @@ use std::pin::Pin;
 
 pub use element_ext::ElementExt;
 pub(crate) use module_future_state::{ModuleFuturePoll, ModuleFutureState};
+pub use publish_options_ext::PublishOptionsExt;
 pub use request_error::RequestError;
 pub(crate) use request_future::{ElementReducerPoll, RequestFuture};
 pub use xmpp_element::XMPPElement;
@@ -15,6 +16,7 @@ pub use xmpp_element::XMPPElement;
 mod element_ext;
 pub(crate) mod id_string_macro;
 mod module_future_state;
+mod publish_options_ext;
 mod request_error;
 mod request_future;
 mod xmpp_element;

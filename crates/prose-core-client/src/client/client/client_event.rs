@@ -10,7 +10,7 @@ use tracing::{debug, error};
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::mods::{caps, chat, ping, profile, status};
+use prose_xmpp::mods::{bookmark, caps, chat, ping, profile, status};
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{client, mods, Event, TimeProvider};
@@ -113,6 +113,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                     from,
                     user_activity,
                 } => self.user_activity_did_change(from, user_activity).await,
+            },
+
+            Event::Bookmark(event) => match event {
+                bookmark::Event::BookmarksPublished { bookmarks } => {
+                    println!("published {:?}", bookmarks);
+                    Ok(())
+                }
+                bookmark::Event::BookmarksRetracted { jids } => {
+                    println!("retracted {:?}", jids);
+                    Ok(())
+                }
             },
         };
 
