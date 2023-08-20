@@ -132,6 +132,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
                 Feature::Notify(ns::USER_ACTIVITY),
                 Feature::Notify(ns::AVATAR_METADATA),
                 Feature::Notify(ns::VCARD4),
+                Feature::Notify(ns::BOOKMARKS2),
             ],
         );
 
