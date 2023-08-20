@@ -40,6 +40,9 @@ jobs:
             target
           key: test-${{ runner.os }}-cargo-${{ matrix.rust-toolchain }}
 
+      - name: Check code style
+        run: cargo fmt -- --check
+
       - name: Build crates
         run: cargo build
 
@@ -60,6 +63,3 @@ jobs:
 
       - name: Run Wasm integration tests
         run: cargo xtask ci wasm
-
-      - name: Check code style
-        run: cargo fmt -- --check
