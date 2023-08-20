@@ -33,7 +33,7 @@ pub type ConnectorProvider = Box<dyn Fn() -> Box<dyn Connector>>;
 #[cfg(not(target_arch = "wasm32"))]
 pub type ConnectorProvider = Box<dyn Fn() -> Box<dyn Connector> + Send + Sync>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Connected,
     Disconnected { error: Option<ConnectionError> },

@@ -23,7 +23,7 @@ pub struct Ping {
     ctx: ModuleContext,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Ping { from: Jid, id: String },
 }

@@ -32,6 +32,30 @@ pub enum Event {
     },
 }
 
+impl PartialEq for Event {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Event::DiscoInfoQuery {
+                    from: f1,
+                    id: i1,
+                    node: n1,
+                },
+                Event::DiscoInfoQuery {
+                    from: f2,
+                    id: i2,
+                    node: n2,
+                },
+            ) => f1 == f2 && i1 == i2 && n1 == n2,
+            (Event::Caps { from: f1, caps: c1 }, Event::Caps { from: f2, caps: c2 }) => {
+                f1 == f2 && c1.ext == c2.ext && c1.node == c2.node && c1.hash == c2.hash
+            }
+            (Event::DiscoInfoQuery { .. }, _) => false,
+            (Event::Caps { .. }, _) => false,
+        }
+    }
+}
+
 impl Module for Caps {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context

@@ -19,7 +19,7 @@ use crate::stanza::message::{
     ChatState, Emoji, Fallback, Forwarded, Message, MessageType, Reactions,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Carbon {
     Received(Forwarded),
     Sent(Forwarded),
@@ -30,7 +30,7 @@ pub struct Chat {
     ctx: ModuleContext,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Message(Message),
     Carbon(Carbon),

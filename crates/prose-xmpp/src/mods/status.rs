@@ -19,7 +19,7 @@ pub struct Status {
     ctx: ModuleContext,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Presence(Presence),
     UserActivity {

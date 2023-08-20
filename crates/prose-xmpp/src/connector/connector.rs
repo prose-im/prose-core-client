@@ -11,7 +11,7 @@ use minidom::Element;
 
 use crate::util::PinnedFuture;
 
-#[derive(Debug, thiserror::Error, Clone)]
+#[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum ConnectionError {
     #[error("Timed out")]
     TimedOut,

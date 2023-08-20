@@ -33,7 +33,7 @@ pub struct Profile {
     ctx: ModuleContext,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Vcard {
         from: Jid,
