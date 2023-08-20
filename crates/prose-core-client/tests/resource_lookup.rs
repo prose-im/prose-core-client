@@ -6,7 +6,8 @@
 use anyhow::Result;
 use insta::assert_snapshot;
 use prose_core_client::test::{ClientTestAdditions, ConnectedClient};
-use prose_core_client::{jid_str, Client};
+use prose_core_client::Client;
+use prose_xmpp::jid_str;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::Presence;
 use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};

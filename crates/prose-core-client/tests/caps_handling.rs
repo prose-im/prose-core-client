@@ -8,11 +8,10 @@ use insta::assert_snapshot;
 use jid::{BareJid, FullJid};
 use prose_core_client::avatar_cache::NoopAvatarCache;
 use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::test::{
-    BareJidTestAdditions, ClientTestAdditions, ConnectedClient, IncrementingIDProvider,
-};
+use prose_core_client::test::{ClientTestAdditions, ConnectedClient};
 use prose_core_client::types::{Availability, SoftwareVersion};
 use prose_core_client::{Client, ClientBuilder};
+use prose_xmpp::test::{BareJidTestAdditions, IncrementingIDProvider};
 use prose_xmpp::{test, SystemTimeProvider};
 use std::str::FromStr;
 use std::sync::Arc;

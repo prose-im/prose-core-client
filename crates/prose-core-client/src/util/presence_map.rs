@@ -74,8 +74,8 @@ pub struct PresenceEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jid_str;
     use crate::types::presence;
+    use prose_xmpp::jid_str;
 
     #[test]
     fn test_update_with_eq_priority() {

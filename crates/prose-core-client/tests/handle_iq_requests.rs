@@ -6,7 +6,8 @@
 use anyhow::{bail, Result};
 use insta::assert_snapshot;
 use prose_core_client::test::{ClientTestAdditions, ConnectedClient, ConstantTimeProvider};
-use prose_core_client::{jid_str, Client};
+use prose_core_client::Client;
+use prose_xmpp::jid_str;
 use prose_xmpp::stanza::LastActivityRequest;
 use xmpp_parsers::disco::{DiscoInfoQuery, DiscoInfoResult};
 use xmpp_parsers::iq::{Iq, IqType};

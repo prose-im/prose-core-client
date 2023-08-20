@@ -6,13 +6,13 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, FixedOffset, TimeZone, Utc};
-use jid::{BareJid, DomainPart, FullJid, NodePart};
+use jid::{BareJid, FullJid};
 use std::str::FromStr;
 use std::sync::Arc;
 
 pub use constant_time_provider::ConstantTimeProvider;
-pub use incrementing_id_provider::IncrementingIDProvider;
 pub use message_builder::MessageBuilder;
+use prose_xmpp::test::{BareJidTestAdditions, IncrementingIDProvider};
 use prose_xmpp::{test, IDProvider, SystemTimeProvider, TimeProvider};
 
 use crate::types::{Availability, SoftwareVersion};
@@ -21,24 +21,11 @@ use crate::{
 };
 
 mod constant_time_provider;
-mod incrementing_id_provider;
 mod message_builder;
-
-pub trait BareJidTestAdditions {
-    fn ours() -> BareJid;
-    fn theirs() -> BareJid;
-}
 
 pub trait DateTimeTestAdditions {
     fn test_timestamp() -> DateTime<FixedOffset>;
     fn test_timestamp_adding(seconds: u32) -> DateTime<FixedOffset>;
-}
-
-#[macro_export]
-macro_rules! jid_str {
-    ($jid:expr) => {
-        $jid.parse::<jid::Jid>().unwrap()
-    };
 }
 
 #[async_trait(?Send)]
@@ -47,22 +34,6 @@ pub trait ClientTestAdditions {
     async fn connected_client_with_time_provider<T: TimeProvider + 'static>(
         time_provider: T,
     ) -> Result<ConnectedClient>;
-}
-
-impl BareJidTestAdditions for BareJid {
-    fn ours() -> BareJid {
-        BareJid::from_parts(
-            Some(&NodePart::new("test").unwrap()),
-            &DomainPart::new("prose.org").unwrap(),
-        )
-    }
-
-    fn theirs() -> BareJid {
-        BareJid::from_parts(
-            Some(&NodePart::new("friend").unwrap()),
-            &DomainPart::new("prose.org").unwrap(),
-        )
-    }
 }
 
 impl DateTimeTestAdditions for Utc {
