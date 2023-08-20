@@ -18,6 +18,7 @@ anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
+insta = { version = "1.3", features = ["json"], optional = true }
 jid = { workspace = true }
 minidom = { workspace = true }
 parking_lot = { workspace = true }
@@ -43,4 +44,4 @@ uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics"] }
 
 [features]
 default = []
-test = []
+test = ["dep:insta"]
