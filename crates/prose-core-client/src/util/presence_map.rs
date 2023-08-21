@@ -41,7 +41,7 @@ impl PresenceMap {
             }
             Jid::Full(jid) => {
                 if let Some(entries) = self.map.get_mut(&jid.to_bare()) {
-                    entries.retain(|p| p.resource.as_deref() != Some(jid.resource()))
+                    entries.retain(|p| p.resource.as_deref() != Some(jid.resource_str()))
                 }
             }
         }

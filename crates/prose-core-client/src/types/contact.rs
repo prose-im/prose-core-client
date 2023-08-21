@@ -42,7 +42,7 @@ impl
             .or(value
                 .0
                 .jid
-                .node()
+                .node_str()
                 .map(|node| node.to_uppercase_first_letter()))
             .unwrap_or(value.0.jid.to_string().to_uppercase_first_letter());
 
