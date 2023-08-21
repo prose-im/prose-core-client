@@ -3,45 +3,37 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use core::fmt::{Debug, Display, Formatter};
 use core::str::FromStr;
-use jid::{DomainPart, NodePart};
 
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "JID")]
-pub struct BareJid {
-    #[wasm_bindgen(skip)]
-    pub node: Option<String>,
-
-    #[wasm_bindgen(skip)]
-    pub domain: String,
-}
+pub struct BareJid(jid::BareJid);
 
 #[wasm_bindgen(js_class = "JID")]
 impl BareJid {
     #[wasm_bindgen(constructor)]
     pub fn new(str: &str) -> Result<BareJid, JsError> {
-        let bare_jid = jid::BareJid::from_str(str)?;
-        Ok(bare_jid.into())
+        Ok(Self(jid::BareJid::from_str(str)?))
     }
 
     /// The node part of the Jabber ID, if it exists, else None.
     #[wasm_bindgen(getter)]
     pub fn node(&self) -> Option<String> {
-        self.node.clone()
+        self.0.node_str().map(ToString::to_string)
     }
 
     /// The domain of the Jabber ID.
     #[wasm_bindgen(getter)]
     pub fn domain(&self) -> String {
-        self.domain.clone()
+        self.0.domain_str().to_string()
     }
 
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
-        let jid: jid::BareJid = self.clone().into();
-        jid.to_string()
+        self.0.to_string()
     }
 
     pub fn equals(&self, other: &BareJid) -> bool {
@@ -49,23 +41,44 @@ impl BareJid {
     }
 }
 
+impl BareJid {
+    pub fn to_full_jid_with_resource(&self, resource: &jid::ResourcePart) -> jid::FullJid {
+        jid::FullJid::from_parts(self.0.node().as_ref(), &self.0.domain(), resource)
+    }
+}
+
 impl From<jid::BareJid> for BareJid {
     fn from(value: jid::BareJid) -> Self {
-        BareJid {
-            node: value.node().map(|s| s.to_string()),
-            domain: value.domain().to_string(),
-        }
+        Self(value)
+    }
+}
+
+impl From<&BareJid> for jid::BareJid {
+    fn from(value: &BareJid) -> Self {
+        value.0.clone()
     }
 }
 
 impl From<BareJid> for jid::BareJid {
     fn from(value: BareJid) -> Self {
-        jid::BareJid::from_parts(
-            value
-                .node
-                .map(|node| NodePart::new(&node).unwrap())
-                .as_ref(),
-            &DomainPart::new(&value.domain).unwrap(),
-        )
+        value.0
+    }
+}
+
+impl From<&BareJid> for jid::Jid {
+    fn from(value: &BareJid) -> Self {
+        jid::Jid::Bare(value.0.clone())
+    }
+}
+
+impl AsRef<jid::BareJid> for BareJid {
+    fn as_ref(&self) -> &jid::BareJid {
+        &self.0
+    }
+}
+
+impl Display for BareJid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }

@@ -10,7 +10,7 @@ use crate::types::{
     StringArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
-use jid::{DomainPart, NodePart, ResourcePart};
+use jid::ResourcePart;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::types::{MessageId, SoftwareVersion, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
@@ -142,15 +142,7 @@ impl Client {
         availability: Availability,
     ) -> Result<()> {
         // TODO: Generate and store resource.
-        let jid = jid::FullJid::from_parts(
-            jid.node
-                .as_ref()
-                .map(|node| NodePart::new(node))
-                .transpose()?
-                .as_ref(),
-            &DomainPart::new(&jid.domain)?,
-            &ResourcePart::new("web").unwrap(),
-        );
+        let jid = jid.to_full_jid_with_resource(&ResourcePart::new("web").unwrap());
 
         self.client
             .connect(&jid, password, availability.into())
@@ -166,8 +158,6 @@ impl Client {
 
     #[wasm_bindgen(js_name = "sendMessage")]
     pub async fn send_message(&self, to: &BareJid, body: String) -> Result<()> {
-        let to = jid::BareJid::from(to.clone());
-
         info!("Sending message to {}…", to);
 
         self.client
@@ -187,11 +177,7 @@ impl Client {
         body: String,
     ) -> Result<()> {
         self.client
-            .update_message(
-                jid::BareJid::from(conversation.clone()),
-                message_id.into(),
-                body,
-            )
+            .update_message(conversation, message_id.into(), body)
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -202,7 +188,7 @@ impl Client {
     #[wasm_bindgen(js_name = "retractMessage")]
     pub async fn retract_message(&self, conversation: &BareJid, message_id: &str) -> Result<()> {
         self.client
-            .retract_message(jid::BareJid::from(conversation.clone()), message_id.into())
+            .retract_message(conversation, message_id.into())
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -217,7 +203,7 @@ impl Client {
         is_composing: bool,
     ) -> Result<()> {
         self.client
-            .set_user_is_composing(jid::BareJid::from(conversation.clone()), is_composing)
+            .set_user_is_composing(conversation, is_composing)
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -254,7 +240,7 @@ impl Client {
     ) -> Result<BareJidArray> {
         let user_jids = self
             .client
-            .load_composing_users(&jid::BareJid::from(conversation.clone()))
+            .load_composing_users(conversation.as_ref())
             .await
             .map_err(WasmError::from)?
             .into_iter()
@@ -283,11 +269,10 @@ impl Client {
         load_from_server: bool,
     ) -> Result<MessagesArray> {
         let since: Option<MessageId> = since.map(|id| id.into());
-        let from = jid::BareJid::from(from.clone());
 
         let messages = self
             .client
-            .load_latest_messages(&from, since.as_ref(), load_from_server)
+            .load_latest_messages(from.as_ref(), since.as_ref(), load_from_server)
             .await
             .map_err(WasmError::from)?;
 
@@ -309,7 +294,7 @@ impl Client {
 
         let messages = self
             .client
-            .load_messages_with_ids(&(conversation.clone().into()), message_ids.as_slice())
+            .load_messages_with_ids(conversation.as_ref(), message_ids.as_slice())
             .await
             .map_err(WasmError::from)?;
 
@@ -326,11 +311,7 @@ impl Client {
         emoji: &str,
     ) -> Result<()> {
         self.client
-            .toggle_reaction_to_message(
-                jid::BareJid::from(conversation.clone()),
-                id.into(),
-                emoji.into(),
-            )
+            .toggle_reaction_to_message(conversation, id.into(), emoji.into())
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -340,7 +321,6 @@ impl Client {
     /// https://xmpp.org/extensions/xep-0084.html
     #[wasm_bindgen(js_name = "loadAvatarDataURL")]
     pub async fn load_avatar_data_url(&self, jid: &BareJid) -> Result<Option<String>> {
-        let jid = jid::BareJid::from(jid.clone());
         let avatar = self
             .client
             .load_avatar(jid, CachePolicy::ReturnCacheDataDontLoad)
@@ -370,7 +350,6 @@ impl Client {
     /// https://xmpp.org/extensions/xep-0292.html
     #[wasm_bindgen(js_name = "loadUserProfile")]
     pub async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
-        let jid = jid::BareJid::from(jid.clone());
         let profile = self
             .client
             .load_user_profile(jid, CachePolicy::ReturnCacheDataElseLoad)
@@ -402,10 +381,9 @@ impl Client {
 
     #[wasm_bindgen(js_name = "loadUserMetadata")]
     pub async fn load_user_metadata(&self, jid: &BareJid) -> Result<UserMetadata> {
-        let jid = jid::BareJid::from(jid.clone());
         let metadata = self
             .client
-            .load_user_metadata(&jid)
+            .load_user_metadata(jid.as_ref())
             .await
             .map_err(WasmError::from)?;
         Ok(metadata.into())
