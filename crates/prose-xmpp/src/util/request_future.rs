@@ -145,13 +145,17 @@ impl<T: Send, U> Future for RequestFuture<T, U> {
             return Poll::Pending;
         };
 
-        let value = (state.transformer)(
-            state
-                .value
-                .take()
-                .expect("Promise has been fulfilled already"),
-        );
-
-        Poll::Ready(result.map(|_| value))
+        match result {
+            Ok(_) => {
+                let value = (state.transformer)(
+                    state
+                        .value
+                        .take()
+                        .expect("Promise has been fulfilled already"),
+                );
+                Poll::Ready(Ok(value))
+            }
+            Err(err) => Poll::Ready(Err(err)),
+        }
     }
 }
