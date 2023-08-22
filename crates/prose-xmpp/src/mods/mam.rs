@@ -123,7 +123,14 @@ impl RequestFuture<MAMFutureState, (Vec<mam::ArchivedMessage>, mam::Fin)> {
                 state.messages.push(archived_message.clone());
                 Ok(ElementReducerPoll::Pending)
             },
-            |state| (state.messages, state.fin.unwrap()),
+            |state| {
+                (
+                    state.messages,
+                    state
+                        .fin
+                        .expect("Internal error. Missing fin in MAMFutureState."),
+                )
+            },
         )
     }
 }
