@@ -124,6 +124,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                     println!("retracted {:?}", jids);
                     Ok(())
                 }
+                bookmark::Event::BookmarksReplaced { bookmarks } => {
+                    println!("replaced {:?}", bookmarks);
+                    Ok(())
+                }
             },
         };
 

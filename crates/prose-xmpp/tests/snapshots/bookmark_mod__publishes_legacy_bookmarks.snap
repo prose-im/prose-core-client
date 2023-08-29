@@ -1,0 +1,6 @@
+---
+source: crates/prose-xmpp/tests/bookmark_mod.rs
+assertion_line: 193
+expression: "sent_stanzas[0]"
+---
+<iq xmlns='jabber:client' id="id-1" type="set"><pubsub xmlns='http://jabber.org/protocol/pubsub'><publish node="storage:bookmarks"><item><storage xmlns='storage:bookmarks'><conference autojoin="true" jid="room@prose.org" name="Room Name"><nick>User Nick</nick><password>Room password</password></conference></storage></item></publish><publish-options><x xmlns='jabber:x:data' type="submit"><field type="hidden" var="FORM_TYPE"><value>http://jabber.org/protocol/pubsub#publish-options</value></field><field type="boolean" var="pubsub#persist_items"><value>true</value></field><field var="pubsub#access_model"><value>whitelist</value></field></x></publish-options></pubsub></iq>

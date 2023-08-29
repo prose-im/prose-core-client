@@ -3,6 +3,6 @@ source: crates/prose-core-client/tests/caps_handling.rs
 assertion_line: 47
 expression: "connection.sent_stanza_strings().join(\"\\n\\n\")"
 ---
-<presence xmlns='jabber:client'><show>chat</show><c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="VMBkSy9zCy3PjLG1MbmCp2KPihk="/></presence>
+<presence xmlns='jabber:client'><show>chat</show><c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="zb4NVAnTtslRjJoRfgEMDQa9XZ4="/></presence>
 
 <iq xmlns='jabber:client' id="id-1" type="set"><enable xmlns='urn:xmpp:carbons:2'/></iq>

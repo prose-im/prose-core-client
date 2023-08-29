@@ -87,6 +87,55 @@ async fn test_loads_bookmarks() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_loads_legacy_bookmarks() -> Result<()> {
+    let ConnectedClient {
+        connection, client, ..
+    } = Client::connected_client().await?;
+
+    let xml = r#"<iq type='result' to='juliet@capulet.lit/randomID' id='id-1' xmlns='jabber:client'>
+  <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+    <items node='storage:bookmarks'>
+      <item id='current'>
+        <storage xmlns='storage:bookmarks'>
+          <conference name='The Play&apos;s the Thing' autojoin='true' jid='theplay@conference.shakespeare.lit'>
+            <nick>JC</nick>
+          </conference>
+        </storage>
+      </item>
+    </items>
+  </pubsub>
+</iq>
+    "#;
+
+    connection.set_stanza_handler(|_| vec![Element::from_str(xml).unwrap()]);
+
+    let bookmark = client.get_mod::<mods::Bookmark>();
+    let bookmarks = bookmark.load_legacy_bookmarks().await?;
+
+    let sent_stanzas = connection.sent_stanza_strings();
+    assert_eq!(sent_stanzas.len(), 1);
+    assert_snapshot!(sent_stanzas[0], @r###"
+        <iq xmlns='jabber:client' id="id-1" type="get"><pubsub xmlns='http://jabber.org/protocol/pubsub'><items node="storage:bookmarks"/></pubsub></iq>
+    "###);
+
+    assert_eq!(
+        bookmarks,
+        vec![ConferenceBookmark {
+            jid: jid_str!("theplay@conference.shakespeare.lit"),
+            conference: Conference {
+                autojoin: Autojoin::True,
+                name: Some("The Play's the Thing".to_string()),
+                nick: Some("JC".to_string()),
+                password: None,
+                extensions: vec![],
+            }
+        },]
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_publishes_bookmark() -> Result<()> {
     let ConnectedClient {
         connection, client, ..
@@ -107,6 +156,36 @@ async fn test_publishes_bookmark() -> Result<()> {
                 extensions: vec![],
             },
         )
+        .await?;
+
+    let sent_stanzas = connection.sent_stanza_strings();
+    assert_eq!(sent_stanzas.len(), 1);
+    assert_snapshot!(sent_stanzas[0]);
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_publishes_legacy_bookmarks() -> Result<()> {
+    let ConnectedClient {
+        connection, client, ..
+    } = Client::connected_client().await?;
+
+    let bookmark = client.get_mod::<mods::Bookmark>();
+
+    connection.set_stanza_handler(|_| vec![Iq::from_result("id-1", None::<pubsub::PubSub>).into()]);
+
+    bookmark
+        .publish_legacy_bookmarks(vec![ConferenceBookmark {
+            jid: jid_str!("room@prose.org"),
+            conference: Conference {
+                autojoin: Autojoin::True,
+                name: Some("Room Name".to_string()),
+                nick: Some("User Nick".to_string()),
+                password: Some("Room password".to_string()),
+                extensions: vec![],
+            },
+        }])
         .await?;
 
     let sent_stanzas = connection.sent_stanza_strings();
@@ -166,6 +245,51 @@ async fn test_bookmarks_published_event() -> Result<()> {
     assert_eq!(
         sent_events[0],
         Event::Bookmark(mods::bookmark::Event::BookmarksPublished {
+            bookmarks: vec![ConferenceBookmark {
+                jid: jid_str!("theplay@conference.shakespeare.lit"),
+                conference: Conference {
+                    autojoin: Autojoin::True,
+                    name: Some("The Play's the Thing".to_string()),
+                    nick: Some("JC".to_string()),
+                    password: None,
+                    extensions: vec![],
+                }
+            }]
+        })
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_legacy_bookmark_event() -> Result<()> {
+    let client = Client::connected_client().await?;
+
+    let xml = r#"<message from='juliet@capulet.lit' to='juliet@capulet.lit/balcony' type='headline' id='rnfoo1' xmlns="jabber:client">
+  <event xmlns='http://jabber.org/protocol/pubsub#event'>
+    <items node='storage:bookmarks'>
+      <item id='current'>
+        <storage xmlns='storage:bookmarks'>
+          <conference name='The Play&apos;s the Thing' autojoin='true' jid='theplay@conference.shakespeare.lit'>
+            <nick>JC</nick>
+          </conference>
+        </storage>
+      </item>
+    </items>
+  </event>
+</message>
+    "#;
+
+    client
+        .connection
+        .receive_stanza(Element::from_str(xml).unwrap())
+        .await;
+
+    let sent_events = client.sent_events();
+    assert_eq!(sent_events.len(), 1);
+    assert_eq!(
+        sent_events[0],
+        Event::Bookmark(mods::bookmark::Event::BookmarksReplaced {
             bookmarks: vec![ConferenceBookmark {
                 jid: jid_str!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
