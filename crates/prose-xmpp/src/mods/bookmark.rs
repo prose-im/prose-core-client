@@ -192,9 +192,9 @@ impl Bookmark {
             if !payload.is("storage", ns::BOOKMARKS) {
                 return None;
             }
-            return Some(bookmarks::Storage::try_from(payload.clone()))
+            return Some(bookmarks::Storage::try_from(payload.clone()));
         }) else {
-            return Ok(vec![])
+            return Ok(vec![]);
         };
 
         let bookmarks = storage?
@@ -305,9 +305,9 @@ impl Bookmark {
             if !payload.is("storage", ns::BOOKMARKS) {
                 return None;
             }
-            return Some(bookmarks::Storage::try_from(payload.clone()))
+            return Some(bookmarks::Storage::try_from(payload.clone()));
         }) else {
-            return Ok(())
+            return Ok(());
         };
 
         let bookmarks = storage?
