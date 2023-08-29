@@ -66,7 +66,7 @@ impl MAM {
         );
 
         self.ctx
-            .send_iq_with_future(iq, RequestFuture::new_mam_request(id, query_id))
+            .send_stanza_with_future(iq, RequestFuture::new_mam_request(id, query_id))
     }
 }
 

@@ -374,8 +374,6 @@ enum Selection {
     SendMessage,
     #[strum(serialize = "Load messages")]
     LoadMessages,
-    #[strum(serialize = "Query server features")]
-    QueryServerFeatures,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
     Disconnect,
@@ -419,9 +417,6 @@ async fn main() -> Result<()> {
             }
             Selection::LoadMessages => {
                 load_messages(&client).await?;
-            }
-            Selection::QueryServerFeatures => {
-                client.query_server_features().await?;
             }
             Selection::DeleteCachedData => {
                 println!("Cleaning cache…");

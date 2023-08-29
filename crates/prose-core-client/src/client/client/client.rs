@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 use strum_macros::Display;
 use tracing::instrument;
 
-use prose_xmpp::mods::{Caps, Chat, Status};
+use prose_xmpp::mods::{Chat, Status};
 use prose_xmpp::ConnectionError;
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
@@ -119,13 +119,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .save_account_settings(settings)
             .await?;
         Ok(())
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub async fn query_server_features(&self) -> Result<()> {
-        let caps = self.client.get_mod::<Caps>();
-        caps.query_server_features().await
     }
 }
 

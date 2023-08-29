@@ -14,6 +14,7 @@ pub use vcard::VCard4;
 pub mod avatar;
 pub mod last_activity;
 pub mod message;
+pub mod muc;
 pub mod ns;
 pub mod pubsub;
 pub mod user_activity;
