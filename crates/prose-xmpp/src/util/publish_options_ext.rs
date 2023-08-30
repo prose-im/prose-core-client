@@ -19,7 +19,7 @@ impl PublishOptionsExt for pubsub::PublishOptions {
                 instructions: None,
                 fields: vec![
                     Field {
-                        var: String::from("pubsub#persist_items"),
+                        var: Some(String::from("pubsub#persist_items")),
                         type_: FieldType::Boolean,
                         label: None,
                         required: false,
@@ -28,7 +28,7 @@ impl PublishOptionsExt for pubsub::PublishOptions {
                         values: vec![String::from("true")],
                     },
                     Field {
-                        var: String::from("pubsub#access_model"),
+                        var: Some(String::from("pubsub#access_model")),
                         type_: FieldType::TextSingle,
                         label: None,
                         required: false,

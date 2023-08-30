@@ -165,6 +165,14 @@ fn prompt_opt_string(prompt: impl Into<String>, default: Option<String>) -> Opti
         .0
 }
 
+fn prompt_string(prompt: impl Into<String>) -> String {
+    Input::<String>::with_theme(&ColorfulTheme::default())
+        .with_prompt(prompt)
+        .allow_empty(false)
+        .interact_text()
+        .unwrap()
+}
+
 struct ContactEnvelope(Contact);
 
 impl Display for ContactEnvelope {
@@ -376,6 +384,8 @@ enum Selection {
     LoadMessages,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
+    CreatePublicChannel,
+    LoadPublicRooms,
     Disconnect,
     Noop,
     Exit,
@@ -421,6 +431,30 @@ async fn main() -> Result<()> {
             Selection::DeleteCachedData => {
                 println!("Cleaning cache…");
                 client.delete_cached_data().await?;
+            }
+            Selection::CreatePublicChannel => {
+                let services = client.load_muc_services().await?;
+                let service = services.first().unwrap();
+
+                let room_name = prompt_string("Enter a name for the channel:");
+                service.create_public_channel(room_name).await?;
+            }
+            Selection::LoadPublicRooms => {
+                let services = client.load_muc_services().await?;
+                let service = services.first().unwrap();
+                let rooms = service
+                    .load_public_rooms()
+                    .await?
+                    .into_iter()
+                    .map(|room| {
+                        format!(
+                            "{} ({})",
+                            room.name.unwrap_or("<untitled>".to_string()),
+                            room.jid
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                println!("{}", rooms.join("\n"));
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

@@ -10,14 +10,14 @@ use prose_xmpp::mods::bookmark::ConferenceBookmark;
 use prose_xmpp::mods::{Bookmark, Caps};
 
 use crate::avatar_cache::AvatarCache;
-use crate::client::client::MUCService;
+use crate::client::muc;
 use crate::data_cache::DataCache;
 
 use super::Client;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
     #[instrument]
-    pub async fn load_muc_services(&self) -> Result<Vec<MUCService>> {
+    pub async fn load_muc_services(&self) -> Result<Vec<muc::Service>> {
         let caps = self.client.get_mod::<Caps>();
         let disco_items = caps.query_server_disco_items(None).await?.items;
         let mut services = vec![];
@@ -34,7 +34,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 continue;
             }
 
-            services.push(MUCService {
+            services.push(muc::Service {
                 client: self.client.clone(),
                 jid: item.jid.into_bare(),
             });

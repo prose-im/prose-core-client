@@ -42,3 +42,6 @@ pub const MUC_OWNER: &str = "http://jabber.org/protocol/muc#owner";
 
 /// XEP-0045: Multi-User Chat
 pub const MUC_ADMIN: &str = "http://jabber.org/protocol/muc#admin";
+
+/// XEP-0045: Multi-User Chat
+pub const MUC_ROOMCONFIG: &str = "http://jabber.org/protocol/muc#roomconfig";

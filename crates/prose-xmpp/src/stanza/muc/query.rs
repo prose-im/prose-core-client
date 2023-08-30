@@ -3,7 +3,7 @@ use crate::util::ElementExt;
 use minidom::{Element, NSChoice};
 use std::str::FromStr;
 use xmpp_parsers::data_forms::DataForm;
-use xmpp_parsers::iq::IqSetPayload;
+use xmpp_parsers::iq::{IqGetPayload, IqSetPayload};
 
 pub enum Role {
     Owner,
@@ -69,6 +69,7 @@ impl TryFrom<Element> for Query {
 }
 
 impl IqSetPayload for Query {}
+impl IqGetPayload for Query {}
 
 pub trait MucQueryPayload: TryFrom<Element> + Into<Element> {}
 

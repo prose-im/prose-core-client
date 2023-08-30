@@ -5,13 +5,18 @@
 
 use crate::client::ModuleContext;
 use crate::mods::Module;
-use crate::ns;
+use crate::stanza::muc;
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
+use crate::{ns, SendUnlessWasm};
 use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
+use std::future::Future;
+use xmpp_parsers::data_forms::{DataForm, DataFormType};
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
+use xmpp_parsers::muc::user::Status;
+use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 use xmpp_parsers::stanza_error::StanzaError;
@@ -33,6 +38,12 @@ impl Module for MUC {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RoomConfigResponse {
+    Submit(DataForm),
+    Cancel,
 }
 
 impl MUC {
@@ -65,19 +76,82 @@ impl MUC {
         service: &BareJid,
         room_name: impl AsRef<str>,
     ) -> Result<()> {
-        let room_jid = service.with_resource_str(room_name.as_ref())?;
-        let presence = Presence::new(presence::Type::None)
-            .with_to(room_jid)
-            .with_payloads(vec![Element::builder("x", ns::MUC).build()]);
-        let response = self.send_presence(presence).await?;
+        let room_jid = service.with_resource_str(&room_name_to_handle(room_name.as_ref()))?;
+        self.create_room(&room_jid).await?;
 
-        println!("{}", String::from(&Element::from(response)));
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            muc::Query {
+                role: muc::query::Role::Owner,
+                payloads: vec![Element::builder("x", ns::DATA_FORMS)
+                    .attr("type", "submit")
+                    .build()],
+            },
+        )
+        .with_to(room_jid.into());
 
-        // <presence
-        //     from='crone1@shakespeare.lit/desktop'
-        //     to='coven@chat.shakespeare.lit/firstwitch'>
-        //   <x xmlns='http://jabber.org/protocol/muc'/>
-        // </presence>
+        let response = self.ctx.send_iq(iq).await?;
+        println!("{:?}", response);
+
+        Ok(())
+    }
+
+    /// https://xmpp.org/extensions/xep-0045.html#createroom
+    pub async fn create_reserved_room<T>(
+        &self,
+        service: &BareJid,
+        room_name: impl AsRef<str>,
+        handler: impl FnOnce(DataForm) -> T,
+    ) -> Result<()>
+    where
+        T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
+    {
+        let room_jid = service.with_resource_str(&room_name_to_handle(room_name.as_ref()))?;
+        self.create_room(&room_jid).await?;
+
+        let iq = Iq::from_get(
+            self.ctx.generate_id(),
+            muc::Query {
+                role: muc::query::Role::Owner,
+                payloads: vec![],
+            },
+        )
+        .with_to(room_jid.clone().into());
+
+        let mut query = muc::Query::try_from(
+            self.ctx
+                .send_iq(iq)
+                .await?
+                .ok_or(RequestError::UnexpectedResponse)?,
+        )?;
+        let form = DataForm::try_from(
+            query
+                .payloads
+                .pop()
+                .ok_or(RequestError::UnexpectedResponse)?,
+        )?;
+
+        let response_form = match handler(form).await? {
+            RoomConfigResponse::Submit(form) => form,
+            RoomConfigResponse::Cancel => DataForm {
+                type_: DataFormType::Cancel,
+                form_type: None,
+                title: None,
+                instructions: None,
+                fields: vec![],
+            },
+        };
+
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            muc::Query {
+                role: muc::query::Role::Owner,
+                payloads: vec![response_form.into()],
+            },
+        )
+        .with_to(room_jid.into());
+
+        self.ctx.send_iq(iq).await?;
 
         Ok(())
     }
@@ -88,12 +162,34 @@ impl MUC {
     /// `to` attribute of `presence`.
     async fn send_presence(&self, presence: Presence) -> Result<Presence, RequestError> {
         let Some(Jid::Full(to)) = presence.to.clone() else {
-            return Err(RequestError::Generic { msg: "Expected FullJid for `to` for sending presence exchange.".to_string() })
+            return Err(RequestError::Generic {
+                msg: "Expected FullJid for `to` for sending presence exchange.".to_string(),
+            });
         };
 
         self.ctx
             .send_stanza_with_future(presence, RequestFuture::new_presence_request(to))
             .await
+    }
+
+    /// https://xmpp.org/extensions/xep-0045.html#createroom
+    pub async fn create_room(&self, room_jid: &FullJid) -> Result<MucUser> {
+        let presence = Presence::new(presence::Type::None)
+            .with_to(room_jid.clone())
+            .with_payloads(vec![Element::builder("x", ns::MUC).build()]);
+
+        let mut response = self.send_presence(presence).await?;
+        let payload = response
+            .payloads
+            .pop()
+            .ok_or(RequestError::UnexpectedResponse)?;
+        let user = MucUser::try_from(payload)?;
+
+        if !user.status.contains(&Status::RoomHasBeenCreated) {
+            return Err(RequestError::UnexpectedResponse.into());
+        }
+
+        Ok(user)
     }
 }
 
@@ -147,4 +243,8 @@ impl RequestFuture<PresenceFutureState, Presence> {
             },
         )
     }
+}
+
+fn room_name_to_handle(room_name: &str) -> String {
+    room_name.to_ascii_lowercase().replace(" ", "-")
 }

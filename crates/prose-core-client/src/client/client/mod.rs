@@ -5,7 +5,6 @@
 
 pub use client::Client;
 pub use client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDataCache};
-pub use muc_service::MUCService;
 
 mod client;
 mod client_builder;
@@ -15,4 +14,3 @@ mod client_event;
 mod client_muc;
 mod client_profile;
 mod client_status;
-mod muc_service;

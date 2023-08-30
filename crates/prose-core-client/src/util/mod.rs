@@ -5,9 +5,11 @@
 
 use std::ops::Deref;
 
+pub(crate) use form_config::FormConfig;
 pub(crate) use presence_map::PresenceMap;
 pub(crate) use string_ext::StringExt;
 
+pub mod form_config;
 mod presence_map;
 mod string_ext;
 
