@@ -35,6 +35,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             }
 
             services.push(muc::Service {
+                user_jid: self.connected_jid()?.into_bare(),
                 client: self.client.clone(),
                 jid: item.jid.into_bare(),
             });

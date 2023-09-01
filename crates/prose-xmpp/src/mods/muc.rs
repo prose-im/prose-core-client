@@ -9,7 +9,7 @@ use crate::stanza::muc;
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
 use crate::{ns, SendUnlessWasm};
 use anyhow::Result;
-use jid::{BareJid, FullJid, Jid};
+use jid::{BareJid, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use std::future::Future;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
@@ -75,8 +75,9 @@ impl MUC {
         &self,
         service: &BareJid,
         room_name: impl AsRef<str>,
+        nickname: impl AsRef<str>,
     ) -> Result<()> {
-        let room_jid = service.with_resource_str(&room_name_to_handle(room_name.as_ref()))?;
+        let room_jid = room_jid(service, room_name, nickname)?;
         self.create_room(&room_jid).await?;
 
         let iq = Iq::from_set(
@@ -88,7 +89,7 @@ impl MUC {
                     .build()],
             },
         )
-        .with_to(room_jid.into());
+        .with_to(room_jid.to_bare().into());
 
         let response = self.ctx.send_iq(iq).await?;
         println!("{:?}", response);
@@ -101,12 +102,13 @@ impl MUC {
         &self,
         service: &BareJid,
         room_name: impl AsRef<str>,
+        nickname: impl AsRef<str>,
         handler: impl FnOnce(DataForm) -> T,
     ) -> Result<()>
     where
         T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
     {
-        let room_jid = service.with_resource_str(&room_name_to_handle(room_name.as_ref()))?;
+        let room_jid = room_jid(service, room_name, nickname)?;
         self.create_room(&room_jid).await?;
 
         let iq = Iq::from_get(
@@ -116,7 +118,7 @@ impl MUC {
                 payloads: vec![],
             },
         )
-        .with_to(room_jid.clone().into());
+        .with_to(room_jid.to_bare().into());
 
         let mut query = muc::Query::try_from(
             self.ctx
@@ -149,7 +151,7 @@ impl MUC {
                 payloads: vec![response_form.into()],
             },
         )
-        .with_to(room_jid.into());
+        .with_to(room_jid.to_bare().into());
 
         self.ctx.send_iq(iq).await?;
 
@@ -245,6 +247,16 @@ impl RequestFuture<PresenceFutureState, Presence> {
     }
 }
 
-fn room_name_to_handle(room_name: &str) -> String {
-    room_name.to_ascii_lowercase().replace(" ", "-")
+fn room_jid(
+    service: &BareJid,
+    room_name: impl AsRef<str>,
+    nickname: impl AsRef<str>,
+) -> Result<FullJid> {
+    Ok(FullJid::from_parts(
+        Some(&NodePart::new(
+            &room_name.as_ref().to_ascii_lowercase().replace(" ", "-"),
+        )?),
+        &service.domain(),
+        &ResourcePart::new(&nickname.as_ref().to_ascii_lowercase().replace(" ", "-"))?,
+    ))
 }
