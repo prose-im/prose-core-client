@@ -68,6 +68,8 @@ impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
         let id_provider = Arc::new(IncrementingIDProvider::new());
         let data_cache = Arc::new(SQLiteCache::in_memory_cache());
 
+        connection.use_start_sequence_handler();
+
         let client = ClientBuilder::new()
             .set_connector_provider(test::Connector::provider(connection.clone()))
             .set_data_cache(data_cache.clone())

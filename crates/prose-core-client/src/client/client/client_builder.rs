@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use prose_xmpp::client::ConnectorProvider;
-use prose_xmpp::mods::{Bookmark, Caps, Chat, Profile, Roster, Status, MAM, MUC};
+use prose_xmpp::mods::{Bookmark, Bookmark2, Caps, Chat, Profile, Roster, Status, MAM, MUC};
 use prose_xmpp::{
     ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, SystemTimeProvider,
     TimeProvider,
@@ -146,20 +146,22 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             software_version: self.software_version,
             delegate: self.delegate,
             presences: Default::default(),
+            muc_service: Default::default(),
         });
 
         let event_inner = inner.clone();
 
         let client = self
             .builder
+            .add_mod(Bookmark2::default())
+            .add_mod(Bookmark::default())
             .add_mod(Caps::default())
-            .add_mod(MAM::default())
             .add_mod(Chat::default())
+            .add_mod(MAM::default())
+            .add_mod(MUC::default())
             .add_mod(Profile::default())
             .add_mod(Roster::default())
             .add_mod(Status::default())
-            .add_mod(Bookmark::default())
-            .add_mod(MUC::default())
             .set_time_provider(self.time_provider)
             .set_event_handler(Box::new(move |xmpp_client, event| {
                 let client = Client {

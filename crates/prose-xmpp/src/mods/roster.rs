@@ -66,7 +66,7 @@ impl TryFrom<Element> for Query {
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         Ok(Query {
-            query_id: value.req_attr("queryid")?.to_string(),
+            query_id: value.attr_req("queryid")?.to_string(),
         })
     }
 }

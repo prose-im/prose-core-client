@@ -6,11 +6,11 @@
 use anyhow::Result;
 use chrono::Utc;
 use jid::{BareJid, Jid};
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::mods::{bookmark, caps, chat, ping, profile, status};
+use prose_xmpp::mods::{bookmark, bookmark2, caps, chat, muc, ping, profile, status};
 use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{client, mods, Event, TimeProvider};
@@ -116,18 +116,25 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             },
 
             Event::Bookmark(event) => match event {
-                bookmark::Event::BookmarksPublished { bookmarks } => {
-                    println!("published {:?}", bookmarks);
+                bookmark::Event::BookmarksChanged { bookmarks } => {
+                    info!("replaced {:?}", bookmarks);
                     Ok(())
                 }
-                bookmark::Event::BookmarksRetracted { jids } => {
-                    println!("retracted {:?}", jids);
+            },
+
+            Event::Bookmark2(event) => match event {
+                bookmark2::Event::BookmarksPublished { bookmarks } => {
+                    info!("published {:?}", bookmarks);
                     Ok(())
                 }
-                bookmark::Event::BookmarksReplaced { bookmarks } => {
-                    println!("replaced {:?}", bookmarks);
+                bookmark2::Event::BookmarksRetracted { jids } => {
+                    info!("retracted {:?}", jids);
                     Ok(())
                 }
+            },
+
+            Event::MUC(event) => match event {
+                muc::Event::DirectInvite { from, invite } => Ok(()),
             },
         };
 

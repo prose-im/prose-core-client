@@ -9,7 +9,7 @@ pub(crate) struct RoomConfig {
 }
 
 impl RoomConfig {
-    pub fn group_chat() -> Self {
+    pub fn group() -> Self {
         let history_len = Value::TextSingle(u32::MAX.to_string());
         RoomConfig {
             config: FormConfig::new([
@@ -78,7 +78,7 @@ impl RoomConfig {
                 FormValue::optional(cfg::ROOM_SECRET, Value::None),
                 FormValue::required(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
                 FormValue::optional(cfg::GET_MEMBER_LIST, Value::Boolean(true)),
-                FormValue::required(cfg::MEMBERS_ONLY, Value::Boolean(true)),
+                FormValue::required(cfg::MEMBERS_ONLY, Value::Boolean(false)),
                 FormValue::required(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
                 FormValue::required(cfg::PUBLIC_ROOM, Value::Boolean(true)),
             ]),

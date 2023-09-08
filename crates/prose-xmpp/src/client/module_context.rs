@@ -106,15 +106,10 @@ pub(super) struct ModuleContextInner {
 }
 
 impl ModuleContextInner {
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(feature = "test"))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
-        wasm_bindgen_futures::spawn_local(async move { fut.await });
-    }
-    #[cfg(all(not(target_arch = "wasm32"), not(feature = "test")))]
-    pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
-        let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
-        tokio::spawn(async move { fut.await });
+        crate::util::spawn(fut);
     }
 
     #[cfg(feature = "test")]

@@ -10,13 +10,14 @@ use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use parking_lot::RwLock;
 use strum_macros::Display;
-use tracing::instrument;
+use tracing::{debug, error, info, instrument, warn};
 
 use prose_xmpp::mods::{Chat, Status};
-use prose_xmpp::ConnectionError;
+use prose_xmpp::{mods, ConnectionError};
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
+use crate::client::muc;
 use crate::data_cache::DataCache;
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
@@ -41,6 +42,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub software_version: SoftwareVersion,
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
     pub presences: RwLock<PresenceMap>,
+    pub muc_service: RwLock<Option<muc::Service>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
@@ -87,6 +89,22 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 msg: err.to_string(),
             })?;
 
+        self.gather_server_features()
+            .await
+            .map_err(|err| ConnectionError::Generic {
+                msg: err.to_string(),
+            })?;
+
+        let client = Client {
+            client: self.client.clone(),
+            inner: self.inner.clone(),
+        };
+        prose_xmpp::spawn(async move {
+            if let Err(error) = client.perform_post_connect_tasks().await {
+                error!("Failed to run post-connect-tasks: {}", error.to_string())
+            }
+        });
+
         Ok(())
     }
 
@@ -118,6 +136,65 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .data_cache
             .save_account_settings(settings)
             .await?;
+        Ok(())
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    async fn gather_server_features(&self) -> Result<()> {
+        let caps = self.client.get_mod::<mods::Caps>();
+        let disco_items = caps.query_server_disco_items(None).await?;
+
+        for item in disco_items.items {
+            let info = caps.query_disco_info(item.jid.clone(), None).await?;
+
+            if info
+                .identities
+                .iter()
+                .find(|ident| ident.category == "conference")
+                .is_none()
+            {
+                continue;
+            }
+
+            *self.inner.muc_service.write() = Some(muc::Service {
+                user_jid: self.connected_jid()?.into_bare(),
+                client: self.client.clone(),
+                jid: item.jid.into_bare(),
+            });
+            break;
+        }
+
+        Ok(())
+    }
+
+    async fn perform_post_connect_tasks(&self) -> Result<()> {
+        let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
+        let bookmark2_mod = self.client.get_mod::<mods::Bookmark2>();
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+
+        // TODO: Ignore duplicates
+        let bookmarks = bookmark_mod
+            .load_bookmarks()
+            .await?
+            .into_iter()
+            .chain(bookmark2_mod.load_bookmarks().await?);
+
+        for bookmark in bookmarks {
+            info!("Entering room {}…", bookmark.jid);
+            muc_mod
+                .enter_room(
+                    &bookmark.jid.into_bare(),
+                    bookmark
+                        .conference
+                        .nick
+                        .as_deref()
+                        .or(self.connected_jid()?.node_str())
+                        .unwrap_or("unknown-user"),
+                )
+                .await?;
+        }
+
         Ok(())
     }
 }

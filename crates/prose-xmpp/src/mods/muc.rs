@@ -4,8 +4,11 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::client::ModuleContext;
+use crate::event::Event as ClientEvent;
 use crate::mods::Module;
-use crate::stanza::muc;
+use crate::stanza::muc::query::{Destroy, Role};
+use crate::stanza::muc::{DirectInvite, Query};
+use crate::stanza::{muc, Message};
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
 use crate::{ns, SendUnlessWasm};
 use anyhow::Result;
@@ -38,12 +41,46 @@ impl Module for MUC {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context
     }
+
+    fn handle_message_stanza(&self, stanza: &Message) -> Result<()> {
+        let (Some(from), Some(direct_invite)) = (&stanza.from, &stanza.direct_invite) else {
+            return Ok(());
+        };
+
+        self.ctx
+            .schedule_event(ClientEvent::MUC(Event::DirectInvite {
+                from: from.clone(),
+                invite: direct_invite.clone(),
+            }));
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    /// XEP-0249: Direct MUC Invitations
+    DirectInvite { from: Jid, invite: DirectInvite },
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RoomConfigResponse {
     Submit(DataForm),
     Cancel,
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Room already exists")]
+    RoomAlreadyExists,
+    #[error(transparent)]
+    RequestError(#[from] RequestError),
+    #[error(transparent)]
+    ParseError(#[from] xmpp_parsers::Error),
+    #[error(transparent)]
+    JidError(#[from] jid::Error),
+    #[error("Handler returned with error {0}")]
+    HandlerError(String),
 }
 
 impl MUC {
@@ -71,13 +108,19 @@ impl MUC {
         Ok(rooms)
     }
 
+    pub async fn enter_room(&self, room_jid: &BareJid, nickname: impl AsRef<str>) -> Result<()> {
+        let full_room_jid = room_jid.with_resource_str(nickname.as_ref())?;
+        self.send_presence_to_room(&full_room_jid).await?;
+        Ok(())
+    }
+
     pub async fn create_instant_room(
         &self,
         service: &BareJid,
         room_name: impl AsRef<str>,
         nickname: impl AsRef<str>,
     ) -> Result<()> {
-        let room_jid = room_jid(service, room_name, nickname)?;
+        let room_jid = Self::build_room_jid_full(service, room_name, nickname)?;
         self.create_room(&room_jid).await?;
 
         let iq = Iq::from_set(
@@ -91,9 +134,7 @@ impl MUC {
         )
         .with_to(room_jid.to_bare().into());
 
-        let response = self.ctx.send_iq(iq).await?;
-        println!("{:?}", response);
-
+        self.ctx.send_iq(iq).await?;
         Ok(())
     }
 
@@ -104,11 +145,11 @@ impl MUC {
         room_name: impl AsRef<str>,
         nickname: impl AsRef<str>,
         handler: impl FnOnce(DataForm) -> T,
-    ) -> Result<()>
+    ) -> Result<(), Error>
     where
         T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
     {
-        let room_jid = room_jid(service, room_name, nickname)?;
+        let room_jid = Self::build_room_jid_full(service, room_name, nickname)?;
         self.create_room(&room_jid).await?;
 
         let iq = Iq::from_get(
@@ -133,7 +174,11 @@ impl MUC {
                 .ok_or(RequestError::UnexpectedResponse)?,
         )?;
 
-        let response_form = match handler(form).await? {
+        let handler_result = handler(form)
+            .await
+            .map_err(|e| Error::HandlerError(e.to_string()))?;
+
+        let response_form = match handler_result {
             RoomConfigResponse::Submit(form) => form,
             RoomConfigResponse::Cancel => DataForm {
                 type_: DataFormType::Cancel,
@@ -157,6 +202,44 @@ impl MUC {
 
         Ok(())
     }
+
+    pub async fn destroy_room(&self, jid: &BareJid) -> Result<()> {
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            Query::new(Role::Owner).with_payload(Destroy {
+                jid: jid.clone(),
+                reason: None,
+            }),
+        );
+        self.ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
+    pub fn build_room_jid_full(
+        service: &BareJid,
+        room_name: impl AsRef<str>,
+        nickname: impl AsRef<str>,
+    ) -> Result<FullJid, jid::Error> {
+        Ok(FullJid::from_parts(
+            Some(&NodePart::new(
+                &room_name.as_ref().to_ascii_lowercase().replace(" ", "-"),
+            )?),
+            &service.domain(),
+            &ResourcePart::new(&nickname.as_ref().to_ascii_lowercase().replace(" ", "-"))?,
+        ))
+    }
+
+    pub fn build_room_jid_bare(
+        service: &BareJid,
+        room_name: impl AsRef<str>,
+    ) -> Result<BareJid, jid::Error> {
+        Ok(BareJid::from_parts(
+            Some(&NodePart::new(
+                &room_name.as_ref().to_ascii_lowercase().replace(" ", "-"),
+            )?),
+            &service.domain(),
+        ))
+    }
 }
 
 impl MUC {
@@ -174,8 +257,7 @@ impl MUC {
             .await
     }
 
-    /// https://xmpp.org/extensions/xep-0045.html#createroom
-    pub async fn create_room(&self, room_jid: &FullJid) -> Result<MucUser> {
+    async fn send_presence_to_room(&self, room_jid: &FullJid) -> Result<MucUser, Error> {
         let presence = Presence::new(presence::Type::None)
             .with_to(room_jid.clone())
             .with_payloads(vec![Element::builder("x", ns::MUC).build()]);
@@ -185,13 +267,33 @@ impl MUC {
             .payloads
             .pop()
             .ok_or(RequestError::UnexpectedResponse)?;
-        let user = MucUser::try_from(payload)?;
+
+        Ok(MucUser::try_from(payload)?)
+    }
+
+    /// https://xmpp.org/extensions/xep-0045.html#createroom
+    async fn create_room(&self, room_jid: &FullJid) -> Result<MucUser, Error> {
+        let user = self.send_presence_to_room(room_jid).await?;
 
         if !user.status.contains(&Status::RoomHasBeenCreated) {
-            return Err(RequestError::UnexpectedResponse.into());
+            return Err(Error::RoomAlreadyExists);
         }
 
         Ok(user)
+    }
+
+    async fn send_direct_invite(
+        &self,
+        to: impl Into<Jid>,
+        direct_invite: DirectInvite,
+    ) -> Result<()> {
+        let message = Message {
+            to: Some(to.into()),
+            direct_invite: Some(direct_invite),
+            ..Default::default()
+        };
+        self.ctx.send_stanza(message)?;
+        Ok(())
     }
 }
 
@@ -245,18 +347,4 @@ impl RequestFuture<PresenceFutureState, Presence> {
             },
         )
     }
-}
-
-fn room_jid(
-    service: &BareJid,
-    room_name: impl AsRef<str>,
-    nickname: impl AsRef<str>,
-) -> Result<FullJid> {
-    Ok(FullJid::from_parts(
-        Some(&NodePart::new(
-            &room_name.as_ref().to_ascii_lowercase().replace(" ", "-"),
-        )?),
-        &service.domain(),
-        &ResourcePart::new(&nickname.as_ref().to_ascii_lowercase().replace(" ", "-"))?,
-    ))
 }

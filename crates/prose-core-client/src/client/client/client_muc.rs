@@ -4,10 +4,11 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use jid::BareJid;
 use tracing::instrument;
 
-use prose_xmpp::mods::bookmark::ConferenceBookmark;
 use prose_xmpp::mods::{Bookmark, Caps};
+use prose_xmpp::stanza::ConferenceBookmark;
 
 use crate::avatar_cache::AvatarCache;
 use crate::client::muc;
@@ -16,36 +17,20 @@ use crate::data_cache::DataCache;
 use super::Client;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    #[instrument]
-    pub async fn load_muc_services(&self) -> Result<Vec<muc::Service>> {
-        let caps = self.client.get_mod::<Caps>();
-        let disco_items = caps.query_server_disco_items(None).await?.items;
-        let mut services = vec![];
-
-        for item in disco_items {
-            let info = caps.query_disco_info(item.jid.clone(), None).await?;
-
-            if info
-                .identities
-                .iter()
-                .find(|ident| ident.category == "conference")
-                .is_none()
-            {
-                continue;
-            }
-
-            services.push(muc::Service {
-                user_jid: self.connected_jid()?.into_bare(),
-                client: self.client.clone(),
-                jid: item.jid.into_bare(),
-            });
-        }
-
-        Ok(services)
+    pub fn muc_service(&self) -> Option<muc::Service> {
+        self.inner.muc_service.read().clone()
     }
 
     pub async fn load_bookmarks(&self) -> Result<Vec<ConferenceBookmark>> {
         let bookmark = self.client.get_mod::<Bookmark>();
         bookmark.load_bookmarks().await
+    }
+
+    pub async fn service_with_jid(&self, jid: &BareJid) -> Result<muc::Service> {
+        Ok(muc::Service {
+            jid: jid.clone(),
+            user_jid: self.connected_jid()?.into_bare(),
+            client: self.client.clone(),
+        })
     }
 }

@@ -57,7 +57,7 @@ impl TryFrom<Element> for ApplyTo {
         value.expect_is("apply-to", ns::FASTEN)?;
 
         Ok(ApplyTo {
-            id: value.req_attr("id")?.into(),
+            id: value.attr_req("id")?.into(),
             clear: value
                 .attr("clear")
                 .map(|value| value.to_lowercase() == "true")

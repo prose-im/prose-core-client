@@ -6,7 +6,7 @@
 use std::future::Future;
 use std::pin::Pin;
 
-pub use element_ext::ElementExt;
+pub use element_ext::{ElementBuilderExt, ElementExt};
 pub(crate) use module_future_state::{ModuleFuturePoll, ModuleFutureState};
 pub use publish_options_ext::PublishOptionsExt;
 pub use request_error::RequestError;
@@ -49,3 +49,16 @@ impl<T> SyncUnlessWasm for T {}
 pub type PinnedFuture<T> = Pin<Box<dyn Future<Output = T>>>;
 #[cfg(not(target_arch = "wasm32"))]
 pub type PinnedFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
+
+pub fn spawn<T>(future: T) -> ()
+where
+    T: Future + SendUnlessWasm + 'static,
+    T::Output: SendUnlessWasm,
+{
+    #[cfg(target_arch = "wasm32")]
+    wasm_bindgen_futures::spawn_local(async move {
+        future.await;
+    });
+    #[cfg(all(not(target_arch = "wasm32")))]
+    tokio::spawn(future);
+}

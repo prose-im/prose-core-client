@@ -40,7 +40,7 @@ impl TryFrom<Element> for OriginId {
         value.expect_is("origin-id", ns::SID)?;
 
         Ok(OriginId {
-            id: value.req_attr("id")?.into(),
+            id: value.attr_req("id")?.into(),
         })
     }
 }
@@ -60,8 +60,8 @@ impl TryFrom<Element> for StanzaId {
         value.expect_is("stanza-id", ns::SID)?;
 
         Ok(StanzaId {
-            id: value.req_attr("id")?.into(),
-            by: Jid::from_str(value.req_attr("by")?)?,
+            id: value.attr_req("id")?.into(),
+            by: Jid::from_str(value.attr_req("by")?)?,
         })
     }
 }
@@ -82,8 +82,8 @@ impl TryFrom<Element> for ReferencedStanza {
         value.expect_is("referenced-stanza", ns::SID)?;
 
         Ok(ReferencedStanza {
-            id: value.req_attr("id")?.into(),
-            by: Jid::from_str(value.req_attr("by")?)?,
+            id: value.attr_req("id")?.into(),
+            by: Jid::from_str(value.attr_req("by")?)?,
         })
     }
 }

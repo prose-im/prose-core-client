@@ -8,7 +8,7 @@ pub use connector::{Connection, ConnectionError, Connector};
 pub use deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 pub use event::Event;
 pub use stanza::ns;
-pub use util::{SendUnlessWasm, SyncUnlessWasm};
+pub use util::{spawn, SendUnlessWasm, SyncUnlessWasm};
 
 pub mod client;
 pub mod connector;

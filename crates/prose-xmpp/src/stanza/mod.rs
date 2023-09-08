@@ -5,6 +5,7 @@
 
 pub use xmpp_parsers::presence;
 
+pub use conference_bookmark::ConferenceBookmark;
 pub use last_activity::LastActivityRequest;
 pub use message::Message;
 pub use pubsub::PubSubMessage;
@@ -12,6 +13,7 @@ pub use user_activity::UserActivity;
 pub use vcard::VCard4;
 
 pub mod avatar;
+pub mod conference_bookmark;
 pub mod last_activity;
 pub mod message;
 pub mod muc;

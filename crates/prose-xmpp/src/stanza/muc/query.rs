@@ -1,5 +1,6 @@
 use crate::ns;
-use crate::util::ElementExt;
+use crate::util::{ElementExt, RequestError};
+use jid::BareJid;
 use minidom::{Element, NSChoice};
 use std::str::FromStr;
 use xmpp_parsers::data_forms::DataForm;
@@ -13,6 +14,11 @@ pub enum Role {
 pub struct Query {
     pub role: Role,
     pub payloads: Vec<Element>,
+}
+
+pub struct Destroy {
+    pub jid: BareJid,
+    pub reason: Option<String>,
 }
 
 impl Query {
@@ -43,7 +49,7 @@ impl From<Query> for Element {
 }
 
 impl TryFrom<Element> for Query {
-    type Error = anyhow::Error;
+    type Error = RequestError;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         root.expect_is("query", NSChoice::AnyOf(&[ns::MUC_OWNER, ns::MUC_ADMIN]))?;
@@ -54,10 +60,12 @@ impl TryFrom<Element> for Query {
             .map(|child| match child {
                 _ if child.is("item", ns::MUC_USER) => Ok(child.clone()),
                 _ if child.is("x", ns::DATA_FORMS) => Ok(child.clone()),
-                _ => Err(anyhow::format_err!(
-                    "Encountered unexpected payload {} in muc query.",
-                    child.name()
-                )),
+                _ => Err(RequestError::Generic {
+                    msg: format!(
+                        "Encountered unexpected payload {} in muc query.",
+                        child.name()
+                    ),
+                }),
             })
             .collect::<Result<Vec<Element>, _>>()?;
 
@@ -75,15 +83,18 @@ pub trait MucQueryPayload: TryFrom<Element> + Into<Element> {}
 
 impl MucQueryPayload for DataForm {}
 impl MucQueryPayload for xmpp_parsers::muc::user::Item {}
+impl MucQueryPayload for Destroy {}
 
 impl FromStr for Role {
-    type Err = anyhow::Error;
+    type Err = RequestError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             ns::MUC_OWNER => Ok(Self::Owner),
             ns::MUC_ADMIN => Ok(Self::Admin),
-            _ => Err(anyhow::format_err!("Unknown role {}", s)),
+            _ => Err(RequestError::Generic {
+                msg: format!("Unknown role {}", s),
+            }),
         }
     }
 }
@@ -95,5 +106,33 @@ impl ToString for Role {
             Self::Admin => ns::MUC_ADMIN,
         }
         .to_string()
+    }
+}
+
+impl TryFrom<Element> for Destroy {
+    type Error = RequestError;
+
+    fn try_from(root: Element) -> Result<Self, Self::Error> {
+        root.expect_is("destroy", ns::MUC_OWNER)?;
+
+        Ok(Destroy {
+            jid: BareJid::from_str(root.attr_req("jid")?)?,
+            reason: root
+                .get_child("destroy", ns::MUC_OWNER)
+                .map(|node| node.text()),
+        })
+    }
+}
+
+impl From<Destroy> for Element {
+    fn from(value: Destroy) -> Self {
+        Element::builder("destroy", ns::MUC_OWNER)
+            .attr("jid", value.jid)
+            .append_all(value.reason.map(|reason| {
+                Element::builder("reason", ns::MUC_OWNER)
+                    .append(reason)
+                    .build()
+            }))
+            .build()
     }
 }

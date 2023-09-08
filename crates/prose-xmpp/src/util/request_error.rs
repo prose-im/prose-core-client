@@ -13,6 +13,8 @@ pub enum RequestError {
     UnexpectedResponse,
     #[error("XMPP Error: {err:?}")]
     XMPP { err: StanzaError },
+    #[error(transparent)]
+    JidError(#[from] jid::Error),
     #[error("Request error: {msg}")]
     Generic { msg: String },
 }

@@ -42,7 +42,7 @@ impl TryFrom<Element> for LastActivityResponse {
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         Ok(LastActivityResponse {
             seconds: root
-                .req_attr("seconds")?
+                .attr_req("seconds")?
                 .parse::<u64>()
                 .context("Failed to parse seconds in LastActivityResponse")?,
             status: root.texts().next().map(|s| s.to_string()),

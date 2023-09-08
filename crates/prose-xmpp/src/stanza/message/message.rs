@@ -15,6 +15,7 @@ use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::stanza_id::{OriginId, StanzaId};
 use crate::stanza::message::{carbons, Fallback, Reactions};
 use crate::stanza::message::{chat_marker, mam};
+use crate::stanza::muc;
 use crate::util::id_string_macro::id_string;
 
 id_string!(Id);
@@ -36,7 +37,7 @@ pub enum ChatState {
     Paused,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Message {
     pub from: Option<Jid>,
     pub to: Option<Jid>,
@@ -59,6 +60,7 @@ pub struct Message {
     pub sent_carbon: Option<carbons::Sent>,
     pub received_carbon: Option<carbons::Received>,
     pub store: Option<bool>,
+    pub direct_invite: Option<muc::DirectInvite>,
 }
 
 impl Message {
@@ -85,6 +87,7 @@ impl Message {
             sent_carbon: None,
             received_carbon: None,
             store: None,
+            direct_invite: None,
         }
     }
 }
@@ -144,6 +147,9 @@ impl TryFrom<xmpp_parsers::message::Message> for Message {
                 }
                 _ if payload.is("received", ns::CARBONS) => {
                     message.received_carbon = Some(carbons::Received::try_from(payload)?)
+                }
+                _ if payload.is("x", ns::DIRECT_MUC_INVITATIONS) => {
+                    message.direct_invite = Some(muc::DirectInvite::try_from(payload)?)
                 }
                 _ => (),
             }
@@ -239,6 +245,9 @@ impl From<Message> for xmpp_parsers::message::Message {
             message.payloads.push(
                 Element::builder(if store { "store" } else { "no-store" }, ns::HINTS).build(),
             );
+        }
+        if let Some(direct_invite) = value.direct_invite {
+            message.payloads.push(direct_invite.into())
         }
         message
     }

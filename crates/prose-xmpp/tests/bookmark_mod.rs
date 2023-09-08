@@ -3,16 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::str::FromStr;
+
 use anyhow::Result;
 use insta::assert_snapshot;
 use minidom::Element;
-use prose_xmpp::mods::bookmark::ConferenceBookmark;
-use prose_xmpp::test::{ClientTestAdditions, ConnectedClient};
-use prose_xmpp::{jid_str, mods, Client, Event};
-use std::str::FromStr;
 use xmpp_parsers::bookmarks2::{Autojoin, Conference};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub;
+
+use prose_xmpp::stanza::ConferenceBookmark;
+use prose_xmpp::test::{ClientTestAdditions, ConnectedClient};
+use prose_xmpp::{jid_str, mods, Client, Event};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_loads_bookmarks() -> Result<()> {
@@ -43,7 +45,7 @@ async fn test_loads_bookmarks() -> Result<()> {
 
     connection.set_stanza_handler(|_| vec![Element::from_str(xml).unwrap()]);
 
-    let bookmark = client.get_mod::<mods::Bookmark>();
+    let bookmark = client.get_mod::<mods::Bookmark2>();
     let bookmarks = bookmark.load_bookmarks().await?;
 
     let sent_stanzas = connection.sent_stanza_strings();
@@ -110,7 +112,7 @@ async fn test_loads_legacy_bookmarks() -> Result<()> {
     connection.set_stanza_handler(|_| vec![Element::from_str(xml).unwrap()]);
 
     let bookmark = client.get_mod::<mods::Bookmark>();
-    let bookmarks = bookmark.load_legacy_bookmarks().await?;
+    let bookmarks = bookmark.load_bookmarks().await?;
 
     let sent_stanzas = connection.sent_stanza_strings();
     assert_eq!(sent_stanzas.len(), 1);
@@ -141,7 +143,7 @@ async fn test_publishes_bookmark() -> Result<()> {
         connection, client, ..
     } = Client::connected_client().await?;
 
-    let bookmark = client.get_mod::<mods::Bookmark>();
+    let bookmark = client.get_mod::<mods::Bookmark2>();
 
     connection.set_stanza_handler(|_| vec![Iq::from_result("id-1", None::<pubsub::PubSub>).into()]);
 
@@ -176,7 +178,7 @@ async fn test_publishes_legacy_bookmarks() -> Result<()> {
     connection.set_stanza_handler(|_| vec![Iq::from_result("id-1", None::<pubsub::PubSub>).into()]);
 
     bookmark
-        .publish_legacy_bookmarks(vec![ConferenceBookmark {
+        .publish_bookmarks(vec![ConferenceBookmark {
             jid: jid_str!("room@prose.org"),
             conference: Conference {
                 autojoin: Autojoin::True,
@@ -201,7 +203,7 @@ async fn test_retracts_bookmark() -> Result<()> {
         connection, client, ..
     } = Client::connected_client().await?;
 
-    let bookmark = client.get_mod::<mods::Bookmark>();
+    let bookmark = client.get_mod::<mods::Bookmark2>();
 
     connection.set_stanza_handler(|_| vec![Iq::from_result("id-1", None::<pubsub::PubSub>).into()]);
 
@@ -244,7 +246,7 @@ async fn test_bookmarks_published_event() -> Result<()> {
     assert_eq!(sent_events.len(), 1);
     assert_eq!(
         sent_events[0],
-        Event::Bookmark(mods::bookmark::Event::BookmarksPublished {
+        Event::Bookmark2(mods::bookmark2::Event::BookmarksPublished {
             bookmarks: vec![ConferenceBookmark {
                 jid: jid_str!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
@@ -289,7 +291,7 @@ async fn test_legacy_bookmark_event() -> Result<()> {
     assert_eq!(sent_events.len(), 1);
     assert_eq!(
         sent_events[0],
-        Event::Bookmark(mods::bookmark::Event::BookmarksReplaced {
+        Event::Bookmark(mods::bookmark::Event::BookmarksChanged {
             bookmarks: vec![ConferenceBookmark {
                 jid: jid_str!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
@@ -328,7 +330,7 @@ async fn test_bookmarks_retracted_event() -> Result<()> {
     assert_eq!(sent_events.len(), 1);
     assert_eq!(
         sent_events[0],
-        Event::Bookmark(mods::bookmark::Event::BookmarksRetracted {
+        Event::Bookmark2(mods::bookmark2::Event::BookmarksRetracted {
             jids: vec![jid_str!("theplay@conference.shakespeare.lit")]
         })
     );

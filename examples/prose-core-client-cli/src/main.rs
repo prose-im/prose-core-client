@@ -43,7 +43,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     let (jid, password) = load_credentials();
 
-    println!("Connecting to server…");
+    println!("Connecting to server as {}…", jid);
     client.connect(&jid, password, Availability::Away).await?;
     println!("Connected.");
 
@@ -384,7 +384,9 @@ enum Selection {
     LoadMessages,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
+    #[strum(serialize = "Create public channel")]
     CreatePublicChannel,
+    #[strum(serialize = "Load public rooms")]
     LoadPublicRooms,
     Disconnect,
     Noop,
@@ -433,15 +435,17 @@ async fn main() -> Result<()> {
                 client.delete_cached_data().await?;
             }
             Selection::CreatePublicChannel => {
-                let services = client.load_muc_services().await?;
-                let service = services.first().unwrap();
+                let service_jid = BareJid::from_str("groups.prose.org").unwrap();
+                let service = client.service_with_jid(&service_jid).await?;
+
+                // let services = client.load_muc_services().await?;
+                // let service = services.first().unwrap();
 
                 let room_name = prompt_string("Enter a name for the channel:");
                 service.create_public_channel(room_name).await?;
             }
             Selection::LoadPublicRooms => {
-                let services = client.load_muc_services().await?;
-                let service = services.first().unwrap();
+                let service = client.muc_service().unwrap();
                 let rooms = service
                     .load_public_rooms()
                     .await?
