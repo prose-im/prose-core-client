@@ -10,4 +10,3 @@ pub use client_delegate::{ClientDelegate, ClientEvent, ConnectionEvent};
 mod cache_policy;
 mod client;
 mod client_delegate;
-pub mod muc;

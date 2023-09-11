@@ -1,3 +1,8 @@
+// prose-core-client/prose-xmpp
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use crate::util::form_config::{FormValue, Value};
 use crate::util::{form_config, FormConfig};
 use prose_xmpp::ns;
@@ -38,8 +43,8 @@ impl RoomConfig {
                 FormValue::optional(cfg::ROOM_NAME, Value::None),
                 FormValue::optional(cfg::ROOM_OWNERS, Value::None),
                 FormValue::optional(cfg::ROOM_SECRET, Value::None),
+                FormValue::optional(cfg::GET_MEMBER_LIST, Value::Boolean(true)),
                 FormValue::required(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
-                FormValue::required(cfg::GET_MEMBER_LIST, Value::Boolean(true)),
                 FormValue::required(cfg::MEMBERS_ONLY, Value::Boolean(true)),
                 FormValue::required(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
                 FormValue::required(cfg::PUBLIC_ROOM, Value::Boolean(false)),

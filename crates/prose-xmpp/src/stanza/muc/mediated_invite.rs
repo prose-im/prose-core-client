@@ -5,7 +5,6 @@
 
 use crate::ns;
 use crate::util::ElementExt;
-use anyhow::bail;
 use jid::Jid;
 use minidom::Element;
 use std::str::FromStr;
@@ -56,13 +55,7 @@ impl TryFrom<Element> for MediatedInvite {
                     invites.push(Invite::try_from(child.clone())?)
                 }
                 _ if child.is("password", ns::MUC_USER) => password = Some(child.text()),
-                _ => {
-                    bail!(
-                        "Unexpected element {} ({}) in mediated invite.",
-                        child.name(),
-                        child.ns()
-                    )
-                }
+                _ => (),
             }
         }
 

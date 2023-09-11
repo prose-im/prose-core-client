@@ -6,6 +6,7 @@
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
+use crate::stanza::muc::mediated_invite::MediatedInvite;
 use crate::stanza::muc::query::{Destroy, Role};
 use crate::stanza::muc::{DirectInvite, Query};
 use crate::stanza::{muc, Message};
@@ -43,15 +44,28 @@ impl Module for MUC {
     }
 
     fn handle_message_stanza(&self, stanza: &Message) -> Result<()> {
-        let (Some(from), Some(direct_invite)) = (&stanza.from, &stanza.direct_invite) else {
+        let Some(from) = &stanza.from else {
             return Ok(());
         };
 
-        self.ctx
-            .schedule_event(ClientEvent::MUC(Event::DirectInvite {
-                from: from.clone(),
-                invite: direct_invite.clone(),
-            }));
+        if let Some(direct_invite) = &stanza.direct_invite {
+            self.ctx
+                .schedule_event(ClientEvent::MUC(Event::DirectInvite {
+                    from: from.clone(),
+                    invite: direct_invite.clone(),
+                }));
+        };
+
+        if let Some(mediated_invite) = &stanza.mediated_invite {
+            // Ignore empty invites.
+            if !mediated_invite.invites.is_empty() {
+                self.ctx
+                    .schedule_event(ClientEvent::MUC(Event::MediatedInvite {
+                        from: from.clone(),
+                        invite: mediated_invite.clone(),
+                    }));
+            }
+        };
 
         Ok(())
     }
@@ -61,6 +75,8 @@ impl Module for MUC {
 pub enum Event {
     /// XEP-0249: Direct MUC Invitations
     DirectInvite { from: Jid, invite: DirectInvite },
+    /// https://xmpp.org/extensions/xep-0045.html#invite-mediated
+    MediatedInvite { from: Jid, invite: MediatedInvite },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,9 +124,14 @@ impl MUC {
         Ok(rooms)
     }
 
-    pub async fn enter_room(&self, room_jid: &BareJid, nickname: impl AsRef<str>) -> Result<()> {
+    pub async fn enter_room(
+        &self,
+        room_jid: &BareJid,
+        nickname: impl AsRef<str>,
+        password: Option<&str>,
+    ) -> Result<()> {
         let full_room_jid = room_jid.with_resource_str(nickname.as_ref())?;
-        self.send_presence_to_room(&full_room_jid).await?;
+        self.send_presence_to_room(&full_room_jid, password).await?;
         Ok(())
     }
 
@@ -257,10 +278,18 @@ impl MUC {
             .await
     }
 
-    async fn send_presence_to_room(&self, room_jid: &FullJid) -> Result<MucUser, Error> {
+    async fn send_presence_to_room(
+        &self,
+        room_jid: &FullJid,
+        password: Option<&str>,
+    ) -> Result<MucUser, Error> {
         let presence = Presence::new(presence::Type::None)
             .with_to(room_jid.clone())
-            .with_payloads(vec![Element::builder("x", ns::MUC).build()]);
+            .with_payloads(vec![Element::builder("x", ns::MUC)
+                .append_all(
+                    password.map(|password| Element::builder("password", ns::MUC).append(password)),
+                )
+                .build()]);
 
         let mut response = self.send_presence(presence).await?;
         let payload = response
@@ -273,7 +302,7 @@ impl MUC {
 
     /// https://xmpp.org/extensions/xep-0045.html#createroom
     async fn create_room(&self, room_jid: &FullJid) -> Result<MucUser, Error> {
-        let user = self.send_presence_to_room(room_jid).await?;
+        let user = self.send_presence_to_room(room_jid, None).await?;
 
         if !user.status.contains(&Status::RoomHasBeenCreated) {
             return Err(Error::RoomAlreadyExists);
@@ -282,7 +311,8 @@ impl MUC {
         Ok(user)
     }
 
-    async fn send_direct_invite(
+    /// https://xmpp.org/extensions/xep-0045.html#invite-direct
+    pub async fn send_direct_invite(
         &self,
         to: impl Into<Jid>,
         direct_invite: DirectInvite,
@@ -290,6 +320,21 @@ impl MUC {
         let message = Message {
             to: Some(to.into()),
             direct_invite: Some(direct_invite),
+            ..Default::default()
+        };
+        self.ctx.send_stanza(message)?;
+        Ok(())
+    }
+
+    /// https://xmpp.org/extensions/xep-0045.html#invite-mediated
+    pub async fn send_mediated_invite(
+        &self,
+        room_jid: &BareJid,
+        mediated_invite: MediatedInvite,
+    ) -> Result<()> {
+        let message = Message {
+            to: Some(room_jid.clone().into()),
+            mediated_invite: Some(mediated_invite),
             ..Default::default()
         };
         self.ctx.send_stanza(message)?;

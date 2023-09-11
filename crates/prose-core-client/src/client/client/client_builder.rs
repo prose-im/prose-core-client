@@ -147,6 +147,8 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             delegate: self.delegate,
             presences: Default::default(),
             muc_service: Default::default(),
+            bookmarks: Default::default(),
+            connected_rooms: Default::default(),
         });
 
         let event_inner = inner.clone();

@@ -117,24 +117,26 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
             Event::Bookmark(event) => match event {
                 bookmark::Event::BookmarksChanged { bookmarks } => {
-                    info!("replaced {:?}", bookmarks);
-                    Ok(())
+                    self.handle_changed_bookmarks(bookmarks).await
                 }
             },
 
             Event::Bookmark2(event) => match event {
                 bookmark2::Event::BookmarksPublished { bookmarks } => {
-                    info!("published {:?}", bookmarks);
-                    Ok(())
+                    self.handle_published_bookmarks2(bookmarks).await
                 }
                 bookmark2::Event::BookmarksRetracted { jids } => {
-                    info!("retracted {:?}", jids);
-                    Ok(())
+                    self.handle_retracted_bookmarks2(jids).await
                 }
             },
 
             Event::MUC(event) => match event {
-                muc::Event::DirectInvite { from, invite } => Ok(()),
+                muc::Event::DirectInvite { from, invite } => {
+                    self.handle_direct_invite(from, invite).await
+                }
+                muc::Event::MediatedInvite { from, invite } => {
+                    self.handle_mediated_invite(from, invite).await
+                }
             },
         };
 

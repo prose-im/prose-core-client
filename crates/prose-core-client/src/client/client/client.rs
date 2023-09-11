@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashSet;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -10,15 +11,15 @@ use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use parking_lot::RwLock;
 use strum_macros::Display;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{error, instrument};
 
 use prose_xmpp::mods::{Chat, Status};
 use prose_xmpp::{mods, ConnectionError};
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
-use crate::client::muc;
 use crate::data_cache::DataCache;
+use crate::types::{muc, Bookmarks};
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
 use crate::ClientDelegate;
@@ -43,6 +44,8 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
     pub presences: RwLock<PresenceMap>,
     pub muc_service: RwLock<Option<muc::Service>>,
+    pub bookmarks: RwLock<Bookmarks>,
+    pub connected_rooms: RwLock<HashSet<BareJid>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
@@ -169,32 +172,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn perform_post_connect_tasks(&self) -> Result<()> {
-        let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
-        let bookmark2_mod = self.client.get_mod::<mods::Bookmark2>();
-        let muc_mod = self.client.get_mod::<mods::MUC>();
-
-        // TODO: Ignore duplicates
-        let bookmarks = bookmark_mod
-            .load_bookmarks()
-            .await?
-            .into_iter()
-            .chain(bookmark2_mod.load_bookmarks().await?);
-
-        for bookmark in bookmarks {
-            info!("Entering room {}…", bookmark.jid);
-            muc_mod
-                .enter_room(
-                    &bookmark.jid.into_bare(),
-                    bookmark
-                        .conference
-                        .nick
-                        .as_deref()
-                        .or(self.connected_jid()?.node_str())
-                        .unwrap_or("unknown-user"),
-                )
-                .await?;
-        }
-
+        self.load_and_connect_bookmarks().await?;
         Ok(())
     }
 }

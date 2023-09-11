@@ -58,11 +58,12 @@ impl Bookmark {
             }),
         );
 
-        let response = self
-            .ctx
-            .send_iq(iq)
-            .await?
-            .ok_or(RequestError::UnexpectedResponse)?;
+        let response = match self.ctx.send_iq(iq).await {
+            Ok(iq) => iq,
+            Err(e) if e.is_item_not_found_err() => return Ok(vec![]),
+            Err(e) => return Err(e.into()),
+        }
+        .ok_or(RequestError::UnexpectedResponse)?;
 
         let pubsub::PubSub::Items(items) = pubsub::PubSub::try_from(response)? else {
             return Err(RequestError::UnexpectedResponse.into());

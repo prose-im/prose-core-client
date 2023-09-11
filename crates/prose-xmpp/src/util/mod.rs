@@ -13,7 +13,7 @@ pub use request_error::RequestError;
 pub(crate) use request_future::{ElementReducerPoll, RequestFuture};
 pub use xmpp_element::XMPPElement;
 
-mod element_ext;
+pub mod element_ext;
 pub(crate) mod id_string_macro;
 mod module_future_state;
 mod publish_options_ext;

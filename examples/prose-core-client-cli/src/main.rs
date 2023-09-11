@@ -9,7 +9,7 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Input, Select};
+use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -173,6 +173,7 @@ fn prompt_string(prompt: impl Into<String>) -> String {
         .unwrap()
 }
 
+#[derive(Debug)]
 struct ContactEnvelope(Contact);
 
 impl Display for ContactEnvelope {
@@ -197,6 +198,27 @@ async fn select_contact(client: &Client) -> Result<BareJid> {
         .unwrap();
     println!();
     Ok(items[selection].0.jid.clone())
+}
+
+async fn select_multiple_contacts(client: &Client) -> Result<Vec<Contact>> {
+    let items = client
+        .load_contacts(CachePolicy::default())
+        .await?
+        .into_iter()
+        .map(ContactEnvelope)
+        .collect::<Vec<_>>();
+
+    let selection = MultiSelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select contacts")
+        .items(&items[..])
+        .interact()
+        .unwrap();
+    println!();
+
+    Ok(selection
+        .into_iter()
+        .map(|idx| items[idx].0.clone())
+        .collect())
 }
 
 async fn load_avatar(client: &Client, jid: &BareJid) -> Result<()> {
@@ -384,6 +406,8 @@ enum Selection {
     LoadMessages,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
+    #[strum(serialize = "Create private group")]
+    CreateGroup,
     #[strum(serialize = "Create public channel")]
     CreatePublicChannel,
     #[strum(serialize = "Load public rooms")]
@@ -434,19 +458,18 @@ async fn main() -> Result<()> {
                 println!("Cleaning cache…");
                 client.delete_cached_data().await?;
             }
+            Selection::CreateGroup => {
+                let contacts = select_multiple_contacts(&client).await?;
+                client
+                    .create_group(&contacts.into_iter().map(|c| c.jid).collect::<Vec<_>>()[..])
+                    .await?;
+            }
             Selection::CreatePublicChannel => {
-                let service_jid = BareJid::from_str("groups.prose.org").unwrap();
-                let service = client.service_with_jid(&service_jid).await?;
-
-                // let services = client.load_muc_services().await?;
-                // let service = services.first().unwrap();
-
                 let room_name = prompt_string("Enter a name for the channel:");
-                service.create_public_channel(room_name).await?;
+                client.create_public_channel(room_name).await?;
             }
             Selection::LoadPublicRooms => {
-                let service = client.muc_service().unwrap();
-                let rooms = service
+                let rooms = client
                     .load_public_rooms()
                     .await?
                     .into_iter()

@@ -66,7 +66,7 @@ impl ModuleContext {
             .jid
             .read()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .unwrap_or(FullJid::from_parts(
                 Some(&NodePart::new("placeholder").unwrap()),
                 &DomainPart::new("prose.org").unwrap(),

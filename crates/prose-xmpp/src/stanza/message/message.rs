@@ -61,6 +61,7 @@ pub struct Message {
     pub received_carbon: Option<carbons::Received>,
     pub store: Option<bool>,
     pub direct_invite: Option<muc::DirectInvite>,
+    pub mediated_invite: Option<muc::MediatedInvite>,
 }
 
 impl Message {
@@ -88,6 +89,7 @@ impl Message {
             received_carbon: None,
             store: None,
             direct_invite: None,
+            mediated_invite: None,
         }
     }
 }
@@ -150,6 +152,9 @@ impl TryFrom<xmpp_parsers::message::Message> for Message {
                 }
                 _ if payload.is("x", ns::DIRECT_MUC_INVITATIONS) => {
                     message.direct_invite = Some(muc::DirectInvite::try_from(payload)?)
+                }
+                _ if payload.is("x", ns::MUC_USER) => {
+                    message.mediated_invite = Some(muc::MediatedInvite::try_from(payload)?)
                 }
                 _ => (),
             }
@@ -248,6 +253,9 @@ impl From<Message> for xmpp_parsers::message::Message {
         }
         if let Some(direct_invite) = value.direct_invite {
             message.payloads.push(direct_invite.into())
+        }
+        if let Some(mediated_invite) = value.mediated_invite {
+            message.payloads.push(mediated_invite.into())
         }
         message
     }
