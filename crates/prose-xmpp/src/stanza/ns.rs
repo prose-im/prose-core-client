@@ -46,5 +46,8 @@ pub const MUC_ADMIN: &str = "http://jabber.org/protocol/muc#admin";
 /// XEP-0045: Multi-User Chat
 pub const MUC_ROOMCONFIG: &str = "http://jabber.org/protocol/muc#roomconfig";
 
+/// XEP-0045: Multi-User Chat
+pub const MUC_ROOMINFO: &str = "http://jabber.org/protocol/muc#roominfo";
+
 /// XEP-0249: Direct MUC Invitations
 pub const DIRECT_MUC_INVITATIONS: &str = "jabber:x:conference";

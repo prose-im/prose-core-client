@@ -102,3 +102,54 @@ pub mod request {
     /// Room Nickname
     pub const ROOM_NICK: &str = "muc#roomnick";
 }
+
+// https://xmpp.org/extensions/xep-0045.html#registrar-features
+pub mod disco_feature {
+    /// Hidden room in Multi-User Chat (MUC)
+    pub const HIDDEN: &str = "muc_hidden";
+    /// Members-only room in Multi-User Chat (MUC)
+    pub const MEMBERS_ONLY: &str = "muc_membersonly";
+    /// Moderated room in Multi-User Chat (MUC)
+    pub const MODERATED: &str = "muc_moderated";
+    pub const MUC: &str = "http://jabber.org/protocol/muc";
+    /// Non-anonymous room in Multi-User Chat (MUC)
+    pub const NON_ANONYMOUS: &str = "muc_nonanonymous";
+    /// XEP-0421: Anonymous unique occupant identifiers for MUCs
+    /// https://xmpp.org/extensions/xep-0421.html
+    pub const OCCUPANT_ID: &str = "urn:xmpp:occupant-id:0";
+    /// Open room in Multi-User Chat (MUC)
+    pub const OPEN: &str = "muc_open";
+    /// Password-protected room in Multi-User Chat (MUC)
+    pub const PASSWORD_PROTECTED: &str = "muc_passwordprotected";
+    /// Persistent room in Multi-User Chat (MUC)
+    pub const PERSISTENT: &str = "muc_persistent";
+    /// Public room in Multi-User Chat (MUC)
+    pub const PUBLIC: &str = "muc_public";
+    /// Support for the muc#register FORM_TYPE
+    pub const REGISTER: &str = "http://jabber.org/protocol/muc#register";
+    /// XEP-0077: In-Band Registration
+    /// https://xmpp.org/extensions/xep-0077.html#schemas-register
+    pub const REGISTER_IN_BAND: &str = "jabber:iq:register";
+    /// https://xmpp.org/extensions/xep-0045.html#registrar-formtype-request
+    pub const REQUEST: &str = "http://jabber.org/protocol/muc#request";
+    /// Support for the muc#roomconfig FORM_TYPE
+    pub const ROOM_CONFIG: &str = "http://jabber.org/protocol/muc#roomconfig";
+    /// Support for the muc#roominfo FORM_TYPE
+    pub const ROOM_INFO: &str = "http://jabber.org/protocol/muc#roominfo";
+    /// List of MUC rooms (each as a separate item)
+    pub const ROOMS: &str = "muc_rooms";
+    /// XEP-0410: MUC Self-Ping
+    /// https://xmpp.org/extensions/xep-0410.html
+    pub const SELF_PING_OPTIMIZATION: &str =
+        "http://jabber.org/protocol/muc#self-ping-optimization";
+    /// Semi-anonymous room in Multi-User Chat (MUC)
+    pub const SEMI_ANONYMOUS: &str = "muc_semianonymous";
+    /// This MUC will reflect the original message 'id' in 'groupchat' messages.
+    pub const STABLE_ID: &str = "http://jabber.org/protocol/muc#stable_id";
+    /// Temporary room in Multi-User Chat (MUC)
+    pub const TEMPORARY: &str = "muc_temporary";
+    /// Unmoderated room in Multi-User Chat (MUC)
+    pub const UNMODERATED: &str = "muc_unmoderated";
+    /// Unsecured room in Multi-User Chat (MUC)
+    pub const UNSECURED: &str = "muc_unsecured";
+}

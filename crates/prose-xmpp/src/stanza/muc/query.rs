@@ -1,24 +1,34 @@
 use crate::ns;
 use crate::util::{ElementExt, RequestError};
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use minidom::{Element, NSChoice};
 use std::str::FromStr;
 use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::iq::{IqGetPayload, IqSetPayload};
+use xmpp_parsers::muc;
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Role {
     Owner,
     Admin,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Query {
     pub role: Role,
     pub payloads: Vec<Element>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Destroy {
-    pub jid: BareJid,
+    pub jid: Option<BareJid>,
     pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct User {
+    jid: Jid,
+    affiliation: muc::user::Affiliation,
 }
 
 impl Query {
@@ -58,7 +68,9 @@ impl TryFrom<Element> for Query {
             .children()
             .into_iter()
             .map(|child| match child {
-                _ if child.is("item", ns::MUC_USER) => Ok(child.clone()),
+                _ if child.is("item", NSChoice::AnyOf(&[ns::MUC_OWNER, ns::MUC_ADMIN])) => {
+                    Ok(child.clone())
+                }
                 _ if child.is("x", ns::DATA_FORMS) => Ok(child.clone()),
                 _ => Err(RequestError::Generic {
                     msg: format!(
@@ -116,7 +128,7 @@ impl TryFrom<Element> for Destroy {
         root.expect_is("destroy", ns::MUC_OWNER)?;
 
         Ok(Destroy {
-            jid: BareJid::from_str(root.attr_req("jid")?)?,
+            jid: root.attr("jid").map(BareJid::from_str).transpose()?,
             reason: root
                 .get_child("destroy", ns::MUC_OWNER)
                 .map(|node| node.text()),
@@ -134,5 +146,22 @@ impl From<Destroy> for Element {
                     .build()
             }))
             .build()
+    }
+}
+
+impl TryFrom<Element> for User {
+    type Error = RequestError;
+
+    fn try_from(root: Element) -> Result<Self, Self::Error> {
+        root.expect_is("item", NSChoice::AnyOf(&[ns::MUC_OWNER, ns::MUC_ADMIN]))?;
+
+        Ok(User {
+            jid: Jid::from_str(root.attr_req("jid")?)?,
+            affiliation: muc::user::Affiliation::from_str(root.attr_req("affiliation")?).map_err(
+                |err| RequestError::Generic {
+                    msg: err.to_string(),
+                },
+            )?,
+        })
     }
 }

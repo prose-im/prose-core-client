@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
@@ -19,6 +19,7 @@ use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
+use crate::types::muc::Room;
 use crate::types::{muc, Bookmarks};
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
@@ -45,7 +46,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub presences: RwLock<PresenceMap>,
     pub muc_service: RwLock<Option<muc::Service>>,
     pub bookmarks: RwLock<Bookmarks>,
-    pub connected_rooms: RwLock<HashSet<BareJid>>,
+    pub connected_rooms: RwLock<HashMap<BareJid, Room>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
@@ -173,6 +174,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
     async fn perform_post_connect_tasks(&self) -> Result<()> {
         self.load_and_connect_bookmarks().await?;
+        self.load_and_connect_public_channels().await?;
         Ok(())
     }
 }

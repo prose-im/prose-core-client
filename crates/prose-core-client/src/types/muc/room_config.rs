@@ -18,8 +18,8 @@ impl RoomConfig {
         let history_len = Value::TextSingle(u32::MAX.to_string());
         RoomConfig {
             config: FormConfig::new([
-                FormValue::optional(cfg::ALLOW_INVITES, Value::Boolean(true)),
-                FormValue::optional(cfg::ALLOW_MEMBER_INVITES, Value::Boolean(true)),
+                FormValue::optional(cfg::ALLOW_INVITES, Value::Boolean(false)),
+                FormValue::optional(cfg::ALLOW_MEMBER_INVITES, Value::Boolean(false)),
                 FormValue::optional(cfg::ALLOW_PM, Value::TextSingle("none".to_string())),
                 FormValue::optional(cfg::CHANGE_SUBJECT, Value::Boolean(true)),
                 FormValue::optional(cfg::DEFAULT_HISTORY_MESSAGES, history_len.clone()),
@@ -44,10 +44,10 @@ impl RoomConfig {
                 FormValue::optional(cfg::ROOM_OWNERS, Value::None),
                 FormValue::optional(cfg::ROOM_SECRET, Value::None),
                 FormValue::optional(cfg::GET_MEMBER_LIST, Value::Boolean(true)),
-                FormValue::required(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
-                FormValue::required(cfg::MEMBERS_ONLY, Value::Boolean(true)),
-                FormValue::required(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
-                FormValue::required(cfg::PUBLIC_ROOM, Value::Boolean(false)),
+                FormValue::optional(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
+                FormValue::optional(cfg::MEMBERS_ONLY, Value::Boolean(true)),
+                FormValue::optional(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
+                FormValue::optional(cfg::PUBLIC_ROOM, Value::Boolean(false)),
             ]),
         }
     }
@@ -81,11 +81,11 @@ impl RoomConfig {
                 FormValue::optional(cfg::ROOM_NAME, Value::TextSingle(name.as_ref().to_string())),
                 FormValue::optional(cfg::ROOM_OWNERS, Value::None),
                 FormValue::optional(cfg::ROOM_SECRET, Value::None),
-                FormValue::required(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
+                FormValue::optional(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
                 FormValue::optional(cfg::GET_MEMBER_LIST, Value::Boolean(true)),
-                FormValue::required(cfg::MEMBERS_ONLY, Value::Boolean(false)),
-                FormValue::required(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
-                FormValue::required(cfg::PUBLIC_ROOM, Value::Boolean(true)),
+                FormValue::optional(cfg::MEMBERS_ONLY, Value::Boolean(false)),
+                FormValue::optional(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
+                FormValue::optional(cfg::PUBLIC_ROOM, Value::Boolean(true)),
             ]),
         }
     }

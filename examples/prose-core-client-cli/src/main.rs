@@ -18,8 +18,9 @@ use url::Url;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::data_cache::sqlite::SQLiteCache;
 use prose_core_client::types::{Address, Availability, Contact, Message, MessageId};
-use prose_core_client::{CachePolicy, ClientBuilder, FsAvatarCache};
+use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
 use prose_xmpp::connector;
+use prose_xmpp::mods::muc;
 
 type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
 
@@ -39,6 +40,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
         .set_data_cache(data_cache)
         .set_avatar_cache(image_cache)
+        .set_delegate(Some(Box::new(Delegate {})))
         .build();
 
     let (jid, password) = load_credentials();
@@ -179,6 +181,20 @@ struct ContactEnvelope(Contact);
 impl Display for ContactEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} ({})", self.0.name, self.0.jid)
+    }
+}
+
+#[derive(Debug)]
+struct RoomEnvelope(muc::Room);
+
+impl Display for RoomEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} ({})",
+            self.0.name.as_deref().unwrap_or("<untitled>"),
+            self.0.jid
+        )
     }
 }
 
@@ -386,6 +402,46 @@ fn format_opt<T: Display>(value: Option<T>) -> String {
     }
 }
 
+struct Delegate {}
+
+impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
+    fn handle_event(
+        &self,
+        client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
+        event: ClientEvent,
+    ) {
+        tokio::spawn(async move {
+            match Self::_handle_event(client, event).await {
+                Ok(_) => (),
+                Err(err) => println!("Failed to handle event. {}", err),
+            }
+        });
+    }
+}
+
+impl Delegate {
+    async fn _handle_event(
+        client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
+        event: ClientEvent,
+    ) -> Result<()> {
+        match event {
+            ClientEvent::MessagesAppended {
+                conversation,
+                message_ids,
+            } => {
+                let messages = client
+                    .load_messages_with_ids(&conversation, message_ids.as_slice())
+                    .await?;
+                for message in messages {
+                    println!("Message from {}: {}", message.from, message.body);
+                }
+            }
+            _ => (),
+        };
+        Ok(())
+    }
+}
+
 #[derive(EnumIter, Display, Clone)]
 enum Selection {
     #[strum(serialize = "Load profile")]
@@ -412,6 +468,8 @@ enum Selection {
     CreatePublicChannel,
     #[strum(serialize = "Load public rooms")]
     LoadPublicRooms,
+    #[strum(serialize = "Destroy public room")]
+    DestroyPublicRoom,
     Disconnect,
     Noop,
     Exit,
@@ -482,6 +540,25 @@ async fn main() -> Result<()> {
                     })
                     .collect::<Vec<_>>();
                 println!("{}", rooms.join("\n"));
+            }
+            Selection::DestroyPublicRoom => {
+                let rooms = client
+                    .load_public_rooms()
+                    .await?
+                    .into_iter()
+                    .map(RoomEnvelope)
+                    .collect::<Vec<_>>();
+
+                let selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Select a room to destroy")
+                    .default(0)
+                    .items(rooms.as_slice())
+                    .interact()
+                    .unwrap();
+                println!();
+                client
+                    .destroy_room(&rooms[selection].0.jid.to_bare())
+                    .await?;
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

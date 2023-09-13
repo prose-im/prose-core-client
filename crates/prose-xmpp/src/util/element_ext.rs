@@ -75,7 +75,7 @@ impl ElementBuilderExt for ElementBuilder {
     }
 }
 
-fn parse_bool(value: impl AsRef<str>) -> Result<bool, RequestError> {
+pub fn parse_bool(value: impl AsRef<str>) -> Result<bool, RequestError> {
     Ok(match value.as_ref() {
         "true" | "1" => true,
         "false" | "0" => false,

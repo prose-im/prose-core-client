@@ -6,7 +6,8 @@
 use anyhow::Result;
 use chrono::Utc;
 use jid::{BareJid, Jid};
-use tracing::{debug, error, info};
+use tracing::{debug, error};
+use xmpp_parsers::message::MessageType;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
@@ -254,6 +255,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         let jid = from.to_bare();
 
+        // If the presence was sent from a JID that belongs to one of our connected rooms, let
+        // that room handle it…
+        if let Some(room) = self.inner.connected_rooms.write().get_mut(&jid) {
+            room.handle_presence(presence);
+            return Ok(());
+        };
+
         // Update user presences with the received one and retrieve the new highest presence…
         let highest_presence = self.update_presence(&from, presence.into());
 
@@ -328,6 +336,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let mut chat_state: Option<ChatStateEvent> = None;
 
         if let ReceivedMessage::Message(message) = &message {
+            if message.r#type != MessageType::Chat {
+                // Ignore all messages other than "chat" for now.
+                return Ok(());
+            }
+
             if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
                 chat_state = Some(ChatStateEvent {
                     state: state.clone(),

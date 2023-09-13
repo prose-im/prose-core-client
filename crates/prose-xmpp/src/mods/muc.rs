@@ -19,7 +19,7 @@ use std::future::Future;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
-use xmpp_parsers::muc::user::Status;
+use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
@@ -228,12 +228,58 @@ impl MUC {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             Query::new(Role::Owner).with_payload(Destroy {
-                jid: jid.clone(),
+                jid: None,
                 reason: None,
             }),
-        );
+        )
+        .with_to(jid.clone().into());
         self.ctx.send_iq(iq).await?;
         Ok(())
+    }
+
+    /// https://xmpp.org/extensions/xep-0045.html#example-129
+    pub async fn request_users(
+        &self,
+        room_jid: &BareJid,
+        affiliation: Affiliation,
+    ) -> Result<Vec<muc::query::User>> {
+        let iq = Iq::from_get(
+            self.ctx.generate_id(),
+            Query {
+                role: Role::Admin,
+                payloads: vec![xmpp_parsers::muc::user::Item {
+                    affiliation,
+                    jid: None,
+                    nick: None,
+                    role: Default::default(),
+                    actor: None,
+                    continue_: None,
+                    reason: None,
+                }
+                .into()],
+            },
+        )
+        .with_to(room_jid.clone().into());
+
+        let response = self
+            .ctx
+            .send_iq(iq)
+            .await?
+            .ok_or(RequestError::UnexpectedResponse)?;
+
+        let query = Query::try_from(response)?;
+        let users = query
+            .payloads
+            .into_iter()
+            .filter_map(|payload| {
+                if !payload.is("item", ns::MUC_ADMIN) {
+                    return None;
+                }
+                return Some(muc::query::User::try_from(payload));
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(users)
     }
 
     pub fn build_room_jid_full(
