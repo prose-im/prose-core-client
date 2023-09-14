@@ -78,7 +78,7 @@ impl std::fmt::Display for RoomValidationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "MUC room does not qualify as {}. The following expecations failed:\n{}",
+            "MUC room does not qualify as {}. The following expectations failed:\n{}",
             self.room_type,
             self.failures
                 .iter()
@@ -138,8 +138,6 @@ impl Features {
 
     pub fn validate_as_public_channel(&self) -> Result<(), RoomValidationError> {
         use prose_xmpp::stanza::muc::ns::disco_feature as feat;
-
-        println!("{:?}", self);
 
         Self::validate(
             "Public Channel",

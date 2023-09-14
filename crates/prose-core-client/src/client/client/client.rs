@@ -174,7 +174,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
     async fn perform_post_connect_tasks(&self) -> Result<()> {
         self.load_and_connect_bookmarks().await?;
-        self.load_and_connect_public_channels().await?;
         Ok(())
     }
 }

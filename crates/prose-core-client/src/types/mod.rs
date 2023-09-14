@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-// pub use message::Message;
 pub use account_settings::AccountSettings;
 pub use availability::Availability;
 pub use avatar_metadata::AvatarMetadata;
@@ -12,6 +11,7 @@ pub use capabilities::{Capabilities, Feature};
 pub use contact::Contact;
 pub use message::{Emoji, Message, MessageId, Reaction, StanzaId};
 pub use message_like::MessageLike;
+pub use muc::Room;
 pub use page::Page;
 pub use presence::Presence;
 pub use software_version::SoftwareVersion;

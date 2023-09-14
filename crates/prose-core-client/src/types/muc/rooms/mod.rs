@@ -6,35 +6,35 @@
 use jid::BareJid;
 
 use crate::types::muc::{Room, RoomInfo};
-pub(self) use abstract_room::{AbstractRoom, Occupant};
+pub(super) use abstract_room::{AbstractRoom, Occupant};
 use prose_xmpp::Client as XMPPClient;
 
 mod abstract_room;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Group {
-    room: AbstractRoom,
+    pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrivateChannel {
-    room: AbstractRoom,
+    pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PublicChannel {
-    room: AbstractRoom,
+    pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GenericRoom {
-    room: AbstractRoom,
+    pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PendingRoom {
-    jid: BareJid,
-    occupants: Vec<Occupant>,
+    pub(super) jid: BareJid,
+    pub(super) occupants: Vec<Occupant>,
 }
 
 impl PendingRoom {

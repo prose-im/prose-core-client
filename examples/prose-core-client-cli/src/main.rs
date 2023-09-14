@@ -9,7 +9,7 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -17,10 +17,11 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::types::{Address, Availability, Contact, Message, MessageId};
+use prose_core_client::types::{Address, Availability, Contact, Message, MessageId, Room};
 use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
+use prose_xmpp::stanza::ConferenceBookmark;
 
 type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
 
@@ -194,6 +195,22 @@ impl Display for RoomEnvelope {
             "{} ({})",
             self.0.name.as_deref().unwrap_or("<untitled>"),
             self.0.jid
+        )
+    }
+}
+
+#[derive(Debug)]
+struct BookmarkEnvelope(ConferenceBookmark);
+
+impl Display for BookmarkEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} ({}) autojoin: {:?}, nick: {}",
+            self.0.conference.name.as_deref().unwrap_or("<untitled>"),
+            self.0.jid,
+            self.0.conference.autojoin,
+            self.0.conference.nick.as_deref().unwrap_or("<no nick>")
         )
     }
 }
@@ -442,6 +459,33 @@ impl Delegate {
     }
 }
 
+#[derive(Debug)]
+struct ConnectedRoomEnvelope(Room);
+
+impl Display for ConnectedRoomEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let kind = match self.0 {
+            Room::Pending(_) => "pending",
+            Room::Group(_) => "group",
+            Room::PrivateChannel(_) => "private channel",
+            Room::PublicChannel(_) => "public channel",
+            Room::Generic(_) => "generic",
+        };
+        write!(f, "[{}] {}", kind, self.0.jid())
+    }
+}
+
+async fn list_connected_rooms(client: &Client) -> Result<()> {
+    let rooms = client
+        .connected_rooms()
+        .into_iter()
+        .map(ConnectedRoomEnvelope)
+        .map(|r| r.to_string())
+        .collect::<Vec<_>>();
+    println!("Connected rooms:\n{}", rooms.join("\n"));
+    Ok(())
+}
+
 #[derive(EnumIter, Display, Clone)]
 enum Selection {
     #[strum(serialize = "Load profile")]
@@ -470,6 +514,12 @@ enum Selection {
     LoadPublicRooms,
     #[strum(serialize = "Destroy public room")]
     DestroyPublicRoom,
+    #[strum(serialize = "Load bookmarks")]
+    LoadBookmarks,
+    #[strum(serialize = "Delete bookmark")]
+    DeleteBookmark,
+    #[strum(serialize = "List connected rooms")]
+    ListConnectedRooms,
     Disconnect,
     Noop,
     Exit,
@@ -531,13 +581,8 @@ async fn main() -> Result<()> {
                     .load_public_rooms()
                     .await?
                     .into_iter()
-                    .map(|room| {
-                        format!(
-                            "{} ({})",
-                            room.name.unwrap_or("<untitled>".to_string()),
-                            room.jid
-                        )
-                    })
+                    .map(RoomEnvelope)
+                    .map(|r| r.to_string())
                     .collect::<Vec<_>>();
                 println!("{}", rooms.join("\n"));
             }
@@ -549,6 +594,11 @@ async fn main() -> Result<()> {
                     .map(RoomEnvelope)
                     .collect::<Vec<_>>();
 
+                if rooms.is_empty() {
+                    println!("No rooms to destroy");
+                    continue;
+                }
+
                 let selection = Select::with_theme(&ColorfulTheme::default())
                     .with_prompt("Select a room to destroy")
                     .default(0)
@@ -559,6 +609,65 @@ async fn main() -> Result<()> {
                 client
                     .destroy_room(&rooms[selection].0.jid.to_bare())
                     .await?;
+            }
+            Selection::LoadBookmarks => {
+                let bookmarks = client
+                    .load_bookmarks()
+                    .await?
+                    .into_iter()
+                    .map(BookmarkEnvelope)
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>();
+                println!("Old-style bookmarks:\n{}", bookmarks.join("\n"));
+
+                let bookmarks = client
+                    .load_bookmarks2()
+                    .await?
+                    .into_iter()
+                    .map(BookmarkEnvelope)
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>();
+                println!("New-style bookmarks:\n{}", bookmarks.join("\n"));
+            }
+            Selection::DeleteBookmark => {
+                let bookmarks = client
+                    .load_bookmarks()
+                    .await?
+                    .into_iter()
+                    .map(BookmarkEnvelope)
+                    .collect::<Vec<_>>();
+
+                if bookmarks.is_empty() {
+                    println!("No bookmarks to delete");
+                    continue;
+                }
+
+                let selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Select a bookmark to delete")
+                    .default(0)
+                    .items(bookmarks.as_slice())
+                    .interact()
+                    .unwrap();
+                println!();
+
+                let selected_bookmark = &bookmarks[selection].0;
+                client.delete_bookmark(&selected_bookmark.jid).await?;
+
+                if Confirm::new()
+                    .with_prompt(format!(
+                        "Do you want to delete room {} as well?",
+                        selected_bookmark.jid
+                    ))
+                    .interact()?
+                {
+                    println!("Deleting room…");
+                    client
+                        .destroy_room(&selected_bookmark.jid.to_bare())
+                        .await?;
+                }
+            }
+            Selection::ListConnectedRooms => {
+                list_connected_rooms(&client).await?;
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

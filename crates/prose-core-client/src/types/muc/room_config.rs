@@ -9,6 +9,7 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::ns::roomconfig as cfg;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
 
+#[derive(Debug, Clone)]
 pub(crate) struct RoomConfig {
     config: FormConfig,
 }

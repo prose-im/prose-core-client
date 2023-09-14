@@ -13,7 +13,7 @@ use crate::stanza::{muc, Message};
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
 use crate::{ns, SendUnlessWasm};
 use anyhow::Result;
-use jid::{BareJid, FullJid, Jid, NodePart, ResourcePart};
+use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
 use std::future::Future;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
@@ -23,7 +23,7 @@ use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
-use xmpp_parsers::stanza_error::StanzaError;
+use xmpp_parsers::stanza_error::{DefinedCondition, StanzaError};
 
 /// XEP-0045: Multi-User Chat
 /// https://xmpp.org/extensions/xep-0045.html#disco-rooms
@@ -87,8 +87,6 @@ pub enum RoomConfigResponse {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("Room already exists")]
-    RoomAlreadyExists,
     #[error(transparent)]
     RequestError(#[from] RequestError),
     #[error(transparent)]
@@ -97,6 +95,15 @@ pub enum Error {
     JidError(#[from] jid::Error),
     #[error("Handler returned with error {0}")]
     HandlerError(String),
+}
+
+impl Error {
+    pub fn defined_condition(&self) -> Option<DefinedCondition> {
+        let Self::RequestError(error) = self else {
+            return None;
+        };
+        return error.defined_condition();
+    }
 }
 
 impl MUC {
@@ -135,14 +142,14 @@ impl MUC {
         Ok(())
     }
 
-    pub async fn create_instant_room(
-        &self,
-        service: &BareJid,
-        room_name: impl AsRef<str>,
-        nickname: impl AsRef<str>,
-    ) -> Result<()> {
-        let room_jid = Self::build_room_jid_full(service, room_name, nickname)?;
-        self.create_room(&room_jid).await?;
+    pub async fn create_instant_room(&self, room_jid: &FullJid) -> Result<MucUser> {
+        // https://xmpp.org/extensions/xep-0045.html#createroom
+        let user = self.send_presence_to_room(&room_jid, None).await?;
+
+        // If the room existed already we don't need to proceed…
+        if !user.status.contains(&Status::RoomHasBeenCreated) {
+            return Ok(user);
+        }
 
         let iq = Iq::from_set(
             self.ctx.generate_id(),
@@ -156,22 +163,25 @@ impl MUC {
         .with_to(room_jid.to_bare().into());
 
         self.ctx.send_iq(iq).await?;
-        Ok(())
+        Ok(user)
     }
 
     /// https://xmpp.org/extensions/xep-0045.html#createroom
     pub async fn create_reserved_room<T>(
         &self,
-        service: &BareJid,
-        room_name: impl AsRef<str>,
-        nickname: impl AsRef<str>,
+        room_jid: &FullJid,
         handler: impl FnOnce(DataForm) -> T,
-    ) -> Result<(), Error>
+    ) -> Result<MucUser, Error>
     where
         T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
     {
-        let room_jid = Self::build_room_jid_full(service, room_name, nickname)?;
-        self.create_room(&room_jid).await?;
+        // https://xmpp.org/extensions/xep-0045.html#createroom
+        let user = self.send_presence_to_room(&room_jid, None).await?;
+
+        // If the room existed already we don't need to proceed…
+        if !user.status.contains(&Status::RoomHasBeenCreated) {
+            return Ok(user);
+        }
 
         let iq = Iq::from_get(
             self.ctx.generate_id(),
@@ -221,7 +231,7 @@ impl MUC {
 
         self.ctx.send_iq(iq).await?;
 
-        Ok(())
+        Ok(user)
     }
 
     pub async fn destroy_room(&self, jid: &BareJid) -> Result<()> {
@@ -281,49 +291,9 @@ impl MUC {
 
         Ok(users)
     }
-
-    pub fn build_room_jid_full(
-        service: &BareJid,
-        room_name: impl AsRef<str>,
-        nickname: impl AsRef<str>,
-    ) -> Result<FullJid, jid::Error> {
-        Ok(FullJid::from_parts(
-            Some(&NodePart::new(
-                &room_name.as_ref().to_ascii_lowercase().replace(" ", "-"),
-            )?),
-            &service.domain(),
-            &ResourcePart::new(&nickname.as_ref().to_ascii_lowercase().replace(" ", "-"))?,
-        ))
-    }
-
-    pub fn build_room_jid_bare(
-        service: &BareJid,
-        room_name: impl AsRef<str>,
-    ) -> Result<BareJid, jid::Error> {
-        Ok(BareJid::from_parts(
-            Some(&NodePart::new(
-                &room_name.as_ref().to_ascii_lowercase().replace(" ", "-"),
-            )?),
-            &service.domain(),
-        ))
-    }
 }
 
 impl MUC {
-    /// Sends `presence` and returns the next received received presence stanza that matches the
-    /// `to` attribute of `presence`.
-    async fn send_presence(&self, presence: Presence) -> Result<Presence, RequestError> {
-        let Some(Jid::Full(to)) = presence.to.clone() else {
-            return Err(RequestError::Generic {
-                msg: "Expected FullJid for `to` for sending presence exchange.".to_string(),
-            });
-        };
-
-        self.ctx
-            .send_stanza_with_future(presence, RequestFuture::new_presence_request(to))
-            .await
-    }
-
     async fn send_presence_to_room(
         &self,
         room_jid: &FullJid,
@@ -337,24 +307,20 @@ impl MUC {
                 )
                 .build()]);
 
-        let mut response = self.send_presence(presence).await?;
+        let mut response = self
+            .ctx
+            .send_stanza_with_future(
+                presence,
+                RequestFuture::new_presence_request(room_jid.clone()),
+            )
+            .await?;
+
         let payload = response
             .payloads
             .pop()
             .ok_or(RequestError::UnexpectedResponse)?;
 
         Ok(MucUser::try_from(payload)?)
-    }
-
-    /// https://xmpp.org/extensions/xep-0045.html#createroom
-    async fn create_room(&self, room_jid: &FullJid) -> Result<MucUser, Error> {
-        let user = self.send_presence_to_room(room_jid, None).await?;
-
-        if !user.status.contains(&Status::RoomHasBeenCreated) {
-            return Err(Error::RoomAlreadyExists);
-        }
-
-        Ok(user)
     }
 
     /// https://xmpp.org/extensions/xep-0045.html#invite-direct

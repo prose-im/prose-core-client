@@ -16,6 +16,7 @@ pub enum Value {
     None,
 }
 
+#[derive(Debug, Clone)]
 pub struct FormValue {
     var: String,
     value: Value,
@@ -60,6 +61,7 @@ pub enum Error {
     InvalidValue { var: String, value: String },
 }
 
+#[derive(Debug, Clone)]
 /// https://xmpp.org/extensions/xep-0045.html#registrar-formtype-owner
 pub struct FormConfig {
     values: HashMap<String, FormValue>,

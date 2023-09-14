@@ -7,8 +7,8 @@ use jid::BareJid;
 use prose_xmpp::Client as XMPPClient;
 use xmpp_parsers::muc;
 
-#[derive(Debug)]
-pub(super) struct AbstractRoom {
+#[derive(Debug, Clone)]
+pub(crate) struct AbstractRoom {
     pub jid: BareJid,
     pub name: Option<String>,
     pub description: Option<String>,
@@ -16,8 +16,8 @@ pub(super) struct AbstractRoom {
     pub occupants: Vec<Occupant>,
 }
 
-#[derive(Debug)]
-pub(super) struct Occupant {
+#[derive(Debug, Clone)]
+pub(crate) struct Occupant {
     pub affiliation: muc::user::Affiliation,
     pub occupant_id: Option<String>,
 }

@@ -21,16 +21,18 @@ pub enum RequestError {
 
 impl RequestError {
     pub fn is_item_not_found_err(&self) -> bool {
-        if let RequestError::XMPP {
-            err:
-                StanzaError {
-                    defined_condition: DefinedCondition::ItemNotFound,
-                    ..
-                },
+        self.defined_condition() == Some(DefinedCondition::ItemNotFound)
+    }
+
+    pub fn defined_condition(&self) -> Option<DefinedCondition> {
+        let RequestError::XMPP {
+            err: StanzaError {
+                defined_condition, ..
+            },
         } = self
-        {
-            return true;
-        }
-        false
+        else {
+            return None;
+        };
+        return Some(defined_condition.clone());
     }
 }

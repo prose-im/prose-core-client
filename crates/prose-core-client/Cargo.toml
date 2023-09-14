@@ -60,3 +60,4 @@ uniffi = { workspace = true, features = ["build"] }
 [features]
 default = []
 test = ["prose-xmpp/test", "dep:auto_impl", "dep:tokio", "tokio/macros", "dep:auto_impl", "dep:insta"]
+debug = []
