@@ -12,7 +12,7 @@ use xmpp_parsers::data_forms::{DataForm, DataFormType};
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::muc::user::{Affiliation, Status};
-use xmpp_parsers::muc::{user, MucUser};
+use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 use xmpp_parsers::stanza_error::StanzaError;

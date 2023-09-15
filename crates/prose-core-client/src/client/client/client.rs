@@ -14,7 +14,7 @@ use strum_macros::Display;
 use tracing::{error, instrument};
 
 use prose_xmpp::mods::{Chat, Status};
-use prose_xmpp::{mods, ConnectionError};
+use prose_xmpp::{mods, ConnectionError, IDProvider};
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
@@ -41,6 +41,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub data_cache: D,
     pub avatar_cache: A,
     pub time_provider: Arc<dyn TimeProvider>,
+    pub id_provider: Arc<dyn IDProvider>,
     pub software_version: SoftwareVersion,
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
     pub presences: RwLock<PresenceMap>,
@@ -165,6 +166,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 user_jid: self.connected_jid()?.into_bare(),
                 client: self.client.clone(),
                 jid: item.jid.into_bare(),
+                id_provider: self.inner.id_provider.clone(),
             });
             break;
         }

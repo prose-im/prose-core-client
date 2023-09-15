@@ -7,9 +7,10 @@ use super::rooms::{Group, PrivateChannel, PublicChannel};
 use crate::types::muc::rooms::{AbstractRoom, GenericRoom};
 use crate::types::muc::RoomMetadata;
 use jid::BareJid;
+use std::cmp::Ordering;
 use xmpp_parsers::presence::Presence;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Room {
     Group(Group),
     PrivateChannel(PrivateChannel),
@@ -32,6 +33,10 @@ impl Room {
         &self.abstract_room().nick
     }
 
+    pub fn name(&self) -> Option<&str> {
+        self.abstract_room().name.as_deref()
+    }
+
     pub fn handle_presence(&mut self, presence: Presence) {
         println!("RECEIVED PRESENCE: {:?}", presence);
     }
@@ -45,6 +50,38 @@ impl Room {
             Room::PublicChannel(room) => &room.room,
             Room::Generic(room) => &room.room,
         }
+    }
+
+    fn sort_value(&self) -> i32 {
+        match self {
+            Room::Group(_) => 0,
+            Room::PrivateChannel(_) => 1,
+            Room::PublicChannel(_) => 2,
+            Room::Generic(_) => 3,
+        }
+    }
+}
+
+impl PartialOrd for Room {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Room {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let sort_val1 = self.sort_value();
+        let sort_val2 = other.sort_value();
+
+        if sort_val1 < sort_val2 {
+            return Ordering::Less;
+        } else if sort_val1 > sort_val2 {
+            return Ordering::Greater;
+        }
+
+        self.name()
+            .unwrap_or_default()
+            .cmp(other.name().unwrap_or_default())
     }
 }
 

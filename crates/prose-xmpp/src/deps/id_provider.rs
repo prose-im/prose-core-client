@@ -11,6 +11,7 @@ pub trait IDProvider: Send + Sync {
     fn new_id(&self) -> String;
 }
 
+#[derive(Default)]
 pub struct UUIDProvider {}
 
 impl UUIDProvider {

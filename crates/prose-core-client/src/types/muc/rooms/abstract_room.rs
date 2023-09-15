@@ -6,7 +6,7 @@
 use jid::BareJid;
 use xmpp_parsers::muc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AbstractRoom {
     pub jid: BareJid,
     pub nick: String,
@@ -15,8 +15,10 @@ pub(crate) struct AbstractRoom {
     pub occupants: Vec<Occupant>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Occupant {
     pub affiliation: muc::user::Affiliation,
     pub occupant_id: Option<String>,
 }
+
+impl Eq for Occupant {}

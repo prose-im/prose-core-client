@@ -6,20 +6,32 @@
 use anyhow::Result;
 use jid::{BareJid, FullJid, NodePart, ResourcePart};
 use sha1::{Digest, Sha1};
+use std::fmt::{Debug, Formatter};
 use std::iter;
+use std::sync::Arc;
 use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_xmpp::mods::muc::RoomConfigResponse;
-use prose_xmpp::{mods, Client as XMPPClient};
+use prose_xmpp::{mods, Client as XMPPClient, IDProvider};
 
 use crate::types::muc::{RoomConfig, RoomMetadata, RoomSettings, RoomValidationError};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct Service {
     pub jid: BareJid,
     pub user_jid: BareJid,
     pub client: XMPPClient,
+    pub id_provider: Arc<dyn IDProvider>,
+}
+
+impl Debug for Service {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Service")
+            .field("jid", &self.jid)
+            .field("user_jid", &self.user_jid)
+            .finish()
+    }
 }
 
 impl Service {
@@ -33,6 +45,10 @@ impl Service {
         group_name: impl AsRef<str>,
         participants: &[BareJid],
     ) -> Result<RoomMetadata> {
+        // We'll create a hash of the sorted jids of our participants. This way users will always
+        // come back to the exact same group if they accidentally try to create it again. Also
+        // other participants (other than the creator of the room) are able to do the same without
+        // having a bookmark.
         let group_hash = Self::hash_for_group_with_participants(
             participants.into_iter().chain(iter::once(&self.user_jid)),
         );
@@ -44,10 +60,29 @@ impl Service {
         .await
     }
 
+    pub async fn create_or_join_private_channel(
+        &self,
+        channel_name: impl AsRef<str>,
+    ) -> Result<RoomMetadata> {
+        // We'll use a random ID for the jid of the private channel. This way different people can
+        // create private channels with the same name without creating a conflict. A conflict might
+        // also potentially be a security issue if jid would contain sensitive information.
+        let channel_id = self.id_provider.new_id();
+        self.create_or_join_room_with_config(
+            &Self::name_for_private_channel(&channel_id),
+            RoomConfig::private_channel(channel_name.as_ref()),
+            |info| info.features.validate_as_private_channel(),
+        )
+        .await
+    }
+
     pub async fn create_or_join_public_channel(
         &self,
         channel_name: impl AsRef<str>,
     ) -> Result<RoomMetadata> {
+        // Public channels should be able to conflict, i.e. there should only be one channel for
+        // any given name. Since these can be discovered publicly and joined by anyone there should
+        // be no harm in exposing the name in the jid.
         self.create_or_join_room_with_config(
             &Self::name_for_public_channel(channel_name.as_ref()),
             RoomConfig::public_channel(channel_name.as_ref()),
@@ -145,6 +180,14 @@ impl Service {
         return format!(
             "{}.{}",
             PUBLIC_CHANNEL_PREFIX,
+            channel_name.to_ascii_lowercase().replace(" ", "-")
+        );
+    }
+
+    pub fn name_for_private_channel(channel_name: &str) -> String {
+        return format!(
+            "{}.{}",
+            PRIVATE_CHANNEL_PREFIX,
             channel_name.to_ascii_lowercase().replace(" ", "-")
         );
     }

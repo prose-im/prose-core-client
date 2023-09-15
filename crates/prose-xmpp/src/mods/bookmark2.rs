@@ -8,7 +8,6 @@ use std::str::FromStr;
 use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::bookmarks2::Conference;
-use xmpp_parsers::data_forms::{Field, FieldType};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub;
 use xmpp_parsers::pubsub::pubsub::Notify;

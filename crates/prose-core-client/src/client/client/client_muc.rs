@@ -137,6 +137,23 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
+    pub async fn create_private_channel(&self, channel_name: impl AsRef<str>) -> Result<()> {
+        // Create room…
+        info!(
+            "Creating private channel with name {}…",
+            channel_name.as_ref()
+        );
+
+        let room: Room = self
+            .muc_service()?
+            .create_or_join_private_channel(channel_name.as_ref())
+            .await?
+            .into();
+
+        self.finish_create_channel(channel_name.as_ref(), room)
+            .await
+    }
+
     pub async fn create_public_channel(&self, channel_name: impl AsRef<str>) -> Result<()> {
         // Create room…
         info!(
@@ -150,28 +167,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .await?
             .into();
 
-        let bookmark = ConferenceBookmark {
-            jid: room.jid().clone().into(),
-            conference: Conference {
-                autojoin: Autojoin::True,
-                name: Some(channel_name.as_ref().to_string()),
-                nick: Some(room.nick().to_string()),
-                password: None,
-                extensions: vec![BookmarkMetadata {
-                    room_type: muc::RoomType::PublicChannel,
-                    participants: None,
-                }
-                .into()],
-            },
-        };
-
-        // Add room to our connected rooms and notify delegate…
-        self.did_enter_room(room);
-
-        // Save bookmark for created (or joined) channel…
-        self.insert_and_publish_bookmark(bookmark).await?;
-
-        Ok(())
+        self.finish_create_channel(channel_name.as_ref(), room)
+            .await
     }
 }
 
@@ -274,6 +271,31 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Err(MUCError::Unsupported);
         };
         return Ok(service);
+    }
+
+    async fn finish_create_channel(&self, name: &str, room: Room) -> Result<()> {
+        let bookmark = ConferenceBookmark {
+            jid: room.jid().clone().into(),
+            conference: Conference {
+                autojoin: Autojoin::True,
+                name: Some(name.to_string()),
+                nick: Some(room.nick().to_string()),
+                password: None,
+                extensions: vec![BookmarkMetadata {
+                    room_type: muc::RoomType::PublicChannel,
+                    participants: None,
+                }
+                .into()],
+            },
+        };
+
+        // Add room to our connected rooms and notify delegate…
+        self.did_enter_room(room);
+
+        // Save bookmark for created (or joined) channel…
+        self.insert_and_publish_bookmark(bookmark).await?;
+
+        Ok(())
     }
 
     async fn enter_room_if_needed(

@@ -470,13 +470,21 @@ impl Display for ConnectedRoomEnvelope {
             Room::PublicChannel(_) => "public channel",
             Room::Generic(_) => "generic",
         };
-        write!(f, "[{}] {}", kind, self.0.jid())
+        write!(
+            f,
+            "[{}] {} ({})",
+            kind,
+            self.0.name().unwrap_or("<untitled>"),
+            self.0.jid()
+        )
     }
 }
 
 async fn list_connected_rooms(client: &Client) -> Result<()> {
-    let rooms = client
-        .connected_rooms()
+    let mut rooms = client.connected_rooms();
+    rooms.sort();
+
+    let rooms = rooms
         .into_iter()
         .map(ConnectedRoomEnvelope)
         .map(|r| r.to_string())
@@ -505,10 +513,12 @@ enum Selection {
     LoadMessages,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
-    #[strum(serialize = "Create private group")]
+    #[strum(serialize = "Create group")]
     CreateGroup,
     #[strum(serialize = "Create public channel")]
     CreatePublicChannel,
+    #[strum(serialize = "Create private channel")]
+    CreatePrivateChannel,
     #[strum(serialize = "Load public rooms")]
     LoadPublicRooms,
     #[strum(serialize = "Destroy public room")]
@@ -574,6 +584,10 @@ async fn main() -> Result<()> {
             Selection::CreatePublicChannel => {
                 let room_name = prompt_string("Enter a name for the channel:");
                 client.create_public_channel(room_name).await?;
+            }
+            Selection::CreatePrivateChannel => {
+                let room_name = prompt_string("Enter a name for the channel:");
+                client.create_private_channel(room_name).await?;
             }
             Selection::LoadPublicRooms => {
                 let rooms = client

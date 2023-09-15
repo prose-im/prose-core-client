@@ -9,7 +9,7 @@ use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::mods::{Bookmark, Bookmark2, Caps, Chat, Profile, Roster, Status, MAM, MUC};
 use prose_xmpp::{
     ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, SystemTimeProvider,
-    TimeProvider,
+    TimeProvider, UUIDProvider,
 };
 
 use crate::avatar_cache::AvatarCache;
@@ -26,6 +26,7 @@ pub struct ClientBuilder<D, A> {
     data_cache: D,
     avatar_cache: A,
     time_provider: Arc<dyn TimeProvider>,
+    id_provider: Arc<dyn IDProvider>,
     software_version: SoftwareVersion,
     delegate: Option<Box<dyn ClientDelegate<D, A>>>,
 }
@@ -37,6 +38,7 @@ impl ClientBuilder<UndefinedDataCache, UndefinedAvatarCache> {
             data_cache: UndefinedDataCache {},
             avatar_cache: UndefinedAvatarCache {},
             time_provider: Arc::new(SystemTimeProvider::default()),
+            id_provider: Arc::new(UUIDProvider::default()),
             software_version: SoftwareVersion::default(),
             delegate: None,
         }
@@ -50,6 +52,7 @@ impl<A> ClientBuilder<UndefinedDataCache, A> {
             data_cache,
             avatar_cache: self.avatar_cache,
             time_provider: self.time_provider,
+            id_provider: self.id_provider,
             software_version: self.software_version,
             delegate: None,
         }
@@ -63,6 +66,7 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
             data_cache: self.data_cache,
             avatar_cache,
             time_provider: self.time_provider,
+            id_provider: self.id_provider,
             software_version: self.software_version,
             delegate: None,
         }
@@ -142,6 +146,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             caps,
             data_cache: self.data_cache,
             avatar_cache: self.avatar_cache,
+            id_provider: self.id_provider.clone(),
             time_provider: self.time_provider.clone(),
             software_version: self.software_version,
             delegate: self.delegate,

@@ -7,22 +7,22 @@ pub(super) use abstract_room::AbstractRoom;
 
 mod abstract_room;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group {
     pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrivateChannel {
     pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PublicChannel {
     pub(super) room: AbstractRoom,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GenericRoom {
     pub(super) room: AbstractRoom,
 }
