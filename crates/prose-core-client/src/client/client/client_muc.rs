@@ -5,16 +5,19 @@
 
 use anyhow::{bail, Result};
 use jid::{BareJid, Jid};
-use prose_xmpp::mods;
 use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
 use prose_xmpp::stanza::ConferenceBookmark;
+use prose_xmpp::{mods, RequestError};
+use std::iter;
 use tracing::info;
 use xmpp_parsers::bookmarks2::{Autojoin, Conference};
+use xmpp_parsers::muc::user::Affiliation;
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::muc::{BookmarkMetadata, Room, RoomInfo};
+use crate::types::muc::{BookmarkMetadata, Room, RoomMetadata, RoomSettings};
 use crate::types::{muc, Bookmarks};
+use crate::util::StringExt;
 
 use super::Client;
 
@@ -40,21 +43,58 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
     pub async fn create_group(&self, participants: &[BareJid]) -> Result<()> {
         if participants.is_empty() {
-            bail!("Group must at least have one other participant.")
+            bail!("Group must have at least one other participant.")
         }
 
-        let result = self
+        // Load participant infos so that we can build a nice human-readable name for the group…
+        let our_jid = self.connected_jid()?.to_bare();
+        let mut participant_names = vec![];
+
+        for jid in participants.iter().chain(iter::once(&our_jid)) {
+            let participant_name = self
+                .load_user_profile(jid.clone(), Default::default())
+                .await?
+                .and_then(|profile| profile.first_name.or(profile.nickname))
+                .or(jid.node_str().map(|node| node.to_uppercase_first_letter()))
+                .unwrap_or(jid.to_string());
+            participant_names.push(participant_name);
+        }
+        participant_names.sort();
+
+        let group_name = participant_names.join(", ");
+
+        let metadata = self
             .muc_service()?
-            .create_or_join_group(participants)
+            .create_or_join_group(&group_name, participants)
             .await?;
 
-        // Save bookmark for created (or joined) room…
-        self.insert_and_publish_bookmark(ConferenceBookmark {
-            jid: result.room_jid.to_bare().into(),
+        let room_has_been_created = metadata.room_has_been_created();
+        let room = Room::from(metadata);
+        let room_jid = room.jid().clone();
+
+        // So we were actually already connected to that room.
+        if self.inner.connected_rooms.read().contains_key(&room.jid()) {
+            return Ok(());
+        }
+
+        // Try to promote all participants to owners…
+        info!("Update participant affiliations…");
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+        muc_mod
+            .update_user_affiliations(
+                &room_jid,
+                participants
+                    .iter()
+                    .map(|jid| (jid.clone(), Affiliation::Owner)),
+            )
+            .await?;
+
+        let bookmark = ConferenceBookmark {
+            jid: room.jid().clone().into(),
             conference: Conference {
                 autojoin: Autojoin::True,
-                name: None,
-                nick: Some(result.room_jid.resource_str().to_string()),
+                name: Some(group_name),
+                nick: Some(room.nick().to_string()),
                 password: None,
                 extensions: vec![BookmarkMetadata {
                     room_type: muc::RoomType::Group,
@@ -62,19 +102,24 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 }
                 .into()],
             },
-        })
-        .await?;
+        };
 
-        if !result.room_has_been_created() {
+        // Add room to our connected rooms and notify delegate…
+        self.did_enter_room(room);
+
+        // Save bookmark for created (or joined) room…
+        self.insert_and_publish_bookmark(bookmark).await?;
+
+        // If the room existed already we won't send any invites again.
+        if !room_has_been_created {
             return Ok(());
         }
 
         // Send invites…
         info!("Sending invites for created group…");
-        let muc_mod = self.client.get_mod::<mods::MUC>();
         muc_mod
             .send_mediated_invite(
-                &result.room_jid.to_bare(),
+                &room_jid,
                 MediatedInvite {
                     invites: participants
                         .into_iter()
@@ -99,18 +144,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             channel_name.as_ref()
         );
 
-        let result = self
+        let room: Room = self
             .muc_service()?
             .create_or_join_public_channel(channel_name.as_ref())
-            .await?;
+            .await?
+            .into();
 
-        // Save bookmark for created (or joined) channel…
-        self.insert_and_publish_bookmark(ConferenceBookmark {
-            jid: result.room_jid.to_bare().into(),
+        let bookmark = ConferenceBookmark {
+            jid: room.jid().clone().into(),
             conference: Conference {
                 autojoin: Autojoin::True,
                 name: Some(channel_name.as_ref().to_string()),
-                nick: Some(result.room_jid.resource_str().to_string()),
+                nick: Some(room.nick().to_string()),
                 password: None,
                 extensions: vec![BookmarkMetadata {
                     room_type: muc::RoomType::PublicChannel,
@@ -118,8 +163,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 }
                 .into()],
             },
-        })
-        .await?;
+        };
+
+        // Add room to our connected rooms and notify delegate…
+        self.did_enter_room(room);
+
+        // Save bookmark for created (or joined) channel…
+        self.insert_and_publish_bookmark(bookmark).await?;
 
         Ok(())
     }
@@ -136,14 +186,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         );
 
         for bookmark in bookmarks.iter() {
-            self.connect_to_room_if_needed(
+            self.enter_room_if_needed(
                 &bookmark.jid.to_bare(),
-                bookmark
-                    .conference
-                    .nick
-                    .as_deref()
-                    .or(self.connected_jid()?.node_str())
-                    .unwrap_or("unknown-user"),
+                bookmark.conference.nick.as_deref(),
                 bookmark.conference.password.as_deref(),
             )
             .await?;
@@ -231,42 +276,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         return Ok(service);
     }
 
-    async fn connect_to_room_if_needed(
+    async fn enter_room_if_needed(
         &self,
         room_jid: &BareJid,
-        nickname: impl AsRef<str>,
+        nickname: Option<&str>,
         password: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<(), RequestError> {
+        // If we're already connected there's nothing to do.
         if self.inner.connected_rooms.read().contains_key(room_jid) {
             return Ok(());
         }
 
-        // Let's insert a PendingRoom so that we can immediately start receiving events while we're
-        // still loading further details about the room.
-        self.inner
-            .connected_rooms
-            .write()
-            .insert(room_jid.clone(), Room::pending(room_jid));
-
-        // Enter room and gather information…
-        let room_info = match self.enter_room(room_jid, nickname, password).await {
-            Ok(room_info) => room_info,
-            Err(error) => {
-                // Remove PendingRoom again if something goes wrong…
-                self.inner.connected_rooms.write().remove(room_jid);
-                return Err(error);
-            }
-        };
-
-        // Convert PendingRoom to proper Room…
-        let mut connected_rooms = self.inner.connected_rooms.write();
-        let Some(Room::Pending(pending_room)) = connected_rooms.remove(room_jid) else {
-            bail!("PendingRoom was modified while being connected.")
-        };
-        connected_rooms.insert(
-            room_jid.clone(),
-            pending_room.into_room(&room_info, self.client.clone()),
-        );
+        let room = self.enter_room(room_jid, nickname, password).await?;
+        self.did_enter_room(room);
 
         Ok(())
     }
@@ -274,18 +296,43 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     async fn enter_room(
         &self,
         room_jid: &BareJid,
-        nickname: impl AsRef<str>,
+        nickname: Option<&str>,
         password: Option<&str>,
-    ) -> Result<RoomInfo> {
+    ) -> Result<Room, RequestError> {
         info!("Entering room {}…", room_jid);
 
+        let nickname = nickname
+            .ok_or(
+                self.connected_jid()
+                    .map_err(|err| RequestError::Generic {
+                        msg: err.to_string(),
+                    })?
+                    .node_str(),
+            )
+            .unwrap_or("unknown-user");
+        let room_jid_full = room_jid.with_resource_str(nickname)?;
+
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        muc_mod
-            .enter_room(room_jid, nickname.as_ref(), password)
-            .await?;
+        let occupancy = muc_mod.enter_room(&room_jid_full, password).await?;
 
         let caps = self.client.get_mod::<mods::Caps>();
-        RoomInfo::try_from(caps.query_disco_info(room_jid.clone(), None).await?)
+        let settings =
+            RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
+
+        return Ok(RoomMetadata {
+            room_jid: room_jid_full,
+            occupancy,
+            settings,
+        }
+        .into());
+    }
+
+    fn did_enter_room(&self, room: Room) {
+        // TODO: Send event to delegate
+        self.inner
+            .connected_rooms
+            .write()
+            .insert(room.jid().clone(), room);
     }
 
     async fn insert_and_publish_bookmark(&self, bookmark: ConferenceBookmark) -> Result<()> {

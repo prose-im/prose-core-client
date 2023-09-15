@@ -9,7 +9,7 @@ use std::pin::Pin;
 pub use element_ext::{parse_bool, ElementBuilderExt, ElementExt};
 pub(crate) use module_future_state::{ModuleFuturePoll, ModuleFutureState};
 pub use publish_options_ext::PublishOptionsExt;
-pub use request_error::RequestError;
+pub use request_error::{ParseError, RequestError};
 pub(crate) use request_future::{ElementReducerPoll, RequestFuture};
 pub use xmpp_element::XMPPElement;
 

@@ -122,11 +122,17 @@ impl Caps {
             .send_stanza(Iq::from_result(id, Some(disco)).with_to(to.into()))
     }
 
-    pub async fn query_server_disco_info(&self, node: Option<String>) -> Result<DiscoInfoResult> {
+    pub async fn query_server_disco_info(
+        &self,
+        node: Option<String>,
+    ) -> Result<DiscoInfoResult, RequestError> {
         self.query_disco_info(self.ctx.server_jid(), node).await
     }
 
-    pub async fn query_server_disco_items(&self, node: Option<String>) -> Result<DiscoItemsResult> {
+    pub async fn query_server_disco_items(
+        &self,
+        node: Option<String>,
+    ) -> Result<DiscoItemsResult, RequestError> {
         self.query_disco_items(self.ctx.server_jid(), node).await
     }
 
@@ -134,7 +140,7 @@ impl Caps {
         &self,
         from: impl Into<Jid>,
         node: Option<String>,
-    ) -> Result<DiscoItemsResult> {
+    ) -> Result<DiscoItemsResult, RequestError> {
         let response = self
             .ctx
             .send_iq(
@@ -150,7 +156,7 @@ impl Caps {
         &self,
         from: impl Into<Jid>,
         node: Option<String>,
-    ) -> Result<DiscoInfoResult> {
+    ) -> Result<DiscoInfoResult, RequestError> {
         let response = self
             .ctx
             .send_iq(

@@ -8,32 +8,18 @@ use jid::{BareJid, FullJid, NodePart, ResourcePart};
 use sha1::{Digest, Sha1};
 use std::iter;
 use xmpp_parsers::muc::user::Status;
-use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::stanza_error::DefinedCondition;
 
-use prose_xmpp::mods::muc;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, Client as XMPPClient};
 
-use crate::types::muc::{RoomConfig, RoomInfo, RoomValidationError};
+use crate::types::muc::{RoomConfig, RoomMetadata, RoomSettings, RoomValidationError};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub(crate) struct Service {
     pub jid: BareJid,
     pub user_jid: BareJid,
     pub client: XMPPClient,
-}
-
-pub struct CreateRoomResult {
-    pub room_jid: FullJid,
-    pub user: MucUser,
-    pub info: RoomInfo,
-}
-
-impl CreateRoomResult {
-    pub fn room_has_been_created(&self) -> bool {
-        self.user.status.contains(&Status::RoomHasBeenCreated)
-    }
 }
 
 impl Service {
@@ -42,21 +28,26 @@ impl Service {
         muc_mod.load_public_rooms(&self.jid).await
     }
 
-    pub async fn create_or_join_group(&self, participants: &[BareJid]) -> Result<CreateRoomResult> {
-        let group_name = Self::name_for_group_with_participants(
+    pub async fn create_or_join_group(
+        &self,
+        group_name: impl AsRef<str>,
+        participants: &[BareJid],
+    ) -> Result<RoomMetadata> {
+        let group_hash = Self::hash_for_group_with_participants(
             participants.into_iter().chain(iter::once(&self.user_jid)),
         );
-
-        self.create_or_join_room_with_config(&group_name, RoomConfig::group(), |info| {
-            info.features.validate_as_group()
-        })
+        self.create_or_join_room_with_config(
+            &group_hash,
+            RoomConfig::group(group_name, participants),
+            |info| info.features.validate_as_group(),
+        )
         .await
     }
 
     pub async fn create_or_join_public_channel(
         &self,
         channel_name: impl AsRef<str>,
-    ) -> Result<CreateRoomResult> {
+    ) -> Result<RoomMetadata> {
         self.create_or_join_room_with_config(
             &Self::name_for_public_channel(channel_name.as_ref()),
             RoomConfig::public_channel(channel_name.as_ref()),
@@ -69,8 +60,8 @@ impl Service {
         &self,
         room_name: &str,
         config: RoomConfig,
-        validate: impl FnOnce(&RoomInfo) -> Result<(), RoomValidationError>,
-    ) -> Result<CreateRoomResult> {
+        validate: impl FnOnce(&RoomSettings) -> Result<(), RoomValidationError>,
+    ) -> Result<RoomMetadata> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         let nickname = self.user_jid.node_str().unwrap_or("unknown-user");
         let mut attempt = 0;
@@ -103,32 +94,29 @@ impl Service {
                 })
                 .await;
 
-            let user = match result {
+            let occupancy = match result {
                 Ok(user) => user,
-                Err(muc::Error::RequestError(error))
-                    if error.defined_condition() == Some(DefinedCondition::Gone) =>
-                {
-                    continue
-                }
+                Err(error) if error.defined_condition() == Some(DefinedCondition::Gone) => continue,
                 Err(error) => return Err(error.into()),
             };
 
             let caps = self.client.get_mod::<mods::Caps>();
-            let info = RoomInfo::try_from(caps.query_disco_info(room_jid.to_bare(), None).await?)?;
+            let settings =
+                RoomSettings::try_from(caps.query_disco_info(room_jid.to_bare(), None).await?)?;
 
-            match (validate)(&info) {
+            match (validate)(&settings) {
                 Ok(_) => (),
-                Err(error) if user.status.contains(&Status::RoomHasBeenCreated) => {
+                Err(error) if occupancy.user.status.contains(&Status::RoomHasBeenCreated) => {
                     _ = muc_mod.destroy_room(&room_jid.to_bare());
                     return Err(error.into());
                 }
                 Err(error) => return Err(error.into()),
             }
 
-            return Ok(CreateRoomResult {
+            return Ok(RoomMetadata {
                 room_jid,
-                user,
-                info,
+                occupancy,
+                settings: settings,
             });
         }
     }
@@ -139,7 +127,7 @@ const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
 const PUBLIC_CHANNEL_PREFIX: &str = "org.prose.public-channel";
 
 impl Service {
-    pub fn name_for_group_with_participants<'a>(
+    pub fn hash_for_group_with_participants<'a>(
         participants: impl IntoIterator<Item = &'a BareJid>,
     ) -> String {
         let mut sorted_participant_jids = participants
@@ -184,7 +172,7 @@ mod tests {
     #[test]
     fn test_group_name_for_participants() {
         assert_eq!(
-            Service::name_for_group_with_participants(&[
+            Service::hash_for_group_with_participants(&[
                 jid_str!("a@prose.org").into_bare(),
                 jid_str!("b@prose.org").into_bare(),
                 jid_str!("c@prose.org").into_bare()
@@ -193,12 +181,12 @@ mod tests {
         );
 
         assert_eq!(
-            Service::name_for_group_with_participants(&[
+            Service::hash_for_group_with_participants(&[
                 jid_str!("a@prose.org").into_bare(),
                 jid_str!("b@prose.org").into_bare(),
                 jid_str!("c@prose.org").into_bare()
             ]),
-            Service::name_for_group_with_participants(&[
+            Service::hash_for_group_with_participants(&[
                 jid_str!("c@prose.org").into_bare(),
                 jid_str!("a@prose.org").into_bare(),
                 jid_str!("b@prose.org").into_bare()

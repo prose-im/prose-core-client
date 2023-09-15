@@ -4,15 +4,14 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use jid::BareJid;
-use prose_xmpp::Client as XMPPClient;
 use xmpp_parsers::muc;
 
 #[derive(Debug, Clone)]
 pub(crate) struct AbstractRoom {
     pub jid: BareJid,
+    pub nick: String,
     pub name: Option<String>,
     pub description: Option<String>,
-    pub client: XMPPClient,
     pub occupants: Vec<Occupant>,
 }
 

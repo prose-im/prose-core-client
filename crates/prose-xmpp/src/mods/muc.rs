@@ -3,6 +3,20 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::future::Future;
+
+use anyhow::Result;
+use jid::{BareJid, FullJid, Jid};
+use minidom::Element;
+use xmpp_parsers::data_forms::{DataForm, DataFormType};
+use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
+use xmpp_parsers::iq::Iq;
+use xmpp_parsers::muc::user::{Affiliation, Status};
+use xmpp_parsers::muc::{user, MucUser};
+use xmpp_parsers::presence;
+use xmpp_parsers::presence::Presence;
+use xmpp_parsers::stanza_error::StanzaError;
+
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
@@ -12,18 +26,6 @@ use crate::stanza::muc::{DirectInvite, Query};
 use crate::stanza::{muc, Message};
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
 use crate::{ns, SendUnlessWasm};
-use anyhow::Result;
-use jid::{BareJid, FullJid, Jid};
-use minidom::Element;
-use std::future::Future;
-use xmpp_parsers::data_forms::{DataForm, DataFormType};
-use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
-use xmpp_parsers::iq::Iq;
-use xmpp_parsers::muc::user::{Affiliation, Status};
-use xmpp_parsers::muc::MucUser;
-use xmpp_parsers::presence;
-use xmpp_parsers::presence::Presence;
-use xmpp_parsers::stanza_error::{DefinedCondition, StanzaError};
 
 /// XEP-0045: Multi-User Chat
 /// https://xmpp.org/extensions/xep-0045.html#disco-rooms
@@ -36,6 +38,27 @@ pub struct MUC {
 pub struct Room {
     pub jid: Jid,
     pub name: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RoomOccupancy {
+    pub user: MucUser,
+    pub self_presence: Presence,
+    pub presences: Vec<Presence>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RoomConfigResponse {
+    Submit(DataForm),
+    Cancel,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    /// XEP-0249: Direct MUC Invitations
+    DirectInvite { from: Jid, invite: DirectInvite },
+    /// https://xmpp.org/extensions/xep-0045.html#invite-mediated
+    MediatedInvite { from: Jid, invite: MediatedInvite },
 }
 
 impl Module for MUC {
@@ -71,42 +94,9 @@ impl Module for MUC {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Event {
-    /// XEP-0249: Direct MUC Invitations
-    DirectInvite { from: Jid, invite: DirectInvite },
-    /// https://xmpp.org/extensions/xep-0045.html#invite-mediated
-    MediatedInvite { from: Jid, invite: MediatedInvite },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum RoomConfigResponse {
-    Submit(DataForm),
-    Cancel,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error(transparent)]
-    RequestError(#[from] RequestError),
-    #[error(transparent)]
-    ParseError(#[from] xmpp_parsers::Error),
-    #[error(transparent)]
-    JidError(#[from] jid::Error),
-    #[error("Handler returned with error {0}")]
-    HandlerError(String),
-}
-
-impl Error {
-    pub fn defined_condition(&self) -> Option<DefinedCondition> {
-        let Self::RequestError(error) = self else {
-            return None;
-        };
-        return error.defined_condition();
-    }
-}
-
 impl MUC {
+    /// Loads public rooms in a MUC service.
+    /// https://xmpp.org/extensions/xep-0045.html#disco-rooms
     pub async fn load_public_rooms(&self, service: &BareJid) -> Result<Vec<Room>> {
         let response = self
             .ctx
@@ -131,24 +121,28 @@ impl MUC {
         Ok(rooms)
     }
 
+    /// Enters a room.
+    /// https://xmpp.org/extensions/xep-0045.html#enter
     pub async fn enter_room(
         &self,
-        room_jid: &BareJid,
-        nickname: impl AsRef<str>,
+        room_jid: &FullJid,
         password: Option<&str>,
-    ) -> Result<()> {
-        let full_room_jid = room_jid.with_resource_str(nickname.as_ref())?;
-        self.send_presence_to_room(&full_room_jid, password).await?;
-        Ok(())
+    ) -> Result<RoomOccupancy, RequestError> {
+        self.send_presence_to_room(&room_jid, password).await
     }
 
-    pub async fn create_instant_room(&self, room_jid: &FullJid) -> Result<MucUser> {
+    /// Creates an instant room or joins an existing room with the same JID.
+    /// https://xmpp.org/extensions/xep-0045.html#createroom-instant
+    pub async fn create_instant_room(
+        &self,
+        room_jid: &FullJid,
+    ) -> Result<RoomOccupancy, RequestError> {
         // https://xmpp.org/extensions/xep-0045.html#createroom
-        let user = self.send_presence_to_room(&room_jid, None).await?;
+        let occupancy = self.send_presence_to_room(&room_jid, None).await?;
 
         // If the room existed already we don't need to proceed…
-        if !user.status.contains(&Status::RoomHasBeenCreated) {
-            return Ok(user);
+        if !occupancy.user.status.contains(&Status::RoomHasBeenCreated) {
+            return Ok(occupancy);
         }
 
         let iq = Iq::from_set(
@@ -163,24 +157,26 @@ impl MUC {
         .with_to(room_jid.to_bare().into());
 
         self.ctx.send_iq(iq).await?;
-        Ok(user)
+        Ok(occupancy)
     }
 
-    /// https://xmpp.org/extensions/xep-0045.html#createroom
+    /// Creates a reserved room or joins an existing room with the same JID. Invokes `handler` to
+    /// perform the configuration of the reserved room.
+    /// https://xmpp.org/extensions/xep-0045.html#createroom-reserved
     pub async fn create_reserved_room<T>(
         &self,
         room_jid: &FullJid,
         handler: impl FnOnce(DataForm) -> T,
-    ) -> Result<MucUser, Error>
+    ) -> Result<RoomOccupancy, RequestError>
     where
         T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
     {
         // https://xmpp.org/extensions/xep-0045.html#createroom
-        let user = self.send_presence_to_room(&room_jid, None).await?;
+        let occupancy = self.send_presence_to_room(&room_jid, None).await?;
 
         // If the room existed already we don't need to proceed…
-        if !user.status.contains(&Status::RoomHasBeenCreated) {
-            return Ok(user);
+        if !occupancy.user.status.contains(&Status::RoomHasBeenCreated) {
+            return Ok(occupancy);
         }
 
         let iq = Iq::from_get(
@@ -198,6 +194,7 @@ impl MUC {
                 .await?
                 .ok_or(RequestError::UnexpectedResponse)?,
         )?;
+
         let form = DataForm::try_from(
             query
                 .payloads
@@ -205,9 +202,9 @@ impl MUC {
                 .ok_or(RequestError::UnexpectedResponse)?,
         )?;
 
-        let handler_result = handler(form)
-            .await
-            .map_err(|e| Error::HandlerError(e.to_string()))?;
+        let handler_result = handler(form).await.map_err(|e| RequestError::Generic {
+            msg: format!("Handler returned with error {}", e.to_string()),
+        })?;
 
         let response_form = match handler_result {
             RoomConfigResponse::Submit(form) => form,
@@ -231,9 +228,11 @@ impl MUC {
 
         self.ctx.send_iq(iq).await?;
 
-        Ok(user)
+        Ok(occupancy)
     }
 
+    /// Destroys a room.
+    /// https://xmpp.org/extensions/xep-0045.html#destroyroom
     pub async fn destroy_room(&self, jid: &BareJid) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
@@ -247,6 +246,7 @@ impl MUC {
         Ok(())
     }
 
+    /// Requests the list of users with a given affiliation.
     /// https://xmpp.org/extensions/xep-0045.html#example-129
     pub async fn request_users(
         &self,
@@ -291,38 +291,36 @@ impl MUC {
 
         Ok(users)
     }
-}
 
-impl MUC {
-    async fn send_presence_to_room(
+    /// Modifies the affiliation of the given users. Make sure to only send the deltas.
+    /// https://xmpp.org/extensions/xep-0045.html#example-183
+    pub async fn update_user_affiliations(
         &self,
-        room_jid: &FullJid,
-        password: Option<&str>,
-    ) -> Result<MucUser, Error> {
-        let presence = Presence::new(presence::Type::None)
-            .with_to(room_jid.clone())
-            .with_payloads(vec![Element::builder("x", ns::MUC)
-                .append_all(
-                    password.map(|password| Element::builder("password", ns::MUC).append(password)),
-                )
-                .build()]);
+        room_jid: &BareJid,
+        users: impl IntoIterator<Item = (BareJid, Affiliation)>,
+    ) -> Result<()> {
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            muc::Query {
+                role: Role::Admin,
+                payloads: users
+                    .into_iter()
+                    .map(|(jid, affiliation)| {
+                        Element::builder("item", &Role::Admin.to_string())
+                            .attr("jid", jid)
+                            .attr("affiliation", affiliation)
+                            .build()
+                    })
+                    .collect(),
+            },
+        )
+        .with_to(room_jid.clone().into());
 
-        let mut response = self
-            .ctx
-            .send_stanza_with_future(
-                presence,
-                RequestFuture::new_presence_request(room_jid.clone()),
-            )
-            .await?;
-
-        let payload = response
-            .payloads
-            .pop()
-            .ok_or(RequestError::UnexpectedResponse)?;
-
-        Ok(MucUser::try_from(payload)?)
+        self.ctx.send_iq(iq).await?;
+        Ok(())
     }
 
+    /// Sends a direct invite to a user.
     /// https://xmpp.org/extensions/xep-0045.html#invite-direct
     pub async fn send_direct_invite(
         &self,
@@ -338,6 +336,7 @@ impl MUC {
         Ok(())
     }
 
+    /// Sends a mediated invite to a room which in turn forwards it to the invited users.
     /// https://xmpp.org/extensions/xep-0045.html#invite-mediated
     pub async fn send_mediated_invite(
         &self,
@@ -354,28 +353,84 @@ impl MUC {
     }
 }
 
-struct PresenceFutureState {
-    pub to: FullJid,
-    pub response: Option<Presence>,
+impl MUC {
+    async fn send_presence_to_room(
+        &self,
+        room_jid: &FullJid,
+        password: Option<&str>,
+    ) -> Result<RoomOccupancy, RequestError> {
+        let presence = Presence::new(presence::Type::None)
+            .with_to(room_jid.clone())
+            .with_payloads(vec![Element::builder("x", ns::MUC)
+                .append_all(
+                    password.map(|password| Element::builder("password", ns::MUC).append(password)),
+                )
+                .build()]);
+
+        let (mut self_presence, presences) = self
+            .ctx
+            .send_stanza_with_future(
+                presence,
+                RequestFuture::new_join_room_request(room_jid.clone()),
+            )
+            .await?;
+
+        let payload = self_presence
+            .payloads
+            .pop()
+            .ok_or(RequestError::UnexpectedResponse)?;
+
+        Ok(RoomOccupancy {
+            user: MucUser::try_from(payload)?,
+            self_presence,
+            presences,
+        })
+    }
 }
 
-impl RequestFuture<PresenceFutureState, Presence> {
-    pub fn new_presence_request(to: FullJid) -> Self {
+/// Order of events (https://xmpp.org/extensions/xep-0045.html#order)
+///   1. In-room presence from other occupants
+///   2. In-room presence from the joining entity itself (so-called "self-presence")
+///   3. Room history (if any)
+///   4. The room subject
+///   5. Live messages, presence updates, new user joins, etc.
+///
+/// We're running our Future for steps 1 & 2. The remaining steps need to be handled by the
+/// Client's event handler.  
+struct JoinRoomState {
+    pub room_jid: FullJid,
+    pub presences: Vec<Presence>,
+    pub self_presence: Option<Presence>,
+}
+
+impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>)> {
+    pub fn new_join_room_request(room_jid: FullJid) -> Self {
         RequestFuture::new(
-            PresenceFutureState {
-                to: to.clone(),
-                response: None,
+            JoinRoomState {
+                room_jid,
+                presences: vec![],
+                self_presence: None,
             },
             |state, element| {
                 let XMPPElement::Presence(presence) = element else {
                     return Ok(ElementReducerPoll::Pending);
                 };
 
-                if presence.from != Some(Jid::Full(state.to.clone())) {
+                let Some(Jid::Full(from)) = &presence.from else {
+                    return Ok(ElementReducerPoll::Pending);
+                };
+
+                // Make sure that the presence is actually sent by our room…
+                if from.node() != state.room_jid.node() || from.domain() != state.room_jid.domain()
+                {
                     return Ok(ElementReducerPoll::Pending);
                 }
 
-                if presence.type_ == presence::Type::Error {
+                // Is that the self-presence or somebody else's?
+                let is_self_presence = from.resource() == state.room_jid.resource();
+
+                // Check if we have an error on our hands (which is addressed at us directly)…
+                if presence.type_ == presence::Type::Error && is_self_presence {
                     return if let Some(error_payload) =
                         presence.payloads.iter().find(|p| p.name() == "error")
                     {
@@ -394,13 +449,21 @@ impl RequestFuture<PresenceFutureState, Presence> {
                     };
                 }
 
-                state.response = Some(presence.clone());
+                if !is_self_presence {
+                    state.presences.push(presence.clone());
+                    return Ok(ElementReducerPoll::Pending);
+                }
+
+                state.self_presence = Some(presence.clone());
                 Ok(ElementReducerPoll::Ready)
             },
             |state| {
-                state
-                    .response
-                    .expect("Internal error. Missing response in PresenceFutureState.")
+                (
+                    state
+                        .self_presence
+                        .expect("Internal error. Missing response in PresenceFutureState."),
+                    state.presences,
+                )
             },
         )
     }

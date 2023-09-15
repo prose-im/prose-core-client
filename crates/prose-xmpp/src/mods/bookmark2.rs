@@ -8,6 +8,7 @@ use std::str::FromStr;
 use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::bookmarks2::Conference;
+use xmpp_parsers::data_forms::{Field, FieldType};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub;
 use xmpp_parsers::pubsub::pubsub::Notify;
@@ -57,6 +58,7 @@ impl Module for Bookmark {
 }
 
 impl Bookmark {
+    /// https://xmpp.org/extensions/xep-0402.html#retrieving-bookmarks
     pub async fn load_bookmarks(&self) -> Result<Vec<ConferenceBookmark>> {
         let iq = Iq::from_get(
             self.ctx.generate_id(),
@@ -88,8 +90,9 @@ impl Bookmark {
         Ok(bookmarks)
     }
 
-    // Use this method to either save or update a bookmark.
-    // Updating a bookmark means republishing it with the same bookmark JID.
+    /// Use this method to either save or update a bookmark.
+    /// Updating a bookmark means republishing it with the same bookmark JID.
+    /// https://xmpp.org/extensions/xep-0402.html#adding-a-bookmark
     pub async fn publish_bookmark(&self, jid: Jid, conference: Conference) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
@@ -102,13 +105,14 @@ impl Bookmark {
                         payload: Some(conference.into()),
                     })],
                 },
-                publish_options: Some(pubsub::pubsub::PublishOptions::for_private_data()),
+                publish_options: Some(pubsub::pubsub::PublishOptions::for_private_data(None)),
             },
         );
         self.ctx.send_iq(iq).await?;
         Ok(())
     }
 
+    /// https://xmpp.org/extensions/xep-0402.html#removing-a-bookmark
     pub async fn retract_bookmark(&self, jid: Jid) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),

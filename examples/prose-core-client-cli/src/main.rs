@@ -465,7 +465,6 @@ struct ConnectedRoomEnvelope(Room);
 impl Display for ConnectedRoomEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = match self.0 {
-            Room::Pending(_) => "pending",
             Room::Group(_) => "group",
             Room::PrivateChannel(_) => "private channel",
             Room::PublicChannel(_) => "public channel",

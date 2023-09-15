@@ -11,7 +11,7 @@ use xmpp_parsers::presence::Presence;
 use crate::ns;
 use crate::stanza::{Message, PubSubMessage};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum XMPPElement {
     Presence(Presence),
     Message(Message),
@@ -38,5 +38,22 @@ impl TryFrom<Element> for XMPPElement {
         } else {
             Err(anyhow::format_err!("Encountered unknown element"))
         }
+    }
+}
+
+impl From<XMPPElement> for Element {
+    fn from(value: XMPPElement) -> Self {
+        match value {
+            XMPPElement::Presence(stanza) => stanza.into(),
+            XMPPElement::Message(stanza) => stanza.into(),
+            XMPPElement::IQ(stanza) => stanza.into(),
+            XMPPElement::PubSubMessage(stanza) => stanza.into(),
+        }
+    }
+}
+
+impl From<XMPPElement> for String {
+    fn from(elem: XMPPElement) -> String {
+        String::from(&Element::from(elem))
     }
 }

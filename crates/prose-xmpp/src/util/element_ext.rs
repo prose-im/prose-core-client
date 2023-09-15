@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::util::RequestError;
+use crate::util::ParseError;
 use minidom::{Element, ElementBuilder, NSChoice};
 
 pub trait ElementExt {
@@ -11,12 +11,12 @@ pub trait ElementExt {
         &self,
         name: impl AsRef<str>,
         ns: impl Into<NSChoice<'a>>,
-    ) -> Result<(), RequestError>;
+    ) -> Result<(), ParseError>;
 
-    fn attr_req(&self, name: impl AsRef<str>) -> Result<&str, RequestError>;
+    fn attr_req(&self, name: impl AsRef<str>) -> Result<&str, ParseError>;
 
-    fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, RequestError>;
-    fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, RequestError>;
+    fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, ParseError>;
+    fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, ParseError>;
 }
 
 pub trait ElementBuilderExt {
@@ -29,10 +29,10 @@ impl ElementExt for Element {
         &self,
         name: impl AsRef<str>,
         ns: impl Into<NSChoice<'a>>,
-    ) -> Result<(), RequestError> {
+    ) -> Result<(), ParseError> {
         let ns = ns.into();
         if !self.is(&name, ns) {
-            return Err(RequestError::Generic {
+            return Err(ParseError::Generic {
                 msg: format!(
                     "Expected element with name {} and namespace {}. Got {} and {} instead.",
                     name.as_ref(),
@@ -45,8 +45,8 @@ impl ElementExt for Element {
         Ok(())
     }
 
-    fn attr_req(&self, name: impl AsRef<str>) -> Result<&str, RequestError> {
-        self.attr(name.as_ref()).ok_or(RequestError::Generic {
+    fn attr_req(&self, name: impl AsRef<str>) -> Result<&str, ParseError> {
+        self.attr(name.as_ref()).ok_or(ParseError::Generic {
             msg: format!(
                 "Missing required attribute {} in element {}.",
                 name.as_ref(),
@@ -55,11 +55,11 @@ impl ElementExt for Element {
         })
     }
 
-    fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, RequestError> {
+    fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, ParseError> {
         self.attr(name.as_ref()).map(parse_bool).transpose()
     }
 
-    fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, RequestError> {
+    fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, ParseError> {
         parse_bool(self.attr_req(name)?)
     }
 }
@@ -75,12 +75,12 @@ impl ElementBuilderExt for ElementBuilder {
     }
 }
 
-pub fn parse_bool(value: impl AsRef<str>) -> Result<bool, RequestError> {
+pub fn parse_bool(value: impl AsRef<str>) -> Result<bool, ParseError> {
     Ok(match value.as_ref() {
         "true" | "1" => true,
         "false" | "0" => false,
         _ => {
-            return Err(RequestError::Generic {
+            return Err(ParseError::Generic {
                 msg: format!("Unknown value '{}' 'continue' attribute", value.as_ref()),
             })
         }

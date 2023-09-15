@@ -5,19 +5,19 @@
 
 use anyhow::Result;
 use prose_xmpp::stanza::muc;
-use prose_xmpp::{ns, parse_bool};
+use prose_xmpp::{ns, parse_bool, ParseError};
 use std::fmt::Formatter;
 use xmpp_parsers::disco;
 use xmpp_parsers::disco::DiscoInfoResult;
 
-#[derive(Debug)]
-pub struct RoomInfo {
+#[derive(Debug, PartialEq, Clone)]
+pub struct RoomSettings {
     pub features: Features,
     pub name: Option<String>,
     pub description: Option<String>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Features {
     /// Hidden room in Multi-User Chat
     pub is_hidden: bool,
@@ -197,12 +197,12 @@ impl Features {
     }
 }
 
-impl TryFrom<DiscoInfoResult> for RoomInfo {
-    type Error = anyhow::Error;
+impl TryFrom<DiscoInfoResult> for RoomSettings {
+    type Error = ParseError;
 
-    fn try_from(value: DiscoInfoResult) -> Result<Self> {
+    fn try_from(value: DiscoInfoResult) -> Result<Self, Self::Error> {
         let features = Features::from(value.features.as_slice());
-        let mut result = RoomInfo {
+        let mut result = RoomSettings {
             features,
             name: None,
             description: None,

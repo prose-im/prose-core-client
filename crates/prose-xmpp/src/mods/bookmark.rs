@@ -110,7 +110,7 @@ impl Bookmark {
                         payload: Some(storage.into()),
                     })],
                 },
-                publish_options: Some(pubsub::pubsub::PublishOptions::for_private_data()),
+                publish_options: Some(pubsub::pubsub::PublishOptions::for_private_data(None)),
             },
         );
         self.ctx.send_iq(iq).await?;

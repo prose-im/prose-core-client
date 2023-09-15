@@ -17,6 +17,22 @@ pub enum RequestError {
     JidError(#[from] jid::Error),
     #[error("Request error: {msg}")]
     Generic { msg: String },
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    #[error("Parse error: {msg}")]
+    Generic { msg: String },
+    #[error(transparent)]
+    XMPPParseError(#[from] xmpp_parsers::Error),
+}
+
+impl From<xmpp_parsers::Error> for RequestError {
+    fn from(value: xmpp_parsers::Error) -> Self {
+        Self::ParseError(value.into())
+    }
 }
 
 impl RequestError {
