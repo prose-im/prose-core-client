@@ -8,16 +8,13 @@ use xmpp_parsers::muc::user::Status;
 
 pub(crate) use bookmark_metadata::{BookmarkMetadata, RoomType};
 use prose_xmpp::mods::muc::RoomOccupancy;
-pub use room::Room;
 pub(crate) use room_config::RoomConfig;
 pub(crate) use room_settings::{RoomSettings, RoomValidationError};
 pub(crate) use service::Service;
 
 mod bookmark_metadata;
-mod room;
 mod room_config;
 mod room_settings;
-mod rooms;
 mod service;
 
 #[derive(Debug, PartialEq, Clone)]

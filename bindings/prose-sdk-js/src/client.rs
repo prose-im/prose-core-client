@@ -7,7 +7,7 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, MessagesArray,
-    StringArray, UserMetadata, UserProfile,
+    RoomsArray, StringArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
 use jid::ResourcePart;
@@ -156,6 +156,11 @@ impl Client {
         Ok(())
     }
 
+    #[wasm_bindgen(js_name = "loadConnectedRooms")]
+    pub async fn load_connected_rooms(&self) -> Result<RoomsArray> {
+        Ok(self.client.connected_rooms().into())
+    }
+
     #[wasm_bindgen(js_name = "sendMessage")]
     pub async fn send_message(&self, to: &BareJid, body: String) -> Result<()> {
         info!("Sending message to {}…", to);
@@ -259,24 +264,6 @@ impl Client {
             .into_iter()
             .map(|c| JsValue::from(Contact::from(c)))
             .collect_into_js_array::<ContactsArray>())
-    }
-
-    #[wasm_bindgen(js_name = "loadLatestMessages")]
-    pub async fn load_latest_messages(
-        &self,
-        from: &BareJid,
-        since: Option<String>,
-        load_from_server: bool,
-    ) -> Result<MessagesArray> {
-        let since: Option<MessageId> = since.map(|id| id.into());
-
-        let messages = self
-            .client
-            .load_latest_messages(from.as_ref(), since.as_ref(), load_from_server)
-            .await
-            .map_err(WasmError::from)?;
-
-        Ok(messages.into())
     }
 
     #[wasm_bindgen(js_name = "loadMessagesWithIDs")]

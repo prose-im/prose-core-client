@@ -14,8 +14,9 @@ use xmpp_parsers::bookmarks2::{Autojoin, Conference};
 use xmpp_parsers::muc::user::Affiliation;
 
 use crate::avatar_cache::AvatarCache;
+use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
-use crate::types::muc::{BookmarkMetadata, Room, RoomMetadata, RoomSettings};
+use crate::types::muc::{BookmarkMetadata, RoomMetadata, RoomSettings};
 use crate::types::{muc, Bookmarks};
 use crate::util::StringExt;
 
@@ -28,7 +29,7 @@ enum MUCError {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub fn connected_rooms(&self) -> Vec<Room> {
+    pub fn connected_rooms(&self) -> Vec<RoomEnvelope<D, A>> {
         self.inner
             .connected_rooms
             .read()
@@ -69,7 +70,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .await?;
 
         let room_has_been_created = metadata.room_has_been_created();
-        let room = Room::from(metadata);
+        let room = RoomEnvelope::try_from((metadata, self))?;
         let room_jid = room.jid().clone();
 
         // So we were actually already connected to that room.
@@ -94,7 +95,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             conference: Conference {
                 autojoin: Autojoin::True,
                 name: Some(group_name),
-                nick: Some(room.nick().to_string()),
+                nick: Some(room.user_nickname().to_string()),
                 password: None,
                 extensions: vec![BookmarkMetadata {
                     room_type: muc::RoomType::Group,
@@ -144,11 +145,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             channel_name.as_ref()
         );
 
-        let room: Room = self
-            .muc_service()?
-            .create_or_join_private_channel(channel_name.as_ref())
-            .await?
-            .into();
+        let room: RoomEnvelope<D, A> = (
+            self.muc_service()?
+                .create_or_join_private_channel(channel_name.as_ref())
+                .await?,
+            self,
+        )
+            .try_into()?;
 
         self.finish_create_channel(channel_name.as_ref(), room)
             .await
@@ -161,11 +164,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             channel_name.as_ref()
         );
 
-        let room: Room = self
-            .muc_service()?
-            .create_or_join_public_channel(channel_name.as_ref())
-            .await?
-            .into();
+        let room: RoomEnvelope<D, A> = (
+            self.muc_service()?
+                .create_or_join_public_channel(channel_name.as_ref())
+                .await?,
+            self,
+        )
+            .try_into()?;
 
         self.finish_create_channel(channel_name.as_ref(), room)
             .await
@@ -273,13 +278,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         return Ok(service);
     }
 
-    async fn finish_create_channel(&self, name: &str, room: Room) -> Result<()> {
+    async fn finish_create_channel(&self, name: &str, room: RoomEnvelope<D, A>) -> Result<()> {
         let bookmark = ConferenceBookmark {
             jid: room.jid().clone().into(),
             conference: Conference {
                 autojoin: Autojoin::True,
                 name: Some(name.to_string()),
-                nick: Some(room.nick().to_string()),
+                nick: Some(room.user_nickname().to_string()),
                 password: None,
                 extensions: vec![BookmarkMetadata {
                     room_type: muc::RoomType::PublicChannel,
@@ -320,7 +325,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         room_jid: &BareJid,
         nickname: Option<&str>,
         password: Option<&str>,
-    ) -> Result<Room, RequestError> {
+    ) -> Result<RoomEnvelope<D, A>, RequestError> {
         info!("Entering room {}…", room_jid);
 
         let nickname = nickname
@@ -341,15 +346,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let settings =
             RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
 
-        return Ok(RoomMetadata {
-            room_jid: room_jid_full,
-            occupancy,
-            settings,
-        }
-        .into());
+        (
+            RoomMetadata {
+                room_jid: room_jid_full,
+                occupancy,
+                settings,
+            },
+            self,
+        )
+            .try_into()
     }
 
-    fn did_enter_room(&self, room: Room) {
+    fn did_enter_room(&self, room: RoomEnvelope<D, A>) {
         // TODO: Send event to delegate
         self.inner
             .connected_rooms

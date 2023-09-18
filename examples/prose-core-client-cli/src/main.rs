@@ -17,8 +17,11 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::types::{Address, Availability, Contact, Message, MessageId, Room};
-use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
+use prose_core_client::types::{Address, Availability, Contact, Message, MessageId};
+use prose_core_client::{
+    room::RoomEnvelope as Room, CachePolicy, ClientBuilder, ClientDelegate, ClientEvent,
+    FsAvatarCache,
+};
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::ConferenceBookmark;
@@ -459,12 +462,12 @@ impl Delegate {
     }
 }
 
-#[derive(Debug)]
-struct ConnectedRoomEnvelope(Room);
+struct ConnectedRoomEnvelope(Room<SQLiteCache, FsAvatarCache>);
 
 impl Display for ConnectedRoomEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = match self.0 {
+            Room::DirectMessage(_) => "direct message",
             Room::Group(_) => "group",
             Room::PrivateChannel(_) => "private channel",
             Room::PublicChannel(_) => "public channel",

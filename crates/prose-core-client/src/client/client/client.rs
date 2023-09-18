@@ -18,8 +18,8 @@ use prose_xmpp::{mods, ConnectionError, IDProvider};
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
+use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
-use crate::types::muc::Room;
 use crate::types::{muc, Bookmarks};
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
@@ -32,11 +32,11 @@ pub enum ClientError {
 
 #[derive(Clone)]
 pub struct Client<D: DataCache + 'static, A: AvatarCache + 'static> {
-    pub(super) client: XMPPClient,
-    pub(super) inner: Arc<ClientInner<D, A>>,
+    pub(in crate::client) client: XMPPClient,
+    pub(in crate::client) inner: Arc<ClientInner<D, A>>,
 }
 
-pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> {
+pub(in crate::client) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub caps: Capabilities,
     pub data_cache: D,
     pub avatar_cache: A,
@@ -47,7 +47,7 @@ pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> 
     pub presences: RwLock<PresenceMap>,
     pub muc_service: RwLock<Option<muc::Service>>,
     pub bookmarks: RwLock<Bookmarks>,
-    pub connected_rooms: RwLock<HashMap<BareJid, Room>>,
+    pub connected_rooms: RwLock<HashMap<BareJid, RoomEnvelope<D, A>>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {

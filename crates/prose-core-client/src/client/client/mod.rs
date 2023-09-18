@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use client::Client;
+pub(super) use client::ClientInner;
 pub use client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDataCache};
 
 mod client;

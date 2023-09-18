@@ -11,7 +11,6 @@ pub use capabilities::{Capabilities, Feature};
 pub use contact::Contact;
 pub use message::{Emoji, Message, MessageId, Reaction, StanzaId};
 pub use message_like::MessageLike;
-pub use muc::Room;
 pub use page::Page;
 pub use presence::Presence;
 pub use software_version::SoftwareVersion;

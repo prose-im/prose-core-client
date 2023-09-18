@@ -86,10 +86,11 @@ impl Chat {
         &self,
         to: impl Into<Jid>,
         body: impl Into<String>,
+        message_type: MessageType,
         chat_state: Option<ChatState>,
     ) -> Result<()> {
         let mut stanza = Message::new()
-            .set_type(MessageType::Chat)
+            .set_type(message_type)
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
