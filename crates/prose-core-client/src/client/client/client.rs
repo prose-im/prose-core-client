@@ -5,13 +5,15 @@
 
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use parking_lot::RwLock;
 use strum_macros::Display;
-use tracing::{error, instrument};
+use tracing::{error, info, instrument};
+use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_xmpp::mods::{Chat, Status};
 use prose_xmpp::{mods, ConnectionError, IDProvider};
@@ -23,7 +25,7 @@ use crate::data_cache::DataCache;
 use crate::types::{muc, Bookmarks};
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
-use crate::ClientDelegate;
+use crate::{CachePolicy, ClientDelegate, ClientEvent};
 
 #[derive(Debug, thiserror::Error, Display)]
 pub enum ClientError {
@@ -40,6 +42,7 @@ pub(in crate::client) struct ClientInner<D: DataCache + 'static, A: AvatarCache 
     pub caps: Capabilities,
     pub data_cache: D,
     pub avatar_cache: A,
+    pub is_observing_rooms: AtomicBool,
     pub time_provider: Arc<dyn TimeProvider>,
     pub id_provider: Arc<dyn IDProvider>,
     pub software_version: SoftwareVersion,
@@ -100,16 +103,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 msg: err.to_string(),
             })?;
 
-        let client = Client {
-            client: self.client.clone(),
-            inner: self.inner.clone(),
-        };
-        prose_xmpp::spawn(async move {
-            if let Err(error) = client.perform_post_connect_tasks().await {
-                error!("Failed to run post-connect-tasks: {}", error.to_string())
-            }
-        });
-
         Ok(())
     }
 
@@ -127,6 +120,79 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    pub async fn start_observing_rooms(&self) -> Result<()> {
+        if self.inner.is_observing_rooms.swap(true, Ordering::Acquire) {
+            return Ok(());
+        }
+
+        let mut rooms = self
+            .load_contacts(CachePolicy::default())
+            .await?
+            .into_iter()
+            .map(|contact| RoomEnvelope::try_from((contact, self)))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let bookmarks = match self.load_bookmarks().await {
+            Ok(bookmarks) => bookmarks,
+            Err(error) => {
+                error!("Failed to load bookmarks. Reason: {}", error.to_string());
+                Default::default()
+            }
+        };
+        let mut invalid_bookmarks = vec![];
+
+        for bookmark in bookmarks.iter() {
+            let result = self
+                .enter_room(
+                    &bookmark.jid.to_bare(),
+                    bookmark.conference.nick.as_deref(),
+                    bookmark.conference.password.as_deref(),
+                )
+                .await;
+
+            match result {
+                Ok(room) => rooms.push(room),
+                Err(error) if error.defined_condition() == Some(DefinedCondition::Gone) => {
+                    // The room does not exist anymore…
+                    invalid_bookmarks.push(bookmark.jid.to_bare());
+                }
+                Err(error) => error!(
+                    "Failed to enter room {}. Reason: {}",
+                    bookmark.jid,
+                    error.to_string()
+                ),
+            }
+        }
+
+        *self.inner.bookmarks.write() = bookmarks;
+
+        if !invalid_bookmarks.is_empty() {
+            info!("Deleting {} invalid bookmarks…", invalid_bookmarks.len());
+            if let Err(error) = self
+                .remove_and_publish_bookmarks(invalid_bookmarks.as_slice())
+                .await
+            {
+                error!(
+                    "Failed to delete invalid bookmarks. Reason {}",
+                    error.to_string()
+                )
+            }
+        }
+
+        if rooms.is_empty() {
+            return Ok(());
+        }
+
+        *self.inner.connected_rooms.write() = rooms
+            .into_iter()
+            .map(|room| (room.jid().clone(), room))
+            .collect();
+
+        self.send_event(ClientEvent::RoomsChanged);
+
+        Ok(())
+    }
+
     pub async fn load_account_settings(&self) -> Result<AccountSettings> {
         Ok(self
             .inner
@@ -171,11 +237,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             break;
         }
 
-        Ok(())
-    }
-
-    async fn perform_post_connect_tasks(&self) -> Result<()> {
-        self.load_and_connect_bookmarks().await?;
         Ok(())
     }
 }

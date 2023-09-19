@@ -22,6 +22,7 @@ const TS_APPEND_CONTENT: &'static str = r#"
 export type RoomID = string;
 
 export interface RoomBase {
+    readonly type: RoomType;
     readonly id: RoomID;
     readonly name: string;
 
@@ -29,55 +30,65 @@ export interface RoomBase {
 }
 
 export interface RoomDirectMessage extends RoomBase {
-  kind: "direct-message";
+  type: RoomType.DirectMessage;
 }
 
 export interface RoomGroup extends RoomBase {
-  kind: "group";
+  type: RoomType.Group;
 }
 
 export interface RoomPrivateChannel extends RoomBase {
-  kind: "private-channel";
+  type: RoomType.PrivateChannel;
 }
 
 export interface RoomPublicChannel extends RoomBase {
-  kind: "public-channel";
+  type: RoomType.PublicChannel;
 }
 
 export interface RoomGeneric extends RoomBase {
-  kind: "generic";
+  type: RoomType.Generic;
 }
 
-export type Room = RoomDirectMessage | RoomGroup | RoomPrivateChannel | RoomPublicChannel;
+export type Room = RoomDirectMessage | RoomGroup | RoomPrivateChannel | RoomPublicChannel | RoomGeneric;
 "#;
+
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub enum RoomType {
+    DirectMessage = 0,
+    Group = 1,
+    PrivateChannel = 2,
+    PublicChannel = 3,
+    Generic = 4,
+}
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomDirectMessage {
-    kind: String,
+    kind: RoomType,
     room: SdkRoom<DirectMessage, Cache, Cache>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomGroup {
-    kind: String,
+    kind: RoomType,
     room: SdkRoom<Group, Cache, Cache>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomPrivateChannel {
-    kind: String,
+    kind: RoomType,
     room: SdkRoom<PrivateChannel, Cache, Cache>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomPublicChannel {
-    kind: String,
+    kind: RoomType,
     room: SdkRoom<PublicChannel, Cache, Cache>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomGeneric {
-    kind: String,
+    kind: RoomType,
     room: SdkRoom<Generic, Cache, Cache>,
 }
 
@@ -85,20 +96,20 @@ macro_rules! base_room_impl {
     ($t:ident) => {
         #[wasm_bindgen]
         impl $t {
-            #[wasm_bindgen(getter)]
-            pub fn kind(&self) -> String {
+            #[wasm_bindgen(getter, js_name = "type")]
+            pub fn kind(&self) -> RoomType {
                 self.kind.clone()
             }
 
             #[wasm_bindgen(getter)]
             pub fn id(&self) -> String {
-                self.room.jid.to_string()
+                self.room.jid().to_string()
             }
 
             #[wasm_bindgen(getter)]
             pub fn name(&self) -> String {
                 self.room
-                    .name
+                    .name()
                     .as_deref()
                     .unwrap_or("<untitled>")
                     .to_string()
@@ -136,23 +147,23 @@ impl From<Vec<RoomEnvelope<Cache, Cache>>> for RoomsArray {
             .map(|envelope| -> JsValue {
                 match envelope {
                     RoomEnvelope::DirectMessage(room) => JsValue::from(RoomDirectMessage {
-                        kind: "direct-message".to_string(),
+                        kind: RoomType::DirectMessage,
                         room,
                     }),
                     RoomEnvelope::Group(room) => JsValue::from(RoomGroup {
-                        kind: "group".to_string(),
+                        kind: RoomType::Group,
                         room,
                     }),
                     RoomEnvelope::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
-                        kind: "private-channel".to_string(),
+                        kind: RoomType::PrivateChannel,
                         room,
                     }),
                     RoomEnvelope::PublicChannel(room) => JsValue::from(RoomPublicChannel {
-                        kind: "public-channel".to_string(),
+                        kind: RoomType::PublicChannel,
                         room,
                     }),
                     RoomEnvelope::Generic(room) => JsValue::from(RoomGeneric {
-                        kind: "generic".to_string(),
+                        kind: RoomType::Generic,
                         room,
                     }),
                 }

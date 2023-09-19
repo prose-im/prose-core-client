@@ -6,6 +6,7 @@
 use anyhow::Result;
 use chrono::Utc;
 use jid::{BareJid, Jid};
+use std::sync::atomic::Ordering;
 use tracing::{debug, error};
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::presence::Presence;
@@ -51,6 +52,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let result = match event {
             Event::Client(event) => match event {
                 client::Event::Connected => {
+                    self.inner
+                        .is_observing_rooms
+                        .store(false, Ordering::Relaxed);
                     self.send_event(ClientEvent::ConnectionStatusChanged {
                         event: ConnectionEvent::Connect,
                     });
@@ -163,7 +167,7 @@ impl ReceivedMessage {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    fn send_event(&self, event: ClientEvent) {
+    pub(super) fn send_event(&self, event: ClientEvent) {
         let Some(delegate) = &self.inner.delegate else {
             return;
         };

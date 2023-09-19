@@ -17,6 +17,7 @@ use crate::client::room::Room;
 use crate::data_cache::DataCache;
 use crate::room::room::RoomInner;
 use crate::types::muc::RoomMetadata;
+use crate::types::Contact;
 use crate::Client;
 
 pub enum RoomEnvelope<D: DataCache + 'static, A: AvatarCache + 'static> {
@@ -170,5 +171,35 @@ impl<D: DataCache, A: AvatarCache> TryFrom<(RoomMetadata, &Client<D, A>)> for Ro
             }
             _ => Self::Generic(make_room(value, MessageType::Groupchat)?),
         })
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> TryFrom<(Contact, &Client<D, A>)> for RoomEnvelope<D, A> {
+    type Error = RequestError;
+
+    fn try_from(value: (Contact, &Client<D, A>)) -> Result<Self, Self::Error> {
+        let (contact, client) = value;
+        let user_jid = client
+            .connected_jid()
+            .map_err(|err| RequestError::Generic {
+                msg: err.to_string(),
+            })?;
+
+        let room = Room {
+            inner: Arc::new(RoomInner {
+                jid: contact.jid,
+                name: Some(contact.name),
+                description: None,
+                user_jid: user_jid.to_bare(),
+                user_nickname: user_jid.resource_str().to_string(),
+                occupants: vec![],
+                xmpp: client.client.clone(),
+                client: client.inner.clone(),
+                message_type: MessageType::Chat,
+            }),
+            _type: Default::default(),
+        };
+
+        Ok(Self::DirectMessage(room))
     }
 }

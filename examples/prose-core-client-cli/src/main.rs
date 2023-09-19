@@ -53,6 +53,10 @@ async fn configure_client() -> Result<(BareJid, Client)> {
     client.connect(&jid, password, Availability::Away).await?;
     println!("Connected.");
 
+    println!("Starting room observation…");
+    client.start_observing_rooms().await?;
+    println!("Done.");
+
     Ok((jid.into_bare(), client))
 }
 
@@ -627,28 +631,30 @@ async fn main() -> Result<()> {
                     .await?;
             }
             Selection::LoadBookmarks => {
-                let bookmarks = client
-                    .load_bookmarks()
-                    .await?
-                    .into_iter()
-                    .map(BookmarkEnvelope)
-                    .map(|b| b.to_string())
-                    .collect::<Vec<_>>();
-                println!("Old-style bookmarks:\n{}", bookmarks.join("\n"));
+                let bookmarks = client.load_bookmarks_dbg().await?;
 
-                let bookmarks = client
-                    .load_bookmarks2()
-                    .await?
+                let bookmarks1 = bookmarks
+                    .0
                     .into_iter()
                     .map(BookmarkEnvelope)
                     .map(|b| b.to_string())
                     .collect::<Vec<_>>();
-                println!("New-style bookmarks:\n{}", bookmarks.join("\n"));
+
+                let bookmarks2 = bookmarks
+                    .1
+                    .into_iter()
+                    .map(BookmarkEnvelope)
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>();
+
+                println!("Old-style bookmarks:\n{}", bookmarks1.join("\n"));
+                println!("New-style bookmarks:\n{}", bookmarks2.join("\n"));
             }
             Selection::DeleteBookmark => {
                 let bookmarks = client
-                    .load_bookmarks()
+                    .load_bookmarks_dbg()
                     .await?
+                    .0
                     .into_iter()
                     .map(BookmarkEnvelope)
                     .collect::<Vec<_>>();

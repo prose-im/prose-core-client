@@ -17,17 +17,19 @@ pub(crate) struct RoomConfig {
 
 impl RoomConfig {
     pub fn group(name: impl AsRef<str>, participants: &[BareJid]) -> Self {
-        let history_len = Value::TextSingle(u32::MAX.to_string());
         RoomConfig {
             config: FormConfig::new([
                 FormValue::optional(cfg::ALLOW_INVITES, Value::Boolean(false)),
                 FormValue::optional(cfg::ALLOW_MEMBER_INVITES, Value::Boolean(false)),
                 FormValue::optional(cfg::ALLOW_PM, Value::TextSingle("none".to_string())),
                 FormValue::optional(cfg::CHANGE_SUBJECT, Value::Boolean(true)),
-                FormValue::optional(cfg::DEFAULT_HISTORY_MESSAGES, history_len.clone()),
+                FormValue::optional(
+                    cfg::DEFAULT_HISTORY_MESSAGES,
+                    Value::TextSingle("0".to_string()),
+                ),
                 FormValue::optional(cfg::ENABLE_LOGGING, Value::Boolean(false)),
                 FormValue::optional(cfg::LANG, Value::TextSingle("en".to_string())),
-                FormValue::optional(cfg::MAX_HISTORY_FETCH, history_len),
+                FormValue::optional(cfg::MAX_HISTORY_FETCH, Value::TextSingle("0".to_string())),
                 FormValue::optional(cfg::MAX_USERS, Value::TextSingle("10".to_string())),
                 FormValue::optional(cfg::MODERATED_ROOM, Value::Boolean(false)),
                 FormValue::optional(cfg::PASSWORD_PROTECTED_ROOM, Value::Boolean(false)),
@@ -58,17 +60,19 @@ impl RoomConfig {
     }
 
     pub fn private_channel(name: impl AsRef<str>) -> Self {
-        let history_len = Value::TextSingle(u32::MAX.to_string());
         RoomConfig {
             config: FormConfig::new([
                 FormValue::optional(cfg::ALLOW_INVITES, Value::Boolean(true)),
                 FormValue::optional(cfg::ALLOW_MEMBER_INVITES, Value::Boolean(true)),
                 FormValue::optional(cfg::ALLOW_PM, Value::TextSingle("none".to_string())),
                 FormValue::optional(cfg::CHANGE_SUBJECT, Value::Boolean(true)),
-                FormValue::optional(cfg::DEFAULT_HISTORY_MESSAGES, history_len.clone()),
+                FormValue::optional(
+                    cfg::DEFAULT_HISTORY_MESSAGES,
+                    Value::TextSingle("0".to_string()),
+                ),
                 FormValue::optional(cfg::ENABLE_LOGGING, Value::Boolean(false)),
                 FormValue::optional(cfg::LANG, Value::TextSingle("en".to_string())),
-                FormValue::optional(cfg::MAX_HISTORY_FETCH, history_len),
+                FormValue::optional(cfg::MAX_HISTORY_FETCH, Value::TextSingle("0".to_string())),
                 FormValue::optional(cfg::MAX_USERS, Value::TextSingle("100".to_string())),
                 FormValue::optional(cfg::MODERATED_ROOM, Value::Boolean(false)),
                 FormValue::optional(cfg::PASSWORD_PROTECTED_ROOM, Value::Boolean(false)),
@@ -96,17 +100,19 @@ impl RoomConfig {
     }
 
     pub fn public_channel(name: impl AsRef<str>) -> Self {
-        let history_len = Value::TextSingle(u32::MAX.to_string());
         RoomConfig {
             config: FormConfig::new([
                 FormValue::optional(cfg::ALLOW_INVITES, Value::Boolean(true)),
                 FormValue::optional(cfg::ALLOW_MEMBER_INVITES, Value::Boolean(true)),
                 FormValue::optional(cfg::ALLOW_PM, Value::TextSingle("none".to_string())),
                 FormValue::optional(cfg::CHANGE_SUBJECT, Value::Boolean(false)),
-                FormValue::optional(cfg::DEFAULT_HISTORY_MESSAGES, history_len.clone()),
+                FormValue::optional(
+                    cfg::DEFAULT_HISTORY_MESSAGES,
+                    Value::TextSingle("0".to_string()),
+                ),
                 FormValue::optional(cfg::ENABLE_LOGGING, Value::Boolean(false)),
                 FormValue::optional(cfg::LANG, Value::TextSingle("en".to_string())),
-                FormValue::optional(cfg::MAX_HISTORY_FETCH, history_len),
+                FormValue::optional(cfg::MAX_HISTORY_FETCH, Value::TextSingle("0".to_string())),
                 FormValue::optional(cfg::MAX_USERS, Value::TextSingle("100".to_string())),
                 FormValue::optional(cfg::MODERATED_ROOM, Value::Boolean(false)),
                 FormValue::optional(cfg::PASSWORD_PROTECTED_ROOM, Value::Boolean(false)),

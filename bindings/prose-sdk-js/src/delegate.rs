@@ -39,6 +39,9 @@ export type ConnectionError = ConnectionTimedOutError | ConnectionInvalidCredent
 export interface ProseClientDelegate {
     clientConnected(): void
     clientDisconnected(client: ProseClient, error?: ConnectionError): void
+    
+    /// The number of available rooms has changed.
+    roomsChanged(client: ProseClient): void
 
     /// A user in `conversation` started or stopped typing.
     composingUsersChanged(client: ProseClient, conversation: JID): void
@@ -81,6 +84,9 @@ extern "C" {
         client: Client,
         conversation: BareJid,
     ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "roomsChanged")]
+    fn rooms_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "contactChanged")]
     fn contact_changed(this: &JSDelegate, client: Client, jid: BareJid) -> Result<(), JsValue>;
@@ -204,6 +210,7 @@ impl Delegate<WasmCache, WasmCache> {
             } => self
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
+            ClientEvent::RoomsChanged => self.inner.rooms_changed(client)?,
             ClientEvent::ContactChanged { jid } => {
                 self.inner.contact_changed(client, jid.into())?
             }

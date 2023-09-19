@@ -12,25 +12,35 @@ use crate::data_cache::DataCache;
 use crate::types::MessageId;
 use crate::Client;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ConnectionEvent {
     Connect,
     Disconnect { error: Option<ConnectionError> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ClientEvent {
+    RoomsChanged,
+
     /// A user in `conversation` started or stopped typing.
-    ComposingUsersChanged { conversation: BareJid },
+    ComposingUsersChanged {
+        conversation: BareJid,
+    },
 
     /// The status of the connection has changed.
-    ConnectionStatusChanged { event: ConnectionEvent },
+    ConnectionStatusChanged {
+        event: ConnectionEvent,
+    },
 
     /// Infos about a contact have changed.
-    ContactChanged { jid: BareJid },
+    ContactChanged {
+        jid: BareJid,
+    },
 
     /// The avatar of a user changed.
-    AvatarChanged { jid: BareJid },
+    AvatarChanged {
+        jid: BareJid,
+    },
 
     /// One or many messages were either received or sent.
     MessagesAppended {

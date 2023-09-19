@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use prose_xmpp::client::ConnectorProvider;
@@ -154,6 +155,7 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             muc_service: Default::default(),
             bookmarks: Default::default(),
             connected_rooms: Default::default(),
+            is_observing_rooms: AtomicBool::new(false),
         });
 
         let event_inner = inner.clone();

@@ -156,6 +156,15 @@ impl Client {
         Ok(())
     }
 
+    #[wasm_bindgen(js_name = "startObservingRooms")]
+    pub async fn start_observing_rooms(&self) -> Result<()> {
+        self.client
+            .start_observing_rooms()
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
     #[wasm_bindgen(js_name = "loadConnectedRooms")]
     pub async fn load_connected_rooms(&self) -> Result<RoomsArray> {
         Ok(self.client.connected_rooms().into())

@@ -8,6 +8,7 @@ use jid::{BareJid, Jid};
 use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
 use prose_xmpp::stanza::ConferenceBookmark;
 use prose_xmpp::{mods, RequestError};
+use std::collections::HashSet;
 use std::iter;
 use tracing::info;
 use xmpp_parsers::bookmarks2::{Autojoin, Conference};
@@ -178,7 +179,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub(super) async fn load_and_connect_bookmarks(&self) -> Result<()> {
+    pub(super) async fn load_bookmarks(&self) -> Result<Bookmarks> {
         let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
         let bookmark2_mod = self.client.get_mod::<mods::Bookmark2>();
 
@@ -187,18 +188,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             bookmark2_mod.load_bookmarks().await?,
         );
 
-        for bookmark in bookmarks.iter() {
-            self.enter_room_if_needed(
-                &bookmark.jid.to_bare(),
-                bookmark.conference.nick.as_deref(),
-                bookmark.conference.password.as_deref(),
-            )
-            .await?;
-        }
-
-        *self.inner.bookmarks.write() = bookmarks;
-
-        Ok(())
+        Ok(bookmarks)
     }
 
     pub(super) async fn handle_direct_invite(&self, from: Jid, invite: DirectInvite) -> Result<()> {
@@ -245,18 +235,97 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     pub(super) async fn handle_retracted_bookmarks2(&self, jids: Vec<Jid>) -> Result<()> {
         Ok(())
     }
+
+    pub(super) async fn enter_room(
+        &self,
+        room_jid: &BareJid,
+        nickname: Option<&str>,
+        password: Option<&str>,
+    ) -> Result<RoomEnvelope<D, A>, RequestError> {
+        info!("Entering room {}…", room_jid);
+
+        let nickname = nickname
+            .ok_or(
+                self.connected_jid()
+                    .map_err(|err| RequestError::Generic {
+                        msg: err.to_string(),
+                    })?
+                    .node_str(),
+            )
+            .unwrap_or("unknown-user");
+        let room_jid_full = room_jid.with_resource_str(nickname)?;
+
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+        let occupancy = muc_mod.enter_room(&room_jid_full, password).await?;
+
+        let caps = self.client.get_mod::<mods::Caps>();
+        let settings =
+            RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
+
+        (
+            RoomMetadata {
+                room_jid: room_jid_full,
+                occupancy,
+                settings,
+            },
+            self,
+        )
+            .try_into()
+    }
+
+    pub(super) async fn remove_and_publish_bookmarks(&self, jids: &[BareJid]) -> Result<()> {
+        if jids.is_empty() {
+            return Ok(());
+        }
+
+        info!("Deleting {} bookmarks…", jids.len());
+        let mut bookmarks = self.inner.bookmarks.write();
+        let bookmarks_to_delete = jids.iter().collect::<HashSet<_>>();
+
+        let bookmarks_len = bookmarks.bookmarks.len();
+        let bookmarks2_len = bookmarks.bookmarks.len();
+
+        bookmarks
+            .bookmarks
+            .retain(|jid, _| !bookmarks_to_delete.contains(jid));
+        bookmarks
+            .bookmarks2
+            .retain(|jid, _| !bookmarks_to_delete.contains(jid));
+
+        let needs_save = bookmarks.bookmarks.len() != bookmarks_len;
+        let needs_save2 = bookmarks.bookmarks2.len() != bookmarks2_len;
+        drop(bookmarks);
+
+        if needs_save {
+            info!("Publishing old-style bookmarks…");
+            let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
+            let guard = self.inner.bookmarks.read();
+            let bookmarks = guard.bookmarks.values().cloned();
+            bookmark_mod.publish_bookmarks(bookmarks).await?;
+        }
+
+        if needs_save2 {
+            info!("Publishing new-style bookmark…");
+            let bookmark_mod = self.client.get_mod::<mods::Bookmark2>();
+            for jid in jids {
+                bookmark_mod.retract_bookmark(jid.clone().into()).await?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(feature = "debug")]
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub async fn load_bookmarks(&self) -> Result<Vec<ConferenceBookmark>> {
-        let bookmarks_mod = self.client.get_mod::<mods::Bookmark>();
-        bookmarks_mod.load_bookmarks().await
-    }
-
-    pub async fn load_bookmarks2(&self) -> Result<Vec<ConferenceBookmark>> {
-        let bookmarks_mod = self.client.get_mod::<mods::Bookmark2>();
-        bookmarks_mod.load_bookmarks().await
+    pub async fn load_bookmarks_dbg(
+        &self,
+    ) -> Result<(Vec<ConferenceBookmark>, Vec<ConferenceBookmark>)> {
+        let bookmarks = self.load_bookmarks().await?;
+        Ok((
+            bookmarks.bookmarks.values().cloned().collect(),
+            bookmarks.bookmarks2.values().cloned().collect(),
+        ))
     }
 
     pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
@@ -266,7 +335,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     pub async fn delete_bookmark(&self, jid: &Jid) -> Result<()> {
-        self.remove_and_publish_bookmark(&jid.to_bare()).await
+        self.remove_and_publish_bookmarks(&[jid.to_bare()]).await
     }
 }
 
@@ -320,43 +389,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
-    async fn enter_room(
-        &self,
-        room_jid: &BareJid,
-        nickname: Option<&str>,
-        password: Option<&str>,
-    ) -> Result<RoomEnvelope<D, A>, RequestError> {
-        info!("Entering room {}…", room_jid);
-
-        let nickname = nickname
-            .ok_or(
-                self.connected_jid()
-                    .map_err(|err| RequestError::Generic {
-                        msg: err.to_string(),
-                    })?
-                    .node_str(),
-            )
-            .unwrap_or("unknown-user");
-        let room_jid_full = room_jid.with_resource_str(nickname)?;
-
-        let muc_mod = self.client.get_mod::<mods::MUC>();
-        let occupancy = muc_mod.enter_room(&room_jid_full, password).await?;
-
-        let caps = self.client.get_mod::<mods::Caps>();
-        let settings =
-            RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
-
-        (
-            RoomMetadata {
-                room_jid: room_jid_full,
-                occupancy,
-                settings,
-            },
-            self,
-        )
-            .try_into()
-    }
-
     fn did_enter_room(&self, room: RoomEnvelope<D, A>) {
         // TODO: Send event to delegate
         self.inner
@@ -395,34 +427,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             bookmark_mod
                 .publish_bookmark(bare_jid.into(), bookmark.conference)
                 .await?;
-        }
-
-        Ok(())
-    }
-
-    async fn remove_and_publish_bookmark(&self, jid: &BareJid) -> Result<()> {
-        info!("Deleting bookmark {}…", jid);
-        let mut bookmarks = self.inner.bookmarks.write();
-
-        let needs_save = bookmarks.bookmarks.contains_key(&jid);
-        let needs_save2 = bookmarks.bookmarks2.contains_key(&jid);
-
-        bookmarks.bookmarks.remove(&jid);
-        bookmarks.bookmarks2.remove(&jid);
-        drop(bookmarks);
-
-        if needs_save {
-            info!("Publishing old-style bookmarks…");
-            let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
-            let guard = self.inner.bookmarks.read();
-            let bookmarks = guard.bookmarks.values().cloned();
-            bookmark_mod.publish_bookmarks(bookmarks).await?;
-        }
-
-        if needs_save2 {
-            info!("Publishing new-style bookmark…");
-            let bookmark_mod = self.client.get_mod::<mods::Bookmark2>();
-            bookmark_mod.retract_bookmark(jid.clone().into()).await?;
         }
 
         Ok(())
