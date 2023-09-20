@@ -24,7 +24,7 @@ pub struct MessageLike {
     pub id: MessageLikeId,
     pub stanza_id: Option<stanza_id::Id>,
     pub target: Option<message::Id>,
-    pub to: BareJid,
+    pub to: Option<BareJid>,
     pub from: BareJid,
     pub timestamp: DateTime<FixedOffset>,
     pub payload: Payload,
@@ -132,10 +132,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             .from
             .as_ref()
             .ok_or(StanzaParseError::missing_attribute("from"))?;
-        let to = msg
-            .to
-            .as_ref()
-            .ok_or(StanzaParseError::missing_attribute("to"))?;
+        let to = msg.to.as_ref();
         let timestamp = msg
             .delay
             .as_ref()
@@ -150,7 +147,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             id,
             stanza_id: stanza_id.as_ref().map(|s| s.id.clone()),
             target: refs,
-            to: to.to_bare(),
+            to: to.map(|jid| jid.to_bare()),
             from: from.to_bare(),
             timestamp: timestamp.clone(),
             payload,
@@ -188,9 +185,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
         } = TargetedPayload::try_from(&message)?;
 
         let id = MessageLikeId::new(message.id);
-        let to = message
-            .to
-            .ok_or(StanzaParseError::missing_attribute("to"))?;
+        let to = message.to;
         let from = message
             .from
             .ok_or(StanzaParseError::missing_attribute("from"))?;
@@ -204,7 +199,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             id,
             stanza_id: Some(stanza_id),
             target: refs,
-            to: to.to_bare(),
+            to: to.map(|jid| jid.to_bare()),
             from: from.to_bare(),
             timestamp: timestamp.0,
             payload,

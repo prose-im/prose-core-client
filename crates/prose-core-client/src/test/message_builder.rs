@@ -73,7 +73,7 @@ impl MessageBuilder {
             id: MessageLikeId::new(Some(self.id)),
             stanza_id: self.stanza_id,
             target: None,
-            to: self.to,
+            to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
             payload: Payload::Message { body: self.body },

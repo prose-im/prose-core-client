@@ -384,12 +384,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             debug!("Caching received message…");
             self.inner.data_cache.insert_messages([message]).await?;
 
-            let conversation = if message_is_carbon {
-                &message.to
-            } else {
-                &message.from
-            };
-            self.send_event_for_message(conversation, message);
+            // let conversation = if message_is_carbon {
+            //     &message.to
+            // } else {
+            //     &message.from
+            // };
+            // self.send_event_for_message(conversation, message);
+            todo!("FIXME");
         }
 
         if let Some(chat_state) = chat_state {
@@ -430,7 +431,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         debug!("Caching sent message…");
         self.inner.data_cache.insert_messages([&message]).await?;
-        self.send_event_for_message(&message.to, &message);
+        // self.send_event_for_message(&message.to, &message);
+        todo!("FIXME");
 
         Ok(())
     }

@@ -102,7 +102,8 @@ impl MessageCache for IndexedDBDataCache {
                     }
 
                     if message.timestamp < newer_than
-                        || (&message.from != conversation && &message.to != conversation)
+                        || (&message.from != conversation
+                            && message.to.as_ref() != Some(conversation))
                     {
                         continue;
                     }
@@ -192,7 +193,7 @@ impl MessageCache for IndexedDBDataCache {
             let message: MessageLike = cursor.value().into_serde()?;
 
             if Some(message.id.id()) != older_than
-                && (&message.from == conversation || &message.to == conversation)
+                && (&message.from == conversation || message.to.as_ref() == Some(conversation))
             {
                 messages.push(IdbMessage {
                     row_id: cursor
@@ -259,7 +260,7 @@ impl MessageCache for IndexedDBDataCache {
             let message: MessageLike = cursor.value().into_serde()?;
 
             if message.id.id() != newer_than
-                && (&message.from == conversation || &message.to == conversation)
+                && (&message.from == conversation || message.to.as_ref() == Some(conversation))
             {
                 messages.push(IdbMessage {
                     row_id: cursor

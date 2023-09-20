@@ -150,7 +150,7 @@ mod tests {
                 id: "1".into(),
                 stanza_id: None,
                 target: None,
-                to: BareJid::from_str("a@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
                 from: BareJid::from_str("b@prose.org").unwrap(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
@@ -165,7 +165,7 @@ mod tests {
                 id: "2".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: BareJid::from_str("a@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
                 from: BareJid::from_str("b@prose.org").unwrap(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 01)
@@ -180,7 +180,7 @@ mod tests {
                 id: "3".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: BareJid::from_str("a@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
                 from: BareJid::from_str("c@prose.org").unwrap(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 02)
@@ -195,7 +195,7 @@ mod tests {
                 id: "4".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: BareJid::from_str("a@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
                 from: BareJid::from_str("b@prose.org").unwrap(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 03)
@@ -210,7 +210,7 @@ mod tests {
                 id: "5".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: BareJid::from_str("a@prose.org").unwrap(),
+                to: Some(BareJid::from_str("a@prose.org").unwrap()),
                 from: BareJid::from_str("b@prose.org").unwrap(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 04)

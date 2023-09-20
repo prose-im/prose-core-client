@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::fmt::{Display, Formatter};
+use std::iter::once;
 use std::path::Path;
 use std::str::FromStr;
 use std::{env, fs};
@@ -193,7 +194,7 @@ struct JidWithName {
 
 impl Display for JidWithName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.name, self.jid)
+        write!(f, "{:<30} | {}", self.name.truncate_to(30), self.jid)
     }
 }
 
@@ -201,7 +202,11 @@ impl From<RoomEnvelope<SQLiteCache, FsAvatarCache>> for JidWithName {
     fn from(value: RoomEnvelope<SQLiteCache, FsAvatarCache>) -> Self {
         Self {
             jid: value.jid().clone(),
-            name: value.name().unwrap_or("<untitled>").to_string(),
+            name: format!(
+                "{} {}",
+                value.kind(),
+                value.name().unwrap_or("<untitled>").to_string()
+            ),
         }
     }
 }
@@ -266,10 +271,7 @@ async fn select_room(client: &Client) -> Result<RoomEnvelope<SQLiteCache, FsAvat
     let mut rooms = client.connected_rooms();
     rooms.sort();
 
-    Ok(select_item_from_list(rooms, |room| {
-        format!("[{}] {}", room.kind(), room.name().unwrap_or("<untitled>"))
-    })
-    .clone())
+    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
 
 fn select_item_from_list<T, O: ToString>(
@@ -442,12 +444,7 @@ async fn load_messages(client: &Client) -> Result<()> {
             "{} | {:<36} | {:<20} | {}",
             message.timestamp.format("%Y/%m/%d %H:%M:%S"),
             message.id.unwrap_or("<no-id>".into()).into_inner(),
-            message
-                .from
-                .to_string()
-                .chars()
-                .take(20)
-                .collect::<String>(),
+            message.from.to_string().truncate_to(20),
             message.body
         );
     }
@@ -518,37 +515,32 @@ trait RoomEnvelopeExt {
     fn kind(&self) -> String;
 }
 
-impl RoomEnvelopeExt for RoomEnvelope<SQLiteCache, FsAvatarCache> {
-    fn kind(&self) -> String {
-        match self {
-            RoomEnvelope::DirectMessage(_) => "direct message",
-            RoomEnvelope::Group(_) => "group",
-            RoomEnvelope::PrivateChannel(_) => "private channel",
-            RoomEnvelope::PublicChannel(_) => "public channel",
-            RoomEnvelope::Generic(_) => "generic",
+trait StringExt {
+    fn truncate_to(&self, new_len: usize) -> String;
+}
+
+impl StringExt for String {
+    fn truncate_to(&self, new_len: usize) -> String {
+        let count = self.chars().count();
+
+        if count <= new_len {
+            return self.clone();
         }
-        .to_string()
+
+        self.chars().take(new_len - 1).chain(once('…')).collect()
     }
 }
 
-struct ConnectedRoomEnvelope(Room<SQLiteCache, FsAvatarCache>);
-
-impl Display for ConnectedRoomEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let kind = match self.0 {
-            Room::DirectMessage(_) => "direct message",
-            Room::Group(_) => "group",
-            Room::PrivateChannel(_) => "private channel",
-            Room::PublicChannel(_) => "public channel",
-            Room::Generic(_) => "generic",
-        };
-        write!(
-            f,
-            "[{}] {} ({})",
-            kind,
-            self.0.name().unwrap_or("<untitled>"),
-            self.0.jid()
-        )
+impl RoomEnvelopeExt for RoomEnvelope<SQLiteCache, FsAvatarCache> {
+    fn kind(&self) -> String {
+        match self {
+            RoomEnvelope::DirectMessage(_) => "💬",
+            RoomEnvelope::Group(_) => "👥",
+            RoomEnvelope::PrivateChannel(_) => "🔒",
+            RoomEnvelope::PublicChannel(_) => "🔊",
+            RoomEnvelope::Generic(_) => "🌐",
+        }
+        .to_string()
     }
 }
 
@@ -558,7 +550,7 @@ async fn list_connected_rooms(client: &Client) -> Result<()> {
 
     let rooms = rooms
         .into_iter()
-        .map(ConnectedRoomEnvelope)
+        .map(JidWithName::from)
         .map(|r| r.to_string())
         .collect::<Vec<_>>();
     println!("Connected rooms:\n{}", rooms.join("\n"));
