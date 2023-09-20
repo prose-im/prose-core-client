@@ -7,7 +7,7 @@ use std::fmt::Debug;
 
 use anyhow::{format_err, Result};
 use jid::{BareJid, Jid};
-use tracing::{debug, instrument};
+use tracing::debug;
 use xmpp_parsers::mam::Complete;
 use xmpp_parsers::message::MessageType;
 

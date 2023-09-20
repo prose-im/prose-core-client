@@ -1,41 +1,32 @@
-// prose-core-client/prose-core-client
-//
-// Copyright: 2023, Marc Bauer <mb@nesium.com>
-// License: Mozilla Public License v2.0 (MPL v2.0)
-
-use super::Room;
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::room::MESSAGE_PAGE_SIZE;
-use crate::types::{Message, MessageId, MessageLike, UserMetadata, UserProfile};
+use crate::room::{Generic, Group, PrivateChannel, PublicChannel, Room, MESSAGE_PAGE_SIZE};
+use crate::types::{Message, MessageId, MessageLike};
 use anyhow::Result;
 use prose_xmpp::mods;
 use tracing::debug;
 
-pub struct DirectMessage;
+pub trait MUCRoom {}
 
-impl<D: DataCache, A: AvatarCache> Room<DirectMessage, D, A> {
-    pub async fn load_user_profile(&self) -> Result<Option<UserProfile>> {
-        Ok(None)
-    }
+impl MUCRoom for Group {}
+impl MUCRoom for PrivateChannel {}
+impl MUCRoom for PublicChannel {}
+impl MUCRoom for Generic {}
 
-    pub async fn load_user_metadata(&self) -> Result<UserMetadata> {
-        Ok(UserMetadata {
-            local_time: None,
-            last_activity: None,
-        })
-    }
-
+impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A>
+where
+    Kind: MUCRoom,
+{
     pub async fn load_latest_messages(
         &self,
         _since: impl Into<Option<&MessageId>>,
         _load_from_server: bool,
     ) -> Result<Vec<Message>> {
-        debug!("Loading messages from server…");
+        debug!("Loading muc messages from server…");
 
         let mam = self.inner.xmpp.get_mod::<mods::MAM>();
         let result = mam
-            .load_messages_in_chat(
+            .load_messages_in_muc_chat(
                 &self.inner.jid,
                 None,
                 None,

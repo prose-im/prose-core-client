@@ -6,7 +6,7 @@
 use crate::avatar_cache::AvatarCache;
 use crate::client::client::ClientInner;
 use crate::data_cache::DataCache;
-use crate::types::{Message, MessageId, MessageLike};
+use crate::types::{Message, MessageId};
 use anyhow::{format_err, Result};
 use jid::BareJid;
 use prose_xmpp::mods;
@@ -16,7 +16,6 @@ use prose_xmpp::Client as XMPPClient;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tracing::debug;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc;
 
@@ -68,8 +67,6 @@ impl<Kind, D: DataCache, A: AvatarCache> PartialEq for Room<Kind, D, A> {
     }
 }
 
-const MESSAGE_PAGE_SIZE: u32 = 50;
-
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
     pub fn jid(&self) -> &BareJid {
         &self.inner.jid
@@ -97,39 +94,6 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
             self.inner.message_type.clone(),
             Some(ChatState::Active),
         )
-    }
-
-    pub async fn load_latest_messages(
-        &self,
-        _since: impl Into<Option<&MessageId>> + Debug,
-        _load_from_server: bool,
-    ) -> Result<Vec<Message>> {
-        debug!("Loading messages from server…");
-
-        let mam = self.inner.xmpp.get_mod::<mods::MAM>();
-        let result = mam
-            .load_messages_in_chat(
-                &self.inner.jid,
-                None,
-                None,
-                Some(MESSAGE_PAGE_SIZE as usize),
-            )
-            .await?;
-
-        let messages = result
-            .0
-            .iter()
-            .map(|msg| MessageLike::try_from(msg))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        debug!("Found {} messages. Saving to cache…", messages.len());
-        self.inner
-            .client
-            .data_cache
-            .insert_messages(messages.iter())
-            .await?;
-
-        Ok(Message::reducing_messages(messages))
     }
 
     pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>> {

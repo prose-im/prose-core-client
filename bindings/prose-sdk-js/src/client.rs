@@ -170,17 +170,6 @@ impl Client {
         Ok(self.client.connected_rooms().into())
     }
 
-    #[wasm_bindgen(js_name = "sendMessage")]
-    pub async fn send_message(&self, to: &BareJid, body: String) -> Result<()> {
-        info!("Sending message to {}…", to);
-
-        self.client
-            .send_message(to, body)
-            .await
-            .map_err(WasmError::from)?;
-        Ok(())
-    }
-
     /// XEP-0308: Last Message Correction
     /// https://xmpp.org/extensions/xep-0308.html
     #[wasm_bindgen(js_name = "updateMessage")]

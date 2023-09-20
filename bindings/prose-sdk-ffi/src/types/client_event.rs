@@ -53,6 +53,7 @@ impl From<prose_core_client::ClientEvent> for ClientEvent {
             ProseClientEvent::ContactChanged { jid } => {
                 ClientEvent::ContactChanged { jid: jid.into() }
             }
+            ProseClientEvent::RoomsChanged => todo!("Handle RoomsChanged event"),
             ProseClientEvent::AvatarChanged { jid } => {
                 ClientEvent::AvatarChanged { jid: jid.into() }
             }

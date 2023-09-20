@@ -4,6 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Formatter};
 use xmpp_parsers::data_forms::{Field, FieldType};
 
+#[allow(dead_code)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Boolean(bool),
@@ -24,6 +25,7 @@ pub struct FormValue {
 }
 
 impl FormValue {
+    #[allow(dead_code)]
     pub fn required(var: impl AsRef<str>, value: Value) -> Self {
         Self {
             var: var.as_ref().to_string(),

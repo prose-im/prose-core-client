@@ -5,11 +5,13 @@
 
 use super::IntoJSArray;
 use crate::client::WasmError;
+use crate::types::MessagesArray;
 use alloc::rc::Rc;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::room::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom, RoomEnvelope,
 };
+use prose_core_client::types::MessageId;
 use tracing::info;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
@@ -27,6 +29,7 @@ export interface RoomBase {
     readonly name: string;
 
     sendMessage(body: string): Promise<void>;
+    loadLatestMessages(since?: string, loadFromServer: boolean): Promise<Message[]>;
 }
 
 export interface RoomDirectMessage extends RoomBase {
@@ -123,6 +126,23 @@ macro_rules! base_room_impl {
                     .await
                     .map_err(WasmError::from)?;
                 Ok(())
+            }
+
+            #[wasm_bindgen(js_name = "loadLatestMessages")]
+            pub async fn load_latest_messages(
+                &self,
+                since: Option<String>,
+                load_from_server: bool,
+            ) -> Result<MessagesArray> {
+                let since: Option<MessageId> = since.map(|id| id.into());
+
+                let messages = self
+                    .room
+                    .load_latest_messages(since.as_ref(), load_from_server)
+                    .await
+                    .map_err(WasmError::from)?;
+
+                Ok(messages.into())
             }
         }
     };

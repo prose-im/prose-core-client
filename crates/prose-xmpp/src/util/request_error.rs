@@ -35,6 +35,12 @@ impl From<xmpp_parsers::Error> for RequestError {
     }
 }
 
+impl From<StanzaError> for RequestError {
+    fn from(value: StanzaError) -> Self {
+        Self::XMPP { err: value }
+    }
+}
+
 impl RequestError {
     pub fn is_item_not_found_err(&self) -> bool {
         self.defined_condition() == Some(DefinedCondition::ItemNotFound)

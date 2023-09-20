@@ -13,6 +13,7 @@ pub struct PresenceMap {
 }
 
 impl PresenceMap {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         PresenceMap::default()
     }

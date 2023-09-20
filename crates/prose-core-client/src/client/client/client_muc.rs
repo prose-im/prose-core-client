@@ -191,7 +191,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(bookmarks)
     }
 
-    pub(super) async fn handle_direct_invite(&self, from: Jid, invite: DirectInvite) -> Result<()> {
+    pub(super) async fn handle_direct_invite(
+        &self,
+        _from: Jid,
+        _invite: DirectInvite,
+    ) -> Result<()> {
         Ok(())
     }
 
@@ -220,19 +224,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
     pub(super) async fn handle_changed_bookmarks(
         &self,
-        bookmarks: Vec<ConferenceBookmark>,
+        _bookmarks: Vec<ConferenceBookmark>,
     ) -> Result<()> {
         Ok(())
     }
 
     pub(super) async fn handle_published_bookmarks2(
         &self,
-        bookmarks: Vec<ConferenceBookmark>,
+        _bookmarks: Vec<ConferenceBookmark>,
     ) -> Result<()> {
         Ok(())
     }
 
-    pub(super) async fn handle_retracted_bookmarks2(&self, jids: Vec<Jid>) -> Result<()> {
+    pub(super) async fn handle_retracted_bookmarks2(&self, _jids: Vec<Jid>) -> Result<()> {
         Ok(())
     }
 
