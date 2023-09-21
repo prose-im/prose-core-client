@@ -125,12 +125,20 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         }
 
-        let mut rooms = self
+        let user_jid = self.connected_jid()?;
+
+        // Insert contacts as "Direct Message" rooms…
+        *self.inner.connected_rooms.write() = self
             .load_contacts(CachePolicy::default())
             .await?
             .into_iter()
-            .map(|contact| RoomEnvelope::try_from((contact, self)))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|contact| {
+                (
+                    contact.jid.clone(),
+                    RoomEnvelope::from((contact, user_jid.clone(), self)),
+                )
+            })
+            .collect();
 
         let bookmarks = match self.load_bookmarks().await {
             Ok(bookmarks) => bookmarks,
@@ -151,7 +159,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 .await;
 
             match result {
-                Ok(room) => rooms.push(room),
+                Ok(_) => (),
                 Err(error) if error.defined_condition() == Some(DefinedCondition::Gone) => {
                     // The room does not exist anymore…
                     invalid_bookmarks.push(bookmark.jid.to_bare());
@@ -167,6 +175,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         *self.inner.bookmarks.write() = bookmarks;
 
         if !invalid_bookmarks.is_empty() {
+            self.inner
+                .connected_rooms
+                .write()
+                .retain(|room_jid, _| !invalid_bookmarks.contains(room_jid));
+
             info!("Deleting {} invalid bookmarks…", invalid_bookmarks.len());
             if let Err(error) = self
                 .remove_and_publish_bookmarks(invalid_bookmarks.as_slice())
@@ -178,15 +191,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 )
             }
         }
-
-        if rooms.is_empty() {
-            return Ok(());
-        }
-
-        *self.inner.connected_rooms.write() = rooms
-            .into_iter()
-            .map(|room| (room.jid().clone(), room))
-            .collect();
 
         self.send_event(ClientEvent::RoomsChanged);
 

@@ -117,9 +117,14 @@ impl Chat {
         self.send_message_stanza(stanza)
     }
 
-    pub fn send_chat_state(&self, to: impl Into<Jid>, chat_state: ChatState) -> Result<()> {
+    pub fn send_chat_state(
+        &self,
+        to: impl Into<Jid>,
+        chat_state: ChatState,
+        message_type: &MessageType,
+    ) -> Result<()> {
         let stanza = Message::new()
-            .set_type(MessageType::Chat)
+            .set_type(message_type.clone())
             .set_from(self.ctx.full_jid())
             .set_to(to)
             .set_chat_state(chat_state);

@@ -3,24 +3,29 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::cmp::Ordering;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use jid::BareJid;
-use prose_xmpp::RequestError;
+use anyhow::{bail, Result};
+use jid::{BareJid, FullJid};
+use parking_lot::lock_api::RwLock;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::presence::Presence;
 
+use super::Room;
 use crate::avatar_cache::AvatarCache;
+use crate::client::client::{ClientInner, ReceivedMessage};
 use crate::client::room;
-use crate::client::room::Room;
 use crate::data_cache::DataCache;
-use crate::room::room::RoomInner;
+use crate::room::room::{RoomInner, RoomInnerMut};
 use crate::types::muc::RoomMetadata;
 use crate::types::Contact;
 use crate::Client;
+use prose_xmpp::Client as XMPPClient;
 
-pub enum RoomEnvelope<D: DataCache + 'static, A: AvatarCache + 'static> {
+pub(in crate::client) enum RoomEnvelope<D: DataCache + 'static, A: AvatarCache + 'static> {
+    /// A room that we're in the process of joining
+    Pending(Room<room::Base, D, A>),
     DirectMessage(Room<room::DirectMessage, D, A>),
     Group(Room<room::Group, D, A>),
     PrivateChannel(Room<room::PrivateChannel, D, A>),
@@ -30,45 +35,37 @@ pub enum RoomEnvelope<D: DataCache + 'static, A: AvatarCache + 'static> {
 }
 
 macro_rules! unwrap_room {
-    ($envelope:expr, $accessor:ident) => {
+    ($envelope:expr, $method_call:ident($( $arg:expr ),*) .await) => {
         match $envelope {
-            Self::DirectMessage(room) => room.$accessor(),
-            Self::Group(room) => room.$accessor(),
-            Self::PrivateChannel(room) => room.$accessor(),
-            Self::PublicChannel(room) => room.$accessor(),
-            Self::Generic(room) => room.$accessor(),
+            RoomEnvelope::Pending(room) => room.$method_call($($arg),*).await,
+            RoomEnvelope::DirectMessage(room) => room.$method_call($($arg),*).await,
+            RoomEnvelope::Group(room) => room.$method_call($($arg),*).await,
+            RoomEnvelope::PrivateChannel(room) => room.$method_call($($arg),*).await,
+            RoomEnvelope::PublicChannel(room) => room.$method_call($($arg),*).await,
+            RoomEnvelope::Generic(room) => room.$method_call($($arg),*).await,
+        }
+    };
+    ($envelope:expr, $method_call:ident($( $arg:expr ),*)) => {
+        match $envelope {
+            RoomEnvelope::Pending(room) => room.$method_call($($arg),*),
+            RoomEnvelope::DirectMessage(room) => room.$method_call($($arg),*),
+            RoomEnvelope::Group(room) => room.$method_call($($arg),*),
+            RoomEnvelope::PrivateChannel(room) => room.$method_call($($arg),*),
+            RoomEnvelope::PublicChannel(room) => room.$method_call($($arg),*),
+            RoomEnvelope::Generic(room) => room.$method_call($($arg),*),
         }
     };
 }
 
-impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
-    pub fn jid(&self) -> &BareJid {
-        unwrap_room!(self, jid)
-    }
-
-    pub fn name(&self) -> Option<&str> {
-        unwrap_room!(self, name)
-    }
-
-    pub fn user_nickname(&self) -> &str {
-        unwrap_room!(self, user_nickname)
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
-    pub(crate) fn handle_presence(&mut self, presence: Presence) {
-        println!("RECEIVED PRESENCE: {:?}", presence);
-    }
-}
-
-impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
-    fn sort_value(&self) -> i32 {
+impl<D: DataCache, A: AvatarCache> Debug for RoomEnvelope<D, A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::DirectMessage(_) => 0,
-            Self::Group(_) => 0,
-            Self::PrivateChannel(_) => 1,
-            Self::PublicChannel(_) => 2,
-            Self::Generic(_) => 3,
+            Self::Pending(room) => write!(f, "RoomEnvelope::Pending({:?}", room),
+            Self::DirectMessage(room) => write!(f, "RoomEnvelope::DirectMessage({:?}", room),
+            Self::Group(room) => write!(f, "RoomEnvelope::Group({:?}", room),
+            Self::PrivateChannel(room) => write!(f, "RoomEnvelope::PrivateChannel({:?}", room),
+            Self::PublicChannel(room) => write!(f, "RoomEnvelope::PublicChannel({:?}", room),
+            Self::Generic(room) => write!(f, "RoomEnvelope::Generic({:?}", room),
         }
     }
 }
@@ -76,6 +73,7 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
 impl<D: DataCache, A: AvatarCache> Clone for RoomEnvelope<D, A> {
     fn clone(&self) -> Self {
         match self {
+            Self::Pending(room) => Self::Pending(room.clone()),
             Self::DirectMessage(room) => Self::DirectMessage(room.clone()),
             Self::Group(room) => Self::Group(room.clone()),
             Self::PrivateChannel(room) => Self::PrivateChannel(room.clone()),
@@ -85,105 +83,156 @@ impl<D: DataCache, A: AvatarCache> Clone for RoomEnvelope<D, A> {
     }
 }
 
-impl<D: DataCache, A: AvatarCache> Eq for RoomEnvelope<D, A> {}
-
-impl<D: DataCache, A: AvatarCache> PartialEq for RoomEnvelope<D, A> {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::DirectMessage(lhs), Self::DirectMessage(rhs)) => lhs == rhs,
-            (Self::Group(lhs), Self::Group(rhs)) => lhs == rhs,
-            (Self::PrivateChannel(lhs), Self::PrivateChannel(rhs)) => lhs == rhs,
-            (Self::PublicChannel(lhs), Self::PublicChannel(rhs)) => lhs == rhs,
-            (Self::Generic(lhs), Self::Generic(rhs)) => lhs == rhs,
-            (Self::DirectMessage(_), _)
-            | (Self::Group(_), _)
-            | (Self::PrivateChannel(_), _)
-            | (Self::PublicChannel(_), _)
-            | (Self::Generic(_), _) => false,
+impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
+    pub fn to_base_room(&self) -> Room<room::Base, D, A> {
+        match self {
+            Self::Pending(room) => room.to_base(),
+            Self::DirectMessage(room) => room.to_base(),
+            Self::Group(room) => room.to_base(),
+            Self::PrivateChannel(room) => room.to_base(),
+            Self::PublicChannel(room) => room.to_base(),
+            Self::Generic(room) => room.to_base(),
         }
     }
 }
 
-impl<D: DataCache, A: AvatarCache> PartialOrd for RoomEnvelope<D, A> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
+    pub fn pending(
+        room_jid: &BareJid,
+        user_jid: &BareJid,
+        nickname: &str,
+        client: &Client<D, A>,
+    ) -> Self {
+        Self::Pending(Room {
+            inner: Arc::new(RoomInner {
+                jid: room_jid.clone(),
+                name: None,
+                description: None,
+                user_jid: user_jid.clone(),
+                user_nickname: nickname.to_string(),
+                xmpp: client.client.clone(),
+                client: client.inner.clone(),
+                message_type: Default::default(),
+            }),
+            inner_mut: Default::default(),
+            _type: Default::default(),
+        })
+    }
+
+    pub fn jid(&self) -> &BareJid {
+        unwrap_room!(self, jid())
+    }
+
+    pub fn user_nickname(&self) -> &str {
+        unwrap_room!(self, user_nickname())
+    }
+
+    pub async fn handle_presence(&self, presence: Presence) -> Result<()> {
+        unwrap_room!(self, handle_presence(presence).await)
+    }
+
+    pub async fn handle_message(&self, message: ReceivedMessage) -> Result<()> {
+        unwrap_room!(self, handle_message(message).await)
+    }
+
+    pub fn promote_to_permanent_room(self, metadata: RoomMetadata) -> Result<Self> {
+        let Self::Pending(pending_room) = self else {
+            bail!("Cannot promote non-pending room");
+        };
+
+        let inner_mut = pending_room.inner_mut.read().clone();
+
+        Ok(Self::from((
+            metadata,
+            pending_room.inner.user_jid.clone(),
+            pending_room.inner.xmpp.clone(),
+            pending_room.inner.client.clone(),
+            inner_mut,
+        )))
     }
 }
 
-impl<D: DataCache, A: AvatarCache> Ord for RoomEnvelope<D, A> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let sort_val1 = self.sort_value();
-        let sort_val2 = other.sort_value();
-
-        if sort_val1 < sort_val2 {
-            return Ordering::Less;
-        } else if sort_val1 > sort_val2 {
-            return Ordering::Greater;
-        }
-
-        self.name()
-            .unwrap_or_default()
-            .cmp(other.name().unwrap_or_default())
+impl<D: DataCache, A: AvatarCache> From<(RoomMetadata, BareJid, &Client<D, A>)>
+    for RoomEnvelope<D, A>
+{
+    fn from(value: (RoomMetadata, BareJid, &Client<D, A>)) -> Self {
+        (
+            value.0,
+            value.1,
+            value.2.client.clone(),
+            value.2.inner.clone(),
+            Default::default(),
+        )
+            .into()
     }
 }
 
-impl<D: DataCache, A: AvatarCache> TryFrom<(RoomMetadata, &Client<D, A>)> for RoomEnvelope<D, A> {
-    type Error = RequestError;
-
-    fn try_from(value: (RoomMetadata, &Client<D, A>)) -> Result<Self, Self::Error> {
+impl<D: DataCache, A: AvatarCache>
+    From<(
+        RoomMetadata,
+        BareJid,
+        XMPPClient,
+        Arc<ClientInner<D, A>>,
+        RoomInnerMut,
+    )> for RoomEnvelope<D, A>
+{
+    fn from(
+        value: (
+            RoomMetadata,
+            BareJid,
+            XMPPClient,
+            Arc<ClientInner<D, A>>,
+            RoomInnerMut,
+        ),
+    ) -> Self {
         fn make_room<Kind, D: DataCache, A: AvatarCache>(
-            value: (RoomMetadata, &Client<D, A>),
+            value: (
+                RoomMetadata,
+                BareJid,
+                XMPPClient,
+                Arc<ClientInner<D, A>>,
+                RoomInnerMut,
+            ),
             message_type: MessageType,
-        ) -> Result<Room<Kind, D, A>, RequestError> {
-            Ok(Room {
+        ) -> Room<Kind, D, A> {
+            let (metadata, user_jid, xmpp, client, inner_mut) = value;
+
+            Room {
                 inner: Arc::new(RoomInner {
-                    jid: value.0.room_jid.to_bare(),
-                    user_nickname: value.0.room_jid.resource_str().to_string(),
-                    name: value.0.settings.name,
-                    description: value.0.settings.description,
-                    user_jid: value
-                        .1
-                        .connected_jid()
-                        .map_err(|err| RequestError::Generic {
-                            msg: err.to_string(),
-                        })?
-                        .into_bare(),
-                    xmpp: value.1.client.clone(),
-                    client: value.1.inner.clone(),
-                    occupants: vec![],
+                    jid: metadata.room_jid.to_bare(),
+                    user_nickname: metadata.room_jid.resource_str().to_string(),
+                    name: metadata.settings.name,
+                    description: metadata.settings.description,
+                    user_jid,
+                    xmpp,
+                    client,
                     message_type,
                 }),
+                inner_mut: Arc::new(RwLock::new(inner_mut)),
                 _type: Default::default(),
-            })
+            }
         }
 
         let features = &value.0.settings.features;
 
-        Ok(match features {
+        match features {
             _ if features.can_act_as_group() => {
-                Self::Group(make_room(value, MessageType::Groupchat)?)
+                Self::Group(make_room(value, MessageType::Groupchat))
             }
             _ if features.can_act_as_private_channel() => {
-                Self::PrivateChannel(make_room(value, MessageType::Groupchat)?)
+                Self::PrivateChannel(make_room(value, MessageType::Groupchat))
             }
             _ if features.can_act_as_public_channel() => {
-                Self::PublicChannel(make_room(value, MessageType::Groupchat)?)
+                Self::PublicChannel(make_room(value, MessageType::Groupchat))
             }
-            _ => Self::Generic(make_room(value, MessageType::Groupchat)?),
-        })
+            _ => Self::Generic(make_room(value, MessageType::Groupchat)),
+        }
     }
 }
 
-impl<D: DataCache, A: AvatarCache> TryFrom<(Contact, &Client<D, A>)> for RoomEnvelope<D, A> {
-    type Error = RequestError;
-
-    fn try_from(value: (Contact, &Client<D, A>)) -> Result<Self, Self::Error> {
-        let (contact, client) = value;
-        let user_jid = client
-            .connected_jid()
-            .map_err(|err| RequestError::Generic {
-                msg: err.to_string(),
-            })?;
+impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for RoomEnvelope<D, A> {
+    fn from(value: (Contact, FullJid, &Client<D, A>)) -> Self {
+        let (contact, user_jid, client) = value;
 
         let room = Room {
             inner: Arc::new(RoomInner {
@@ -192,14 +241,14 @@ impl<D: DataCache, A: AvatarCache> TryFrom<(Contact, &Client<D, A>)> for RoomEnv
                 description: None,
                 user_jid: user_jid.to_bare(),
                 user_nickname: user_jid.resource_str().to_string(),
-                occupants: vec![],
                 xmpp: client.client.clone(),
                 client: client.inner.clone(),
                 message_type: MessageType::Chat,
             }),
+            inner_mut: Default::default(),
             _type: Default::default(),
         };
 
-        Ok(Self::DirectMessage(room))
+        Self::DirectMessage(room)
     }
 }

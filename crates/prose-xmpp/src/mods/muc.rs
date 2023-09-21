@@ -11,6 +11,7 @@ use minidom::Element;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
+use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence;
@@ -350,6 +351,15 @@ impl MUC {
         };
         self.ctx.send_stanza(message)?;
         Ok(())
+    }
+
+    pub async fn set_room_subject(&self, room_jid: &BareJid, subject: Option<&str>) -> Result<()> {
+        let message = Message::new()
+            .set_id(self.ctx.generate_id().into())
+            .set_type(MessageType::Groupchat)
+            .set_to(room_jid.clone())
+            .set_subject(subject.unwrap_or_default()); // Send empty string for empty subject
+        self.ctx.send_stanza(message)
     }
 }
 

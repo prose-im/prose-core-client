@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::Path;
@@ -18,12 +19,8 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::room::RoomEnvelope;
-use prose_core_client::types::{Address, Availability, Contact};
-use prose_core_client::{
-    room::RoomEnvelope as Room, CachePolicy, ClientBuilder, ClientDelegate, ClientEvent,
-    FsAvatarCache,
-};
+use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact};
+use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::ConferenceBookmark;
@@ -198,14 +195,18 @@ impl Display for JidWithName {
     }
 }
 
-impl From<RoomEnvelope<SQLiteCache, FsAvatarCache>> for JidWithName {
-    fn from(value: RoomEnvelope<SQLiteCache, FsAvatarCache>) -> Self {
+impl From<ConnectedRoom<SQLiteCache, FsAvatarCache>> for JidWithName {
+    fn from(value: ConnectedRoom<SQLiteCache, FsAvatarCache>) -> Self {
         Self {
-            jid: value.jid().clone(),
+            jid: value.to_base_room().jid().clone(),
             name: format!(
                 "{} {}",
                 value.kind(),
-                value.name().unwrap_or("<untitled>").to_string()
+                value
+                    .to_base_room()
+                    .name()
+                    .unwrap_or("<untitled>")
+                    .to_string()
             ),
         }
     }
@@ -229,6 +230,30 @@ impl From<Contact> for JidWithName {
     }
 }
 
+struct ConnectedRoomEnvelope(ConnectedRoom<SQLiteCache, FsAvatarCache>);
+
+impl Display for ConnectedRoomEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {:<40} | {:<70} | {}",
+            self.0.kind(),
+            self.0
+                .to_base_room()
+                .name()
+                .unwrap_or("<untitled>")
+                .to_string()
+                .truncate_to(40),
+            self.0.to_base_room().jid().to_string().truncate_to(70),
+            self.0
+                .to_base_room()
+                .subject()
+                .as_deref()
+                .unwrap_or("<no subject>")
+        )
+    }
+}
+
 #[derive(Debug)]
 struct BookmarkEnvelope(ConferenceBookmark);
 
@@ -236,9 +261,15 @@ impl Display for BookmarkEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} ({}) autojoin: {:?}, nick: {}",
-            self.0.conference.name.as_deref().unwrap_or("<untitled>"),
-            self.0.jid,
+            "{:<30} | {:<70} | autojoin: {:?} | nick: {}",
+            self.0
+                .conference
+                .name
+                .as_deref()
+                .unwrap_or("<untitled>")
+                .to_string()
+                .truncate_to(30),
+            self.0.jid.to_string().truncate_to(70),
             self.0.conference.autojoin,
             self.0.conference.nick.as_deref().unwrap_or("<no nick>")
         )
@@ -267,10 +298,24 @@ async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
     Ok(select_multiple_jids_from_list(contacts))
 }
 
-async fn select_room(client: &Client) -> Result<RoomEnvelope<SQLiteCache, FsAvatarCache>> {
+async fn select_room(client: &Client) -> Result<ConnectedRoom<SQLiteCache, FsAvatarCache>> {
     let mut rooms = client.connected_rooms();
-    rooms.sort();
+    rooms.sort_by(compare_room_envelopes);
+    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+}
 
+async fn select_muc_room(client: &Client) -> Result<ConnectedRoom<SQLiteCache, FsAvatarCache>> {
+    let mut rooms = client
+        .connected_rooms()
+        .into_iter()
+        .filter(|room| {
+            if let &ConnectedRoom::DirectMessage(_) = room {
+                return false;
+            }
+            true
+        })
+        .collect::<Vec<_>>();
+    rooms.sort_by(compare_room_envelopes);
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
 
@@ -432,11 +477,11 @@ async fn load_messages(client: &Client) -> Result<()> {
     let room = select_room(client).await?;
 
     let messages = match room {
-        RoomEnvelope::DirectMessage(room) => room.load_latest_messages(None, true).await?,
-        RoomEnvelope::Group(room) => room.load_latest_messages(None, true).await?,
-        RoomEnvelope::PrivateChannel(room) => room.load_latest_messages(None, true).await?,
-        RoomEnvelope::PublicChannel(room) => room.load_latest_messages(None, true).await?,
-        RoomEnvelope::Generic(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::DirectMessage(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::Group(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::PrivateChannel(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::PublicChannel(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::Generic(room) => room.load_latest_messages(None, true).await?,
     };
 
     for message in messages {
@@ -453,15 +498,16 @@ async fn load_messages(client: &Client) -> Result<()> {
 }
 
 async fn send_message(client: &Client) -> Result<()> {
-    // let jid = select_contact(client).await?;
-    let jid = prompt_jid(Some(&Jid::from_str("marc@prose.org").unwrap()));
+    let room = select_room(client).await?.to_base_room();
+
     let body = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message")
         .default(String::from("Hello World!"))
         .allow_empty(false)
         .interact_text()
         .unwrap();
-    client.send_message(jid, body).await
+
+    room.send_message(body).await
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -469,6 +515,35 @@ fn format_opt<T: Display>(value: Option<T>) -> String {
         Some(val) => val.to_string(),
         None => "<not set>".to_string(),
     }
+}
+
+fn compare_room_envelopes(
+    lhs: &ConnectedRoom<SQLiteCache, FsAvatarCache>,
+    rhs: &ConnectedRoom<SQLiteCache, FsAvatarCache>,
+) -> Ordering {
+    fn sort_order(envelope: &ConnectedRoom<SQLiteCache, FsAvatarCache>) -> i32 {
+        match envelope {
+            ConnectedRoom::DirectMessage(_) => 0,
+            ConnectedRoom::Group(_) => 1,
+            ConnectedRoom::PrivateChannel(_) => 2,
+            ConnectedRoom::PublicChannel(_) => 3,
+            ConnectedRoom::Generic(_) => 4,
+        }
+    }
+
+    let sort_val1 = sort_order(lhs);
+    let sort_val2 = sort_order(rhs);
+
+    if sort_val1 < sort_val2 {
+        return Ordering::Less;
+    } else if sort_val1 > sort_val2 {
+        return Ordering::Greater;
+    }
+
+    lhs.to_base_room()
+        .name()
+        .unwrap_or_default()
+        .cmp(rhs.to_base_room().name().unwrap_or_default())
 }
 
 struct Delegate {}
@@ -511,7 +586,7 @@ impl Delegate {
     }
 }
 
-trait RoomEnvelopeExt {
+trait ConnectedRoomExt {
     fn kind(&self) -> String;
 }
 
@@ -531,14 +606,14 @@ impl StringExt for String {
     }
 }
 
-impl RoomEnvelopeExt for RoomEnvelope<SQLiteCache, FsAvatarCache> {
+impl ConnectedRoomExt for ConnectedRoom<SQLiteCache, FsAvatarCache> {
     fn kind(&self) -> String {
         match self {
-            RoomEnvelope::DirectMessage(_) => "💬",
-            RoomEnvelope::Group(_) => "👥",
-            RoomEnvelope::PrivateChannel(_) => "🔒",
-            RoomEnvelope::PublicChannel(_) => "🔊",
-            RoomEnvelope::Generic(_) => "🌐",
+            ConnectedRoom::DirectMessage(_) => "💬",
+            ConnectedRoom::Group(_) => "👥",
+            ConnectedRoom::PrivateChannel(_) => "🔒",
+            ConnectedRoom::PublicChannel(_) => "🔊",
+            ConnectedRoom::Generic(_) => "🌐",
         }
         .to_string()
     }
@@ -546,11 +621,11 @@ impl RoomEnvelopeExt for RoomEnvelope<SQLiteCache, FsAvatarCache> {
 
 async fn list_connected_rooms(client: &Client) -> Result<()> {
     let mut rooms = client.connected_rooms();
-    rooms.sort();
+    rooms.sort_by(compare_room_envelopes);
 
     let rooms = rooms
         .into_iter()
-        .map(JidWithName::from)
+        .map(ConnectedRoomEnvelope)
         .map(|r| r.to_string())
         .collect::<Vec<_>>();
     println!("Connected rooms:\n{}", rooms.join("\n"));
@@ -593,6 +668,8 @@ enum Selection {
     DeleteBookmark,
     #[strum(serialize = "List connected rooms")]
     ListConnectedRooms,
+    #[strum(serialize = "Set room subject")]
+    SetRoomSubject,
     Disconnect,
     Noop,
     Exit,
@@ -743,6 +820,18 @@ async fn main() -> Result<()> {
             }
             Selection::ListConnectedRooms => {
                 list_connected_rooms(&client).await?;
+            }
+            Selection::SetRoomSubject => {
+                let room = select_muc_room(&client).await?;
+                let subject = prompt_string("Enter a subject:");
+
+                match room {
+                    ConnectedRoom::DirectMessage(_) => unreachable!(),
+                    ConnectedRoom::Group(room) => room.set_subject(Some(&subject)).await,
+                    ConnectedRoom::PrivateChannel(room) => room.set_subject(Some(&subject)).await,
+                    ConnectedRoom::PublicChannel(room) => room.set_subject(Some(&subject)).await,
+                    ConnectedRoom::Generic(room) => room.set_subject(Some(&subject)).await,
+                }?;
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

@@ -18,7 +18,7 @@ use crate::avatar_cache::AvatarCache;
 use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
 use crate::types::muc::{BookmarkMetadata, RoomMetadata, RoomSettings};
-use crate::types::{muc, Bookmarks};
+use crate::types::{muc, Bookmarks, ConnectedRoom};
 use crate::util::StringExt;
 
 use super::Client;
@@ -30,12 +30,25 @@ enum MUCError {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub fn connected_rooms(&self) -> Vec<RoomEnvelope<D, A>> {
+    pub fn connected_rooms(&self) -> Vec<ConnectedRoom<D, A>> {
         self.inner
             .connected_rooms
             .read()
             .values()
-            .cloned()
+            .filter_map(|envelope| match envelope {
+                RoomEnvelope::Pending(_) => None,
+                RoomEnvelope::DirectMessage(room) => {
+                    Some(ConnectedRoom::DirectMessage(room.clone()))
+                }
+                RoomEnvelope::Group(room) => Some(ConnectedRoom::Group(room.clone())),
+                RoomEnvelope::PrivateChannel(room) => {
+                    Some(ConnectedRoom::PrivateChannel(room.clone()))
+                }
+                RoomEnvelope::PublicChannel(room) => {
+                    Some(ConnectedRoom::PublicChannel(room.clone()))
+                }
+                RoomEnvelope::Generic(room) => Some(ConnectedRoom::Generic(room.clone())),
+            })
             .collect()
     }
 
@@ -49,10 +62,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         }
 
         // Load participant infos so that we can build a nice human-readable name for the group…
-        let our_jid = self.connected_jid()?.to_bare();
+        let user_jid = self.connected_jid()?.into_bare();
         let mut participant_names = vec![];
 
-        for jid in participants.iter().chain(iter::once(&our_jid)) {
+        for jid in participants.iter().chain(iter::once(&user_jid)) {
             let participant_name = self
                 .load_user_profile(jid.clone(), Default::default())
                 .await?
@@ -71,7 +84,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .await?;
 
         let room_has_been_created = metadata.room_has_been_created();
-        let room = RoomEnvelope::try_from((metadata, self))?;
+        let room = RoomEnvelope::from((metadata, user_jid, self));
         let room_jid = room.jid().clone();
 
         // So we were actually already connected to that room.
@@ -150,6 +163,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             self.muc_service()?
                 .create_or_join_private_channel(channel_name.as_ref())
                 .await?,
+            self.connected_jid()?.into_bare(),
             self,
         )
             .try_into()?;
@@ -169,9 +183,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             self.muc_service()?
                 .create_or_join_public_channel(channel_name.as_ref())
                 .await?,
+            self.connected_jid()?.into_bare(),
             self,
         )
-            .try_into()?;
+            .into();
 
         self.finish_create_channel(channel_name.as_ref(), room)
             .await
@@ -245,36 +260,44 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         room_jid: &BareJid,
         nickname: Option<&str>,
         password: Option<&str>,
-    ) -> Result<RoomEnvelope<D, A>, RequestError> {
+    ) -> Result<(), RequestError> {
         info!("Entering room {}…", room_jid);
 
-        let nickname = nickname
-            .ok_or(
-                self.connected_jid()
-                    .map_err(|err| RequestError::Generic {
-                        msg: err.to_string(),
-                    })?
-                    .node_str(),
-            )
-            .unwrap_or("unknown-user");
-        let room_jid_full = room_jid.with_resource_str(nickname)?;
+        let user_jid = self.connected_jid().map_err(|err| RequestError::Generic {
+            msg: err.to_string(),
+        })?;
+        let nickname = nickname.or(user_jid.node_str()).unwrap_or("unknown-user");
 
-        let muc_mod = self.client.get_mod::<mods::MUC>();
-        let occupancy = muc_mod.enter_room(&room_jid_full, password).await?;
+        // Insert pending room so that we don't miss any stanzas for this room while we're
+        // connecting to it…
+        self.inner.connected_rooms.write().insert(
+            room_jid.clone(),
+            RoomEnvelope::pending(room_jid, &user_jid.to_bare(), nickname, self),
+        );
 
-        let caps = self.client.get_mod::<mods::Caps>();
-        let settings =
-            RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
+        let metadata = match self.perform_enter_room(room_jid, nickname, password).await {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                // Remove pending room again…
+                self.inner.connected_rooms.write().remove(room_jid);
+                return Err(error);
+            }
+        };
 
-        (
-            RoomMetadata {
-                room_jid: room_jid_full,
-                occupancy,
-                settings,
-            },
-            self,
-        )
-            .try_into()
+        let mut connected_rooms = self.inner.connected_rooms.write();
+        let Some(room) = connected_rooms.remove(room_jid) else {
+            return Err(RequestError::Generic {
+                msg: "Room was modified during connection".to_string(),
+            });
+        };
+
+        let room =
+            room.promote_to_permanent_room(metadata)
+                .map_err(|err| RequestError::Generic {
+                    msg: err.to_string(),
+                })?;
+        connected_rooms.insert(room_jid.clone(), room);
+        Ok(())
     }
 
     pub(super) async fn remove_and_publish_bookmarks(&self, jids: &[BareJid]) -> Result<()> {
@@ -376,21 +399,26 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(())
     }
 
-    async fn enter_room_if_needed(
+    pub(super) async fn perform_enter_room(
         &self,
         room_jid: &BareJid,
-        nickname: Option<&str>,
+        nickname: &str,
         password: Option<&str>,
-    ) -> Result<(), RequestError> {
-        // If we're already connected there's nothing to do.
-        if self.inner.connected_rooms.read().contains_key(room_jid) {
-            return Ok(());
-        }
+    ) -> Result<RoomMetadata, RequestError> {
+        let room_jid_full = room_jid.with_resource_str(nickname)?;
 
-        let room = self.enter_room(room_jid, nickname, password).await?;
-        self.did_enter_room(room);
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+        let occupancy = muc_mod.enter_room(&room_jid_full, password).await?;
 
-        Ok(())
+        let caps = self.client.get_mod::<mods::Caps>();
+        let settings =
+            RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
+
+        Ok(RoomMetadata {
+            room_jid: room_jid_full,
+            occupancy,
+            settings,
+        })
     }
 
     fn did_enter_room(&self, room: RoomEnvelope<D, A>) {

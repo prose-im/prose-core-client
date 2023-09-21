@@ -9,9 +9,9 @@ use crate::types::MessagesArray;
 use alloc::rc::Rc;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::room::{
-    DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom, RoomEnvelope,
+    DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
 };
-use prose_core_client::types::MessageId;
+use prose_core_client::types::{ConnectedRoom, MessageId};
 use tracing::info;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
@@ -32,23 +32,29 @@ export interface RoomBase {
     loadLatestMessages(since?: string, loadFromServer: boolean): Promise<Message[]>;
 }
 
+export interface RoomMUC {
+    readonly subject?: string;
+    
+    setSubject(subject?: string): Promise<void>;
+}
+
 export interface RoomDirectMessage extends RoomBase {
   type: RoomType.DirectMessage;
 }
 
-export interface RoomGroup extends RoomBase {
+export interface RoomGroup extends RoomBase, RoomMUC {
   type: RoomType.Group;
 }
 
-export interface RoomPrivateChannel extends RoomBase {
+export interface RoomPrivateChannel extends RoomBase, RoomMUC {
   type: RoomType.PrivateChannel;
 }
 
-export interface RoomPublicChannel extends RoomBase {
+export interface RoomPublicChannel extends RoomBase, RoomMUC {
   type: RoomType.PublicChannel;
 }
 
-export interface RoomGeneric extends RoomBase {
+export interface RoomGeneric extends RoomBase, RoomMUC {
   type: RoomType.Generic;
 }
 
@@ -144,6 +150,36 @@ macro_rules! base_room_impl {
 
                 Ok(messages.into())
             }
+
+            #[wasm_bindgen(js_name = "setUserIsComposing")]
+            pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
+                self.room
+                    .set_user_is_composing(is_composing)
+                    .await
+                    .map_err(WasmError::from)?;
+                Ok(())
+            }
+        }
+    };
+}
+
+macro_rules! muc_room_impl {
+    ($t:ident) => {
+        #[wasm_bindgen]
+        impl $t {
+            #[wasm_bindgen(getter)]
+            pub fn subject(&self) -> Option<String> {
+                self.room.subject()
+            }
+
+            #[wasm_bindgen(js_name = "setSubject")]
+            pub async fn set_subject(&self, subject: Option<String>) -> Result<()> {
+                self.room
+                    .set_subject(subject.as_deref())
+                    .await
+                    .map_err(WasmError::from)?;
+                Ok(())
+            }
         }
     };
 }
@@ -154,35 +190,40 @@ base_room_impl!(RoomPrivateChannel);
 base_room_impl!(RoomPublicChannel);
 base_room_impl!(RoomGeneric);
 
+muc_room_impl!(RoomGroup);
+muc_room_impl!(RoomPrivateChannel);
+muc_room_impl!(RoomPublicChannel);
+muc_room_impl!(RoomGeneric);
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(typescript_type = "Room[]")]
     pub type RoomsArray;
 }
 
-impl From<Vec<RoomEnvelope<Cache, Cache>>> for RoomsArray {
-    fn from(value: Vec<RoomEnvelope<Cache, Cache>>) -> Self {
+impl From<Vec<ConnectedRoom<Cache, Cache>>> for RoomsArray {
+    fn from(value: Vec<ConnectedRoom<Cache, Cache>>) -> Self {
         value
             .into_iter()
             .map(|envelope| -> JsValue {
                 match envelope {
-                    RoomEnvelope::DirectMessage(room) => JsValue::from(RoomDirectMessage {
+                    ConnectedRoom::DirectMessage(room) => JsValue::from(RoomDirectMessage {
                         kind: RoomType::DirectMessage,
                         room,
                     }),
-                    RoomEnvelope::Group(room) => JsValue::from(RoomGroup {
+                    ConnectedRoom::Group(room) => JsValue::from(RoomGroup {
                         kind: RoomType::Group,
                         room,
                     }),
-                    RoomEnvelope::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
+                    ConnectedRoom::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
                         kind: RoomType::PrivateChannel,
                         room,
                     }),
-                    RoomEnvelope::PublicChannel(room) => JsValue::from(RoomPublicChannel {
+                    ConnectedRoom::PublicChannel(room) => JsValue::from(RoomPublicChannel {
                         kind: RoomType::PublicChannel,
                         room,
                     }),
-                    RoomEnvelope::Generic(room) => JsValue::from(RoomGeneric {
+                    ConnectedRoom::Generic(room) => JsValue::from(RoomGeneric {
                         kind: RoomType::Generic,
                         room,
                     }),

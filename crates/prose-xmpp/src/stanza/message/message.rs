@@ -7,7 +7,7 @@ use jid::Jid;
 use minidom::Element;
 use strum_macros::{Display, EnumString};
 use xmpp_parsers::delay::Delay;
-use xmpp_parsers::message::{Body, MessageType};
+use xmpp_parsers::message::{Body, MessageType, Subject};
 use xmpp_parsers::message_correct::Replace;
 
 use crate::ns;
@@ -46,6 +46,7 @@ pub struct Message {
     pub origin_id: Option<OriginId>,
     pub r#type: MessageType,
     pub body: Option<String>,
+    pub subject: Option<String>,
     pub chat_state: Option<ChatState>,
     pub replace: Option<Id>,
     pub reactions: Option<Reactions>,
@@ -66,31 +67,7 @@ pub struct Message {
 
 impl Message {
     pub fn new() -> Self {
-        Message {
-            from: None,
-            to: None,
-            id: None,
-            stanza_id: None,
-            origin_id: None,
-            r#type: MessageType::Chat,
-            body: None,
-            chat_state: None,
-            replace: None,
-            reactions: None,
-            fastening: None,
-            fallback: None,
-            delay: None,
-            markable: false,
-            displayed_marker: None,
-            received_marker: None,
-            acknowledged_marker: None,
-            archived_message: None,
-            sent_carbon: None,
-            received_carbon: None,
-            store: None,
-            direct_invite: None,
-            mediated_invite: None,
-        }
+        Message::default()
     }
 }
 
@@ -103,6 +80,10 @@ impl TryFrom<xmpp_parsers::message::Message> for Message {
         message.body = root
             .get_best_body(vec![])
             .map(|(_, body)| body.0.to_string());
+
+        message.subject = root
+            .get_best_subject(vec![])
+            .map(|(_, subject)| subject.0.to_string());
 
         for payload in root.payloads.into_iter() {
             match payload {
@@ -193,6 +174,9 @@ impl From<Message> for xmpp_parsers::message::Message {
 
         if let Some(body) = value.body {
             message.bodies.insert("".into(), Body(body));
+        }
+        if let Some(subject) = value.subject {
+            message.subjects.insert("".into(), Subject(subject));
         }
         if let Some(stanza_id) = value.stanza_id {
             message.payloads.push(stanza_id.into())

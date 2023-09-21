@@ -4,20 +4,20 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::avatar_cache::AvatarCache;
-use crate::client::client::ClientInner;
+use crate::client::client::{ClientInner, ReceivedMessage};
 use crate::data_cache::DataCache;
 use crate::types::{Message, MessageId};
 use anyhow::{format_err, Result};
 use jid::BareJid;
-use prose_xmpp::mods;
+use parking_lot::RwLock;
 use prose_xmpp::stanza::message;
-use prose_xmpp::stanza::message::{ChatState, Emoji};
 use prose_xmpp::Client as XMPPClient;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc;
+use xmpp_parsers::presence::Presence;
 
 pub struct Group;
 pub struct Generic;
@@ -30,6 +30,7 @@ pub struct Occupant {
 
 pub struct Room<Kind, D: DataCache + 'static, A: AvatarCache + 'static> {
     pub(super) inner: Arc<RoomInner<D, A>>,
+    pub(super) inner_mut: Arc<RwLock<RoomInnerMut>>,
     pub(super) _type: PhantomData<Kind>,
 }
 
@@ -44,20 +45,41 @@ pub(super) struct RoomInner<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub user_jid: BareJid,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
-    /// The occupants of the room.
-    pub occupants: Vec<Occupant>,
 
     pub xmpp: XMPPClient,
     pub client: Arc<ClientInner<D, A>>,
     pub message_type: MessageType,
 }
 
+#[derive(Default, Clone, PartialEq, Debug)]
+pub(super) struct RoomInnerMut {
+    /// The room's subject.
+    pub subject: Option<String>,
+    /// The occupants of the room.
+    pub occupants: Vec<Occupant>,
+}
+
 impl<Kind, D: DataCache, A: AvatarCache> Clone for Room<Kind, D, A> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            inner_mut: self.inner_mut.clone(),
             _type: Default::default(),
         }
+    }
+}
+
+impl<Kind, D: DataCache, A: AvatarCache> Debug for Room<Kind, D, A> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Room")
+            .field("jid", &self.inner.jid)
+            .field("name", &self.inner.name)
+            .field("description", &self.inner.description)
+            .field("user_jid", &self.inner.user_jid)
+            .field("user_nickname", &self.inner.user_nickname)
+            .field("subject", &self.inner_mut.read().subject)
+            .field("occupants", &self.inner_mut.read().occupants)
+            .finish_non_exhaustive()
     }
 }
 
@@ -68,124 +90,26 @@ impl<Kind, D: DataCache, A: AvatarCache> PartialEq for Room<Kind, D, A> {
 }
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
-    pub fn jid(&self) -> &BareJid {
-        &self.inner.jid
+    pub(super) async fn handle_presence(&self, presence: Presence) -> Result<()> {
+        //println!("RECEIVED PRESENCE: {:?}", presence);
+        Ok(())
     }
 
-    pub fn name(&self) -> Option<&str> {
-        self.inner.name.as_deref()
-    }
-
-    pub fn description(&self) -> Option<&str> {
-        self.inner.description.as_deref()
-    }
-
-    pub fn user_nickname(&self) -> &str {
-        &self.inner.user_nickname
-    }
-}
-
-impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
-    pub async fn send_message(&self, body: impl Into<String>) -> Result<()> {
-        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.send_message(
-            self.inner.jid.clone(),
-            body,
-            self.inner.message_type.clone(),
-            Some(ChatState::Active),
-        )
-    }
-
-    pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>> {
-        let ids = ids
-            .iter()
-            .map(|id| id.as_ref().into())
-            .collect::<Vec<message::Id>>();
-        let messages = self
-            .inner
-            .client
-            .data_cache
-            .load_messages_targeting(&self.inner.jid, ids.as_slice(), None, true)
-            .await?;
-        Ok(Message::reducing_messages(messages))
-    }
-
-    pub async fn update_message(&self, id: MessageId, body: impl Into<String>) -> Result<()> {
-        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.update_message(id.into_inner().into(), self.inner.jid.clone(), body)
-    }
-
-    pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
-        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.send_chat_state(
-            self.inner.jid.clone(),
-            if is_composing {
-                ChatState::Composing
-            } else {
-                ChatState::Paused
-            },
-        )
-    }
-
-    pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
-        let message_id = message::Id::from(id.into_inner());
-        let message = self.load_message(&message_id).await?;
-        let mut emoji_found = false;
-
-        let mut reactions = message
-            .reactions
-            .into_iter()
-            .filter_map(|r| {
-                if r.from.contains(&self.inner.user_jid) {
-                    if r.emoji == emoji {
-                        emoji_found = true;
-                        return None;
-                    }
-                    Some(prose_xmpp::stanza::message::Emoji::from(
-                        r.emoji.into_inner(),
-                    ))
-                } else {
+    pub(super) async fn handle_message(&self, message: ReceivedMessage) -> Result<()> {
+        if let ReceivedMessage::Message(message) = &message {
+            if let Some(subject) = &message.subject {
+                self.inner_mut.write().subject = if subject.is_empty() {
                     None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        if !emoji_found {
-            reactions.push(prose_xmpp::stanza::message::Emoji::from(emoji.into_inner()))
+                } else {
+                    Some(subject.to_string())
+                };
+                return Ok(());
+            }
         }
 
-        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.react_to_message(message_id, self.inner.jid.clone(), reactions)?;
-
         Ok(())
     }
 
-    pub async fn retract_message(&self, id: MessageId) -> Result<()> {
-        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.retract_message(id.into_inner().into(), self.inner.jid.clone())?;
-        Ok(())
-    }
-
-    pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
-        self.inner
-            .client
-            .data_cache
-            .save_draft(&self.inner.jid, text)
-            .await?;
-        Ok(())
-    }
-
-    pub async fn load_draft(&self) -> Result<Option<String>> {
-        Ok(self
-            .inner
-            .client
-            .data_cache
-            .load_draft(&self.inner.jid)
-            .await?)
-    }
-}
-
-impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
     pub(super) async fn load_message(&self, message_id: &message::Id) -> Result<Message> {
         let ids = [MessageId::from(message_id.as_ref())];
         self.load_messages_with_ids(&ids)

@@ -6,6 +6,7 @@
 pub use client::Client;
 pub(super) use client::ClientInner;
 pub use client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDataCache};
+pub(super) use client_event::ReceivedMessage;
 
 mod client;
 mod client_builder;

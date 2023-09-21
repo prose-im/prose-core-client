@@ -207,6 +207,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             } else {
                 ChatState::Paused
             },
+            &Default::default(),
         )
     }
 

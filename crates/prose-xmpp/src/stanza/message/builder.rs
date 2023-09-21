@@ -38,6 +38,11 @@ impl Message {
         self
     }
 
+    pub fn set_subject(mut self, subject: impl Into<String>) -> Self {
+        self.subject = Some(subject.into());
+        self
+    }
+
     pub fn set_chat_state(mut self, state: ChatState) -> Self {
         self.chat_state = Some(state);
         self

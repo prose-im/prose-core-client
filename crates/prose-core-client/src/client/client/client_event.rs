@@ -152,7 +152,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 #[derive(Debug)]
-pub enum ReceivedMessage {
+pub(in crate::client) enum ReceivedMessage {
     Message(Message),
     Carbon(Carbon),
 }
@@ -162,6 +162,22 @@ impl ReceivedMessage {
         match self {
             Self::Message(_) => false,
             Self::Carbon(_) => true,
+        }
+    }
+
+    pub fn from(&self) -> Option<BareJid> {
+        match &self {
+            ReceivedMessage::Message(message) => message.from.as_ref().map(|jid| jid.to_bare()),
+            ReceivedMessage::Carbon(Carbon::Received(message)) => message
+                .stanza
+                .as_ref()
+                .and_then(|message| message.from.as_ref())
+                .map(|jid| jid.to_bare()),
+            ReceivedMessage::Carbon(Carbon::Sent(message)) => message
+                .stanza
+                .as_ref()
+                .and_then(|message| message.from.as_ref())
+                .map(|jid| jid.to_bare()),
         }
     }
 }
@@ -261,8 +277,9 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         // If the presence was sent from a JID that belongs to one of our connected rooms, let
         // that room handle it…
-        if let Some(room) = self.inner.connected_rooms.write().get_mut(&jid) {
-            room.handle_presence(presence);
+        let room = self.inner.connected_rooms.read().get(&jid).cloned();
+        if let Some(room) = room {
+            room.handle_presence(presence).await?;
             return Ok(());
         };
 
@@ -332,6 +349,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn did_receive_message(&self, message: ReceivedMessage) -> Result<()> {
+        let Some(from) = message.from() else {
+            error!("Received message without 'from'");
+            return Ok(());
+        };
+
+        let Some(room) = self.inner.connected_rooms.read().get(&from).cloned() else {
+            todo!("Received message from sender for which we do not have a room.");
+        };
+
+        room.handle_message(message).await?;
+        return Ok(());
+
         struct ChatStateEvent {
             state: ChatState,
             from: BareJid,

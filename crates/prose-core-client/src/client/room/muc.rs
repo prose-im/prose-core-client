@@ -6,17 +6,22 @@ use anyhow::Result;
 use prose_xmpp::mods;
 use tracing::debug;
 
-pub trait MUCRoom {}
+pub trait MUC {}
 
-impl MUCRoom for Group {}
-impl MUCRoom for PrivateChannel {}
-impl MUCRoom for PublicChannel {}
-impl MUCRoom for Generic {}
+impl MUC for Group {}
+impl MUC for PrivateChannel {}
+impl MUC for PublicChannel {}
+impl MUC for Generic {}
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A>
 where
-    Kind: MUCRoom,
+    Kind: MUC,
 {
+    pub async fn set_subject(&self, subject: Option<&str>) -> Result<()> {
+        let muc = self.inner.xmpp.get_mod::<mods::MUC>();
+        muc.set_room_subject(self.jid(), subject).await
+    }
+
     pub async fn load_latest_messages(
         &self,
         _since: impl Into<Option<&MessageId>>,
