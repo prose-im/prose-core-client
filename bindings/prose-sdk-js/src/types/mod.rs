@@ -7,7 +7,7 @@ pub use contact::{Availability, Contact};
 pub use jid::BareJid;
 pub use js_array::*;
 pub use message::Message;
-pub use room::RoomsArray;
+pub use room::{ConnectedRoomExt, RoomsArray};
 pub use user_metadata::UserMetadata;
 pub use user_profile::UserProfile;
 

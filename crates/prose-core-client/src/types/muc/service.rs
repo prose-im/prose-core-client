@@ -55,6 +55,7 @@ impl Service {
         self.create_or_join_room_with_config(
             &group_hash,
             RoomConfig::group(group_name, participants),
+            participants,
             |info| info.features.validate_as_group(),
         )
         .await
@@ -71,6 +72,7 @@ impl Service {
         self.create_or_join_room_with_config(
             &Self::name_for_private_channel(&channel_id),
             RoomConfig::private_channel(channel_name.as_ref()),
+            &[],
             |info| info.features.validate_as_private_channel(),
         )
         .await
@@ -86,6 +88,7 @@ impl Service {
         self.create_or_join_room_with_config(
             &Self::name_for_public_channel(channel_name.as_ref()),
             RoomConfig::public_channel(channel_name.as_ref()),
+            &[],
             |info| info.features.validate_as_public_channel(),
         )
         .await
@@ -95,6 +98,7 @@ impl Service {
         &self,
         room_name: &str,
         config: RoomConfig,
+        participants: &[BareJid],
         validate: impl FnOnce(&RoomSettings) -> Result<(), RoomValidationError>,
     ) -> Result<RoomMetadata> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
@@ -151,7 +155,8 @@ impl Service {
             return Ok(RoomMetadata {
                 room_jid,
                 occupancy,
-                settings: settings,
+                settings,
+                members: participants.iter().map(Clone::clone).collect(),
             });
         }
     }

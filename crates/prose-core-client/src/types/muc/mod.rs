@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::FullJid;
+use jid::{BareJid, FullJid};
 use xmpp_parsers::muc::user::Status;
 
 pub(crate) use bookmark_metadata::{BookmarkMetadata, RoomType};
@@ -22,6 +22,7 @@ pub(crate) struct RoomMetadata {
     pub room_jid: FullJid,
     pub occupancy: RoomOccupancy,
     pub settings: RoomSettings,
+    pub members: Vec<BareJid>,
 }
 
 impl RoomMetadata {

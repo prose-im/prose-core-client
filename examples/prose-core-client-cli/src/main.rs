@@ -19,7 +19,7 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact};
+use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact, Message};
 use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
@@ -198,12 +198,12 @@ impl Display for JidWithName {
 impl From<ConnectedRoom<SQLiteCache, FsAvatarCache>> for JidWithName {
     fn from(value: ConnectedRoom<SQLiteCache, FsAvatarCache>) -> Self {
         Self {
-            jid: value.to_base_room().jid().clone(),
+            jid: value.to_generic_room().jid().clone(),
             name: format!(
                 "{} {}",
                 value.kind(),
                 value
-                    .to_base_room()
+                    .to_generic_room()
                     .name()
                     .unwrap_or("<untitled>")
                     .to_string()
@@ -239,14 +239,14 @@ impl Display for ConnectedRoomEnvelope {
             "{} {:<40} | {:<70} | {}",
             self.0.kind(),
             self.0
-                .to_base_room()
+                .to_generic_room()
                 .name()
                 .unwrap_or("<untitled>")
                 .to_string()
                 .truncate_to(40),
-            self.0.to_base_room().jid().to_string().truncate_to(70),
+            self.0.to_generic_room().jid().to_string().truncate_to(70),
             self.0
-                .to_base_room()
+                .to_generic_room()
                 .subject()
                 .as_deref()
                 .unwrap_or("<no subject>")
@@ -485,20 +485,33 @@ async fn load_messages(client: &Client) -> Result<()> {
     };
 
     for message in messages {
-        println!(
-            "{} | {:<36} | {:<20} | {}",
-            message.timestamp.format("%Y/%m/%d %H:%M:%S"),
-            message.id.unwrap_or("<no-id>".into()).into_inner(),
-            message.from.to_string().truncate_to(20),
-            message.body
-        );
+        println!("{}", MessageEnvelope(message));
     }
 
     Ok(())
 }
 
+struct MessageEnvelope(Message);
+
+impl Display for MessageEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} | {:<36} | {:<20} | {}",
+            self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
+            self.0
+                .id
+                .as_ref()
+                .map(|id| id.clone().into_inner())
+                .unwrap_or("<no-id>".to_string()),
+            self.0.from.to_string().truncate_to(20),
+            self.0.body
+        )
+    }
+}
+
 async fn send_message(client: &Client) -> Result<()> {
-    let room = select_room(client).await?.to_base_room();
+    let room = select_room(client).await?.to_generic_room();
 
     let body = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message")
@@ -540,10 +553,10 @@ fn compare_room_envelopes(
         return Ordering::Greater;
     }
 
-    lhs.to_base_room()
+    lhs.to_generic_room()
         .name()
         .unwrap_or_default()
-        .cmp(rhs.to_base_room().name().unwrap_or_default())
+        .cmp(rhs.to_generic_room().name().unwrap_or_default())
 }
 
 struct Delegate {}
@@ -552,7 +565,7 @@ impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
     fn handle_event(
         &self,
         client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
-        event: ClientEvent,
+        event: ClientEvent<SQLiteCache, FsAvatarCache>,
     ) {
         tokio::spawn(async move {
             match Self::_handle_event(client, event).await {
@@ -566,18 +579,16 @@ impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
 impl Delegate {
     async fn _handle_event(
         client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
-        event: ClientEvent,
+        event: ClientEvent<SQLiteCache, FsAvatarCache>,
     ) -> Result<()> {
         match event {
-            ClientEvent::MessagesAppended {
-                conversation,
-                message_ids,
-            } => {
-                let messages = client
-                    .load_messages_with_ids(&conversation, message_ids.as_slice())
+            ClientEvent::MessagesAppended { room, message_ids } => {
+                let messages = room
+                    .to_generic_room()
+                    .load_messages_with_ids(message_ids.as_slice())
                     .await?;
                 for message in messages {
-                    println!("Message from {}: {}", message.from, message.body);
+                    println!("Received message:\n{}", MessageEnvelope(message));
                 }
             }
             _ => (),

@@ -19,13 +19,13 @@ use crate::client::room;
 use crate::data_cache::DataCache;
 use crate::room::room::{RoomInner, RoomInnerMut};
 use crate::types::muc::RoomMetadata;
-use crate::types::Contact;
+use crate::types::{ConnectedRoom, Contact};
 use crate::Client;
 use prose_xmpp::Client as XMPPClient;
 
 pub(in crate::client) enum RoomEnvelope<D: DataCache + 'static, A: AvatarCache + 'static> {
     /// A room that we're in the process of joining
-    Pending(Room<room::Base, D, A>),
+    Pending(Room<room::Generic, D, A>),
     DirectMessage(Room<room::DirectMessage, D, A>),
     Group(Room<room::Group, D, A>),
     PrivateChannel(Room<room::PrivateChannel, D, A>),
@@ -84,7 +84,8 @@ impl<D: DataCache, A: AvatarCache> Clone for RoomEnvelope<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
-    pub fn to_base_room(&self) -> Room<room::Base, D, A> {
+    #[allow(dead_code)]
+    pub fn to_generic_room(&self) -> Room<room::Generic, D, A> {
         match self {
             Self::Pending(room) => room.to_base(),
             Self::DirectMessage(room) => room.to_base(),
@@ -113,7 +114,9 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
                 xmpp: client.client.clone(),
                 client: client.inner.clone(),
                 message_type: Default::default(),
+                members: vec![],
             }),
+            to_connected_room: Arc::new(|_| unreachable!()),
             inner_mut: Default::default(),
             _type: Default::default(),
         })
@@ -194,6 +197,7 @@ impl<D: DataCache, A: AvatarCache>
                 RoomInnerMut,
             ),
             message_type: MessageType,
+            to_connected_room: impl Fn(Room<Kind, D, A>) -> ConnectedRoom<D, A> + Send + Sync + 'static,
         ) -> Room<Kind, D, A> {
             let (metadata, user_jid, xmpp, client, inner_mut) = value;
 
@@ -207,7 +211,9 @@ impl<D: DataCache, A: AvatarCache>
                     xmpp,
                     client,
                     message_type,
+                    members: metadata.members,
                 }),
+                to_connected_room: Arc::new(to_connected_room),
                 inner_mut: Arc::new(RwLock::new(inner_mut)),
                 _type: Default::default(),
             }
@@ -216,16 +222,26 @@ impl<D: DataCache, A: AvatarCache>
         let features = &value.0.settings.features;
 
         match features {
-            _ if features.can_act_as_group() => {
-                Self::Group(make_room(value, MessageType::Groupchat))
-            }
-            _ if features.can_act_as_private_channel() => {
-                Self::PrivateChannel(make_room(value, MessageType::Groupchat))
-            }
-            _ if features.can_act_as_public_channel() => {
-                Self::PublicChannel(make_room(value, MessageType::Groupchat))
-            }
-            _ => Self::Generic(make_room(value, MessageType::Groupchat)),
+            _ if features.can_act_as_group() => Self::Group(make_room(
+                value,
+                MessageType::Groupchat,
+                ConnectedRoom::Group,
+            )),
+            _ if features.can_act_as_private_channel() => Self::PrivateChannel(make_room(
+                value,
+                MessageType::Groupchat,
+                ConnectedRoom::PrivateChannel,
+            )),
+            _ if features.can_act_as_public_channel() => Self::PublicChannel(make_room(
+                value,
+                MessageType::Groupchat,
+                ConnectedRoom::PublicChannel,
+            )),
+            _ => Self::Generic(make_room(
+                value,
+                MessageType::Groupchat,
+                ConnectedRoom::Generic,
+            )),
         }
     }
 }
@@ -236,7 +252,7 @@ impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for R
 
         let room = Room {
             inner: Arc::new(RoomInner {
-                jid: contact.jid,
+                jid: contact.jid.clone(),
                 name: Some(contact.name),
                 description: None,
                 user_jid: user_jid.to_bare(),
@@ -244,8 +260,10 @@ impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for R
                 xmpp: client.client.clone(),
                 client: client.inner.clone(),
                 message_type: MessageType::Chat,
+                members: vec![contact.jid],
             }),
             inner_mut: Default::default(),
+            to_connected_room: Arc::new(|room| ConnectedRoom::DirectMessage(room)),
             _type: Default::default(),
         };
 

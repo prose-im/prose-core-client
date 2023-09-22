@@ -6,7 +6,7 @@
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
 use crate::room;
-use crate::room::{Base, Room};
+use crate::room::{Generic, Room};
 
 pub enum ConnectedRoom<D: DataCache + 'static, A: AvatarCache + 'static> {
     DirectMessage(Room<room::DirectMessage, D, A>),
@@ -18,7 +18,7 @@ pub enum ConnectedRoom<D: DataCache + 'static, A: AvatarCache + 'static> {
 }
 
 impl<D: DataCache, A: AvatarCache> ConnectedRoom<D, A> {
-    pub fn to_base_room(&self) -> Room<Base, D, A> {
+    pub fn to_generic_room(&self) -> Room<Generic, D, A> {
         match self {
             Self::DirectMessage(room) => room.to_base(),
             Self::Group(room) => room.to_base(),

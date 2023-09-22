@@ -179,7 +179,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         body: impl Into<String> + Debug,
     ) -> Result<()> {
         let chat = self.client.get_mod::<Chat>();
-        chat.send_message(to, body, MessageType::Chat, Some(ChatState::Active))
+        chat.send_message(to, body, &MessageType::Chat, Some(ChatState::Active))
     }
 
     #[deprecated(note = "Use the Room API instead.")]
@@ -190,7 +190,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         body: impl Into<String> + Debug,
     ) -> Result<()> {
         let chat = self.client.get_mod::<Chat>();
-        chat.update_message(id.into_inner().into(), conversation, body)
+        chat.update_message(
+            id.into_inner().into(),
+            conversation,
+            body,
+            &Default::default(),
+        )
     }
 
     #[deprecated(note = "Use the Room API instead.")]
@@ -262,7 +267,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         }
 
         let chat = self.client.get_mod::<Chat>();
-        chat.react_to_message(message_id, conversation, reactions)?;
+        chat.react_to_message(message_id, conversation, reactions, &Default::default())?;
 
         Ok(())
     }
@@ -274,7 +279,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         id: MessageId,
     ) -> Result<()> {
         let chat = self.client.get_mod::<Chat>();
-        chat.retract_message(id.into_inner().into(), conversation)?;
+        chat.retract_message(id.into_inner().into(), conversation, &Default::default())?;
         Ok(())
     }
 

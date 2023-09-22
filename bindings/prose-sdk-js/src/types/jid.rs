@@ -53,6 +53,12 @@ impl From<jid::BareJid> for BareJid {
     }
 }
 
+impl From<&jid::BareJid> for BareJid {
+    fn from(value: &jid::BareJid) -> Self {
+        Self(value.clone())
+    }
+}
+
 impl From<&BareJid> for jid::BareJid {
     fn from(value: &BareJid) -> Self {
         value.0.clone()

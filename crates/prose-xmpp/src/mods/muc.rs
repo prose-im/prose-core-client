@@ -253,7 +253,7 @@ impl MUC {
         &self,
         room_jid: &BareJid,
         affiliation: Affiliation,
-    ) -> Result<Vec<muc::query::User>> {
+    ) -> Result<Vec<muc::query::User>, RequestError> {
         let iq = Iq::from_get(
             self.ctx.generate_id(),
             Query {

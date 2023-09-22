@@ -9,7 +9,7 @@ use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::MessageId;
+use crate::types::{ConnectedRoom, MessageId};
 use crate::Client;
 
 #[derive(Debug, PartialEq)]
@@ -18,49 +18,41 @@ pub enum ConnectionEvent {
     Disconnect { error: Option<ConnectionError> },
 }
 
-#[derive(Debug, PartialEq)]
-pub enum ClientEvent {
+pub enum ClientEvent<D: DataCache + 'static, A: AvatarCache + 'static> {
+    /// The status of the connection has changed.
+    ConnectionStatusChanged { event: ConnectionEvent },
+
+    /// The number of rooms changed.
     RoomsChanged,
 
-    /// A user in `conversation` started or stopped typing.
-    ComposingUsersChanged {
-        conversation: BareJid,
-    },
-
-    /// The status of the connection has changed.
-    ConnectionStatusChanged {
-        event: ConnectionEvent,
-    },
-
     /// Infos about a contact have changed.
-    ContactChanged {
-        jid: BareJid,
-    },
+    ContactChanged { jid: BareJid },
 
     /// The avatar of a user changed.
-    AvatarChanged {
-        jid: BareJid,
-    },
+    AvatarChanged { jid: BareJid },
+
+    /// A user in `conversation` started or stopped typing.
+    ComposingUsersChanged { room: ConnectedRoom<D, A> },
 
     /// One or many messages were either received or sent.
     MessagesAppended {
-        conversation: BareJid,
+        room: ConnectedRoom<D, A>,
         message_ids: Vec<MessageId>,
     },
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
     MessagesUpdated {
-        conversation: BareJid,
+        room: ConnectedRoom<D, A>,
         message_ids: Vec<MessageId>,
     },
 
     /// A message was deleted.
     MessagesDeleted {
-        conversation: BareJid,
+        room: ConnectedRoom<D, A>,
         message_ids: Vec<MessageId>,
     },
 }
 
 pub trait ClientDelegate<D: DataCache, A: AvatarCache>: SendUnlessWasm + SyncUnlessWasm {
-    fn handle_event(&self, client: Client<D, A>, event: ClientEvent);
+    fn handle_event(&self, client: Client<D, A>, event: ClientEvent<D, A>);
 }

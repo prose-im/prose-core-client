@@ -6,21 +6,26 @@
 use crate::avatar_cache::AvatarCache;
 use crate::client::client::{ClientInner, ReceivedMessage};
 use crate::data_cache::DataCache;
-use crate::types::{Message, MessageId};
+use crate::types::message_like::TimestampedMessage;
+use crate::types::{ConnectedRoom, Message, MessageId, MessageLike};
+use crate::{Client, ClientEvent};
 use anyhow::{format_err, Result};
+use chrono::Utc;
 use jid::BareJid;
+use minidom::Element;
 use parking_lot::RwLock;
 use prose_xmpp::stanza::message;
-use prose_xmpp::Client as XMPPClient;
+use prose_xmpp::stanza::message::ChatState;
+use prose_xmpp::{mods, Client as XMPPClient};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
+use tracing::{debug, error};
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc;
 use xmpp_parsers::presence::Presence;
 
 pub struct Group;
-pub struct Generic;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Occupant {
@@ -31,6 +36,7 @@ pub struct Occupant {
 pub struct Room<Kind, D: DataCache + 'static, A: AvatarCache + 'static> {
     pub(super) inner: Arc<RoomInner<D, A>>,
     pub(super) inner_mut: Arc<RwLock<RoomInnerMut>>,
+    pub(super) to_connected_room: Arc<dyn Fn(Self) -> ConnectedRoom<D, A> + Send + Sync>,
     pub(super) _type: PhantomData<Kind>,
 }
 
@@ -45,6 +51,8 @@ pub(super) struct RoomInner<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub user_jid: BareJid,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
+    /// The members of this room (if the room is members-only).
+    pub members: Vec<BareJid>,
 
     pub xmpp: XMPPClient,
     pub client: Arc<ClientInner<D, A>>,
@@ -64,6 +72,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Clone for Room<Kind, D, A> {
         Self {
             inner: self.inner.clone(),
             inner_mut: self.inner_mut.clone(),
+            to_connected_room: self.to_connected_room.clone(),
             _type: Default::default(),
         }
     }
@@ -91,7 +100,11 @@ impl<Kind, D: DataCache, A: AvatarCache> PartialEq for Room<Kind, D, A> {
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
     pub(super) async fn handle_presence(&self, presence: Presence) -> Result<()> {
-        //println!("RECEIVED PRESENCE: {:?}", presence);
+        println!(
+            "{} - {}",
+            self.inner.jid,
+            String::from(&Element::from(presence))
+        );
         Ok(())
     }
 
@@ -105,6 +118,98 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
                 };
                 return Ok(());
             }
+        }
+
+        struct ChatStateEvent {
+            state: ChatState,
+            from: BareJid,
+        }
+
+        let mut chat_state: Option<ChatStateEvent> = None;
+
+        if let ReceivedMessage::Message(message) = &message {
+            if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
+                chat_state = Some(ChatStateEvent {
+                    state: state.clone(),
+                    from: from.to_bare(),
+                });
+            }
+        }
+
+        let message_is_carbon = message.is_carbon();
+        let now = Utc::now();
+
+        let parsed_message: Result<MessageLike> = match message {
+            ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
+                message,
+                timestamp: now.into(),
+            }),
+            ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
+                message: carbon,
+                timestamp: now.into(),
+            }),
+        };
+
+        let parsed_message = match parsed_message {
+            Ok(message) => Some(message),
+            Err(err) => {
+                error!("Failed to parse received message: {}", err);
+                None
+            }
+        };
+
+        if parsed_message.is_none() && chat_state.is_none() {
+            // Nothing to do…
+            return Ok(());
+        }
+
+        let client = Client {
+            client: self.inner.xmpp.clone(),
+            inner: self.inner.client.clone(),
+        };
+
+        if let Some(message) = &parsed_message {
+            debug!("Caching received message…");
+            self.inner
+                .client
+                .data_cache
+                .insert_messages([message])
+                .await?;
+
+            // let conversation = if message_is_carbon {
+            //     &message.to
+            // } else {
+            //     &message.from
+            // };
+
+            let room = (self.to_connected_room)(self.clone());
+
+            client.send_event_for_message(room, message);
+        }
+
+        if let Some(chat_state) = chat_state {
+            let room = (self.to_connected_room)(self.clone());
+
+            self.inner
+                .client
+                .data_cache
+                .insert_chat_state(&chat_state.from, &chat_state.state)
+                .await?;
+            client.send_event(ClientEvent::ComposingUsersChanged { room })
+        }
+
+        let Some(message) = parsed_message else {
+            return Ok(());
+        };
+
+        // Don't send delivery receipts for carbons or anything other than a regular message.
+        if message_is_carbon || !message.payload.is_message() {
+            return Ok(());
+        }
+
+        if let Some(message_id) = message.id.into_original_id() {
+            let chat = self.inner.xmpp.get_mod::<mods::Chat>();
+            chat.mark_message_received(message_id, message.from, &self.inner.message_type)?;
         }
 
         Ok(())

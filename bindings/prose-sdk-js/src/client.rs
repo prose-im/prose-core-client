@@ -6,16 +6,15 @@
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, MessagesArray,
-    RoomsArray, StringArray, UserMetadata, UserProfile,
+    Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, RoomsArray,
+    UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
 use jid::ResourcePart;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
-use prose_core_client::types::{MessageId, SoftwareVersion, UserActivity};
+use prose_core_client::types::{SoftwareVersion, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
 use std::rc::Rc;
-use tracing::info;
 use wasm_bindgen::prelude::*;
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -165,51 +164,9 @@ impl Client {
         Ok(())
     }
 
-    #[wasm_bindgen(js_name = "loadConnectedRooms")]
-    pub async fn load_connected_rooms(&self) -> Result<RoomsArray> {
+    #[wasm_bindgen(js_name = "connectedRooms")]
+    pub fn connected_rooms(&self) -> Result<RoomsArray> {
         Ok(self.client.connected_rooms().into())
-    }
-
-    /// XEP-0308: Last Message Correction
-    /// https://xmpp.org/extensions/xep-0308.html
-    #[wasm_bindgen(js_name = "updateMessage")]
-    pub async fn update_message(
-        &self,
-        conversation: &BareJid,
-        message_id: &str,
-        body: String,
-    ) -> Result<()> {
-        self.client
-            .update_message(conversation, message_id.into(), body)
-            .await
-            .map_err(WasmError::from)?;
-        Ok(())
-    }
-
-    /// XEP-0424: Message Retraction
-    /// https://xmpp.org/extensions/xep-0424.html
-    #[wasm_bindgen(js_name = "retractMessage")]
-    pub async fn retract_message(&self, conversation: &BareJid, message_id: &str) -> Result<()> {
-        self.client
-            .retract_message(conversation, message_id.into())
-            .await
-            .map_err(WasmError::from)?;
-        Ok(())
-    }
-
-    /// XEP-0085: Chat State Notifications
-    /// https://xmpp.org/extensions/xep-0085.html
-    #[wasm_bindgen(js_name = "setUserIsComposing")]
-    pub async fn set_user_is_composing(
-        &self,
-        conversation: &BareJid,
-        is_composing: bool,
-    ) -> Result<()> {
-        self.client
-            .set_user_is_composing(conversation, is_composing)
-            .await
-            .map_err(WasmError::from)?;
-        Ok(())
     }
 
     /// XEP-0108: User Activity
@@ -262,44 +219,6 @@ impl Client {
             .into_iter()
             .map(|c| JsValue::from(Contact::from(c)))
             .collect_into_js_array::<ContactsArray>())
-    }
-
-    #[wasm_bindgen(js_name = "loadMessagesWithIDs")]
-    pub async fn load_messages_with_ids(
-        &self,
-        conversation: &BareJid,
-        message_ids: &StringArray,
-    ) -> Result<MessagesArray> {
-        info!("Loading messages in conversation {:?}…", conversation);
-
-        let message_ids: Vec<MessageId> = Vec::<String>::try_from(message_ids)?
-            .into_iter()
-            .map(|id| MessageId::from(id))
-            .collect();
-
-        let messages = self
-            .client
-            .load_messages_with_ids(conversation.as_ref(), message_ids.as_slice())
-            .await
-            .map_err(WasmError::from)?;
-
-        Ok(messages.into())
-    }
-
-    /// XEP-0444: Message Reactions
-    /// https://xmpp.org/extensions/xep-0444.html
-    #[wasm_bindgen(js_name = "toggleReactionToMessage")]
-    pub async fn toggle_reaction_to_message(
-        &self,
-        conversation: &BareJid,
-        id: &str,
-        emoji: &str,
-    ) -> Result<()> {
-        self.client
-            .toggle_reaction_to_message(conversation, id.into(), emoji.into())
-            .await
-            .map_err(WasmError::from)?;
-        Ok(())
     }
 
     /// XEP-0084: User Avatar

@@ -8,21 +8,21 @@ use chrono::Utc;
 use jid::{BareJid, Jid};
 use std::sync::atomic::Ordering;
 use tracing::{debug, error};
-use xmpp_parsers::message::MessageType;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::mods::{bookmark, bookmark2, caps, chat, muc, ping, profile, status};
-use prose_xmpp::stanza::message::ChatState;
+
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{client, mods, Event, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
 use crate::types::message_like::{Payload, TimestampedMessage};
-use crate::types::{AvatarMetadata, MessageLike, UserProfile};
+use crate::types::{AvatarMetadata, ConnectedRoom, MessageLike, UserProfile};
 use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
 
+#[allow(dead_code)]
 enum Request {
     Ping {
         from: Jid,
@@ -183,7 +183,7 @@ impl ReceivedMessage {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub(super) fn send_event(&self, event: ClientEvent) {
+    pub(in crate::client) fn send_event(&self, event: ClientEvent<D, A>) {
         let Some(delegate) = &self.inner.delegate else {
             return;
         };
@@ -194,7 +194,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         delegate.handle_event(client, event);
     }
 
-    fn send_event_for_message(&self, conversation: &BareJid, message: &MessageLike) {
+    pub(in crate::client) fn send_event_for_message(
+        &self,
+        room: ConnectedRoom<D, A>,
+        message: &MessageLike,
+    ) {
         if self.inner.delegate.is_none() {
             return;
         }
@@ -202,18 +206,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let event = if let Some(ref target) = message.target {
             if message.payload == Payload::Retraction {
                 ClientEvent::MessagesDeleted {
-                    conversation: conversation.clone(),
+                    room,
                     message_ids: vec![target.as_ref().into()],
                 }
             } else {
                 ClientEvent::MessagesUpdated {
-                    conversation: conversation.clone(),
+                    room,
                     message_ids: vec![target.as_ref().into()],
                 }
             }
         } else {
             ClientEvent::MessagesAppended {
-                conversation: conversation.clone(),
+                room,
                 message_ids: vec![message.id.id().as_ref().into()],
             }
         };
@@ -360,93 +364,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
         room.handle_message(message).await?;
         return Ok(());
-
-        struct ChatStateEvent {
-            state: ChatState,
-            from: BareJid,
-        }
-
-        let mut chat_state: Option<ChatStateEvent> = None;
-
-        if let ReceivedMessage::Message(message) = &message {
-            if message.r#type != MessageType::Chat {
-                // Ignore all messages other than "chat" for now.
-                return Ok(());
-            }
-
-            if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
-                chat_state = Some(ChatStateEvent {
-                    state: state.clone(),
-                    from: from.to_bare(),
-                });
-            }
-        }
-
-        let message_is_carbon = message.is_carbon();
-        let now = Utc::now();
-
-        let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
-                message,
-                timestamp: now.into(),
-            }),
-            ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
-                message: carbon,
-                timestamp: now.into(),
-            }),
-        };
-
-        let parsed_message = match parsed_message {
-            Ok(message) => Some(message),
-            Err(err) => {
-                error!("Failed to parse received message: {}", err);
-                None
-            }
-        };
-
-        if parsed_message.is_none() && chat_state.is_none() {
-            // Nothing to do…
-            return Ok(());
-        }
-
-        if let Some(message) = &parsed_message {
-            debug!("Caching received message…");
-            self.inner.data_cache.insert_messages([message]).await?;
-
-            // let conversation = if message_is_carbon {
-            //     &message.to
-            // } else {
-            //     &message.from
-            // };
-            // self.send_event_for_message(conversation, message);
-            todo!("FIXME");
-        }
-
-        if let Some(chat_state) = chat_state {
-            self.inner
-                .data_cache
-                .insert_chat_state(&chat_state.from, &chat_state.state)
-                .await?;
-            self.send_event(ClientEvent::ComposingUsersChanged {
-                conversation: chat_state.from,
-            })
-        }
-
-        let Some(message) = parsed_message else {
-            return Ok(());
-        };
-
-        // Don't send delivery receipts for carbons or anything other than a regular message.
-        if message_is_carbon || !message.payload.is_message() {
-            return Ok(());
-        }
-
-        if let Some(message_id) = message.id.into_original_id() {
-            let chat = self.client.get_mod::<mods::Chat>();
-            chat.mark_message_received(message_id, message.from)?;
-        }
-
-        Ok(())
     }
 
     async fn did_send_message(&self, message: Message) -> Result<()> {
@@ -461,7 +378,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         debug!("Caching sent message…");
         self.inner.data_cache.insert_messages([&message]).await?;
         // self.send_event_for_message(&message.to, &message);
-        todo!("FIXME");
+        // todo!("FIXME");
 
         Ok(())
     }

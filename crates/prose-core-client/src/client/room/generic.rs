@@ -6,20 +6,22 @@
 use super::Room;
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::{Message, MessageId};
+use crate::types::{ConnectedRoom, Message, MessageId};
 use anyhow::Result;
 use jid::BareJid;
 use prose_xmpp::mods;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{ChatState, Emoji};
+use std::sync::Arc;
 
-pub struct Base {}
+pub struct Generic {}
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
-    pub fn to_base(&self) -> Room<Base, D, A> {
+    pub fn to_base(&self) -> Room<Generic, D, A> {
         Room {
             inner: self.inner.clone(),
             inner_mut: self.inner_mut.clone(),
+            to_connected_room: Arc::new(|room| ConnectedRoom::Generic(room)),
             _type: Default::default(),
         }
     }
@@ -45,6 +47,10 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
     pub fn subject(&self) -> Option<String> {
         self.inner_mut.read().subject.clone()
     }
+
+    pub fn members(&self) -> &[BareJid] {
+        self.inner.members.as_slice()
+    }
 }
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
@@ -53,39 +59,17 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         chat.send_message(
             self.inner.jid.clone(),
             body,
-            self.inner.message_type.clone(),
+            &self.inner.message_type,
             Some(ChatState::Active),
         )
     }
 
-    pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>> {
-        let ids = ids
-            .iter()
-            .map(|id| id.as_ref().into())
-            .collect::<Vec<message::Id>>();
-        let messages = self
-            .inner
-            .client
-            .data_cache
-            .load_messages_targeting(&self.inner.jid, ids.as_slice(), None, true)
-            .await?;
-        Ok(Message::reducing_messages(messages))
-    }
-
     pub async fn update_message(&self, id: MessageId, body: impl Into<String>) -> Result<()> {
         let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.update_message(id.into_inner().into(), self.inner.jid.clone(), body)
-    }
-
-    pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
-        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.send_chat_state(
+        chat.update_message(
+            id.into_inner().into(),
             self.inner.jid.clone(),
-            if is_composing {
-                ChatState::Composing
-            } else {
-                ChatState::Paused
-            },
+            body,
             &self.inner.message_type,
         )
     }
@@ -118,15 +102,69 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         }
 
         let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.react_to_message(message_id, self.inner.jid.clone(), reactions)?;
+        chat.react_to_message(
+            message_id,
+            self.inner.jid.clone(),
+            reactions,
+            &self.inner.message_type,
+        )?;
 
         Ok(())
     }
 
     pub async fn retract_message(&self, id: MessageId) -> Result<()> {
         let chat = self.inner.xmpp.get_mod::<mods::Chat>();
-        chat.retract_message(id.into_inner().into(), self.inner.jid.clone())?;
+        chat.retract_message(
+            id.into_inner().into(),
+            self.inner.jid.clone(),
+            &self.inner.message_type,
+        )?;
         Ok(())
+    }
+
+    pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<Message>> {
+        let ids = ids
+            .iter()
+            .map(|id| id.as_ref().into())
+            .collect::<Vec<message::Id>>();
+        let messages = self
+            .inner
+            .client
+            .data_cache
+            .load_messages_targeting(&self.inner.jid, ids.as_slice(), None, true)
+            .await?;
+        Ok(Message::reducing_messages(messages))
+    }
+
+    pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
+        let chat = self.inner.xmpp.get_mod::<mods::Chat>();
+        chat.send_chat_state(
+            self.inner.jid.clone(),
+            if is_composing {
+                ChatState::Composing
+            } else {
+                ChatState::Paused
+            },
+            &self.inner.message_type,
+        )
+    }
+
+    pub async fn load_composing_users(&self, conversation: &BareJid) -> Result<Vec<BareJid>> {
+        // We currently do not support multi-user chats. So either our conversation partner is
+        // typing or they are not.
+        let conversation_partner_is_composing = self
+            .inner
+            .client
+            .data_cache
+            .load_chat_state(conversation)
+            .await?
+            == Some(ChatState::Composing);
+
+        if conversation_partner_is_composing {
+            Ok(vec![conversation.clone()])
+        } else {
+            Ok(vec![])
+        }
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {

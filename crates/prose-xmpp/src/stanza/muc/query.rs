@@ -27,8 +27,8 @@ pub struct Destroy {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct User {
-    jid: Jid,
-    affiliation: muc::user::Affiliation,
+    pub jid: Jid,
+    pub affiliation: muc::user::Affiliation,
 }
 
 impl Query {

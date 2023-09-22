@@ -76,7 +76,7 @@ impl<S> Layer<S> for CustomLogger
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
-    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
+    fn on_new_span(&self, _attrs: &Attributes<'_>, _id: &Id, _ctx: Context<'_, S>) {
         // let span = ctx.span(id).expect("Encountered invalid span");
         //
         // let metadata = span.metadata();
@@ -127,7 +127,7 @@ where
             .log(metadata.level().into(), message);
     }
 
-    fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
+    fn on_enter(&self, _id: &Id, _ctx: Context<'_, S>) {
         // let span = ctx.span(id).expect("Encountered invalid span");
         // let metadata = span.metadata();
         // let function_name = [metadata.target(), metadata.name()].join("::");
@@ -140,7 +140,7 @@ where
         // activity.start_time = Instant::now();
     }
 
-    fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
+    fn on_exit(&self, _id: &Id, _ctx: Context<'_, S>) {
         // let span = ctx.span(id).expect("Encountered invalid span");
         // let metadata = span.metadata();
         // let function_name = [metadata.target(), metadata.name()].join("::");
@@ -156,7 +156,7 @@ where
         // );
     }
 
-    fn on_close(&self, id: Id, ctx: Context<'_, S>) {
+    fn on_close(&self, _id: Id, _ctx: Context<'_, S>) {
         // let span = ctx.span(&id).expect("Encountered invalid span");
         // let metadata = span.metadata();
         // let function_name = [metadata.target(), metadata.name()].join("::");
@@ -169,10 +169,12 @@ where
     }
 }
 
+#[allow(dead_code)]
 struct Activity {
     start_time: Instant,
 }
 
+#[allow(dead_code)]
 impl Activity {
     fn new() -> Self {
         Activity {

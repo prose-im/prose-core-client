@@ -255,7 +255,7 @@ impl ProseClientDelegate<SQLiteCache, FsAvatarCache> for DelegateWrapper {
     fn handle_event(
         &self,
         _client: ProseClient<SQLiteCache, FsAvatarCache>,
-        event: prose_core_client::ClientEvent,
+        event: prose_core_client::ClientEvent<SQLiteCache, FsAvatarCache>,
     ) {
         self.0.handle_event(event.into())
     }

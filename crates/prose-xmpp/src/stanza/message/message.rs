@@ -9,6 +9,7 @@ use strum_macros::{Display, EnumString};
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::{Body, MessageType, Subject};
 use xmpp_parsers::message_correct::Replace;
+use xmpp_parsers::stanza_error::StanzaError;
 
 use crate::ns;
 use crate::stanza::message::fasten::ApplyTo;
@@ -63,6 +64,7 @@ pub struct Message {
     pub store: Option<bool>,
     pub direct_invite: Option<muc::DirectInvite>,
     pub mediated_invite: Option<muc::MediatedInvite>,
+    pub error: Option<StanzaError>,
 }
 
 impl Message {
@@ -136,6 +138,9 @@ impl TryFrom<xmpp_parsers::message::Message> for Message {
                 }
                 _ if payload.is("x", ns::MUC_USER) => {
                     message.mediated_invite = Some(muc::MediatedInvite::try_from(payload)?)
+                }
+                _ if payload.is("error", ns::DEFAULT_NS) => {
+                    message.error = Some(StanzaError::try_from(payload)?)
                 }
                 _ => (),
             }

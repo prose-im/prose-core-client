@@ -414,10 +414,20 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let settings =
             RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
 
+        // When creating a group we change all "members" to "owners", so at least for Prose groups
+        // this should work as expected…
+        let members = muc_mod
+            .request_users(room_jid, Affiliation::Owner)
+            .await?
+            .into_iter()
+            .map(|user| user.jid.into_bare())
+            .collect::<Vec<_>>();
+
         Ok(RoomMetadata {
             room_jid: room_jid_full,
             occupancy,
             settings,
+            members,
         })
     }
 

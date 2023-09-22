@@ -217,6 +217,10 @@ impl TryFrom<&Message> for TargetedPayload {
     type Error = anyhow::Error;
 
     fn try_from(message: &Message) -> Result<Self> {
+        if let Some(error) = &message.error {
+            return Err(anyhow::format_err!("{:?}", error));
+        }
+
         if let Some(reactions) = &message.reactions {
             return Ok(TargetedPayload {
                 target: Some(reactions.id.clone()),
