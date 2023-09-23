@@ -6,8 +6,8 @@
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    Availability, BareJid, BareJidArray, Contact, ContactsArray, IntoJSArray, RoomsArray,
-    UserMetadata, UserProfile,
+    Availability, BareJid, BareJidArray, Channel, ChannelsArray, Contact, ContactsArray,
+    IntoJSArray, RoomsArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
 use jid::ResourcePart;
@@ -167,6 +167,18 @@ impl Client {
     #[wasm_bindgen(js_name = "connectedRooms")]
     pub fn connected_rooms(&self) -> Result<RoomsArray> {
         Ok(self.client.connected_rooms().into())
+    }
+
+    #[wasm_bindgen(js_name = "loadPublicChannels")]
+    pub async fn load_public_channels(&self) -> Result<ChannelsArray> {
+        Ok(self
+            .client
+            .load_public_rooms()
+            .await
+            .map_err(WasmError::from)?
+            .into_iter()
+            .map(Channel::from)
+            .collect_into_js_array::<ChannelsArray>())
     }
 
     /// XEP-0108: User Activity

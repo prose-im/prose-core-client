@@ -25,7 +25,7 @@ use crate::data_cache::DataCache;
 use crate::types::{muc, Bookmarks};
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
-use crate::{CachePolicy, ClientDelegate, ClientEvent};
+use crate::{CachePolicy, ClientDelegate, ClientEvent, ConnectionEvent};
 
 #[derive(Debug, thiserror::Error, Display)]
 pub enum ClientError {
@@ -102,6 +102,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
+
+        self.send_event(ClientEvent::ConnectionStatusChanged {
+            event: ConnectionEvent::Connect,
+        });
 
         Ok(())
     }

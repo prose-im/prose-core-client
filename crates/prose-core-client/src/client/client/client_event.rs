@@ -52,15 +52,15 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let result = match event {
             Event::Client(event) => match event {
                 client::Event::Connected => {
-                    self.inner
-                        .is_observing_rooms
-                        .store(false, Ordering::Relaxed);
-                    self.send_event(ClientEvent::ConnectionStatusChanged {
-                        event: ConnectionEvent::Connect,
-                    });
+                    // We'll send an event from our `connect` method since we need to gather
+                    // information about the server first. Once we'll fire the event SDK consumers
+                    // can be sure that we have everything we need.
                     Ok(())
                 }
                 client::Event::Disconnected { error } => {
+                    self.inner
+                        .is_observing_rooms
+                        .store(false, Ordering::Relaxed);
                     self.send_event(ClientEvent::ConnectionStatusChanged {
                         event: ConnectionEvent::Disconnect { error },
                     });
