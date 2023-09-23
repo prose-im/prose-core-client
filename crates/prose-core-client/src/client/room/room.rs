@@ -176,6 +176,8 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
                 .insert_messages([message])
                 .await?;
 
+            // TODO: Fixme
+
             // let conversation = if message_is_carbon {
             //     &message.to
             // } else {

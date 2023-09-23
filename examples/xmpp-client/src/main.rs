@@ -77,7 +77,7 @@ async fn handle_event(client: Client, event: Event) -> Result<()> {
     chat.send_message(
         from,
         format!("> {}\nHello {}. This is an automated response.", body, name),
-        Default::default(),
+        &Default::default(),
         None,
     )?;
 
