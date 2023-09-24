@@ -3,23 +3,25 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::{bail, Result};
-use jid::{BareJid, Jid};
-use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
-use prose_xmpp::stanza::ConferenceBookmark;
-use prose_xmpp::{mods, RequestError};
-use std::collections::HashSet;
-use std::iter;
-use tracing::info;
-use xmpp_parsers::bookmarks2::{Autojoin, Conference};
-use xmpp_parsers::muc::user::Affiliation;
-
 use crate::avatar_cache::AvatarCache;
 use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
 use crate::types::muc::{BookmarkMetadata, RoomMetadata, RoomSettings};
 use crate::types::{muc, Bookmarks, ConnectedRoom};
 use crate::util::StringExt;
+use crate::ClientEvent;
+use anyhow::{bail, Result};
+use jid::{BareJid, FullJid, Jid};
+use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
+use prose_xmpp::stanza::ConferenceBookmark;
+use prose_xmpp::Client as XMPPClient;
+use prose_xmpp::{mods, RequestError};
+use std::collections::HashSet;
+use std::future::Future;
+use std::iter;
+use tracing::info;
+use xmpp_parsers::bookmarks2::{Autojoin, Conference};
+use xmpp_parsers::muc::user::Affiliation;
 
 use super::Client;
 
@@ -120,7 +122,12 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         };
 
         // Add room to our connected rooms and notify delegate…
-        self.did_enter_room(room);
+        self.inner
+            .connected_rooms
+            .write()
+            .insert(room.jid().clone(), room);
+
+        self.send_event(ClientEvent::RoomsChanged);
 
         // Save bookmark for created (or joined) room…
         self.insert_and_publish_bookmark(bookmark).await?;
@@ -168,7 +175,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         )
             .try_into()?;
 
-        self.finish_create_channel(channel_name.as_ref(), room)
+        self.conclude_create_channel(channel_name.as_ref(), room)
             .await
     }
 
@@ -188,7 +195,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         )
             .into();
 
-        self.finish_create_channel(channel_name.as_ref(), room)
+        self.conclude_create_channel(channel_name.as_ref(), room)
             .await
     }
 }
@@ -261,43 +268,45 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         nickname: Option<&str>,
         password: Option<&str>,
     ) -> Result<(), RequestError> {
-        info!("Entering room {}…", room_jid);
+        async fn enter_room(
+            client: XMPPClient,
+            room_jid_full: FullJid,
+            password: Option<String>,
+        ) -> Result<RoomMetadata, RequestError> {
+            let muc_mod = client.get_mod::<mods::MUC>();
+            let occupancy = muc_mod
+                .enter_room(&room_jid_full, password.as_deref())
+                .await?;
 
-        let user_jid = self.connected_jid().map_err(|err| RequestError::Generic {
-            msg: err.to_string(),
-        })?;
-        let nickname = nickname.or(user_jid.node_str()).unwrap_or("unknown-user");
+            let caps = client.get_mod::<mods::Caps>();
+            let settings = RoomSettings::try_from(
+                caps.query_disco_info(room_jid_full.to_bare(), None).await?,
+            )?;
 
-        // Insert pending room so that we don't miss any stanzas for this room while we're
-        // connecting to it…
-        self.inner.connected_rooms.write().insert(
-            room_jid.clone(),
-            RoomEnvelope::pending(room_jid, &user_jid.to_bare(), nickname, self),
-        );
+            // When creating a group we change all "members" to "owners", so at least for Prose groups
+            // this should work as expected…
+            let members = muc_mod
+                .request_users(&room_jid_full.to_bare(), Affiliation::Owner)
+                .await?
+                .into_iter()
+                .map(|user| user.jid.into_bare())
+                .collect::<Vec<_>>();
 
-        let metadata = match self.perform_enter_room(room_jid, nickname, password).await {
-            Ok(metadata) => metadata,
-            Err(error) => {
-                // Remove pending room again…
-                self.inner.connected_rooms.write().remove(room_jid);
-                return Err(error);
-            }
-        };
+            Ok(RoomMetadata {
+                room_jid: room_jid_full,
+                occupancy,
+                settings,
+                members,
+            })
+        }
 
-        let mut connected_rooms = self.inner.connected_rooms.write();
-        let Some(room) = connected_rooms.remove(room_jid) else {
-            return Err(RequestError::Generic {
-                msg: "Room was modified during connection".to_string(),
-            });
-        };
-
-        let room =
-            room.promote_to_permanent_room(metadata)
-                .map_err(|err| RequestError::Generic {
-                    msg: err.to_string(),
-                })?;
-        connected_rooms.insert(room_jid.clone(), room);
-        Ok(())
+        let password = password.map(ToString::to_string);
+        self.create_or_enter_room_with_handler(room_jid, nickname.clone(), move |room_jid_full| {
+            let room_jid_full = room_jid_full.clone();
+            let fut = enter_room(self.client.clone(), room_jid_full, password);
+            async move { fut.await }
+        })
+        .await
     }
 
     pub(super) async fn remove_and_publish_bookmarks(&self, jids: &[BareJid]) -> Result<()> {
@@ -374,7 +383,64 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         return Ok(service);
     }
 
-    async fn finish_create_channel(&self, name: &str, room: RoomEnvelope<D, A>) -> Result<()> {
+    /// Inserts a `PendingRoom` into `connected_rooms` before calling `handler` to create or enter
+    /// a room so that no stanzas referring the room are lost during the handshake. If `handler`
+    /// succeeds the returned `RoomMetadata` is used to promote the `PendingRoom` to a permanent
+    /// room (`Group`, `PrivateChannel` or otherwise). If `handler` fails the `PendingRoom` is
+    /// removed from `connected_rooms` again.  
+    async fn create_or_enter_room_with_handler<Fut>(
+        &self,
+        room_jid: &BareJid,
+        nickname: Option<&str>,
+        handler: impl FnOnce(&FullJid) -> Fut,
+    ) -> Result<(), RequestError>
+    where
+        Fut: Future<Output = Result<RoomMetadata, RequestError>> + 'static,
+    {
+        info!("Entering room {}…", room_jid);
+
+        let user_jid = self.connected_jid().map_err(|err| RequestError::Generic {
+            msg: err.to_string(),
+        })?;
+        let nickname = nickname.or(user_jid.node_str()).unwrap_or("unknown-user");
+
+        // Insert pending room so that we don't miss any stanzas for this room while we're
+        // connecting to it…
+        self.inner.connected_rooms.write().insert(
+            room_jid.clone(),
+            RoomEnvelope::pending(room_jid, &user_jid.to_bare(), nickname, self),
+        );
+
+        let room_jid_full = room_jid.with_resource_str(nickname)?;
+        let metadata = match handler(&room_jid_full).await {
+            // Remove pending room again…
+            Ok(metadata) => metadata,
+            Err(error) => {
+                // Remove pending room again…
+                self.inner.connected_rooms.write().remove(room_jid);
+                return Err(error);
+            }
+        };
+
+        let mut connected_rooms = self.inner.connected_rooms.write();
+        let Some(room) = connected_rooms.remove(room_jid) else {
+            return Err(RequestError::Generic {
+                msg: "Room was modified during connection".to_string(),
+            });
+        };
+
+        let room =
+            room.promote_to_permanent_room(metadata)
+                .map_err(|err| RequestError::Generic {
+                    msg: err.to_string(),
+                })?;
+        connected_rooms.insert(room_jid.clone(), room);
+        Ok(())
+    }
+
+    /// Notifies the delegate about the change of rooms and saves and publishes a bookmark for the
+    /// new room.
+    async fn conclude_create_channel(&self, name: &str, room: RoomEnvelope<D, A>) -> Result<()> {
         let bookmark = ConferenceBookmark {
             jid: room.jid().clone().into(),
             conference: Conference {
@@ -391,52 +457,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         };
 
         // Add room to our connected rooms and notify delegate…
-        self.did_enter_room(room);
+        self.inner
+            .connected_rooms
+            .write()
+            .insert(room.jid().clone(), room);
+
+        self.send_event(ClientEvent::RoomsChanged);
 
         // Save bookmark for created (or joined) channel…
         self.insert_and_publish_bookmark(bookmark).await?;
 
         Ok(())
-    }
-
-    pub(super) async fn perform_enter_room(
-        &self,
-        room_jid: &BareJid,
-        nickname: &str,
-        password: Option<&str>,
-    ) -> Result<RoomMetadata, RequestError> {
-        let room_jid_full = room_jid.with_resource_str(nickname)?;
-
-        let muc_mod = self.client.get_mod::<mods::MUC>();
-        let occupancy = muc_mod.enter_room(&room_jid_full, password).await?;
-
-        let caps = self.client.get_mod::<mods::Caps>();
-        let settings =
-            RoomSettings::try_from(caps.query_disco_info(room_jid.clone(), None).await?)?;
-
-        // When creating a group we change all "members" to "owners", so at least for Prose groups
-        // this should work as expected…
-        let members = muc_mod
-            .request_users(room_jid, Affiliation::Owner)
-            .await?
-            .into_iter()
-            .map(|user| user.jid.into_bare())
-            .collect::<Vec<_>>();
-
-        Ok(RoomMetadata {
-            room_jid: room_jid_full,
-            occupancy,
-            settings,
-            members,
-        })
-    }
-
-    fn did_enter_room(&self, room: RoomEnvelope<D, A>) {
-        // TODO: Send event to delegate
-        self.inner
-            .connected_rooms
-            .write()
-            .insert(room.jid().clone(), room);
     }
 
     async fn insert_and_publish_bookmark(&self, bookmark: ConferenceBookmark) -> Result<()> {

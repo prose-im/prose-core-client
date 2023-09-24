@@ -1,4 +1,4 @@
-use crate::types::{BareJid, IntoJSArray};
+use crate::types::BareJid;
 use prose_xmpp::mods;
 use wasm_bindgen::prelude::wasm_bindgen;
 
