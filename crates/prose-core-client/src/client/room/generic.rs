@@ -17,7 +17,7 @@ use std::sync::Arc;
 pub struct Generic {}
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
-    pub fn to_base(&self) -> Room<Generic, D, A> {
+    pub fn to_generic(&self) -> Room<Generic, D, A> {
         Room {
             inner: self.inner.clone(),
             inner_mut: self.inner_mut.clone(),

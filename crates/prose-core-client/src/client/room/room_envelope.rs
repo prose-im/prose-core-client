@@ -87,12 +87,12 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
     #[allow(dead_code)]
     pub fn to_generic_room(&self) -> Room<room::Generic, D, A> {
         match self {
-            Self::Pending(room) => room.to_base(),
-            Self::DirectMessage(room) => room.to_base(),
-            Self::Group(room) => room.to_base(),
-            Self::PrivateChannel(room) => room.to_base(),
-            Self::PublicChannel(room) => room.to_base(),
-            Self::Generic(room) => room.to_base(),
+            Self::Pending(room) => room.to_generic(),
+            Self::DirectMessage(room) => room.to_generic(),
+            Self::Group(room) => room.to_generic(),
+            Self::PrivateChannel(room) => room.to_generic(),
+            Self::PublicChannel(room) => room.to_generic(),
+            Self::Generic(room) => room.to_generic(),
         }
     }
 }

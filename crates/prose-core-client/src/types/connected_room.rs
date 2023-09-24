@@ -20,11 +20,11 @@ pub enum ConnectedRoom<D: DataCache + 'static, A: AvatarCache + 'static> {
 impl<D: DataCache, A: AvatarCache> ConnectedRoom<D, A> {
     pub fn to_generic_room(&self) -> Room<Generic, D, A> {
         match self {
-            Self::DirectMessage(room) => room.to_base(),
-            Self::Group(room) => room.to_base(),
-            Self::PrivateChannel(room) => room.to_base(),
-            Self::PublicChannel(room) => room.to_base(),
-            Self::Generic(room) => room.to_base(),
+            Self::DirectMessage(room) => room.to_generic(),
+            Self::Group(room) => room.to_generic(),
+            Self::PrivateChannel(room) => room.to_generic(),
+            Self::PublicChannel(room) => room.to_generic(),
+            Self::Generic(room) => room.to_generic(),
         }
     }
 }
