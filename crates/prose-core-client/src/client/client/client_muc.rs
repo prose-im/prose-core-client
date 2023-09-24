@@ -3,25 +3,28 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::avatar_cache::AvatarCache;
-use crate::client::room::RoomEnvelope;
-use crate::data_cache::DataCache;
-use crate::types::muc::{BookmarkMetadata, RoomMetadata, RoomSettings};
-use crate::types::{muc, ConnectedRoom};
-use crate::util::StringExt;
-use crate::ClientEvent;
-use anyhow::{bail, Result};
-use jid::{BareJid, FullJid, Jid};
-use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
-use prose_xmpp::stanza::ConferenceBookmark;
-use prose_xmpp::Client as XMPPClient;
-use prose_xmpp::{mods, RequestError};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::iter;
-use tracing::info;
+
+use anyhow::{bail, Result};
+use jid::{BareJid, FullJid, Jid};
+use sha1::{Digest, Sha1};
+use tracing::{error, info};
 use xmpp_parsers::bookmarks2::{Autojoin, Conference};
 use xmpp_parsers::muc::user::Affiliation;
+
+use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
+use prose_xmpp::stanza::ConferenceBookmark;
+use prose_xmpp::{mods, RequestError};
+
+use crate::avatar_cache::AvatarCache;
+use crate::client::room::RoomEnvelope;
+use crate::data_cache::DataCache;
+use crate::types::muc::{RoomConfig, RoomMetadata, RoomSettings};
+use crate::types::{muc, ConnectedRoom};
+use crate::util::StringExt;
+use crate::ClientEvent;
 
 use super::Client;
 
@@ -55,106 +58,27 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     pub async fn load_public_rooms(&self) -> Result<Vec<mods::muc::Room>> {
-        self.muc_service()?.load_public_rooms().await
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+        muc_mod.load_public_rooms(&self.muc_service()?.jid).await
     }
 
-    pub async fn create_group(&self, participants: &[BareJid]) -> Result<()> {
+    pub async fn create_direct_message(&self, participants: &[BareJid]) -> Result<()> {
         if participants.is_empty() {
             bail!("Group must have at least one other participant.")
         }
 
-        // Load participant infos so that we can build a nice human-readable name for the group…
-        let user_jid = self.connected_jid()?.into_bare();
-        let mut participant_names = vec![];
-
-        for jid in participants.iter().chain(iter::once(&user_jid)) {
-            let participant_name = self
-                .load_user_profile(jid.clone(), Default::default())
-                .await?
-                .and_then(|profile| profile.first_name.or(profile.nickname))
-                .or(jid.node_str().map(|node| node.to_uppercase_first_letter()))
-                .unwrap_or(jid.to_string());
-            participant_names.push(participant_name);
-        }
-        participant_names.sort();
-
-        let group_name = participant_names.join(", ");
-
-        let metadata = self
-            .muc_service()?
-            .create_or_join_group(&group_name, participants)
-            .await?;
-
-        let room_has_been_created = metadata.room_has_been_created();
-        let room = RoomEnvelope::from((metadata, user_jid, self));
-        let room_jid = room.jid().clone();
-
-        // So we were actually already connected to that room.
-        if self.inner.connected_rooms.read().contains_key(&room.jid()) {
-            return Ok(());
-        }
-
-        // Try to promote all participants to owners…
-        info!("Update participant affiliations…");
-        let muc_mod = self.client.get_mod::<mods::MUC>();
-        muc_mod
-            .update_user_affiliations(
-                &room_jid,
-                participants
-                    .iter()
-                    .map(|jid| (jid.clone(), Affiliation::Owner)),
-            )
-            .await?;
-
-        let bookmark = ConferenceBookmark {
-            jid: room.jid().clone().into(),
-            conference: Conference {
-                autojoin: Autojoin::True,
-                name: Some(group_name),
-                nick: Some(room.user_nickname().to_string()),
-                password: None,
-                extensions: vec![BookmarkMetadata {
-                    room_type: muc::RoomType::Group,
-                    participants: Some(participants.iter().map(Clone::clone).collect()),
-                }
-                .into()],
-            },
-        };
-
-        // Add room to our connected rooms and notify delegate…
-        self.inner
-            .connected_rooms
-            .write()
-            .insert(room.jid().clone(), room);
-
-        self.send_event(ClientEvent::RoomsChanged);
-
-        // Save bookmark for created (or joined) room…
-        self.insert_and_publish_bookmark(bookmark).await?;
-
-        // If the room existed already we won't send any invites again.
-        if !room_has_been_created {
-            return Ok(());
-        }
-
-        // Send invites…
-        info!("Sending invites for created group…");
-        muc_mod
-            .send_mediated_invite(
-                &room_jid,
-                MediatedInvite {
-                    invites: participants
-                        .into_iter()
-                        .map(|participant| mediated_invite::Invite {
-                            from: None,
-                            to: Some(participant.clone().into()),
-                            reason: None,
-                        })
-                        .collect(),
-                    password: None,
+        self.create_or_join_room(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Create {
+                service: self.muc_service()?.jid,
+                room_type: CreateRoomType::Group {
+                    participants: participants.to_vec(),
+                    send_invites: true,
                 },
-            )
-            .await?;
+            },
+            save_bookmark: true,
+            notify_delegate: false,
+        })
+        .await?;
 
         Ok(())
     }
@@ -166,17 +90,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             channel_name.as_ref()
         );
 
-        let room: RoomEnvelope<D, A> = (
-            self.muc_service()?
-                .create_or_join_private_channel(channel_name.as_ref())
-                .await?,
-            self.connected_jid()?.into_bare(),
-            self,
-        )
-            .try_into()?;
+        self.create_or_join_room(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Create {
+                service: self.muc_service()?.jid,
+                room_type: CreateRoomType::PrivateChannel {
+                    name: channel_name.as_ref().to_string(),
+                },
+            },
+            save_bookmark: true,
+            notify_delegate: false,
+        })
+        .await?;
 
-        self.conclude_create_channel(channel_name.as_ref(), room)
-            .await
+        Ok(())
     }
 
     pub async fn create_public_channel(&self, channel_name: impl AsRef<str>) -> Result<()> {
@@ -186,17 +112,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             channel_name.as_ref()
         );
 
-        let room: RoomEnvelope<D, A> = (
-            self.muc_service()?
-                .create_or_join_public_channel(channel_name.as_ref())
-                .await?,
-            self.connected_jid()?.into_bare(),
-            self,
-        )
-            .into();
+        self.create_or_join_room(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Create {
+                service: self.muc_service()?.jid,
+                room_type: CreateRoomType::PublicChannel {
+                    name: channel_name.as_ref().to_string(),
+                },
+            },
+            save_bookmark: true,
+            notify_delegate: false,
+        })
+        .await?;
 
-        self.conclude_create_channel(channel_name.as_ref(), room)
-            .await
+        Ok(())
     }
 }
 
@@ -266,43 +194,14 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         nickname: Option<&str>,
         password: Option<&str>,
     ) -> Result<(), RequestError> {
-        async fn enter_room(
-            client: XMPPClient,
-            room_jid_full: FullJid,
-            password: Option<String>,
-        ) -> Result<RoomMetadata, RequestError> {
-            let muc_mod = client.get_mod::<mods::MUC>();
-            let occupancy = muc_mod
-                .enter_room(&room_jid_full, password.as_deref())
-                .await?;
-
-            let caps = client.get_mod::<mods::Caps>();
-            let settings = RoomSettings::try_from(
-                caps.query_disco_info(room_jid_full.to_bare(), None).await?,
-            )?;
-
-            // When creating a group we change all "members" to "owners", so at least for Prose groups
-            // this should work as expected…
-            let members = muc_mod
-                .request_users(&room_jid_full.to_bare(), Affiliation::Owner)
-                .await?
-                .into_iter()
-                .map(|user| user.jid.into_bare())
-                .collect::<Vec<_>>();
-
-            Ok(RoomMetadata {
-                room_jid: room_jid_full,
-                occupancy,
-                settings,
-                members,
-            })
-        }
-
-        let password = password.map(ToString::to_string);
-        self.create_or_enter_room_with_handler(room_jid, nickname.clone(), move |room_jid_full| {
-            let room_jid_full = room_jid_full.clone();
-            let fut = enter_room(self.client.clone(), room_jid_full, password);
-            async move { fut.await }
+        self.create_or_join_room(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Join {
+                room_jid: room_jid.clone(),
+                nickname: nickname.map(ToString::to_string),
+                password: password.map(ToString::to_string),
+            },
+            save_bookmark: false,
+            notify_delegate: false,
         })
         .await
     }
@@ -358,93 +257,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         return Ok(service);
     }
 
-    /// Inserts a `PendingRoom` into `connected_rooms` before calling `handler` to create or enter
-    /// a room so that no stanzas referring the room are lost during the handshake. If `handler`
-    /// succeeds the returned `RoomMetadata` is used to promote the `PendingRoom` to a permanent
-    /// room (`Group`, `PrivateChannel` or otherwise). If `handler` fails the `PendingRoom` is
-    /// removed from `connected_rooms` again.  
-    async fn create_or_enter_room_with_handler<Fut>(
-        &self,
-        room_jid: &BareJid,
-        nickname: Option<&str>,
-        handler: impl FnOnce(&FullJid) -> Fut,
-    ) -> Result<(), RequestError>
-    where
-        Fut: Future<Output = Result<RoomMetadata, RequestError>> + 'static,
-    {
-        info!("Entering room {}…", room_jid);
-
-        let user_jid = self.connected_jid().map_err(|err| RequestError::Generic {
-            msg: err.to_string(),
-        })?;
-        let nickname = nickname.or(user_jid.node_str()).unwrap_or("unknown-user");
-
-        // Insert pending room so that we don't miss any stanzas for this room while we're
-        // connecting to it…
-        self.inner.connected_rooms.write().insert(
-            room_jid.clone(),
-            RoomEnvelope::pending(room_jid, &user_jid.to_bare(), nickname, self),
-        );
-
-        let room_jid_full = room_jid.with_resource_str(nickname)?;
-        let metadata = match handler(&room_jid_full).await {
-            // Remove pending room again…
-            Ok(metadata) => metadata,
-            Err(error) => {
-                // Remove pending room again…
-                self.inner.connected_rooms.write().remove(room_jid);
-                return Err(error);
-            }
-        };
-
-        let mut connected_rooms = self.inner.connected_rooms.write();
-        let Some(room) = connected_rooms.remove(room_jid) else {
-            return Err(RequestError::Generic {
-                msg: "Room was modified during connection".to_string(),
-            });
-        };
-
-        let room =
-            room.promote_to_permanent_room(metadata)
-                .map_err(|err| RequestError::Generic {
-                    msg: err.to_string(),
-                })?;
-        connected_rooms.insert(room_jid.clone(), room);
-        Ok(())
-    }
-
-    /// Notifies the delegate about the change of rooms and saves and publishes a bookmark for the
-    /// new room.
-    async fn conclude_create_channel(&self, name: &str, room: RoomEnvelope<D, A>) -> Result<()> {
-        let bookmark = ConferenceBookmark {
-            jid: room.jid().clone().into(),
-            conference: Conference {
-                autojoin: Autojoin::True,
-                name: Some(name.to_string()),
-                nick: Some(room.user_nickname().to_string()),
-                password: None,
-                extensions: vec![BookmarkMetadata {
-                    room_type: muc::RoomType::PublicChannel,
-                    participants: None,
-                }
-                .into()],
-            },
-        };
-
-        // Add room to our connected rooms and notify delegate…
-        self.inner
-            .connected_rooms
-            .write()
-            .insert(room.jid().clone(), room);
-
-        self.send_event(ClientEvent::RoomsChanged);
-
-        // Save bookmark for created (or joined) channel…
-        self.insert_and_publish_bookmark(bookmark).await?;
-
-        Ok(())
-    }
-
     async fn insert_and_publish_bookmark(&self, bookmark: ConferenceBookmark) -> Result<()> {
         let bare_jid = bookmark.jid.to_bare();
         info!("Inserting bookmark {}…", bare_jid);
@@ -463,5 +275,571 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
         bookmark_mod.publish_bookmarks(bookmarks_to_publish).await?;
         Ok(())
+    }
+}
+
+enum CreateRoomType {
+    Group {
+        participants: Vec<BareJid>,
+        send_invites: bool,
+    },
+    PrivateChannel {
+        name: String,
+    },
+    PublicChannel {
+        name: String,
+    },
+}
+
+enum CreateOrEnterRoomRequestType {
+    Create {
+        service: BareJid,
+        room_type: CreateRoomType,
+    },
+    Join {
+        room_jid: BareJid,
+        nickname: Option<String>,
+        password: Option<String>,
+    },
+}
+
+struct CreateOrEnterRoomRequest {
+    r#type: CreateOrEnterRoomRequestType,
+    save_bookmark: bool,
+    notify_delegate: bool,
+}
+
+mod room_handling {
+    use anyhow::Context;
+    use jid::NodePart;
+    use xmpp_parsers::muc::user::Status;
+    use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
+
+    use prose_xmpp::mods::muc::{RoomConfigResponse, RoomOccupancy};
+
+    use super::*;
+
+    pub(super) const GROUP_PREFIX: &str = "org.prose.group";
+    pub(super) const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
+    pub(super) const PUBLIC_CHANNEL_PREFIX: &str = "org.prose.public-channel";
+
+    impl<D: DataCache, A: AvatarCache> Client<D, A> {
+        pub(super) async fn create_or_join_room(
+            &self,
+            CreateOrEnterRoomRequest {
+                r#type,
+                save_bookmark,
+                notify_delegate,
+            }: CreateOrEnterRoomRequest,
+        ) -> Result<(), RequestError> {
+            let user_jid = self
+                .connected_jid()
+                .map_err(|err| RequestError::Generic {
+                    msg: err.to_string(),
+                })?
+                .into_bare();
+            let default_nickname = user_jid.node_str().unwrap_or("unknown-user");
+
+            let metadata = match r#type {
+                CreateOrEnterRoomRequestType::Create { service, room_type } => match room_type {
+                    CreateRoomType::Group {
+                        participants,
+                        send_invites,
+                    } => {
+                        self.create_or_join_group(
+                            &service,
+                            &user_jid,
+                            default_nickname,
+                            participants,
+                            send_invites,
+                        )
+                        .await
+                    }
+                    CreateRoomType::PrivateChannel { name } => {
+                        // We'll use a random ID for the jid of the private channel. This way
+                        // different people can create private channels with the same name without
+                        // creating a conflict. A conflict might also potentially be a security
+                        // issue if jid would contain sensitive information.
+                        let channel_id = self.inner.id_provider.new_id();
+
+                        self.create_or_join_room_with_config(
+                            &service,
+                            &user_jid,
+                            &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
+                            default_nickname,
+                            RoomConfig::private_channel(&name),
+                            |_| async { Ok(()) },
+                        )
+                        .await
+                    }
+                    CreateRoomType::PublicChannel { name } => {
+                        // Public channels should be able to conflict, i.e. there should only be
+                        // one channel for any given name. Since these can be discovered publicly
+                        // and joined by anyone there should be no harm in exposing the name in
+                        // the jid.
+                        let name = format!(
+                            "{}.{}",
+                            PUBLIC_CHANNEL_PREFIX,
+                            name.to_ascii_lowercase().replace(" ", "-")
+                        );
+
+                        self.create_or_join_room_with_config(
+                            &service,
+                            &user_jid,
+                            &name,
+                            default_nickname,
+                            RoomConfig::public_channel(&name),
+                            |_| async { Ok(()) },
+                        )
+                        .await
+                    }
+                }
+                .map_err(|err| RequestError::Generic {
+                    msg: err.to_string(),
+                })?,
+                CreateOrEnterRoomRequestType::Join {
+                    room_jid,
+                    nickname,
+                    password,
+                } => {
+                    self.join_room_by_resolving_nickname_conflict(
+                        &room_jid,
+                        &user_jid,
+                        nickname.as_deref().unwrap_or(default_nickname),
+                        password.as_deref(),
+                        0,
+                    )
+                    .await?
+                }
+            };
+
+            // It could be the case that the room_jid was modified, i.e. if the preferred JID was
+            // taken already.
+            let room_jid = metadata.room_jid.clone();
+
+            let mut connected_rooms = self.inner.connected_rooms.write();
+            let Some(room) = connected_rooms.remove(&room_jid.to_bare()) else {
+                return Err(RequestError::Generic {
+                    msg: "Room was modified during connection".to_string(),
+                });
+            };
+
+            // Convert the temporary room to its final form…
+            let room =
+                room.promote_to_permanent_room(metadata)
+                    .map_err(|err| RequestError::Generic {
+                        msg: err.to_string(),
+                    })?;
+
+            let room_name = room.name().map(ToString::to_string);
+
+            connected_rooms.insert(room_jid.to_bare(), room);
+
+            if save_bookmark {
+                let bookmark = ConferenceBookmark {
+                    jid: room_jid.to_bare().into(),
+                    conference: Conference {
+                        autojoin: Autojoin::True,
+                        name: room_name,
+                        // We're not saving a nickname so that we keep using the node of the
+                        // logged-in user's JID instead.
+                        nick: None,
+                        password: None,
+                        extensions: vec![],
+                    },
+                };
+                match self.insert_and_publish_bookmark(bookmark).await {
+                    Ok(_) => (),
+                    Err(error) => {
+                        error!("Failed to save bookmark for room {}. {}", room_jid, error)
+                    }
+                }
+            }
+
+            if notify_delegate {
+                self.send_event(ClientEvent::RoomsChanged)
+            }
+
+            Ok(())
+        }
+
+        async fn join_room_by_resolving_nickname_conflict(
+            &self,
+            room_jid: &BareJid,
+            user_jid: &BareJid,
+            preferred_nickname: &str,
+            password: Option<&str>,
+            attempt: u32,
+        ) -> Result<RoomMetadata, RequestError> {
+            let mut attempt = attempt;
+
+            loop {
+                let nickname = if attempt == 0 {
+                    preferred_nickname.to_string()
+                } else {
+                    format!("{}#{}", preferred_nickname, attempt)
+                };
+                attempt += 1;
+
+                // Insert pending room so that we don't miss any stanzas for this room while we're
+                // connecting to it…
+                self.inner.connected_rooms.write().insert(
+                    room_jid.clone(),
+                    RoomEnvelope::pending(room_jid, user_jid, &nickname, self),
+                );
+
+                info!(
+                    "Trying to join room {} with nickname {}…",
+                    room_jid, nickname
+                );
+                return match self
+                    .join_room(&room_jid.with_resource_str(&nickname)?, password)
+                    .await
+                {
+                    Ok(metadata) => {
+                        info!("Successfully joined room.");
+                        Ok(metadata)
+                    }
+                    Err(error) => {
+                        // Remove pending room again…
+                        self.inner.connected_rooms.write().remove(&room_jid);
+
+                        if error.defined_condition() == Some(DefinedCondition::Conflict) {
+                            info!("Nickname was already taken in room. Will try again with modified nickname…");
+                            continue;
+                        }
+
+                        Err(error.into())
+                    }
+                };
+            }
+        }
+
+        async fn join_room(
+            &self,
+            room_jid: &FullJid,
+            password: Option<&str>,
+        ) -> Result<RoomMetadata, RequestError> {
+            let muc_mod = self.client.get_mod::<mods::MUC>();
+            let occupancy = muc_mod.enter_room(&room_jid, password.as_deref()).await?;
+
+            // If we accidentally created the room, we'll return an ItemNotFound error since our
+            // actual intention was to join an existing room.
+            if occupancy.user.status.contains(&Status::RoomHasBeenCreated) {
+                return Err(RequestError::XMPP {
+                    err: StanzaError {
+                        type_: ErrorType::Cancel,
+                        by: None,
+                        defined_condition: DefinedCondition::ItemNotFound,
+                        texts: Default::default(),
+                        other: None,
+                    },
+                });
+            }
+
+            return self.gather_metadata_for_room(room_jid, occupancy).await;
+        }
+
+        async fn gather_metadata_for_room(
+            &self,
+            room_jid: &FullJid,
+            occupancy: RoomOccupancy,
+        ) -> Result<RoomMetadata, RequestError> {
+            let caps = self.client.get_mod::<mods::Caps>();
+            let settings =
+                RoomSettings::try_from(caps.query_disco_info(room_jid.to_bare(), None).await?)?;
+
+            // When creating a group we change all "members" to "owners", so at least for Prose groups
+            // this should work as expected. In case it fails we ignore the error, which can happen
+            // for channels.
+            let muc_mod = self.client.get_mod::<mods::MUC>();
+            let members = muc_mod
+                .request_users(&room_jid.to_bare(), Affiliation::Owner)
+                .await
+                .unwrap_or(vec![])
+                .into_iter()
+                .map(|user| user.jid.into_bare())
+                .collect::<Vec<_>>();
+
+            Ok(RoomMetadata {
+                room_jid: room_jid.clone(),
+                occupancy,
+                settings,
+                members,
+            })
+        }
+
+        async fn create_or_join_group(
+            &self,
+            service: &BareJid,
+            user_jid: &BareJid,
+            nickname: &str,
+            participants: Vec<BareJid>,
+            send_invites: bool,
+        ) -> Result<RoomMetadata> {
+            // Load participant infos so that we can build a nice human-readable name for the group…
+            let mut participant_names = vec![];
+            let participants_including_self = participants
+                .iter()
+                .chain(iter::once(user_jid))
+                .cloned()
+                .collect::<Vec<_>>();
+
+            for jid in participants_including_self.iter() {
+                let participant_name = self
+                    .load_user_profile(jid.clone(), Default::default())
+                    .await?
+                    .and_then(|profile| profile.first_name.or(profile.nickname))
+                    .or(jid.node_str().map(|node| node.to_uppercase_first_letter()))
+                    .unwrap_or(jid.to_string());
+                participant_names.push(participant_name);
+            }
+            participant_names.sort();
+
+            let group_name = participant_names.join(", ");
+
+            // We'll create a hash of the sorted jids of our participants. This way users will always
+            // come back to the exact same group if they accidentally try to create it again. Also
+            // other participants (other than the creator of the room) are able to do the same without
+            // having a bookmark.
+            let group_hash = participants_including_self.group_name_hash();
+
+            let metadata = self.create_or_join_room_with_config(
+                service,
+                user_jid,
+                &group_hash,
+                nickname,
+                RoomConfig::group(group_name, participants_including_self.iter()),
+                |room_metadata| {
+                    // Try to promote all participants to owners…
+                    info!("Update participant affiliations…");
+                    let muc_mod = self.client.get_mod::<mods::MUC>();
+                    let room_jid = room_metadata.room_jid.to_bare();
+                    let room_has_been_created = room_metadata.room_has_been_created();
+                    let owners = participants_including_self
+                        .iter()
+                        .map(|jid| (jid.clone(), Affiliation::Owner))
+                        .collect::<Vec<_>>();
+
+                    async move {
+                        if room_has_been_created {
+                            muc_mod
+                                .update_user_affiliations(&room_jid, owners)
+                                .await
+                                .context(
+                                    "Failed to update user affiliations of created group to type 'owner'",
+                                )
+                        } else {
+                            Ok(())
+                        }
+                    }
+                },
+            )
+                .await?;
+
+            // Send invites…
+            if send_invites && metadata.room_has_been_created() {
+                info!("Sending invites for created group…");
+                let muc_mod = self.client.get_mod::<mods::MUC>();
+                muc_mod
+                    .send_mediated_invite(
+                        &metadata.room_jid.to_bare(),
+                        MediatedInvite {
+                            invites: participants
+                                .into_iter()
+                                .map(|participant| mediated_invite::Invite {
+                                    from: None,
+                                    to: Some(participant.clone().into()),
+                                    reason: None,
+                                })
+                                .collect(),
+                            password: None,
+                        },
+                    )
+                    .await?;
+            }
+
+            Ok(metadata)
+        }
+
+        async fn create_or_join_room_with_config<Fut: Future<Output = Result<()>> + 'static>(
+            &self,
+            service: &BareJid,
+            user_jid: &BareJid,
+            room_name: &str,
+            nickname: &str,
+            config: RoomConfig,
+            perform_additional_config: impl FnOnce(&RoomMetadata) -> Fut,
+        ) -> Result<RoomMetadata> {
+            let muc_mod = self.client.get_mod::<mods::MUC>();
+            let mut attempt = 0;
+
+            // Algo is…
+            // 1. Try to create or enter room with given room name and nickname
+            // 2. If server returns "conflict" error (room exists and nickname is taken) append
+            //    "#($ATTEMPT)" to nickname and continue at 1.
+            // 2. If server returns "gone" error (room existed once but was deleted in the meantime)
+            //    append "#($ATTEMPT)" to room name and continue at 1.
+            // 3. Get room info
+            // 4. Validate created/joined room with room info
+            // 5. If validation fails and the room was created by us, delete room and return error
+            // 6. Return final room jid, user and info.
+
+            loop {
+                let unique_room_name = if attempt == 0 {
+                    room_name.to_string()
+                } else {
+                    format!("{}#{}", room_name, attempt)
+                };
+                attempt += 1;
+
+                let room_jid = BareJid::from_parts(
+                    Some(&NodePart::new(&unique_room_name)?),
+                    &service.domain(),
+                );
+                let full_room_jid = room_jid.with_resource_str(nickname)?;
+
+                // Insert pending room so that we don't miss any stanzas for this room while we're
+                // creating (but potentially connecting to) it…
+                self.inner.connected_rooms.write().insert(
+                    room_jid.clone(),
+                    RoomEnvelope::pending(&room_jid, user_jid, &nickname, self),
+                );
+
+                // Try to create or enter the room and configure it…
+                let room_config = config.clone();
+                let result = muc_mod
+                    .create_reserved_room(&full_room_jid, |form| async move {
+                        Ok(RoomConfigResponse::Submit(
+                            room_config.populate_form(&form)?,
+                        ))
+                    })
+                    .await;
+
+                let occupancy = match result {
+                    Ok(occupancy) => occupancy,
+                    Err(error) => {
+                        // Remove pending room again…
+                        self.inner.connected_rooms.write().remove(&room_jid);
+
+                        // We've received a conflict which means that the room exists but that our
+                        // nickname is taken.
+                        if error.defined_condition() == Some(DefinedCondition::Conflict) {
+                            // So we'll try to connect again by modifying our nickname…
+                            return self
+                                .join_room_by_resolving_nickname_conflict(
+                                    &room_jid, user_jid, nickname, None, 1,
+                                )
+                                .await
+                                .map_err(|err| err.into());
+                        }
+                        // In this case the room existed in the past but was deleted. We'll modify
+                        // the name and try again…
+                        else if error.defined_condition() == Some(DefinedCondition::Gone) {
+                            continue;
+                        }
+
+                        return Err(error.into());
+                    }
+                };
+
+                let room_has_been_created =
+                    occupancy.user.status.contains(&Status::RoomHasBeenCreated);
+
+                let metadata = match self
+                    .gather_metadata_for_room(&full_room_jid, occupancy)
+                    .await
+                {
+                    Ok(metadata) => metadata,
+                    Err(error) => {
+                        // Remove pending room again…
+                        self.inner.connected_rooms.write().remove(&room_jid);
+                        if room_has_been_created {
+                            _ = muc_mod.destroy_room(&room_jid).await;
+                        }
+                        return Err(error.into());
+                    }
+                };
+
+                match config.validate(&metadata.settings) {
+                    Ok(_) => (),
+                    Err(error) => {
+                        // Remove pending room again…
+                        self.inner.connected_rooms.write().remove(&room_jid);
+                        // If the validation failed and we've created the room we'll destroy it again.
+                        if room_has_been_created {
+                            _ = muc_mod.destroy_room(&room_jid).await;
+                        }
+                        return Err(error.into());
+                    }
+                }
+
+                match (perform_additional_config)(&metadata).await {
+                    Ok(_) => (),
+                    Err(error) => {
+                        // Remove pending room again…
+                        self.inner.connected_rooms.write().remove(&room_jid);
+                        // Again, if the additional configuration fails and we've created the room
+                        // we'll destroy it again.
+                        if room_has_been_created {
+                            _ = muc_mod.destroy_room(&metadata.room_jid.to_bare()).await;
+                        }
+                        return Err(error.into());
+                    }
+                }
+
+                return Ok(metadata);
+            }
+        }
+    }
+}
+
+trait ParticipantsVecExt {
+    fn group_name_hash(&self) -> String;
+}
+
+impl ParticipantsVecExt for Vec<BareJid> {
+    fn group_name_hash(&self) -> String {
+        let mut sorted_participant_jids =
+            self.iter().map(|jid| jid.to_string()).collect::<Vec<_>>();
+        sorted_participant_jids.sort();
+
+        let mut hasher = Sha1::new();
+        hasher.update(sorted_participant_jids.join(","));
+        format!("{}.{:x}", room_handling::GROUP_PREFIX, hasher.finalize())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prose_xmpp::jid_str;
+
+    #[test]
+    fn test_group_name_for_participants() {
+        assert_eq!(
+            vec![
+                jid_str!("a@prose.org").into_bare(),
+                jid_str!("b@prose.org").into_bare(),
+                jid_str!("c@prose.org").into_bare()
+            ]
+            .group_name_hash(),
+            "org.prose.group.7c138d7281db96e0d42fe026a4195c85a7dc2cae".to_string()
+        );
+
+        assert_eq!(
+            vec![
+                jid_str!("a@prose.org").into_bare(),
+                jid_str!("b@prose.org").into_bare(),
+                jid_str!("c@prose.org").into_bare()
+            ]
+            .group_name_hash(),
+            vec![
+                jid_str!("c@prose.org").into_bare(),
+                jid_str!("a@prose.org").into_bare(),
+                jid_str!("b@prose.org").into_bare()
+            ]
+            .group_name_hash()
+        )
     }
 }

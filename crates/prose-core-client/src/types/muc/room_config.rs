@@ -3,20 +3,32 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::types::muc::{RoomSettings, RoomValidationError};
 use crate::util::form_config::{FormValue, Value};
 use crate::util::{form_config, FormConfig};
 use jid::BareJid;
 use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::ns::roomconfig as cfg;
+use std::sync::Arc;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct RoomConfig {
     config: FormConfig,
+    validate: Arc<dyn Fn(&RoomSettings) -> Result<(), RoomValidationError> + Send + Sync>,
 }
 
 impl RoomConfig {
-    pub fn group(name: impl AsRef<str>, participants: &[BareJid]) -> Self {
+    pub fn validate(&self, settings: &RoomSettings) -> Result<(), RoomValidationError> {
+        (self.validate)(settings)
+    }
+}
+
+impl RoomConfig {
+    pub fn group<'a>(
+        name: impl AsRef<str>,
+        participants: impl IntoIterator<Item = &'a BareJid>,
+    ) -> Self {
         RoomConfig {
             config: FormConfig::new([
                 FormValue::optional(cfg::ALLOW_INVITES, Value::Boolean(false)),
@@ -44,7 +56,12 @@ impl RoomConfig {
                 FormValue::optional(cfg::PUBSUB, Value::None),
                 FormValue::optional(
                     cfg::ROOM_ADMINS,
-                    Value::JidMulti(participants.iter().map(|jid| jid.clone().into()).collect()),
+                    Value::JidMulti(
+                        participants
+                            .into_iter()
+                            .map(|jid| jid.clone().into())
+                            .collect(),
+                    ),
                 ),
                 FormValue::optional(cfg::ROOM_DESC, Value::None),
                 FormValue::optional(cfg::ROOM_NAME, Value::TextSingle(name.as_ref().to_string())),
@@ -56,6 +73,7 @@ impl RoomConfig {
                 FormValue::optional(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
                 FormValue::optional(cfg::PUBLIC_ROOM, Value::Boolean(false)),
             ]),
+            validate: Arc::new(|settings| settings.features.validate_as_group()),
         }
     }
 
@@ -96,6 +114,7 @@ impl RoomConfig {
                 FormValue::optional(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
                 FormValue::optional(cfg::PUBLIC_ROOM, Value::Boolean(false)),
             ]),
+            validate: Arc::new(|settings| settings.features.validate_as_private_channel()),
         }
     }
 
@@ -136,6 +155,7 @@ impl RoomConfig {
                 FormValue::optional(cfg::PERSISTENT_ROOM, Value::Boolean(true)),
                 FormValue::optional(cfg::PUBLIC_ROOM, Value::Boolean(true)),
             ]),
+            validate: Arc::new(|settings| settings.features.validate_as_public_channel()),
         }
     }
 }

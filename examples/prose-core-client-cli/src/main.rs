@@ -120,6 +120,7 @@ fn prompt_full_jid<'a>(default: impl Into<Option<&'a FullJid>>) -> FullJid {
     FullJid::from_str(&input).unwrap()
 }
 
+#[allow(dead_code)]
 fn prompt_jid<'a>(default: impl Into<Option<&'a Jid>>) -> Jid {
     let input = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter (full or bare) jid")
@@ -578,7 +579,7 @@ impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
 
 impl Delegate {
     async fn _handle_event(
-        client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
+        _client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
         event: ClientEvent<SQLiteCache, FsAvatarCache>,
     ) -> Result<()> {
         match event {
@@ -729,7 +730,7 @@ async fn main() -> Result<()> {
             }
             Selection::CreateGroup => {
                 let contacts = select_multiple_contacts(&client).await?;
-                client.create_group(contacts.as_slice()).await?;
+                client.create_direct_message(contacts.as_slice()).await?;
             }
             Selection::CreatePublicChannel => {
                 let room_name = prompt_string("Enter a name for the channel:");

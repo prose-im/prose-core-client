@@ -109,6 +109,7 @@ impl Features {
                 expect!(feat::PERSISTENT, self.is_persistent, true),
                 expect!(feat::HIDDEN, self.is_hidden, true),
                 expect!(feat::MEMBERS_ONLY, self.is_members_only, true),
+                expect!(feat::NON_ANONYMOUS, self.is_nonanonymous, true),
                 expect!(
                     muc::ns::roomconfig::ALLOW_INVITES,
                     self.is_invites_allowed,

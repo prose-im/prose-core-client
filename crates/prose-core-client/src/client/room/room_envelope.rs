@@ -122,12 +122,8 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
         })
     }
 
-    pub fn jid(&self) -> &BareJid {
-        unwrap_room!(self, jid())
-    }
-
-    pub fn user_nickname(&self) -> &str {
-        unwrap_room!(self, user_nickname())
+    pub fn name(&self) -> Option<&str> {
+        unwrap_room!(self, name())
     }
 
     pub async fn handle_presence(&self, presence: Presence) -> Result<()> {

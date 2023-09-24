@@ -238,10 +238,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             }
 
             *self.inner.muc_service.write() = Some(muc::Service {
-                user_jid: self.connected_jid()?.into_bare(),
-                client: self.client.clone(),
                 jid: item.jid.into_bare(),
-                id_provider: self.inner.id_provider.clone(),
             });
             break;
         }
