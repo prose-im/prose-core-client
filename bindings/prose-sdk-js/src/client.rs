@@ -6,11 +6,13 @@
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    Availability, BareJid, BareJidArray, Channel, ChannelsArray, Contact, ContactsArray,
-    IntoJSArray, RoomsArray, UserMetadata, UserProfile,
+    Availability, BareJid, BareJidArray, Channel, ChannelsArray, ConnectedRoomExt, Contact,
+    ContactsArray, IntoJSArray, RoomsArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
+use core::str::FromStr;
 use jid::ResourcePart;
+use js_sys::Array;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::types::{SoftwareVersion, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
@@ -179,6 +181,51 @@ impl Client {
             .into_iter()
             .map(Channel::from)
             .collect_into_js_array::<ChannelsArray>())
+    }
+
+    /// Currently creates a group and returns the created `Room`. Pass a String[] as participants,
+    /// where each string is a valid BareJid.
+    #[wasm_bindgen(js_name = "createGroup")]
+    pub async fn create_group(&self, participants: Array) -> Result<JsValue> {
+        let participants = participants
+            .into_iter()
+            .map(|value| {
+                value
+                    .as_string()
+                    .ok_or(anyhow::format_err!(
+                        "Could not read String from supposed String Array"
+                    ))
+                    .and_then(|str| jid::BareJid::from_str(&str).map_err(Into::into))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(WasmError::from)?;
+
+        Ok(self
+            .client
+            .create_direct_message(participants.as_slice())
+            .await
+            .map_err(WasmError::from)?
+            .into_js_value())
+    }
+
+    #[wasm_bindgen(js_name = "createPublicChannel")]
+    pub async fn create_public_channel(&self, channel_name: &str) -> Result<JsValue> {
+        Ok(self
+            .client
+            .create_public_channel(channel_name)
+            .await
+            .map_err(WasmError::from)?
+            .into_js_value())
+    }
+
+    #[wasm_bindgen(js_name = "createPrivateChannel")]
+    pub async fn create_private_channel(&self, channel_name: &str) -> Result<JsValue> {
+        Ok(self
+            .client
+            .create_private_channel(channel_name)
+            .await
+            .map_err(WasmError::from)?
+            .into_js_value())
     }
 
     /// XEP-0108: User Activity

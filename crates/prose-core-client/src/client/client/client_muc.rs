@@ -40,20 +40,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .connected_rooms
             .read()
             .values()
-            .filter_map(|envelope| match envelope {
-                RoomEnvelope::Pending(_) => None,
-                RoomEnvelope::DirectMessage(room) => {
-                    Some(ConnectedRoom::DirectMessage(room.clone()))
-                }
-                RoomEnvelope::Group(room) => Some(ConnectedRoom::Group(room.clone())),
-                RoomEnvelope::PrivateChannel(room) => {
-                    Some(ConnectedRoom::PrivateChannel(room.clone()))
-                }
-                RoomEnvelope::PublicChannel(room) => {
-                    Some(ConnectedRoom::PublicChannel(room.clone()))
-                }
-                RoomEnvelope::Generic(room) => Some(ConnectedRoom::Generic(room.clone())),
-            })
+            .filter_map(|envelope| ConnectedRoom::try_from(envelope.clone()).ok())
             .collect()
     }
 
@@ -62,69 +49,81 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         muc_mod.load_public_rooms(&self.muc_service()?.jid).await
     }
 
-    pub async fn create_direct_message(&self, participants: &[BareJid]) -> Result<()> {
+    pub async fn create_direct_message(
+        &self,
+        participants: &[BareJid],
+    ) -> Result<ConnectedRoom<D, A>> {
         if participants.is_empty() {
             bail!("Group must have at least one other participant.")
         }
 
-        self.create_or_join_room(CreateOrEnterRoomRequest {
-            r#type: CreateOrEnterRoomRequestType::Create {
-                service: self.muc_service()?.jid,
-                room_type: CreateRoomType::Group {
-                    participants: participants.to_vec(),
-                    send_invites: true,
+        let room = self
+            .create_or_join_room(CreateOrEnterRoomRequest {
+                r#type: CreateOrEnterRoomRequestType::Create {
+                    service: self.muc_service()?.jid,
+                    room_type: CreateRoomType::Group {
+                        participants: participants.to_vec(),
+                        send_invites: true,
+                    },
                 },
-            },
-            save_bookmark: true,
-            notify_delegate: false,
-        })
-        .await?;
+                save_bookmark: true,
+                notify_delegate: false,
+            })
+            .await?;
 
-        Ok(())
+        Ok(room)
     }
 
-    pub async fn create_private_channel(&self, channel_name: impl AsRef<str>) -> Result<()> {
+    pub async fn create_private_channel(
+        &self,
+        channel_name: impl AsRef<str>,
+    ) -> Result<ConnectedRoom<D, A>> {
         // Create room…
         info!(
             "Creating private channel with name {}…",
             channel_name.as_ref()
         );
 
-        self.create_or_join_room(CreateOrEnterRoomRequest {
-            r#type: CreateOrEnterRoomRequestType::Create {
-                service: self.muc_service()?.jid,
-                room_type: CreateRoomType::PrivateChannel {
-                    name: channel_name.as_ref().to_string(),
+        let room = self
+            .create_or_join_room(CreateOrEnterRoomRequest {
+                r#type: CreateOrEnterRoomRequestType::Create {
+                    service: self.muc_service()?.jid,
+                    room_type: CreateRoomType::PrivateChannel {
+                        name: channel_name.as_ref().to_string(),
+                    },
                 },
-            },
-            save_bookmark: true,
-            notify_delegate: false,
-        })
-        .await?;
+                save_bookmark: true,
+                notify_delegate: false,
+            })
+            .await?;
 
-        Ok(())
+        Ok(room)
     }
 
-    pub async fn create_public_channel(&self, channel_name: impl AsRef<str>) -> Result<()> {
+    pub async fn create_public_channel(
+        &self,
+        channel_name: impl AsRef<str>,
+    ) -> Result<ConnectedRoom<D, A>> {
         // Create room…
         info!(
             "Creating public channel with name {}…",
             channel_name.as_ref()
         );
 
-        self.create_or_join_room(CreateOrEnterRoomRequest {
-            r#type: CreateOrEnterRoomRequestType::Create {
-                service: self.muc_service()?.jid,
-                room_type: CreateRoomType::PublicChannel {
-                    name: channel_name.as_ref().to_string(),
+        let room = self
+            .create_or_join_room(CreateOrEnterRoomRequest {
+                r#type: CreateOrEnterRoomRequestType::Create {
+                    service: self.muc_service()?.jid,
+                    room_type: CreateRoomType::PublicChannel {
+                        name: channel_name.as_ref().to_string(),
+                    },
                 },
-            },
-            save_bookmark: true,
-            notify_delegate: false,
-        })
-        .await?;
+                save_bookmark: true,
+                notify_delegate: false,
+            })
+            .await?;
 
-        Ok(())
+        Ok(room)
     }
 }
 
@@ -203,7 +202,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             save_bookmark: false,
             notify_delegate: false,
         })
-        .await
+        .await?;
+        Ok(())
     }
 
     pub(super) async fn remove_and_publish_bookmarks(&self, jids: &[BareJid]) -> Result<()> {
@@ -331,7 +331,7 @@ mod room_handling {
                 save_bookmark,
                 notify_delegate,
             }: CreateOrEnterRoomRequest,
-        ) -> Result<(), RequestError> {
+        ) -> Result<ConnectedRoom<D, A>, RequestError> {
             let user_jid = self
                 .connected_jid()
                 .map_err(|err| RequestError::Generic {
@@ -433,7 +433,7 @@ mod room_handling {
 
             let room_name = room.name().map(ToString::to_string);
 
-            connected_rooms.insert(room_jid.to_bare(), room);
+            connected_rooms.insert(room_jid.to_bare(), room.clone());
 
             if save_bookmark {
                 let bookmark = ConferenceBookmark {
@@ -460,7 +460,11 @@ mod room_handling {
                 self.send_event(ClientEvent::RoomsChanged)
             }
 
-            Ok(())
+            Ok(
+                ConnectedRoom::try_from(room).map_err(|err| RequestError::Generic {
+                    msg: err.to_string(),
+                })?,
+            )
         }
 
         async fn join_room_by_resolving_nickname_conflict(

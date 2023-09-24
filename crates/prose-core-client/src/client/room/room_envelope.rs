@@ -266,3 +266,20 @@ impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for R
         Self::DirectMessage(room)
     }
 }
+
+impl<D: DataCache, A: AvatarCache> TryFrom<RoomEnvelope<D, A>> for ConnectedRoom<D, A> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RoomEnvelope<D, A>) -> std::result::Result<Self, Self::Error> {
+        match value {
+            RoomEnvelope::Pending(_) => {
+                bail!("Cannot convert RoomEnvelope::Pending to ConnectedRoom")
+            }
+            RoomEnvelope::DirectMessage(room) => Ok(ConnectedRoom::DirectMessage(room)),
+            RoomEnvelope::Group(room) => Ok(ConnectedRoom::Group(room)),
+            RoomEnvelope::PrivateChannel(room) => Ok(ConnectedRoom::PrivateChannel(room)),
+            RoomEnvelope::PublicChannel(room) => Ok(ConnectedRoom::PublicChannel(room)),
+            RoomEnvelope::Generic(room) => Ok(ConnectedRoom::Generic(room)),
+        }
+    }
+}
