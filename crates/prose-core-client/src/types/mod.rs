@@ -6,7 +6,6 @@
 pub use account_settings::AccountSettings;
 pub use availability::Availability;
 pub use avatar_metadata::AvatarMetadata;
-pub(crate) use bookmarks::Bookmarks;
 pub use capabilities::{Capabilities, Feature};
 pub use connected_room::ConnectedRoom;
 pub use contact::Contact;
@@ -22,7 +21,6 @@ pub use user_profile::{Address, Url, UserProfile};
 mod account_settings;
 mod availability;
 mod avatar_metadata;
-mod bookmarks;
 mod capabilities;
 mod connected_room;
 mod contact;

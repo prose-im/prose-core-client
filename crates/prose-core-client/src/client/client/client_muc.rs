@@ -7,7 +7,7 @@ use crate::avatar_cache::AvatarCache;
 use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
 use crate::types::muc::{BookmarkMetadata, RoomMetadata, RoomSettings};
-use crate::types::{muc, Bookmarks, ConnectedRoom};
+use crate::types::{muc, ConnectedRoom};
 use crate::util::StringExt;
 use crate::ClientEvent;
 use anyhow::{bail, Result};
@@ -16,7 +16,7 @@ use prose_xmpp::stanza::muc::{mediated_invite, DirectInvite, MediatedInvite};
 use prose_xmpp::stanza::ConferenceBookmark;
 use prose_xmpp::Client as XMPPClient;
 use prose_xmpp::{mods, RequestError};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::iter;
 use tracing::info;
@@ -201,16 +201,14 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub(super) async fn load_bookmarks(&self) -> Result<Bookmarks> {
+    pub(super) async fn load_bookmarks(&self) -> Result<HashMap<BareJid, ConferenceBookmark>> {
         let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
-        let bookmark2_mod = self.client.get_mod::<mods::Bookmark2>();
-
-        let bookmarks = Bookmarks::new(
-            bookmark_mod.load_bookmarks().await?,
-            bookmark2_mod.load_bookmarks().await?,
-        );
-
-        Ok(bookmarks)
+        Ok(bookmark_mod
+            .load_bookmarks()
+            .await?
+            .into_iter()
+            .map(|bookmark| (bookmark.jid.to_bare(), bookmark))
+            .collect())
     }
 
     pub(super) async fn handle_direct_invite(
@@ -317,51 +315,28 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         info!("Deleting {} bookmarks…", jids.len());
         let mut bookmarks = self.inner.bookmarks.write();
         let bookmarks_to_delete = jids.iter().collect::<HashSet<_>>();
+        let bookmarks_len = bookmarks.len();
 
-        let bookmarks_len = bookmarks.bookmarks.len();
-        let bookmarks2_len = bookmarks.bookmarks.len();
+        bookmarks.retain(|jid, _| !bookmarks_to_delete.contains(jid));
 
-        bookmarks
-            .bookmarks
-            .retain(|jid, _| !bookmarks_to_delete.contains(jid));
-        bookmarks
-            .bookmarks2
-            .retain(|jid, _| !bookmarks_to_delete.contains(jid));
+        if bookmarks.len() == bookmarks_len {
+            return Ok(());
+        }
 
-        let needs_save = bookmarks.bookmarks.len() != bookmarks_len;
-        let needs_save2 = bookmarks.bookmarks2.len() != bookmarks2_len;
+        let bookmarks_to_publish = bookmarks.values().cloned().collect::<Vec<_>>();
         drop(bookmarks);
 
-        if needs_save {
-            info!("Publishing old-style bookmarks…");
-            let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
-            let guard = self.inner.bookmarks.read();
-            let bookmarks = guard.bookmarks.values().cloned();
-            bookmark_mod.publish_bookmarks(bookmarks).await?;
-        }
-
-        if needs_save2 {
-            info!("Publishing new-style bookmark…");
-            let bookmark_mod = self.client.get_mod::<mods::Bookmark2>();
-            for jid in jids {
-                bookmark_mod.retract_bookmark(jid.clone().into()).await?;
-            }
-        }
-
+        info!("Publishing bookmarks…");
+        let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
+        bookmark_mod.publish_bookmarks(bookmarks_to_publish).await?;
         Ok(())
     }
 }
 
 #[cfg(feature = "debug")]
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub async fn load_bookmarks_dbg(
-        &self,
-    ) -> Result<(Vec<ConferenceBookmark>, Vec<ConferenceBookmark>)> {
-        let bookmarks = self.load_bookmarks().await?;
-        Ok((
-            bookmarks.bookmarks.values().cloned().collect(),
-            bookmarks.bookmarks2.values().cloned().collect(),
-        ))
+    pub async fn load_bookmarks_dbg(&self) -> Result<Vec<ConferenceBookmark>> {
+        Ok(self.load_bookmarks().await?.values().cloned().collect())
     }
 
     pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
@@ -475,33 +450,18 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         info!("Inserting bookmark {}…", bare_jid);
         let mut bookmarks = self.inner.bookmarks.write();
 
-        let needs_save = bookmarks.bookmarks.get(&bare_jid) != Some(&bookmark);
-        let needs_save2 = bookmarks.bookmarks2.get(&bare_jid) != Some(&bookmark);
+        if bookmarks.get(&bare_jid) == Some(&bookmark) {
+            return Ok(());
+        }
 
-        bookmarks
-            .bookmarks
-            .insert(bare_jid.clone(), bookmark.clone());
-        bookmarks
-            .bookmarks2
-            .insert(bare_jid.clone(), bookmark.clone());
+        bookmarks.insert(bare_jid, bookmark);
+
+        let bookmarks_to_publish = bookmarks.values().cloned().collect::<Vec<_>>();
         drop(bookmarks);
 
-        if needs_save {
-            info!("Publishing old-style bookmarks…");
-            let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
-            let guard = self.inner.bookmarks.read();
-            let bookmarks = guard.bookmarks.values().cloned();
-            bookmark_mod.publish_bookmarks(bookmarks).await?;
-        }
-
-        if needs_save2 {
-            info!("Publishing new-style bookmark…");
-            let bookmark_mod = self.client.get_mod::<mods::Bookmark2>();
-            bookmark_mod
-                .publish_bookmark(bare_jid.into(), bookmark.conference)
-                .await?;
-        }
-
+        info!("Publishing bookmarks…");
+        let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
+        bookmark_mod.publish_bookmarks(bookmarks_to_publish).await?;
         Ok(())
     }
 }

@@ -16,13 +16,14 @@ use tracing::{error, info, instrument};
 use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_xmpp::mods::{Chat, Status};
+use prose_xmpp::stanza::ConferenceBookmark;
 use prose_xmpp::{mods, ConnectionError, IDProvider};
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
-use crate::types::{muc, Bookmarks};
+use crate::types::muc;
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
 use crate::{CachePolicy, ClientDelegate, ClientEvent, ConnectionEvent};
@@ -49,7 +50,7 @@ pub(in crate::client) struct ClientInner<D: DataCache + 'static, A: AvatarCache 
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
     pub presences: RwLock<PresenceMap>,
     pub muc_service: RwLock<Option<muc::Service>>,
-    pub bookmarks: RwLock<Bookmarks>,
+    pub bookmarks: RwLock<HashMap<BareJid, ConferenceBookmark>>,
     pub connected_rooms: RwLock<HashMap<BareJid, RoomEnvelope<D, A>>>,
 }
 
@@ -153,10 +154,10 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         };
         let mut invalid_bookmarks = vec![];
 
-        for bookmark in bookmarks.iter() {
+        for (jid, bookmark) in bookmarks.iter() {
             let result = self
                 .enter_room(
-                    &bookmark.jid.to_bare(),
+                    &jid,
                     bookmark.conference.nick.as_deref(),
                     bookmark.conference.password.as_deref(),
                 )

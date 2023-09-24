@@ -772,30 +772,20 @@ async fn main() -> Result<()> {
                 client.destroy_room(&rooms[selection].jid).await?;
             }
             Selection::LoadBookmarks => {
-                let bookmarks = client.load_bookmarks_dbg().await?;
-
-                let bookmarks1 = bookmarks
-                    .0
+                let bookmarks = client
+                    .load_bookmarks_dbg()
+                    .await?
                     .into_iter()
                     .map(BookmarkEnvelope)
                     .map(|b| b.to_string())
                     .collect::<Vec<_>>();
 
-                let bookmarks2 = bookmarks
-                    .1
-                    .into_iter()
-                    .map(BookmarkEnvelope)
-                    .map(|b| b.to_string())
-                    .collect::<Vec<_>>();
-
-                println!("Old-style bookmarks:\n{}", bookmarks1.join("\n"));
-                println!("New-style bookmarks:\n{}", bookmarks2.join("\n"));
+                println!("Bookmarks:\n{}", bookmarks.join("\n"));
             }
             Selection::DeleteBookmark => {
                 let bookmarks = client
                     .load_bookmarks_dbg()
                     .await?
-                    .0
                     .into_iter()
                     .map(BookmarkEnvelope)
                     .collect::<Vec<_>>();
