@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use chrono::Utc;
 use jid::{BareJid, Jid};
 use std::sync::atomic::Ordering;
 use tracing::{debug, error};
@@ -18,7 +17,7 @@ use prose_xmpp::{client, mods, Event, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::message_like::{Payload, TimestampedMessage};
+use crate::types::message_like::Payload;
 use crate::types::{AvatarMetadata, ConnectedRoom, MessageLike, UserProfile};
 use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
 
@@ -165,7 +164,7 @@ impl ReceivedMessage {
         }
     }
 
-    pub fn from(&self) -> Option<BareJid> {
+    pub fn sender(&self) -> Option<BareJid> {
         match &self {
             ReceivedMessage::Message(message) => message.from.as_ref().map(|jid| jid.to_bare()),
             ReceivedMessage::Carbon(Carbon::Received(message)) => message
@@ -176,7 +175,7 @@ impl ReceivedMessage {
             ReceivedMessage::Carbon(Carbon::Sent(message)) => message
                 .stanza
                 .as_ref()
-                .and_then(|message| message.from.as_ref())
+                .and_then(|message| message.to.as_ref())
                 .map(|jid| jid.to_bare()),
         }
     }
@@ -192,36 +191,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             inner: self.inner.clone(),
         };
         delegate.handle_event(client, event);
-    }
-
-    pub(in crate::client) fn send_event_for_message(
-        &self,
-        room: ConnectedRoom<D, A>,
-        message: &MessageLike,
-    ) {
-        if self.inner.delegate.is_none() {
-            return;
-        }
-
-        let event = if let Some(ref target) = message.target {
-            if message.payload == Payload::Retraction {
-                ClientEvent::MessagesDeleted {
-                    room,
-                    message_ids: vec![target.as_ref().into()],
-                }
-            } else {
-                ClientEvent::MessagesUpdated {
-                    room,
-                    message_ids: vec![target.as_ref().into()],
-                }
-            }
-        } else {
-            ClientEvent::MessagesAppended {
-                room,
-                message_ids: vec![message.id.id().as_ref().into()],
-            }
-        };
-        self.send_event(event)
     }
 
     async fn vcard_did_change(&self, from: Jid, vcard: VCard4) -> Result<()> {
@@ -353,8 +322,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn did_receive_message(&self, message: ReceivedMessage) -> Result<()> {
-        let Some(from) = message.from() else {
-            error!("Received message without 'from'");
+        let Some(from) = message.sender() else {
+            error!("Received message from unknown sender.");
             return Ok(());
         };
 
@@ -363,24 +332,28 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             return Ok(());
         };
 
-        room.handle_message(message).await?;
+        room.handle_received_message(message).await?;
         return Ok(());
     }
 
     async fn did_send_message(&self, message: Message) -> Result<()> {
-        // TODO: Inject date from outside for testing
-        let timestamped_message = TimestampedMessage {
-            message,
-            timestamp: Utc::now().into(),
+        let Some(to) = &message.to else {
+            error!("Sent message to unknown recipient.");
+            return Ok(());
         };
 
-        let message = MessageLike::try_from(timestamped_message)?;
+        let Some(room) = self
+            .inner
+            .connected_rooms
+            .read()
+            .get(&to.to_bare())
+            .cloned()
+        else {
+            error!("Sent message to recipient for which we do not have a room.");
+            return Ok(());
+        };
 
-        debug!("Caching sent message…");
-        self.inner.data_cache.insert_messages([&message]).await?;
-        // self.send_event_for_message(&message.to, &message);
-        // todo!("FIXME");
-
+        room.handle_sent_message(message).await?;
         Ok(())
     }
 }
@@ -393,5 +366,31 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         map.get_highest_presence(&from.to_bare())
             .map(|entry| entry.presence.clone())
             .unwrap_or(types::Presence::unavailable())
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> ClientEvent<D, A> {
+    pub(in crate::client) fn event_for_message(
+        room: ConnectedRoom<D, A>,
+        message: &MessageLike,
+    ) -> Self {
+        if let Some(ref target) = message.target {
+            if message.payload == Payload::Retraction {
+                ClientEvent::MessagesDeleted {
+                    room,
+                    message_ids: vec![target.as_ref().into()],
+                }
+            } else {
+                ClientEvent::MessagesUpdated {
+                    room,
+                    message_ids: vec![target.as_ref().into()],
+                }
+            }
+        } else {
+            ClientEvent::MessagesAppended {
+                room,
+                message_ids: vec![message.id.id().as_ref().into()],
+            }
+        }
     }
 }

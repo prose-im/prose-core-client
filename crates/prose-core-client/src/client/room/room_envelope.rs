@@ -21,6 +21,7 @@ use crate::room::room::{RoomInner, RoomInnerMut};
 use crate::types::muc::RoomMetadata;
 use crate::types::{ConnectedRoom, Contact};
 use crate::Client;
+use prose_xmpp::stanza::Message;
 use prose_xmpp::Client as XMPPClient;
 
 pub(in crate::client) enum RoomEnvelope<D: DataCache + 'static, A: AvatarCache + 'static> {
@@ -116,7 +117,7 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
                 message_type: Default::default(),
                 members: vec![],
             }),
-            to_connected_room: Arc::new(|_| unreachable!()),
+            to_connected_room: Arc::new(|_| Err(())),
             inner_mut: Default::default(),
             _type: Default::default(),
         })
@@ -130,8 +131,12 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
         unwrap_room!(self, handle_presence(presence).await)
     }
 
-    pub async fn handle_message(&self, message: ReceivedMessage) -> Result<()> {
-        unwrap_room!(self, handle_message(message).await)
+    pub async fn handle_received_message(&self, message: ReceivedMessage) -> Result<()> {
+        unwrap_room!(self, handle_received_message(message).await)
+    }
+
+    pub async fn handle_sent_message(&self, message: Message) -> Result<()> {
+        unwrap_room!(self, handle_sent_message(message).await)
     }
 
     pub fn promote_to_permanent_room(self, metadata: RoomMetadata) -> Result<Self> {
@@ -193,7 +198,10 @@ impl<D: DataCache, A: AvatarCache>
                 RoomInnerMut,
             ),
             message_type: MessageType,
-            to_connected_room: impl Fn(Room<Kind, D, A>) -> ConnectedRoom<D, A> + Send + Sync + 'static,
+            to_connected_room: impl Fn(Room<Kind, D, A>) -> Result<ConnectedRoom<D, A>, ()>
+                + Send
+                + Sync
+                + 'static,
         ) -> Room<Kind, D, A> {
             let (metadata, user_jid, xmpp, client, inner_mut) = value;
 
@@ -218,26 +226,24 @@ impl<D: DataCache, A: AvatarCache>
         let features = &value.0.settings.features;
 
         match features {
-            _ if features.can_act_as_group() => Self::Group(make_room(
-                value,
-                MessageType::Groupchat,
-                ConnectedRoom::Group,
-            )),
-            _ if features.can_act_as_private_channel() => Self::PrivateChannel(make_room(
-                value,
-                MessageType::Groupchat,
-                ConnectedRoom::PrivateChannel,
-            )),
-            _ if features.can_act_as_public_channel() => Self::PublicChannel(make_room(
-                value,
-                MessageType::Groupchat,
-                ConnectedRoom::PublicChannel,
-            )),
-            _ => Self::Generic(make_room(
-                value,
-                MessageType::Groupchat,
-                ConnectedRoom::Generic,
-            )),
+            _ if features.can_act_as_group() => {
+                Self::Group(make_room(value, MessageType::Groupchat, |room| {
+                    Ok(ConnectedRoom::Group(room))
+                }))
+            }
+            _ if features.can_act_as_private_channel() => {
+                Self::PrivateChannel(make_room(value, MessageType::Groupchat, |room| {
+                    Ok(ConnectedRoom::PrivateChannel(room))
+                }))
+            }
+            _ if features.can_act_as_public_channel() => {
+                Self::PublicChannel(make_room(value, MessageType::Groupchat, |room| {
+                    Ok(ConnectedRoom::PublicChannel(room))
+                }))
+            }
+            _ => Self::Generic(make_room(value, MessageType::Groupchat, |room| {
+                Ok(ConnectedRoom::Generic(room))
+            })),
         }
     }
 }
@@ -259,7 +265,7 @@ impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for R
                 members: vec![contact.jid],
             }),
             inner_mut: Default::default(),
-            to_connected_room: Arc::new(|room| ConnectedRoom::DirectMessage(room)),
+            to_connected_room: Arc::new(|room| Ok(ConnectedRoom::DirectMessage(room))),
             _type: Default::default(),
         };
 

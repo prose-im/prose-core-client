@@ -3,9 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use core::str::FromStr;
 use crate::client::WasmError;
 use anyhow::anyhow;
+use core::str::FromStr;
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
@@ -98,14 +98,13 @@ impl TryFrom<&StringArray> for Vec<String> {
 }
 
 pub fn try_jid_vec_from_string_array(arr: Array) -> Result<Vec<jid::BareJid>, WasmError> {
-    arr
-        .into_iter()
+    arr.into_iter()
         .map(|value| {
             value
                 .as_string()
                 .ok_or(anyhow::format_err!(
-                        "Could not read String from supposed String Array"
-                    ))
+                    "Could not read String from supposed String Array"
+                ))
                 .and_then(|str| jid::BareJid::from_str(&str).map_err(Into::into))
         })
         .collect::<Result<Vec<_>, _>>()

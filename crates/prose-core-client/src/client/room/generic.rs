@@ -21,7 +21,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         Room {
             inner: self.inner.clone(),
             inner_mut: self.inner_mut.clone(),
-            to_connected_room: Arc::new(|room| ConnectedRoom::Generic(room)),
+            to_connected_room: Arc::new(|room| Ok(ConnectedRoom::Generic(room))),
             _type: Default::default(),
         }
     }

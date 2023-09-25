@@ -10,13 +10,12 @@ use crate::types::message_like::TimestampedMessage;
 use crate::types::{ConnectedRoom, Message, MessageId, MessageLike};
 use crate::{Client, ClientEvent};
 use anyhow::{format_err, Result};
-use chrono::Utc;
 use jid::BareJid;
 use minidom::Element;
 use parking_lot::RwLock;
 use prose_xmpp::stanza::message;
-use prose_xmpp::stanza::message::ChatState;
-use prose_xmpp::{mods, Client as XMPPClient};
+use prose_xmpp::stanza::message::{ChatState, Message as XMPPMessage};
+use prose_xmpp::{mods, Client as XMPPClient, TimeProvider};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -36,7 +35,9 @@ pub struct Occupant {
 pub struct Room<Kind, D: DataCache + 'static, A: AvatarCache + 'static> {
     pub(super) inner: Arc<RoomInner<D, A>>,
     pub(super) inner_mut: Arc<RwLock<RoomInnerMut>>,
-    pub(super) to_connected_room: Arc<dyn Fn(Self) -> ConnectedRoom<D, A> + Send + Sync>,
+    /// Converts Room to a ConnectedRoom unless Room is pending.
+    pub(super) to_connected_room:
+        Arc<dyn Fn(Self) -> Result<ConnectedRoom<D, A>, ()> + Send + Sync>,
     pub(super) _type: PhantomData<Kind>,
 }
 
@@ -108,7 +109,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         Ok(())
     }
 
-    pub(super) async fn handle_message(&self, message: ReceivedMessage) -> Result<()> {
+    pub(super) async fn handle_received_message(&self, message: ReceivedMessage) -> Result<()> {
         if let ReceivedMessage::Message(message) = &message {
             if let Some(subject) = &message.subject {
                 self.inner_mut.write().subject = if subject.is_empty() {
@@ -137,7 +138,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         }
 
         let message_is_carbon = message.is_carbon();
-        let now = Utc::now();
+        let now = self.inner.client.time_provider.now();
 
         let parsed_message: Result<MessageLike> = match message {
             ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
@@ -163,11 +164,6 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
             return Ok(());
         }
 
-        let client = Client {
-            client: self.inner.xmpp.clone(),
-            inner: self.inner.client.clone(),
-        };
-
         if let Some(message) = &parsed_message {
             debug!("Caching received message…");
             self.inner
@@ -176,28 +172,16 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
                 .insert_messages([message])
                 .await?;
 
-            // TODO: Fixme
-
-            // let conversation = if message_is_carbon {
-            //     &message.to
-            // } else {
-            //     &message.from
-            // };
-
-            let room = (self.to_connected_room)(self.clone());
-
-            client.send_event_for_message(room, message);
+            self.send_event(|room| ClientEvent::event_for_message(room, &message));
         }
 
         if let Some(chat_state) = chat_state {
-            let room = (self.to_connected_room)(self.clone());
-
             self.inner
                 .client
                 .data_cache
                 .insert_chat_state(&chat_state.from, &chat_state.state)
                 .await?;
-            client.send_event(ClientEvent::ComposingUsersChanged { room })
+            self.send_event(|room| ClientEvent::ComposingUsersChanged { room });
         }
 
         let Some(message) = parsed_message else {
@@ -217,11 +201,49 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         Ok(())
     }
 
+    pub(super) async fn handle_sent_message(&self, message: XMPPMessage) -> Result<()> {
+        let timestamped_message = TimestampedMessage {
+            message,
+            timestamp: self.inner.client.time_provider.now(),
+        };
+
+        let message = MessageLike::try_from(timestamped_message)?;
+
+        debug!("Caching sent message…");
+        self.inner
+            .client
+            .data_cache
+            .insert_messages([&message])
+            .await?;
+
+        self.send_event(|room| ClientEvent::event_for_message(room, &message));
+        Ok(())
+    }
+
     pub(super) async fn load_message(&self, message_id: &message::Id) -> Result<Message> {
         let ids = [MessageId::from(message_id.as_ref())];
         self.load_messages_with_ids(&ids)
             .await?
             .pop()
             .ok_or(format_err!("No message with id {}", ids[0]))
+    }
+}
+
+impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
+    fn send_event(&self, builder: impl FnOnce(ConnectedRoom<D, A>) -> ClientEvent<D, A>) {
+        let client = Client {
+            client: self.inner.xmpp.clone(),
+            inner: self.inner.client.clone(),
+        };
+
+        let room = match (self.to_connected_room)(self.clone()) {
+            Ok(room) => room,
+            Err(_) => {
+                debug!("Not sending event from pending room.");
+                return;
+            }
+        };
+
+        client.send_event(builder(room))
     }
 }
