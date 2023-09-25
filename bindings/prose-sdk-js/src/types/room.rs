@@ -235,6 +235,18 @@ macro_rules! base_room_impl {
                 Ok(())
             }
 
+            #[wasm_bindgen(js_name = "loadComposingUsers")]
+            pub async fn load_composing_users(&self) -> Result<BareJidArray> {
+                Ok(self
+                    .room
+                    .load_composing_users()
+                    .await
+                    .map_err(WasmError::from)?
+                    .into_iter()
+                    .map(BareJid::from)
+                    .collect_into_js_array::<BareJidArray>())
+            }
+
             #[wasm_bindgen(js_name = "saveDraft")]
             pub async fn save_draft(&self, message: Option<String>) -> Result<()> {
                 self.room

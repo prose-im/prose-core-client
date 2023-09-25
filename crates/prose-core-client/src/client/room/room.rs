@@ -10,26 +10,33 @@ use crate::types::message_like::TimestampedMessage;
 use crate::types::{ConnectedRoom, Message, MessageId, MessageLike};
 use crate::{Client, ClientEvent};
 use anyhow::{format_err, Result};
-use jid::BareJid;
-use minidom::Element;
+use chrono::{DateTime, Utc};
+use jid::{BareJid, Jid};
 use parking_lot::RwLock;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{ChatState, Message as XMPPMessage};
-use prose_xmpp::{mods, Client as XMPPClient, TimeProvider};
+use prose_xmpp::{mods, ns, Client as XMPPClient, TimeProvider};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc;
+use xmpp_parsers::muc::user::Affiliation;
+use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
 pub struct Group;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Occupant {
+    /// The real JID of the occupant. Only available in non-anonymous rooms.
+    pub jid: Option<BareJid>,
     pub affiliation: muc::user::Affiliation,
     pub occupant_id: Option<String>,
+    pub chat_state: ChatState,
+    pub chat_state_updated: DateTime<Utc>,
 }
 
 pub struct Room<Kind, D: DataCache + 'static, A: AvatarCache + 'static> {
@@ -52,8 +59,6 @@ pub(super) struct RoomInner<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub user_jid: BareJid,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
-    /// The members of this room (if the room is members-only).
-    pub members: Vec<BareJid>,
 
     pub xmpp: XMPPClient,
     pub client: Arc<ClientInner<D, A>>,
@@ -64,8 +69,28 @@ pub(super) struct RoomInner<D: DataCache + 'static, A: AvatarCache + 'static> {
 pub(super) struct RoomInnerMut {
     /// The room's subject.
     pub subject: Option<String>,
-    /// The occupants of the room.
-    pub occupants: Vec<Occupant>,
+    /// The occupants of the room. The key is either the user's FullJid in a MUC room or the user's
+    /// BareJid in direct message room.
+    pub occupants: HashMap<Jid, Occupant>,
+}
+
+impl RoomInnerMut {
+    pub(super) fn merge_members<'a>(&mut self, members: impl IntoIterator<Item = &'a Jid>) {
+        for member in members.into_iter() {
+            if !self.occupants.contains_key(member) {
+                self.occupants.insert(
+                    member.clone(),
+                    Occupant {
+                        jid: None,
+                        affiliation: Affiliation::Member,
+                        occupant_id: None,
+                        chat_state: ChatState::Inactive,
+                        chat_state_updated: Default::default(),
+                    },
+                );
+            }
+        }
+    }
 }
 
 impl<Kind, D: DataCache, A: AvatarCache> Clone for Room<Kind, D, A> {
@@ -101,11 +126,49 @@ impl<Kind, D: DataCache, A: AvatarCache> PartialEq for Room<Kind, D, A> {
 
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
     pub(super) async fn handle_presence(&self, presence: Presence) -> Result<()> {
-        println!(
-            "{} - {}",
-            self.inner.jid,
-            String::from(&Element::from(presence))
+        let Some(from) = presence.from else {
+            return Ok(());
+        };
+
+        info!(
+            "Received presence from {} in room {}.",
+            from, self.inner.jid
         );
+
+        let Some(muc_user) = presence
+            .payloads
+            .into_iter()
+            .filter_map(|payload| {
+                if !payload.is("x", ns::MUC_USER) {
+                    return None;
+                }
+                MucUser::try_from(payload).ok()
+            })
+            .take(1)
+            .next()
+        else {
+            return Ok(());
+        };
+
+        // Let's try to pull out the real jid of our user…
+        let Some(jid) = muc_user
+            .items
+            .into_iter()
+            .filter_map(|item| item.jid)
+            .take(1)
+            .next()
+        else {
+            return Ok(());
+        };
+
+        info!("Received real jid for {}: {}", from, jid);
+
+        {
+            let mut inner_mut = self.inner_mut.write();
+            let occupant = inner_mut.occupants.entry(from).or_default();
+            occupant.jid = Some(jid.to_bare());
+        }
+
         Ok(())
     }
 
@@ -123,7 +186,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
 
         struct ChatStateEvent {
             state: ChatState,
-            from: BareJid,
+            from: Jid,
         }
 
         let mut chat_state: Option<ChatStateEvent> = None;
@@ -132,7 +195,11 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
             if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
                 chat_state = Some(ChatStateEvent {
                     state: state.clone(),
-                    from: from.to_bare(),
+                    from: if message.r#type == MessageType::Groupchat {
+                        from.clone()
+                    } else {
+                        Jid::Bare(from.to_bare())
+                    },
                 });
             }
         }
@@ -176,11 +243,14 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         }
 
         if let Some(chat_state) = chat_state {
-            self.inner
-                .client
-                .data_cache
-                .insert_chat_state(&chat_state.from, &chat_state.state)
-                .await?;
+            self.inner_mut
+                .write()
+                .occupants
+                .entry(chat_state.from)
+                .and_modify(|occupant| {
+                    occupant.chat_state = chat_state.state;
+                    occupant.chat_state_updated = now.clone().with_timezone(&Utc);
+                });
             self.send_event(|room| ClientEvent::ComposingUsersChanged { room });
         }
 

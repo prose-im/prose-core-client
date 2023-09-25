@@ -23,7 +23,9 @@ id_string!(Id);
 
 // We're redeclaring ChatState here since this makes it easier to work with when saving it to the
 // SQL db.
-#[derive(Debug, PartialEq, Display, EnumString, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, PartialEq, Display, EnumString, Clone, serde::Serialize, serde::Deserialize, Default,
+)]
 #[strum(serialize_all = "lowercase")]
 pub enum ChatState {
     /// User is actively participating in the chat session.
@@ -31,6 +33,7 @@ pub enum ChatState {
     /// User has not been actively participating in the chat session.
     Composing,
     /// User has effectively ended their participation in the chat session.
+    #[default]
     Gone,
     /// User is composing a message.
     Inactive,

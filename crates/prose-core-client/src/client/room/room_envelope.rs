@@ -7,9 +7,10 @@ use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
-use jid::{BareJid, FullJid};
+use jid::{BareJid, FullJid, Jid};
 use parking_lot::lock_api::RwLock;
 use xmpp_parsers::message::MessageType;
+use xmpp_parsers::muc::user::Affiliation;
 use xmpp_parsers::presence::Presence;
 
 use super::Room;
@@ -115,7 +116,6 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
                 xmpp: client.client.clone(),
                 client: client.inner.clone(),
                 message_type: Default::default(),
-                members: vec![],
             }),
             to_connected_room: Arc::new(|_| Err(())),
             inner_mut: Default::default(),
@@ -144,7 +144,8 @@ impl<D: DataCache, A: AvatarCache> RoomEnvelope<D, A> {
             bail!("Cannot promote non-pending room");
         };
 
-        let inner_mut = pending_room.inner_mut.read().clone();
+        let mut inner_mut = pending_room.inner_mut.read().clone();
+        inner_mut.merge_members(metadata.members.iter());
 
         Ok(Self::from((
             metadata,
@@ -203,7 +204,8 @@ impl<D: DataCache, A: AvatarCache>
                 + Sync
                 + 'static,
         ) -> Room<Kind, D, A> {
-            let (metadata, user_jid, xmpp, client, inner_mut) = value;
+            let (metadata, user_jid, xmpp, client, mut inner_mut) = value;
+            inner_mut.merge_members(metadata.members.iter());
 
             Room {
                 inner: Arc::new(RoomInner {
@@ -215,7 +217,6 @@ impl<D: DataCache, A: AvatarCache>
                     xmpp,
                     client,
                     message_type,
-                    members: metadata.members,
                 }),
                 to_connected_room: Arc::new(to_connected_room),
                 inner_mut: Arc::new(RwLock::new(inner_mut)),
@@ -252,6 +253,14 @@ impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for R
     fn from(value: (Contact, FullJid, &Client<D, A>)) -> Self {
         let (contact, user_jid, client) = value;
 
+        let mut inner_mut = RoomInnerMut::default();
+        let occupant = inner_mut
+            .occupants
+            .entry(Jid::Bare(contact.jid.clone()))
+            .or_default();
+        occupant.jid = Some(contact.jid.clone());
+        occupant.affiliation = Affiliation::Owner;
+
         let room = Room {
             inner: Arc::new(RoomInner {
                 jid: contact.jid.clone(),
@@ -262,9 +271,8 @@ impl<D: DataCache, A: AvatarCache> From<(Contact, FullJid, &Client<D, A>)> for R
                 xmpp: client.client.clone(),
                 client: client.inner.clone(),
                 message_type: MessageType::Chat,
-                members: vec![contact.jid],
             }),
-            inner_mut: Default::default(),
+            inner_mut: Arc::new(RwLock::new(inner_mut)),
             to_connected_room: Arc::new(|room| Ok(ConnectedRoom::DirectMessage(room))),
             _type: Default::default(),
         };

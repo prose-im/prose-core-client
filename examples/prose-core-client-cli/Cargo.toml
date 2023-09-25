@@ -10,6 +10,7 @@ anyhow = { workspace = true }
 common = { path = "../common" }
 dialoguer = "0.10.3"
 jid = { workspace = true }
+minidom = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client", features = ["debug"] }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 strum = { workspace = true }

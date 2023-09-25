@@ -11,19 +11,20 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
+use common::{enable_debug_logging, load_credentials, Level};
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
-use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter};
-use url::Url;
-
-use common::{enable_debug_logging, load_credentials, Level};
+use minidom::convert::IntoAttributeValue;
 use prose_core_client::data_cache::sqlite::SQLiteCache;
+use prose_core_client::room::Occupant;
 use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact, Message};
 use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::ConferenceBookmark;
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
+use url::Url;
 
 type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
 
@@ -257,6 +258,28 @@ impl Display for ConnectedRoomEnvelope {
 
 #[derive(Debug)]
 struct BookmarkEnvelope(ConferenceBookmark);
+
+struct OccupantEnvelope(Occupant);
+
+impl Display for OccupantEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:<20} {:<10}",
+            self.0
+                .jid
+                .as_ref()
+                .map(|jid| jid.to_string())
+                .unwrap_or("<unknown real jid>".to_string())
+                .truncate_to(20),
+            self.0
+                .affiliation
+                .clone()
+                .into_attribute_value()
+                .unwrap_or("<no affiliation>".to_string()),
+        )
+    }
+}
 
 impl Display for BookmarkEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -682,6 +705,8 @@ enum Selection {
     ListConnectedRooms,
     #[strum(serialize = "Set room subject")]
     SetRoomSubject,
+    #[strum(serialize = "List occupants in room")]
+    ListRoomOccupants,
     Disconnect,
     Noop,
     Exit,
@@ -834,6 +859,15 @@ async fn main() -> Result<()> {
                     ConnectedRoom::PublicChannel(room) => room.set_subject(Some(&subject)).await,
                     ConnectedRoom::Generic(room) => room.set_subject(Some(&subject)).await,
                 }?;
+            }
+            Selection::ListRoomOccupants => {
+                let room = select_muc_room(&client).await?.to_generic_room();
+                let occupants = room
+                    .occupants()
+                    .into_iter()
+                    .map(|o| OccupantEnvelope(o).to_string())
+                    .collect::<Vec<_>>();
+                println!("{}", occupants.join("\n"))
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

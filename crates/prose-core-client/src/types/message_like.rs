@@ -8,7 +8,6 @@ use chrono::{DateTime, FixedOffset};
 use jid::BareJid;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use xmpp_parsers::Element;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
@@ -267,20 +266,9 @@ impl TryFrom<&Message> for TargetedPayload {
             });
         }
 
-        let fallback = TargetedPayload {
-            target: None,
-            payload: Payload::Message {
-                body: format!(
-                    "Failed to interpret message {}",
-                    String::from(&Element::from(message.clone()))
-                ),
-            },
-        };
-        Ok(fallback)
-
-        // Err(anyhow::format_err!(
-        //     "Failed to interpret message {:?}",
-        //     message
-        // ))
+        Err(anyhow::format_err!(
+            "Failed to interpret message {:?}",
+            message
+        ))
     }
 }

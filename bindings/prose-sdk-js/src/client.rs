@@ -6,8 +6,8 @@
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    try_jid_vec_from_string_array, Availability, BareJid, BareJidArray, Channel, ChannelsArray,
-    ConnectedRoomExt, Contact, ContactsArray, IntoJSArray, RoomsArray, UserMetadata, UserProfile,
+    try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, ConnectedRoomExt,
+    Contact, ContactsArray, IntoJSArray, RoomsArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
 use jid::ResourcePart;
@@ -238,22 +238,6 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(())
-    }
-
-    #[wasm_bindgen(js_name = "loadComposingUsersInConversation")]
-    pub async fn load_composing_users_in_conversation(
-        &self,
-        conversation: &BareJid,
-    ) -> Result<BareJidArray> {
-        let user_jids = self
-            .client
-            .load_composing_users(conversation.as_ref())
-            .await
-            .map_err(WasmError::from)?
-            .into_iter()
-            .map(|jid| BareJid::from(jid))
-            .collect_into_js_array::<BareJidArray>();
-        Ok(user_jids)
     }
 
     #[wasm_bindgen(js_name = "loadContacts")]

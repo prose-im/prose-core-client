@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::{BareJid, FullJid};
+use jid::{FullJid, Jid};
 use xmpp_parsers::muc::user::Status;
 
 use prose_xmpp::mods::muc::RoomOccupancy;
@@ -20,7 +20,7 @@ pub(crate) struct RoomMetadata {
     pub room_jid: FullJid,
     pub occupancy: RoomOccupancy,
     pub settings: RoomSettings,
-    pub members: Vec<BareJid>,
+    pub members: Vec<Jid>,
 }
 
 impl RoomMetadata {

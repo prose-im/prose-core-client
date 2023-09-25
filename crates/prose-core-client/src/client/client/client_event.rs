@@ -252,8 +252,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         // that room handle it…
         let room = self.inner.connected_rooms.read().get(&jid).cloned();
         if let Some(room) = room {
-            room.handle_presence(presence).await?;
-            return Ok(());
+            room.handle_presence(presence.clone()).await?;
         };
 
         // Update user presences with the received one and retrieve the new highest presence…

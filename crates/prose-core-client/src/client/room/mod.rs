@@ -17,4 +17,7 @@ pub use muc::MUC;
 pub use room::{Group, Room};
 pub(super) use room_envelope::RoomEnvelope;
 
+#[cfg(feature = "debug")]
+pub use room::Occupant;
+
 const MESSAGE_PAGE_SIZE: u32 = 50;

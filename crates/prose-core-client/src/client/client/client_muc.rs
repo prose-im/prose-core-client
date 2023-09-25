@@ -607,7 +607,7 @@ mod room_handling {
                 .await
                 .unwrap_or(vec![])
                 .into_iter()
-                .map(|user| user.jid.into_bare())
+                .map(|user| user.jid)
                 .collect::<Vec<_>>();
 
             Ok(RoomMetadata {
@@ -652,6 +652,16 @@ mod room_handling {
             // other participants (other than the creator of the room) are able to do the same without
             // having a bookmark.
             let group_hash = participants_including_self.group_name_hash();
+
+            info!(
+                "Trying to create group {} with participants {}",
+                group_hash,
+                participants_including_self
+                    .iter()
+                    .map(|jid| jid.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
 
             let metadata = self.create_or_join_room_with_config(
                 service,

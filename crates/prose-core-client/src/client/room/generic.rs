@@ -8,10 +8,11 @@ use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
 use crate::types::{ConnectedRoom, Message, MessageId};
 use anyhow::Result;
+use chrono::{Duration, Utc};
 use jid::BareJid;
-use prose_xmpp::mods;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{ChatState, Emoji};
+use prose_xmpp::{mods, TimeProvider};
 use std::sync::Arc;
 
 pub struct Generic {}
@@ -48,8 +49,13 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         self.inner_mut.read().subject.clone()
     }
 
-    pub fn members(&self) -> &[BareJid] {
-        self.inner.members.as_slice()
+    pub fn members(&self) -> Vec<BareJid> {
+        self.inner_mut
+            .read()
+            .occupants
+            .values()
+            .filter_map(|occupant| occupant.jid.clone())
+            .collect()
     }
 }
 
@@ -149,22 +155,25 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         )
     }
 
-    pub async fn load_composing_users(&self, conversation: &BareJid) -> Result<Vec<BareJid>> {
-        // We currently do not support multi-user chats. So either our conversation partner is
-        // typing or they are not.
-        let conversation_partner_is_composing = self
-            .inner
-            .client
-            .data_cache
-            .load_chat_state(conversation)
-            .await?
-            == Some(ChatState::Composing);
+    pub async fn load_composing_users(&self) -> Result<Vec<BareJid>> {
+        let now = self.inner.client.time_provider.now().with_timezone(&Utc);
 
-        if conversation_partner_is_composing {
-            Ok(vec![conversation.clone()])
-        } else {
-            Ok(vec![])
-        }
+        Ok(self
+            .inner_mut
+            .read()
+            .occupants
+            .values()
+            .filter_map(|occupant| {
+                // If the chat state is 'composing' but older than 30 seconds we do not consider
+                // the user as currently typing.
+                if occupant.chat_state != ChatState::Composing
+                    || now - occupant.chat_state_updated > Duration::seconds(30)
+                {
+                    return None;
+                }
+                occupant.jid.clone()
+            })
+            .collect())
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
@@ -183,5 +192,12 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
             .data_cache
             .load_draft(&self.inner.jid)
             .await?)
+    }
+}
+
+#[cfg(feature = "debug")]
+impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
+    pub fn occupants(&self) -> Vec<crate::room::room::Occupant> {
+        self.inner_mut.read().occupants.values().cloned().collect()
     }
 }
