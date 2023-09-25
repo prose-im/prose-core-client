@@ -5,8 +5,11 @@
 
 use super::IntoJSArray;
 use crate::client::WasmError;
-use crate::types::{BareJid, BareJidArray, MessagesArray, StringArray};
+use crate::types::{
+    try_jid_vec_from_string_array, BareJid, BareJidArray, MessagesArray, StringArray,
+};
 use alloc::rc::Rc;
+use js_sys::Array;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
 use prose_core_client::room::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
@@ -50,6 +53,11 @@ export interface RoomMUC {
     setSubject(subject?: string): Promise<void>;
 }
 
+export interface RoomChannel {
+    /// Pass an array of valid BareJid strings.
+    inviteUsers(users: string[]): Promise<void>;
+}
+
 export interface RoomDirectMessage extends RoomBase {
   type: RoomType.DirectMessage;
 }
@@ -58,11 +66,11 @@ export interface RoomGroup extends RoomBase, RoomMUC {
   type: RoomType.Group;
 }
 
-export interface RoomPrivateChannel extends RoomBase, RoomMUC {
+export interface RoomPrivateChannel extends RoomBase, RoomMUC, RoomChannel {
   type: RoomType.PrivateChannel;
 }
 
-export interface RoomPublicChannel extends RoomBase, RoomMUC {
+export interface RoomPublicChannel extends RoomBase, RoomMUC, RoomChannel {
   type: RoomType.PublicChannel;
 }
 
@@ -265,6 +273,23 @@ macro_rules! muc_room_impl {
     };
 }
 
+macro_rules! channel_room_impl {
+    ($t:ident) => {
+        #[wasm_bindgen]
+        impl $t {
+            #[wasm_bindgen(js_name = "inviteUsers")]
+            pub async fn invite_users(&self, users: Array) -> Result<()> {
+                let users = try_jid_vec_from_string_array(users)?;
+                self.room
+                    .invite_users(users.as_slice())
+                    .await
+                    .map_err(WasmError::from)?;
+                Ok(())
+            }
+        }
+    };
+}
+
 base_room_impl!(RoomDirectMessage);
 base_room_impl!(RoomGroup);
 base_room_impl!(RoomPrivateChannel);
@@ -275,6 +300,9 @@ muc_room_impl!(RoomGroup);
 muc_room_impl!(RoomPrivateChannel);
 muc_room_impl!(RoomPublicChannel);
 muc_room_impl!(RoomGeneric);
+
+channel_room_impl!(RoomPrivateChannel);
+channel_room_impl!(RoomPublicChannel);
 
 #[wasm_bindgen]
 extern "C" {

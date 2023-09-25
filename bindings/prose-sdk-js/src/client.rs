@@ -6,11 +6,10 @@
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    Availability, BareJid, BareJidArray, Channel, ChannelsArray, ConnectedRoomExt, Contact,
-    ContactsArray, IntoJSArray, RoomsArray, UserMetadata, UserProfile,
+    try_jid_vec_from_string_array, Availability, BareJid, BareJidArray, Channel, ChannelsArray,
+    ConnectedRoomExt, Contact, ContactsArray, IntoJSArray, RoomsArray, UserMetadata, UserProfile,
 };
 use base64::{engine::general_purpose, Engine as _};
-use core::str::FromStr;
 use jid::ResourcePart;
 use js_sys::Array;
 use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
@@ -187,18 +186,7 @@ impl Client {
     /// where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "createGroup")]
     pub async fn create_group(&self, participants: Array) -> Result<JsValue> {
-        let participants = participants
-            .into_iter()
-            .map(|value| {
-                value
-                    .as_string()
-                    .ok_or(anyhow::format_err!(
-                        "Could not read String from supposed String Array"
-                    ))
-                    .and_then(|str| jid::BareJid::from_str(&str).map_err(Into::into))
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(WasmError::from)?;
+        let participants = try_jid_vec_from_string_array(participants)?;
 
         Ok(self
             .client

@@ -359,7 +359,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         };
 
         let Some(room) = self.inner.connected_rooms.read().get(&from).cloned() else {
-            todo!("Received message from sender for which we do not have a room.");
+            error!("Received message from sender for which we do not have a room.");
+            return Ok(());
         };
 
         room.handle_message(message).await?;

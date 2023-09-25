@@ -138,11 +138,20 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             .collect())
     }
 
-    pub(super) async fn handle_direct_invite(
-        &self,
-        _from: Jid,
-        _invite: DirectInvite,
-    ) -> Result<()> {
+    pub(super) async fn handle_direct_invite(&self, from: Jid, invite: DirectInvite) -> Result<()> {
+        info!("Joining room {} after receiving direct invite…", from);
+
+        self.create_or_join_room(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Join {
+                room_jid: invite.jid,
+                nickname: None,
+                password: invite.password,
+            },
+            save_bookmark: true,
+            notify_delegate: true,
+        })
+        .await?;
+
         Ok(())
     }
 
@@ -151,21 +160,19 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         from: Jid,
         invite: MediatedInvite,
     ) -> Result<()> {
-        println!("DID RECEIVE MEDIATED INVITE FROM {}: {:?}", from, invite);
+        info!("Joining room {} after receiving mediated invite…", from);
 
-        // // TODO: Handle this properly
-        //
-        // self.insert_and_publish_bookmark(ConferenceBookmark {
-        //     jid: from,
-        //     conference: Conference {
-        //         autojoin: Autojoin::True,
-        //         name: None,
-        //         nick: None,
-        //         password: None,
-        //         extensions: vec![],
-        //     },
-        // })
-        // .await?;
+        self.create_or_join_room(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Join {
+                room_jid: from.to_bare(),
+                nickname: None,
+                password: invite.password,
+            },
+            save_bookmark: true,
+            notify_delegate: true,
+        })
+        .await?;
+
         Ok(())
     }
 
@@ -260,16 +267,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     async fn insert_and_publish_bookmark(&self, bookmark: ConferenceBookmark) -> Result<()> {
         let bare_jid = bookmark.jid.to_bare();
         info!("Inserting bookmark {}…", bare_jid);
-        let mut bookmarks = self.inner.bookmarks.write();
 
-        if bookmarks.get(&bare_jid) == Some(&bookmark) {
-            return Ok(());
-        }
+        let bookmarks_to_publish = {
+            let mut bookmarks = self.inner.bookmarks.write();
 
-        bookmarks.insert(bare_jid, bookmark);
+            if bookmarks.get(&bare_jid) == Some(&bookmark) {
+                return Ok(());
+            }
 
-        let bookmarks_to_publish = bookmarks.values().cloned().collect::<Vec<_>>();
-        drop(bookmarks);
+            bookmarks.insert(bare_jid, bookmark);
+            bookmarks.values().cloned().collect::<Vec<_>>()
+        };
 
         info!("Publishing bookmarks…");
         let bookmark_mod = self.client.get_mod::<mods::Bookmark>();
@@ -310,11 +318,28 @@ struct CreateOrEnterRoomRequest {
 }
 
 mod room_handling {
+    #[derive(thiserror::Error, Debug)]
+    pub(super) enum Error {
+        #[error("Room is already connected ({0}).")]
+        RoomIsAlreadyConnected(BareJid),
+        #[error(transparent)]
+        RequestError(#[from] RequestError),
+        #[error(transparent)]
+        RoomValidationError(#[from] RoomValidationError),
+        #[error(transparent)]
+        Anyhow(#[from] anyhow::Error),
+        #[error(transparent)]
+        JidError(#[from] jid::Error),
+        #[error(transparent)]
+        ParseError(#[from] prose_xmpp::ParseError),
+    }
+
     use anyhow::Context;
     use jid::NodePart;
     use xmpp_parsers::muc::user::Status;
     use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
+    use crate::types::muc::RoomValidationError;
     use prose_xmpp::mods::muc::{RoomConfigResponse, RoomOccupancy};
 
     use super::*;
@@ -331,7 +356,7 @@ mod room_handling {
                 save_bookmark,
                 notify_delegate,
             }: CreateOrEnterRoomRequest,
-        ) -> Result<ConnectedRoom<D, A>, RequestError> {
+        ) -> Result<ConnectedRoom<D, A>, Error> {
             let user_jid = self
                 .connected_jid()
                 .map_err(|err| RequestError::Generic {
@@ -340,7 +365,7 @@ mod room_handling {
                 .into_bare();
             let default_nickname = user_jid.node_str().unwrap_or("unknown-user");
 
-            let metadata = match r#type {
+            let result = match r#type {
                 CreateOrEnterRoomRequestType::Create { service, room_type } => match room_type {
                     CreateRoomType::Group {
                         participants,
@@ -377,26 +402,22 @@ mod room_handling {
                         // one channel for any given name. Since these can be discovered publicly
                         // and joined by anyone there should be no harm in exposing the name in
                         // the jid.
-                        let name = format!(
-                            "{}.{}",
-                            PUBLIC_CHANNEL_PREFIX,
-                            name.to_ascii_lowercase().replace(" ", "-")
-                        );
 
                         self.create_or_join_room_with_config(
                             &service,
                             &user_jid,
-                            &name,
+                            &format!(
+                                "{}.{}",
+                                PUBLIC_CHANNEL_PREFIX,
+                                name.to_ascii_lowercase().replace(" ", "-")
+                            ),
                             default_nickname,
                             RoomConfig::public_channel(&name),
                             |_| async { Ok(()) },
                         )
                         .await
                     }
-                }
-                .map_err(|err| RequestError::Generic {
-                    msg: err.to_string(),
-                })?,
+                },
                 CreateOrEnterRoomRequestType::Join {
                     room_jid,
                     nickname,
@@ -409,31 +430,52 @@ mod room_handling {
                         password.as_deref(),
                         0,
                     )
-                    .await?
+                    .await
                 }
+            };
+
+            let metadata = match result {
+                Ok(metadata) => metadata,
+                Err(Error::RoomIsAlreadyConnected(room_jid)) => {
+                    if let Some(room) = self
+                        .inner
+                        .connected_rooms
+                        .read()
+                        .get(&room_jid)
+                        .and_then(|room| ConnectedRoom::try_from(room.clone()).ok())
+                    {
+                        return Ok(room);
+                    };
+                    return Err(Error::RoomIsAlreadyConnected(room_jid));
+                }
+                Err(error) => return Err(error),
             };
 
             // It could be the case that the room_jid was modified, i.e. if the preferred JID was
             // taken already.
             let room_jid = metadata.room_jid.clone();
 
-            let mut connected_rooms = self.inner.connected_rooms.write();
-            let Some(room) = connected_rooms.remove(&room_jid.to_bare()) else {
-                return Err(RequestError::Generic {
-                    msg: "Room was modified during connection".to_string(),
-                });
+            let room = {
+                let mut connected_rooms = self.inner.connected_rooms.write();
+                let Some(room) = connected_rooms.remove(&room_jid.to_bare()) else {
+                    return Err(RequestError::Generic {
+                        msg: "Room was modified during connection".to_string(),
+                    }
+                    .into());
+                };
+
+                // Convert the temporary room to its final form…
+                let room = room.promote_to_permanent_room(metadata).map_err(|err| {
+                    RequestError::Generic {
+                        msg: err.to_string(),
+                    }
+                })?;
+
+                connected_rooms.insert(room_jid.to_bare(), room.clone());
+                room
             };
 
-            // Convert the temporary room to its final form…
-            let room =
-                room.promote_to_permanent_room(metadata)
-                    .map_err(|err| RequestError::Generic {
-                        msg: err.to_string(),
-                    })?;
-
             let room_name = room.name().map(ToString::to_string);
-
-            connected_rooms.insert(room_jid.to_bare(), room.clone());
 
             if save_bookmark {
                 let bookmark = ConferenceBookmark {
@@ -474,7 +516,7 @@ mod room_handling {
             preferred_nickname: &str,
             password: Option<&str>,
             attempt: u32,
-        ) -> Result<RoomMetadata, RequestError> {
+        ) -> Result<RoomMetadata, Error> {
             let mut attempt = attempt;
 
             loop {
@@ -487,10 +529,7 @@ mod room_handling {
 
                 // Insert pending room so that we don't miss any stanzas for this room while we're
                 // connecting to it…
-                self.inner.connected_rooms.write().insert(
-                    room_jid.clone(),
-                    RoomEnvelope::pending(room_jid, user_jid, &nickname, self),
-                );
+                self.insert_pending_room(room_jid, user_jid, &nickname)?;
 
                 info!(
                     "Trying to join room {} with nickname {}…",
@@ -504,7 +543,7 @@ mod room_handling {
                         info!("Successfully joined room.");
                         Ok(metadata)
                     }
-                    Err(error) => {
+                    Err(Error::RequestError(error)) => {
                         // Remove pending room again…
                         self.inner.connected_rooms.write().remove(&room_jid);
 
@@ -515,6 +554,11 @@ mod room_handling {
 
                         Err(error.into())
                     }
+                    Err(error) => {
+                        // Remove pending room again…
+                        self.inner.connected_rooms.write().remove(&room_jid);
+                        Err(error)
+                    }
                 };
             }
         }
@@ -523,7 +567,7 @@ mod room_handling {
             &self,
             room_jid: &FullJid,
             password: Option<&str>,
-        ) -> Result<RoomMetadata, RequestError> {
+        ) -> Result<RoomMetadata, Error> {
             let muc_mod = self.client.get_mod::<mods::MUC>();
             let occupancy = muc_mod.enter_room(&room_jid, password.as_deref()).await?;
 
@@ -538,7 +582,8 @@ mod room_handling {
                         texts: Default::default(),
                         other: None,
                     },
-                });
+                }
+                .into());
             }
 
             return self.gather_metadata_for_room(room_jid, occupancy).await;
@@ -548,7 +593,7 @@ mod room_handling {
             &self,
             room_jid: &FullJid,
             occupancy: RoomOccupancy,
-        ) -> Result<RoomMetadata, RequestError> {
+        ) -> Result<RoomMetadata, Error> {
             let caps = self.client.get_mod::<mods::Caps>();
             let settings =
                 RoomSettings::try_from(caps.query_disco_info(room_jid.to_bare(), None).await?)?;
@@ -580,7 +625,7 @@ mod room_handling {
             nickname: &str,
             participants: Vec<BareJid>,
             send_invites: bool,
-        ) -> Result<RoomMetadata> {
+        ) -> Result<RoomMetadata, Error> {
             // Load participant infos so that we can build a nice human-readable name for the group…
             let mut participant_names = vec![];
             let participants_including_self = participants
@@ -674,7 +719,7 @@ mod room_handling {
             nickname: &str,
             config: RoomConfig,
             perform_additional_config: impl FnOnce(&RoomMetadata) -> Fut,
-        ) -> Result<RoomMetadata> {
+        ) -> Result<RoomMetadata, Error> {
             let muc_mod = self.client.get_mod::<mods::MUC>();
             let mut attempt = 0;
 
@@ -705,10 +750,7 @@ mod room_handling {
 
                 // Insert pending room so that we don't miss any stanzas for this room while we're
                 // creating (but potentially connecting to) it…
-                self.inner.connected_rooms.write().insert(
-                    room_jid.clone(),
-                    RoomEnvelope::pending(&room_jid, user_jid, &nickname, self),
-                );
+                self.insert_pending_room(&room_jid, user_jid, &nickname)?;
 
                 // Try to create or enter the room and configure it…
                 let room_config = config.clone();
@@ -793,6 +835,37 @@ mod room_handling {
                 }
 
                 return Ok(metadata);
+            }
+        }
+
+        fn insert_pending_room(
+            &self,
+            room_jid: &BareJid,
+            user_jid: &BareJid,
+            nickname: &str,
+        ) -> Result<(), Error> {
+            let mut connected_rooms = self.inner.connected_rooms.write();
+
+            if connected_rooms.contains_key(&room_jid) {
+                return Err(Error::RoomIsAlreadyConnected(room_jid.clone()));
+            }
+
+            connected_rooms.insert(
+                room_jid.clone(),
+                RoomEnvelope::pending(room_jid, user_jid, nickname, self),
+            );
+
+            Ok(())
+        }
+    }
+
+    impl From<Error> for RequestError {
+        fn from(value: Error) -> Self {
+            if let Error::RequestError(error) = value {
+                return error;
+            }
+            RequestError::Generic {
+                msg: value.to_string(),
             }
         }
     }
