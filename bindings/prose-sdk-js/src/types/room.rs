@@ -67,6 +67,10 @@ export interface RoomDirectMessage extends RoomBase {
 
 export interface RoomGroup extends RoomBase, RoomMUC {
   type: RoomType.Group;
+  
+  /// Resends invites to its members. Can be useful if someone accidentally rejected the invite or 
+  /// deleted their bookmark.
+  resendInvitesToMembers(): Promise<void>;
 }
 
 export interface RoomPrivateChannel extends RoomBase, RoomMUC, RoomChannel {
@@ -312,6 +316,18 @@ macro_rules! channel_room_impl {
             }
         }
     };
+}
+
+#[wasm_bindgen]
+impl RoomGroup {
+    #[wasm_bindgen(js_name = "resendInvitesToMembers")]
+    pub async fn resend_invites_to_members(&self) -> Result<()> {
+        self.room
+            .resend_invites_to_members()
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
 }
 
 base_room_impl!(RoomDirectMessage);

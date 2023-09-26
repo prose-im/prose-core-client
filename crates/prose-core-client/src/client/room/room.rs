@@ -26,8 +26,6 @@ use xmpp_parsers::muc;
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
-pub struct Group;
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct Occupant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.

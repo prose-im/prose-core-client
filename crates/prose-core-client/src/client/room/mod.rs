@@ -6,6 +6,7 @@
 mod channel;
 mod direct_message;
 mod generic;
+mod group;
 mod muc;
 mod room;
 mod room_envelope;
@@ -13,8 +14,9 @@ mod room_envelope;
 pub use channel::{PrivateChannel, PublicChannel};
 pub use direct_message::DirectMessage;
 pub use generic::Generic;
+pub use group::Group;
 pub use muc::MUC;
-pub use room::{Group, Room};
+pub use room::Room;
 pub(super) use room_envelope::RoomEnvelope;
 
 #[cfg(feature = "debug")]

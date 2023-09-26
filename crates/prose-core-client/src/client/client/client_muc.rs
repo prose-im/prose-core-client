@@ -709,7 +709,7 @@ mod room_handling {
                                 .into_iter()
                                 .map(|participant| mediated_invite::Invite {
                                     from: None,
-                                    to: Some(participant.clone().into()),
+                                    to: Some(participant.into()),
                                     reason: None,
                                 })
                                 .collect(),
