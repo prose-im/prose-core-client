@@ -707,6 +707,8 @@ enum Selection {
     SetRoomSubject,
     #[strum(serialize = "List occupants in room")]
     ListRoomOccupants,
+    #[strum(serialize = "List members in room")]
+    ListRoomMembers,
     Disconnect,
     Noop,
     Exit,
@@ -868,6 +870,15 @@ async fn main() -> Result<()> {
                     .map(|o| OccupantEnvelope(o).to_string())
                     .collect::<Vec<_>>();
                 println!("{}", occupants.join("\n"))
+            }
+            Selection::ListRoomMembers => {
+                let room = select_muc_room(&client).await?.to_generic_room();
+                let members = room
+                    .members()
+                    .iter()
+                    .map(|jid| jid.to_string())
+                    .collect::<Vec<_>>();
+                println!("{}", members.join("\n"))
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

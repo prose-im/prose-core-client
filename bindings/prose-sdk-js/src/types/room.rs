@@ -30,7 +30,10 @@ export interface RoomBase {
     readonly type: RoomType;
     readonly id: RoomID;
     readonly name: string;
+    /// The members of a room. Only available for DirectMessage and Group (member-only rooms)
     readonly members: JID[];
+    /// The occupants of a room.
+    readonly occupants: JID[];
 
     sendMessage(body: string): Promise<void>;
     updateMessage(messageID: string, body: string): Promise<void>;
@@ -148,6 +151,15 @@ macro_rules! base_room_impl {
             pub fn members(&self) -> BareJidArray {
                 self.room
                     .members()
+                    .iter()
+                    .map(BareJid::from)
+                    .collect_into_js_array::<BareJidArray>()
+            }
+
+            #[wasm_bindgen(getter)]
+            pub fn occupants(&self) -> BareJidArray {
+                self.room
+                    .occupants()
                     .iter()
                     .map(BareJid::from)
                     .collect_into_js_array::<BareJidArray>()

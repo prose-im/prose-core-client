@@ -23,7 +23,6 @@ use std::sync::Arc;
 use tracing::{debug, error, info};
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc;
-use xmpp_parsers::muc::user::Affiliation;
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
@@ -59,6 +58,8 @@ pub(super) struct RoomInner<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub user_jid: BareJid,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
+    /// The list of members. Only available for DirectMessage and Group (member-only rooms).
+    pub members: Vec<BareJid>,
 
     pub xmpp: XMPPClient,
     pub client: Arc<ClientInner<D, A>>,
@@ -72,25 +73,6 @@ pub(super) struct RoomInnerMut {
     /// The occupants of the room. The key is either the user's FullJid in a MUC room or the user's
     /// BareJid in direct message room.
     pub occupants: HashMap<Jid, Occupant>,
-}
-
-impl RoomInnerMut {
-    pub(super) fn merge_members<'a>(&mut self, members: impl IntoIterator<Item = &'a Jid>) {
-        for member in members.into_iter() {
-            if !self.occupants.contains_key(member) {
-                self.occupants.insert(
-                    member.clone(),
-                    Occupant {
-                        jid: None,
-                        affiliation: Affiliation::Member,
-                        occupant_id: None,
-                        chat_state: ChatState::Inactive,
-                        chat_state_updated: Default::default(),
-                    },
-                );
-            }
-        }
-    }
 }
 
 impl<Kind, D: DataCache, A: AvatarCache> Clone for Room<Kind, D, A> {
@@ -151,10 +133,10 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         };
 
         // Let's try to pull out the real jid of our user…
-        let Some(jid) = muc_user
+        let Some((jid, affiliation)) = muc_user
             .items
             .into_iter()
-            .filter_map(|item| item.jid)
+            .filter_map(|item| item.jid.map(|jid| (jid, item.affiliation)))
             .take(1)
             .next()
         else {
@@ -167,6 +149,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
             let mut inner_mut = self.inner_mut.write();
             let occupant = inner_mut.occupants.entry(from).or_default();
             occupant.jid = Some(jid.to_bare());
+            occupant.affiliation = affiliation;
         }
 
         Ok(())

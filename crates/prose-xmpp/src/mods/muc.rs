@@ -300,24 +300,25 @@ impl MUC {
         room_jid: &BareJid,
         users: impl IntoIterator<Item = (BareJid, Affiliation)>,
     ) -> Result<()> {
-        let iq = Iq::from_set(
-            self.ctx.generate_id(),
-            muc::Query {
-                role: Role::Admin,
-                payloads: users
-                    .into_iter()
-                    .map(|(jid, affiliation)| {
-                        Element::builder("item", &Role::Admin.to_string())
-                            .attr("jid", jid)
-                            .attr("affiliation", affiliation)
-                            .build()
-                    })
-                    .collect(),
-            },
-        )
-        .with_to(room_jid.clone().into());
+        // It seems that we can only send one user at a time, otherwise only the first is used when
+        // we're sending all at once…
 
-        self.ctx.send_iq(iq).await?;
+        for (jid, affiliation) in users.into_iter() {
+            let iq = Iq::from_set(
+                self.ctx.generate_id(),
+                muc::Query {
+                    role: Role::Admin,
+                    payloads: vec![Element::builder("item", &Role::Admin.to_string())
+                        .attr("jid", jid)
+                        .attr("affiliation", affiliation)
+                        .build()],
+                },
+            )
+            .with_to(room_jid.clone().into());
+
+            self.ctx.send_iq(iq).await?;
+        }
+
         Ok(())
     }
 

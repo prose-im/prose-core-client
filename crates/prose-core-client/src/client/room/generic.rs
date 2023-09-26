@@ -49,7 +49,11 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
         self.inner_mut.read().subject.clone()
     }
 
-    pub fn members(&self) -> Vec<BareJid> {
+    pub fn members(&self) -> &[BareJid] {
+        self.inner.members.as_slice()
+    }
+
+    pub fn occupants(&self) -> Vec<BareJid> {
         self.inner_mut
             .read()
             .occupants

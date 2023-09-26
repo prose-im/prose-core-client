@@ -607,7 +607,7 @@ mod room_handling {
                 .await
                 .unwrap_or(vec![])
                 .into_iter()
-                .map(|user| user.jid)
+                .map(|user| user.jid.to_bare())
                 .collect::<Vec<_>>();
 
             Ok(RoomMetadata {
@@ -663,22 +663,23 @@ mod room_handling {
                     .join(", ")
             );
 
-            let metadata = self.create_or_join_room_with_config(
-                service,
-                user_jid,
-                &group_hash,
-                nickname,
-                RoomConfig::group(group_name, participants_including_self.iter()),
-                |room_metadata| {
-                    // Try to promote all participants to owners…
-                    info!("Update participant affiliations…");
-                    let muc_mod = self.client.get_mod::<mods::MUC>();
-                    let room_jid = room_metadata.room_jid.to_bare();
-                    let room_has_been_created = room_metadata.room_has_been_created();
-                    let owners = participants_including_self
-                        .iter()
-                        .map(|jid| (jid.clone(), Affiliation::Owner))
-                        .collect::<Vec<_>>();
+            let metadata = self
+                .create_or_join_room_with_config(
+                    service,
+                    user_jid,
+                    &group_hash,
+                    nickname,
+                    RoomConfig::group(group_name, participants_including_self.iter()),
+                    |room_metadata| {
+                        // Try to promote all participants to owners…
+                        info!("Update participant affiliations…");
+                        let muc_mod = self.client.get_mod::<mods::MUC>();
+                        let room_jid = room_metadata.room_jid.to_bare();
+                        let room_has_been_created = room_metadata.room_has_been_created();
+                        let owners = participants_including_self
+                            .iter()
+                            .map(|jid| (jid.clone(), Affiliation::Owner))
+                            .collect::<Vec<_>>();
 
                     async move {
                         if room_has_been_created {
