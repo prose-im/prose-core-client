@@ -30,7 +30,7 @@ export interface RoomBase {
     readonly type: RoomType;
     readonly id: RoomID;
     readonly name: string;
-    readonly members: BareJID[];
+    readonly members: JID[];
 
     sendMessage(body: string): Promise<void>;
     updateMessage(messageID: string, body: string): Promise<void>;
@@ -41,7 +41,7 @@ export interface RoomBase {
     loadMessagesWithIDs(messageIDs: string[]): Promise<Message[]>;
     
     setUserIsComposing(isComposing: boolean): Promise<void>;
-    loadComposingUsers(): Promise<BareJID[]>;
+    loadComposingUsers(): Promise<JID[]>;
     
     saveDraft(message?: string): Promise<void>;
     loadDraft(): Promise<string>;
