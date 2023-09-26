@@ -7,7 +7,7 @@ use super::Room;
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
 use crate::room::MESSAGE_PAGE_SIZE;
-use crate::types::{Message, MessageId, MessageLike, UserMetadata, UserProfile};
+use crate::types::{Message, MessageId, MessageLike};
 use anyhow::Result;
 use prose_xmpp::mods;
 use tracing::debug;
@@ -15,17 +15,6 @@ use tracing::debug;
 pub struct DirectMessage;
 
 impl<D: DataCache, A: AvatarCache> Room<DirectMessage, D, A> {
-    pub async fn load_user_profile(&self) -> Result<Option<UserProfile>> {
-        Ok(None)
-    }
-
-    pub async fn load_user_metadata(&self) -> Result<UserMetadata> {
-        Ok(UserMetadata {
-            local_time: None,
-            last_activity: None,
-        })
-    }
-
     pub async fn load_latest_messages(
         &self,
         _since: impl Into<Option<&MessageId>>,
