@@ -6,11 +6,11 @@
 use anyhow::Result;
 use jid::{BareJid, Jid};
 use std::sync::atomic::Ordering;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::mods::{bookmark, bookmark2, caps, chat, muc, ping, profile, status};
+use prose_xmpp::mods::{bookmark, bookmark2, caps, chat, muc, ping, profile, roster, status};
 
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{client, mods, Event, TimeProvider};
@@ -140,6 +140,16 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 }
                 muc::Event::MediatedInvite { from, invite } => {
                     self.handle_mediated_invite(from, invite).await
+                }
+            },
+
+            Event::Roster(event) => match event {
+                roster::Event::PresenceSubscriptionRequest { from } => {
+                    info!("Approving presence subscription request from {}…", from);
+                    let roster_mod = self.client.get_mod::<mods::Roster>();
+                    roster_mod
+                        .approve_presence_subscription_request(&from)
+                        .await
                 }
             },
         };

@@ -681,6 +681,8 @@ enum Selection {
     SaveUserAvatar,
     #[strum(serialize = "Load contacts")]
     LoadContacts,
+    #[strum(serialize = "Add contact")]
+    AddContact,
     #[strum(serialize = "Send message")]
     SendMessage,
     #[strum(serialize = "Load messages")]
@@ -744,6 +746,10 @@ async fn main() -> Result<()> {
             }
             Selection::LoadContacts => {
                 load_contacts(&client).await?;
+            }
+            Selection::AddContact => {
+                let jid = prompt_bare_jid(None);
+                client.add_contact(&jid).await?;
             }
             Selection::SendMessage => {
                 send_message(&client).await?;
@@ -865,7 +871,7 @@ async fn main() -> Result<()> {
             Selection::ListRoomOccupants => {
                 let room = select_muc_room(&client).await?.to_generic_room();
                 let occupants = room
-                    .occupants()
+                    .occupants_dbg()
                     .into_iter()
                     .map(|o| OccupantEnvelope(o).to_string())
                     .collect::<Vec<_>>();

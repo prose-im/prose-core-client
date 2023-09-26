@@ -201,7 +201,7 @@ impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
 
 #[cfg(feature = "debug")]
 impl<Kind, D: DataCache, A: AvatarCache> Room<Kind, D, A> {
-    pub fn occupants(&self) -> Vec<crate::room::room::Occupant> {
+    pub fn occupants_dbg(&self) -> Vec<crate::room::room::Occupant> {
         self.inner_mut.read().occupants.values().cloned().collect()
     }
 }

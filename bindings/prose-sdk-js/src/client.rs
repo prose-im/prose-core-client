@@ -255,6 +255,16 @@ impl Client {
         Ok(())
     }
 
+    /// Adds a contact to the roster and sends a presence subscription request.
+    #[wasm_bindgen(js_name = "addContact")]
+    pub async fn add_contact(&self, jid: &BareJid) -> Result<()> {
+        Ok(self
+            .client
+            .add_contact(&jid.into())
+            .await
+            .map_err(WasmError::from)?)
+    }
+
     #[wasm_bindgen(js_name = "loadContacts")]
     pub async fn load_contacts(&self) -> Result<ContactsArray> {
         Ok(self
