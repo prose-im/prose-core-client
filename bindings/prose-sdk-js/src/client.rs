@@ -182,8 +182,9 @@ impl Client {
             .collect_into_js_array::<ChannelsArray>())
     }
 
-    /// Currently creates a group and returns the created `Room`. Pass a String[] as participants,
-    /// where each string is a valid BareJid.
+    /// Creates the group or joins it if it already exists and returns the `Room`.
+    /// Sends invites to all participants if the group was created.
+    /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "createGroup")]
     pub async fn create_group(&self, participants: Array) -> Result<JsValue> {
         let participants = try_jid_vec_from_string_array(participants)?;
@@ -196,6 +197,8 @@ impl Client {
             .into_js_value())
     }
 
+    /// Creates the public channel or joins it if one with the same name already exists and
+    /// returns the `Room`.
     #[wasm_bindgen(js_name = "createPublicChannel")]
     pub async fn create_public_channel(&self, channel_name: &str) -> Result<JsValue> {
         Ok(self
@@ -206,6 +209,7 @@ impl Client {
             .into_js_value())
     }
 
+    /// Creates the private channel and returns the created `Room`.
     #[wasm_bindgen(js_name = "createPrivateChannel")]
     pub async fn create_private_channel(&self, channel_name: &str) -> Result<JsValue> {
         Ok(self
@@ -213,6 +217,17 @@ impl Client {
             .create_private_channel(channel_name)
             .await
             .map_err(WasmError::from)?
+            .into_js_value())
+    }
+
+    /// Joins and returns the room identified by `Room`.
+    #[wasm_bindgen(js_name = "joinRoom")]
+    pub async fn join_room(&self, room_jid: &BareJid, password: Option<String>) -> Result<JsValue> {
+        Ok(self
+            .client
+            .join_room_with_jid(&room_jid.into(), password.as_deref())
+            .await
+            .map_err(|err| WasmError::from(anyhow::Error::from(err)))?
             .into_js_value())
     }
 

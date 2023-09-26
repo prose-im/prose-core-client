@@ -49,6 +49,25 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         muc_mod.load_public_rooms(&self.muc_service()?.jid).await
     }
 
+    pub async fn join_room_with_jid(
+        &self,
+        room_jid: &BareJid,
+        password: Option<&str>,
+    ) -> Result<ConnectedRoom<D, A>, RequestError> {
+        let room = self
+            .create_or_join_room(CreateOrEnterRoomRequest {
+                r#type: CreateOrEnterRoomRequestType::Join {
+                    room_jid: room_jid.clone(),
+                    nickname: None,
+                    password: password.map(ToString::to_string),
+                },
+                save_bookmark: true,
+                notify_delegate: false,
+            })
+            .await?;
+        Ok(room)
+    }
+
     pub async fn create_direct_message(
         &self,
         participants: &[BareJid],
