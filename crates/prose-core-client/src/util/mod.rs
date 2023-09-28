@@ -5,13 +5,15 @@
 
 use std::ops::Deref;
 
+pub(crate) use form_config::FormConfig;
 pub(crate) use presence_map::PresenceMap;
 pub(crate) use string_ext::StringExt;
 
+pub(crate) mod form_config;
 mod presence_map;
 mod string_ext;
 
-pub fn concatenate_names(
+pub(crate) fn concatenate_names(
     first_name: &Option<String>,
     last_name: &Option<String>,
 ) -> Option<String> {

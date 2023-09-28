@@ -4,8 +4,9 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::uniffi_types::JID;
+use prose_core_client::data_cache::sqlite::SQLiteCache;
 use prose_core_client::types::MessageId;
-use prose_core_client::{ClientEvent as ProseClientEvent, ConnectionEvent};
+use prose_core_client::{ConnectionEvent, FsAvatarCache};
 
 pub enum ClientEvent {
     /// A user in `conversation` started or stopped typing.
@@ -39,44 +40,46 @@ pub enum ClientEvent {
     },
 }
 
-impl From<prose_core_client::ClientEvent> for ClientEvent {
-    fn from(value: prose_core_client::ClientEvent) -> Self {
-        match value {
-            ProseClientEvent::ComposingUsersChanged { conversation } => {
-                ClientEvent::ComposingUsersChanged {
-                    conversation: conversation.into(),
-                }
-            }
-            ProseClientEvent::ConnectionStatusChanged { event } => {
-                ClientEvent::ConnectionStatusChanged { event }
-            }
-            ProseClientEvent::ContactChanged { jid } => {
-                ClientEvent::ContactChanged { jid: jid.into() }
-            }
-            ProseClientEvent::AvatarChanged { jid } => {
-                ClientEvent::AvatarChanged { jid: jid.into() }
-            }
-            ProseClientEvent::MessagesAppended {
-                conversation,
-                message_ids,
-            } => ClientEvent::MessagesAppended {
-                conversation: conversation.into(),
-                message_ids,
-            },
-            ProseClientEvent::MessagesUpdated {
-                conversation,
-                message_ids,
-            } => ClientEvent::MessagesUpdated {
-                conversation: conversation.into(),
-                message_ids,
-            },
-            ProseClientEvent::MessagesDeleted {
-                conversation,
-                message_ids,
-            } => ClientEvent::MessagesDeleted {
-                conversation: conversation.into(),
-                message_ids,
-            },
-        }
+impl From<prose_core_client::ClientEvent<SQLiteCache, FsAvatarCache>> for ClientEvent {
+    fn from(_value: prose_core_client::ClientEvent<SQLiteCache, FsAvatarCache>) -> Self {
+        todo!("FIXME")
+        // match value {
+        //     ProseClientEvent::ComposingUsersChanged { room } => {
+        //         ClientEvent::ComposingUsersChanged {
+        //             conversation: conversation.into(),
+        //         }
+        //     }
+        //     ProseClientEvent::ConnectionStatusChanged { event } => {
+        //         ClientEvent::ConnectionStatusChanged { event }
+        //     }
+        //     ProseClientEvent::ContactChanged { jid } => {
+        //         ClientEvent::ContactChanged { jid: jid.into() }
+        //     }
+        //     ProseClientEvent::RoomsChanged => todo!("Handle RoomsChanged event"),
+        //     ProseClientEvent::AvatarChanged { jid } => {
+        //         ClientEvent::AvatarChanged { jid: jid.into() }
+        //     }
+        //     ProseClientEvent::MessagesAppended {
+        //         conversation,
+        //         message_ids,
+        //     } => ClientEvent::MessagesAppended {
+        //         conversation: conversation.into(),
+        //         message_ids,
+        //     },
+        //     ProseClientEvent::MessagesUpdated {
+        //         conversation,
+        //         message_ids,
+        //     } => ClientEvent::MessagesUpdated {
+        //         conversation: conversation.into(),
+        //         message_ids,
+        //     },
+        //     ProseClientEvent::MessagesDeleted {
+        //         conversation,
+        //         message_ids,
+        //     } => ClientEvent::MessagesDeleted {
+        //         conversation: conversation.into(),
+        //         message_ids,
+        //     },
+        // }
     }
 }

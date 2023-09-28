@@ -5,6 +5,8 @@
 
 use crate::client::WasmError;
 use anyhow::anyhow;
+use core::str::FromStr;
+use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
 use crate::types::Message;
@@ -93,4 +95,18 @@ impl TryFrom<&StringArray> for Vec<String> {
 
         Ok(typed_array)
     }
+}
+
+pub fn try_jid_vec_from_string_array(arr: Array) -> Result<Vec<jid::BareJid>, WasmError> {
+    arr.into_iter()
+        .map(|value| {
+            value
+                .as_string()
+                .ok_or(anyhow::format_err!(
+                    "Could not read String from supposed String Array"
+                ))
+                .and_then(|str| jid::BareJid::from_str(&str).map_err(Into::into))
+        })
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(WasmError::from)
 }

@@ -61,11 +61,11 @@ impl TryFrom<Element> for Info {
         value.expect_is("info", ns::AVATAR_METADATA)?;
 
         Ok(Info {
-            bytes: value.req_attr("bytes")?.parse()?,
+            bytes: value.attr_req("bytes")?.parse()?,
             width: value.attr("width").map(|w| w.parse()).transpose()?,
             height: value.attr("height").map(|h| h.parse()).transpose()?,
-            id: value.req_attr("id")?.into(),
-            r#type: value.req_attr("type")?.to_string(),
+            id: value.attr_req("id")?.into(),
+            r#type: value.attr_req("type")?.to_string(),
             url: value.attr("url").map(ToString::to_string),
         })
     }

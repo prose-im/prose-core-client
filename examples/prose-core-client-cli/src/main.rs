@@ -3,23 +3,28 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
+use std::iter::once;
 use std::path::Path;
 use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
-use dialoguer::{theme::ColorfulTheme, Input, Select};
+use common::{enable_debug_logging, load_credentials, Level};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
+use minidom::convert::IntoAttributeValue;
+use prose_core_client::data_cache::sqlite::SQLiteCache;
+use prose_core_client::room::Occupant;
+use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact, Message};
+use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
+use prose_xmpp::connector;
+use prose_xmpp::mods::muc;
+use prose_xmpp::stanza::ConferenceBookmark;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use url::Url;
-
-use common::{enable_debug_logging, load_credentials, Level};
-use prose_core_client::data_cache::sqlite::SQLiteCache;
-use prose_core_client::types::{Address, Availability, Contact, Message, MessageId};
-use prose_core_client::{CachePolicy, ClientBuilder, FsAvatarCache};
-use prose_xmpp::connector;
 
 type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
 
@@ -39,13 +44,18 @@ async fn configure_client() -> Result<(BareJid, Client)> {
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
         .set_data_cache(data_cache)
         .set_avatar_cache(image_cache)
+        .set_delegate(Some(Box::new(Delegate {})))
         .build();
 
     let (jid, password) = load_credentials();
 
-    println!("Connecting to server…");
+    println!("Connecting to server as {}…", jid);
     client.connect(&jid, password, Availability::Away).await?;
     println!("Connected.");
+
+    println!("Starting room observation…");
+    client.start_observing_rooms().await?;
+    println!("Done.");
 
     Ok((jid.into_bare(), client))
 }
@@ -89,6 +99,7 @@ fn prompt_bare_jid<'a>(default: impl Into<Option<&'a BareJid>>) -> BareJid {
     BareJid::from_str(&input).unwrap()
 }
 
+#[allow(dead_code)]
 fn prompt_full_jid<'a>(default: impl Into<Option<&'a FullJid>>) -> FullJid {
     let input = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter jid")
@@ -110,6 +121,7 @@ fn prompt_full_jid<'a>(default: impl Into<Option<&'a FullJid>>) -> FullJid {
     FullJid::from_str(&input).unwrap()
 }
 
+#[allow(dead_code)]
 fn prompt_jid<'a>(default: impl Into<Option<&'a Jid>>) -> Jid {
     let input = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter (full or bare) jid")
@@ -165,30 +177,200 @@ fn prompt_opt_string(prompt: impl Into<String>, default: Option<String>) -> Opti
         .0
 }
 
-struct ContactEnvelope(Contact);
+fn prompt_string(prompt: impl Into<String>) -> String {
+    Input::<String>::with_theme(&ColorfulTheme::default())
+        .with_prompt(prompt)
+        .allow_empty(false)
+        .interact_text()
+        .unwrap()
+}
 
-impl Display for ContactEnvelope {
+#[derive(Debug)]
+struct JidWithName {
+    jid: BareJid,
+    name: String,
+}
+
+impl Display for JidWithName {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.0.name, self.0.jid)
+        write!(f, "{:<30} | {}", self.name.truncate_to(30), self.jid)
     }
 }
 
+impl From<ConnectedRoom<SQLiteCache, FsAvatarCache>> for JidWithName {
+    fn from(value: ConnectedRoom<SQLiteCache, FsAvatarCache>) -> Self {
+        Self {
+            jid: value.to_generic_room().jid().clone(),
+            name: format!(
+                "{} {}",
+                value.kind(),
+                value
+                    .to_generic_room()
+                    .name()
+                    .unwrap_or("<untitled>")
+                    .to_string()
+            ),
+        }
+    }
+}
+
+impl From<muc::Room> for JidWithName {
+    fn from(value: muc::Room) -> Self {
+        Self {
+            jid: value.jid.into_bare(),
+            name: value.name.as_deref().unwrap_or("<untitled>").to_string(),
+        }
+    }
+}
+
+impl From<Contact> for JidWithName {
+    fn from(value: Contact) -> Self {
+        Self {
+            jid: value.jid,
+            name: value.name,
+        }
+    }
+}
+
+struct ConnectedRoomEnvelope(ConnectedRoom<SQLiteCache, FsAvatarCache>);
+
+impl Display for ConnectedRoomEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {:<40} | {:<70} | {}",
+            self.0.kind(),
+            self.0
+                .to_generic_room()
+                .name()
+                .unwrap_or("<untitled>")
+                .to_string()
+                .truncate_to(40),
+            self.0.to_generic_room().jid().to_string().truncate_to(70),
+            self.0
+                .to_generic_room()
+                .subject()
+                .as_deref()
+                .unwrap_or("<no subject>")
+        )
+    }
+}
+
+#[derive(Debug)]
+struct BookmarkEnvelope(ConferenceBookmark);
+
+struct OccupantEnvelope(Occupant);
+
+impl Display for OccupantEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:<20} {:<10}",
+            self.0
+                .jid
+                .as_ref()
+                .map(|jid| jid.to_string())
+                .unwrap_or("<unknown real jid>".to_string())
+                .truncate_to(20),
+            self.0
+                .affiliation
+                .clone()
+                .into_attribute_value()
+                .unwrap_or("<no affiliation>".to_string()),
+        )
+    }
+}
+
+impl Display for BookmarkEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{:<30} | {:<70} | autojoin: {:?} | nick: {}",
+            self.0
+                .conference
+                .name
+                .as_deref()
+                .unwrap_or("<untitled>")
+                .to_string()
+                .truncate_to(30),
+            self.0.jid.to_string().truncate_to(70),
+            self.0.conference.autojoin,
+            self.0.conference.nick.as_deref().unwrap_or("<no nick>")
+        )
+    }
+}
+
+#[allow(dead_code)]
 async fn select_contact(client: &Client) -> Result<BareJid> {
-    let items = client
+    let contacts = client
+        .load_contacts(CachePolicy::default())
+        .await?
+        .into_iter();
+    Ok(
+        select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
+            .jid
+            .clone(),
+    )
+}
+
+async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
+    let contacts = client
         .load_contacts(CachePolicy::default())
         .await?
         .into_iter()
-        .map(ContactEnvelope)
-        .collect::<Vec<_>>();
+        .map(JidWithName::from);
+    Ok(select_multiple_jids_from_list(contacts))
+}
 
+async fn select_room(client: &Client) -> Result<ConnectedRoom<SQLiteCache, FsAvatarCache>> {
+    let mut rooms = client.connected_rooms();
+    rooms.sort_by(compare_room_envelopes);
+    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+}
+
+async fn select_muc_room(client: &Client) -> Result<ConnectedRoom<SQLiteCache, FsAvatarCache>> {
+    let mut rooms = client
+        .connected_rooms()
+        .into_iter()
+        .filter(|room| {
+            if let &ConnectedRoom::DirectMessage(_) = room {
+                return false;
+            }
+            true
+        })
+        .collect::<Vec<_>>();
+    rooms.sort_by(compare_room_envelopes);
+    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+}
+
+fn select_item_from_list<T, O: ToString>(
+    iter: impl IntoIterator<Item = T>,
+    format: impl Fn(&T) -> O,
+) -> T {
+    let mut list = iter.into_iter().collect::<Vec<_>>();
+    let display_list = list.iter().map(format).collect::<Vec<_>>();
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select a contact")
         .default(0)
-        .items(&items[..])
+        .items(display_list.as_slice())
         .interact()
         .unwrap();
     println!();
-    Ok(items[selection].0.jid.clone())
+    list.swap_remove(selection)
+}
+
+fn select_multiple_jids_from_list(jids: impl IntoIterator<Item = JidWithName>) -> Vec<BareJid> {
+    let items = jids.into_iter().collect::<Vec<JidWithName>>();
+    let selection = MultiSelect::with_theme(&ColorfulTheme::default())
+        .with_prompt("Select contacts")
+        .items(items.as_slice())
+        .interact()
+        .unwrap();
+    println!();
+    selection
+        .into_iter()
+        .map(|idx| items[idx].jid.clone())
+        .collect()
 }
 
 async fn load_avatar(client: &Client, jid: &BareJid) -> Result<()> {
@@ -316,37 +498,53 @@ async fn load_contacts(client: &Client) -> Result<()> {
 }
 
 async fn load_messages(client: &Client) -> Result<()> {
-    let jid = select_contact(client).await?;
+    let room = select_room(client).await?;
 
-    fn print_messages(messages: &[Message]) {
-        for message in messages {
-            println!("{:?}", message);
-        }
-    }
+    let messages = match room {
+        ConnectedRoom::DirectMessage(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::Group(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::PrivateChannel(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::PublicChannel(room) => room.load_latest_messages(None, true).await?,
+        ConnectedRoom::Generic(room) => room.load_latest_messages(None, true).await?,
+    };
 
-    let messages = client.load_latest_messages(&jid, None, true).await?;
-    let mut oldest_message_id: Option<MessageId> = messages.last().and_then(|msg| msg.id.clone());
-    print_messages(&messages);
-
-    while let Some(message_id) = oldest_message_id {
-        let page = client.load_messages_before(&jid, &message_id).await?;
-        oldest_message_id = page.items.last().and_then(|msg| msg.id.clone());
-        print_messages(&page.items);
+    for message in messages {
+        println!("{}", MessageEnvelope(message));
     }
 
     Ok(())
 }
 
+struct MessageEnvelope(Message);
+
+impl Display for MessageEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} | {:<36} | {:<20} | {}",
+            self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
+            self.0
+                .id
+                .as_ref()
+                .map(|id| id.clone().into_inner())
+                .unwrap_or("<no-id>".to_string()),
+            self.0.from.to_string().truncate_to(20),
+            self.0.body
+        )
+    }
+}
+
 async fn send_message(client: &Client) -> Result<()> {
-    // let jid = select_contact(client).await?;
-    let jid = prompt_jid(Some(&Jid::from_str("marc@prose.org").unwrap()));
+    let room = select_room(client).await?.to_generic_room();
+
     let body = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message")
         .default(String::from("Hello World!"))
         .allow_empty(false)
         .interact_text()
         .unwrap();
-    client.send_message(jid, body).await
+
+    room.send_message(body).await
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -354,6 +552,119 @@ fn format_opt<T: Display>(value: Option<T>) -> String {
         Some(val) => val.to_string(),
         None => "<not set>".to_string(),
     }
+}
+
+fn compare_room_envelopes(
+    lhs: &ConnectedRoom<SQLiteCache, FsAvatarCache>,
+    rhs: &ConnectedRoom<SQLiteCache, FsAvatarCache>,
+) -> Ordering {
+    fn sort_order(envelope: &ConnectedRoom<SQLiteCache, FsAvatarCache>) -> i32 {
+        match envelope {
+            ConnectedRoom::DirectMessage(_) => 0,
+            ConnectedRoom::Group(_) => 1,
+            ConnectedRoom::PrivateChannel(_) => 2,
+            ConnectedRoom::PublicChannel(_) => 3,
+            ConnectedRoom::Generic(_) => 4,
+        }
+    }
+
+    let sort_val1 = sort_order(lhs);
+    let sort_val2 = sort_order(rhs);
+
+    if sort_val1 < sort_val2 {
+        return Ordering::Less;
+    } else if sort_val1 > sort_val2 {
+        return Ordering::Greater;
+    }
+
+    lhs.to_generic_room()
+        .name()
+        .unwrap_or_default()
+        .cmp(rhs.to_generic_room().name().unwrap_or_default())
+}
+
+struct Delegate {}
+
+impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
+    fn handle_event(
+        &self,
+        client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
+        event: ClientEvent<SQLiteCache, FsAvatarCache>,
+    ) {
+        tokio::spawn(async move {
+            match Self::_handle_event(client, event).await {
+                Ok(_) => (),
+                Err(err) => println!("Failed to handle event. {}", err),
+            }
+        });
+    }
+}
+
+impl Delegate {
+    async fn _handle_event(
+        _client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
+        event: ClientEvent<SQLiteCache, FsAvatarCache>,
+    ) -> Result<()> {
+        match event {
+            ClientEvent::MessagesAppended { room, message_ids } => {
+                let messages = room
+                    .to_generic_room()
+                    .load_messages_with_ids(message_ids.as_slice())
+                    .await?;
+                for message in messages {
+                    println!("Received message:\n{}", MessageEnvelope(message));
+                }
+            }
+            _ => (),
+        };
+        Ok(())
+    }
+}
+
+trait ConnectedRoomExt {
+    fn kind(&self) -> String;
+}
+
+trait StringExt {
+    fn truncate_to(&self, new_len: usize) -> String;
+}
+
+impl StringExt for String {
+    fn truncate_to(&self, new_len: usize) -> String {
+        let count = self.chars().count();
+
+        if count <= new_len {
+            return self.clone();
+        }
+
+        self.chars().take(new_len - 1).chain(once('…')).collect()
+    }
+}
+
+impl ConnectedRoomExt for ConnectedRoom<SQLiteCache, FsAvatarCache> {
+    fn kind(&self) -> String {
+        match self {
+            ConnectedRoom::DirectMessage(_) => "💬",
+            ConnectedRoom::Group(_) => "👥",
+            ConnectedRoom::PrivateChannel(_) => "🔒",
+            ConnectedRoom::PublicChannel(_) => "🔊",
+            ConnectedRoom::Generic(_) => "🌐",
+        }
+        .to_string()
+    }
+}
+
+async fn list_connected_rooms(client: &Client) -> Result<()> {
+    let mut rooms = client.connected_rooms();
+    rooms.sort_by(compare_room_envelopes);
+
+    let rooms = rooms
+        .into_iter()
+        .map(ConnectedRoomEnvelope)
+        .map(|r| r.to_string())
+        .collect::<Vec<_>>();
+    println!("Connected rooms:\n{}", rooms.join("\n"));
+    Ok(())
 }
 
 #[derive(EnumIter, Display, Clone)]
@@ -370,14 +681,36 @@ enum Selection {
     SaveUserAvatar,
     #[strum(serialize = "Load contacts")]
     LoadContacts,
+    #[strum(serialize = "Add contact")]
+    AddContact,
     #[strum(serialize = "Send message")]
     SendMessage,
     #[strum(serialize = "Load messages")]
     LoadMessages,
-    #[strum(serialize = "Query server features")]
-    QueryServerFeatures,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
+    #[strum(serialize = "Create group")]
+    CreateGroup,
+    #[strum(serialize = "Create public channel")]
+    CreatePublicChannel,
+    #[strum(serialize = "Create private channel")]
+    CreatePrivateChannel,
+    #[strum(serialize = "Load public rooms")]
+    LoadPublicRooms,
+    #[strum(serialize = "Destroy public room")]
+    DestroyPublicRoom,
+    #[strum(serialize = "Load bookmarks")]
+    LoadBookmarks,
+    #[strum(serialize = "Delete bookmark")]
+    DeleteBookmark,
+    #[strum(serialize = "List connected rooms")]
+    ListConnectedRooms,
+    #[strum(serialize = "Set room subject")]
+    SetRoomSubject,
+    #[strum(serialize = "List occupants in room")]
+    ListRoomOccupants,
+    #[strum(serialize = "List members in room")]
+    ListRoomMembers,
     Disconnect,
     Noop,
     Exit,
@@ -414,18 +747,144 @@ async fn main() -> Result<()> {
             Selection::LoadContacts => {
                 load_contacts(&client).await?;
             }
+            Selection::AddContact => {
+                let jid = prompt_bare_jid(None);
+                client.add_contact(&jid).await?;
+            }
             Selection::SendMessage => {
                 send_message(&client).await?;
             }
             Selection::LoadMessages => {
                 load_messages(&client).await?;
             }
-            Selection::QueryServerFeatures => {
-                client.query_server_features().await?;
-            }
             Selection::DeleteCachedData => {
                 println!("Cleaning cache…");
                 client.delete_cached_data().await?;
+            }
+            Selection::CreateGroup => {
+                let contacts = select_multiple_contacts(&client).await?;
+                client.create_direct_message(contacts.as_slice()).await?;
+            }
+            Selection::CreatePublicChannel => {
+                let room_name = prompt_string("Enter a name for the channel:");
+                client.create_public_channel(room_name).await?;
+            }
+            Selection::CreatePrivateChannel => {
+                let room_name = prompt_string("Enter a name for the channel:");
+                client.create_private_channel(room_name).await?;
+            }
+            Selection::LoadPublicRooms => {
+                let rooms = client
+                    .load_public_rooms()
+                    .await?
+                    .into_iter()
+                    .map(JidWithName::from)
+                    .map(|r| r.to_string())
+                    .collect::<Vec<_>>();
+                println!("{}", rooms.join("\n"));
+            }
+            Selection::DestroyPublicRoom => {
+                let rooms = client
+                    .load_public_rooms()
+                    .await?
+                    .into_iter()
+                    .map(JidWithName::from)
+                    .collect::<Vec<_>>();
+
+                if rooms.is_empty() {
+                    println!("No rooms to destroy");
+                    continue;
+                }
+
+                let selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Select a room to destroy")
+                    .default(0)
+                    .items(rooms.as_slice())
+                    .interact()
+                    .unwrap();
+                println!();
+                client.destroy_room(&rooms[selection].jid).await?;
+            }
+            Selection::LoadBookmarks => {
+                let bookmarks = client
+                    .load_bookmarks_dbg()
+                    .await?
+                    .into_iter()
+                    .map(BookmarkEnvelope)
+                    .map(|b| b.to_string())
+                    .collect::<Vec<_>>();
+
+                println!("Bookmarks:\n{}", bookmarks.join("\n"));
+            }
+            Selection::DeleteBookmark => {
+                let bookmarks = client
+                    .load_bookmarks_dbg()
+                    .await?
+                    .into_iter()
+                    .map(BookmarkEnvelope)
+                    .collect::<Vec<_>>();
+
+                if bookmarks.is_empty() {
+                    println!("No bookmarks to delete");
+                    continue;
+                }
+
+                let selection = Select::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Select a bookmark to delete")
+                    .default(0)
+                    .items(bookmarks.as_slice())
+                    .interact()
+                    .unwrap();
+                println!();
+
+                let selected_bookmark = &bookmarks[selection].0;
+                client.delete_bookmark(&selected_bookmark.jid).await?;
+
+                if Confirm::new()
+                    .with_prompt(format!(
+                        "Do you want to delete room {} as well?",
+                        selected_bookmark.jid
+                    ))
+                    .interact()?
+                {
+                    println!("Deleting room…");
+                    client
+                        .destroy_room(&selected_bookmark.jid.to_bare())
+                        .await?;
+                }
+            }
+            Selection::ListConnectedRooms => {
+                list_connected_rooms(&client).await?;
+            }
+            Selection::SetRoomSubject => {
+                let room = select_muc_room(&client).await?;
+                let subject = prompt_string("Enter a subject:");
+
+                match room {
+                    ConnectedRoom::DirectMessage(_) => unreachable!(),
+                    ConnectedRoom::Group(room) => room.set_subject(Some(&subject)).await,
+                    ConnectedRoom::PrivateChannel(room) => room.set_subject(Some(&subject)).await,
+                    ConnectedRoom::PublicChannel(room) => room.set_subject(Some(&subject)).await,
+                    ConnectedRoom::Generic(room) => room.set_subject(Some(&subject)).await,
+                }?;
+            }
+            Selection::ListRoomOccupants => {
+                let room = select_muc_room(&client).await?.to_generic_room();
+                let occupants = room
+                    .occupants_dbg()
+                    .into_iter()
+                    .map(|o| OccupantEnvelope(o).to_string())
+                    .collect::<Vec<_>>();
+                println!("{}", occupants.join("\n"))
+            }
+            Selection::ListRoomMembers => {
+                let room = select_muc_room(&client).await?.to_generic_room();
+                let members = room
+                    .members()
+                    .iter()
+                    .map(|jid| jid.to_string())
+                    .collect::<Vec<_>>();
+                println!("{}", members.join("\n"))
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

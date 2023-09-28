@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::any::TypeId;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 use std::task::Waker;
 use std::time::{Duration, SystemTime};
@@ -25,6 +26,12 @@ use crate::Event as ClientEvent;
 #[derive(Clone)]
 pub struct Client {
     pub(super) inner: Arc<ClientInner>,
+}
+
+impl Debug for Client {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Client").finish()
+    }
 }
 
 impl Client {

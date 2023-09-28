@@ -4,23 +4,24 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use chrono::Utc;
 use jid::{BareJid, Jid};
-use tracing::{debug, error};
+use std::sync::atomic::Ordering;
+use tracing::{debug, error, info};
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::mods::{bookmark, caps, chat, ping, profile, status};
-use prose_xmpp::stanza::message::ChatState;
+use prose_xmpp::mods::{bookmark, bookmark2, caps, chat, muc, ping, profile, roster, status};
+
 use prose_xmpp::stanza::{avatar, Message, UserActivity, VCard4};
 use prose_xmpp::{client, mods, Event, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;
-use crate::types::message_like::{Payload, TimestampedMessage};
-use crate::types::{AvatarMetadata, MessageLike, UserProfile};
+use crate::types::message_like::Payload;
+use crate::types::{AvatarMetadata, ConnectedRoom, MessageLike, UserProfile};
 use crate::{types, CachePolicy, Client, ClientEvent, ConnectionEvent};
 
+#[allow(dead_code)]
 enum Request {
     Ping {
         from: Jid,
@@ -50,12 +51,15 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         let result = match event {
             Event::Client(event) => match event {
                 client::Event::Connected => {
-                    self.send_event(ClientEvent::ConnectionStatusChanged {
-                        event: ConnectionEvent::Connect,
-                    });
+                    // We'll send an event from our `connect` method since we need to gather
+                    // information about the server first. Once we'll fire the event SDK consumers
+                    // can be sure that we have everything we need.
                     Ok(())
                 }
                 client::Event::Disconnected { error } => {
+                    self.inner
+                        .is_observing_rooms
+                        .store(false, Ordering::Relaxed);
                     self.send_event(ClientEvent::ConnectionStatusChanged {
                         event: ConnectionEvent::Disconnect { error },
                     });
@@ -116,17 +120,36 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             },
 
             Event::Bookmark(event) => match event {
-                bookmark::Event::BookmarksPublished { bookmarks } => {
-                    println!("published {:?}", bookmarks);
-                    Ok(())
+                bookmark::Event::BookmarksChanged { bookmarks } => {
+                    self.handle_changed_bookmarks(bookmarks).await
                 }
-                bookmark::Event::BookmarksRetracted { jids } => {
-                    println!("retracted {:?}", jids);
-                    Ok(())
+            },
+
+            Event::Bookmark2(event) => match event {
+                bookmark2::Event::BookmarksPublished { bookmarks } => {
+                    self.handle_published_bookmarks2(bookmarks).await
                 }
-                bookmark::Event::BookmarksReplaced { bookmarks } => {
-                    println!("replaced {:?}", bookmarks);
-                    Ok(())
+                bookmark2::Event::BookmarksRetracted { jids } => {
+                    self.handle_retracted_bookmarks2(jids).await
+                }
+            },
+
+            Event::MUC(event) => match event {
+                muc::Event::DirectInvite { from, invite } => {
+                    self.handle_direct_invite(from, invite).await
+                }
+                muc::Event::MediatedInvite { from, invite } => {
+                    self.handle_mediated_invite(from, invite).await
+                }
+            },
+
+            Event::Roster(event) => match event {
+                roster::Event::PresenceSubscriptionRequest { from } => {
+                    info!("Approving presence subscription request from {}…", from);
+                    let roster_mod = self.client.get_mod::<mods::Roster>();
+                    roster_mod
+                        .approve_presence_subscription_request(&from)
+                        .await
                 }
             },
         };
@@ -138,7 +161,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 #[derive(Debug)]
-pub enum ReceivedMessage {
+pub(in crate::client) enum ReceivedMessage {
     Message(Message),
     Carbon(Carbon),
 }
@@ -150,10 +173,26 @@ impl ReceivedMessage {
             Self::Carbon(_) => true,
         }
     }
+
+    pub fn sender(&self) -> Option<BareJid> {
+        match &self {
+            ReceivedMessage::Message(message) => message.from.as_ref().map(|jid| jid.to_bare()),
+            ReceivedMessage::Carbon(Carbon::Received(message)) => message
+                .stanza
+                .as_ref()
+                .and_then(|message| message.from.as_ref())
+                .map(|jid| jid.to_bare()),
+            ReceivedMessage::Carbon(Carbon::Sent(message)) => message
+                .stanza
+                .as_ref()
+                .and_then(|message| message.to.as_ref())
+                .map(|jid| jid.to_bare()),
+        }
+    }
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    fn send_event(&self, event: ClientEvent) {
+    pub(in crate::client) fn send_event(&self, event: ClientEvent<D, A>) {
         let Some(delegate) = &self.inner.delegate else {
             return;
         };
@@ -162,32 +201,6 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             inner: self.inner.clone(),
         };
         delegate.handle_event(client, event);
-    }
-
-    fn send_event_for_message(&self, conversation: &BareJid, message: &MessageLike) {
-        if self.inner.delegate.is_none() {
-            return;
-        }
-
-        let event = if let Some(ref target) = message.target {
-            if message.payload == Payload::Retraction {
-                ClientEvent::MessagesDeleted {
-                    conversation: conversation.clone(),
-                    message_ids: vec![target.as_ref().into()],
-                }
-            } else {
-                ClientEvent::MessagesUpdated {
-                    conversation: conversation.clone(),
-                    message_ids: vec![target.as_ref().into()],
-                }
-            }
-        } else {
-            ClientEvent::MessagesAppended {
-                conversation: conversation.clone(),
-                message_ids: vec![message.id.id().as_ref().into()],
-            }
-        };
-        self.send_event(event)
     }
 
     async fn vcard_did_change(&self, from: Jid, vcard: VCard4) -> Result<()> {
@@ -244,6 +257,13 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         };
 
         let jid = from.to_bare();
+
+        // If the presence was sent from a JID that belongs to one of our connected rooms, let
+        // that room handle it…
+        let room = self.inner.connected_rooms.read().get(&jid).cloned();
+        if let Some(room) = room {
+            room.handle_presence(presence.clone()).await?;
+        };
 
         // Update user presences with the received one and retrieve the new highest presence…
         let highest_presence = self.update_presence(&from, presence.into());
@@ -311,101 +331,38 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
     }
 
     async fn did_receive_message(&self, message: ReceivedMessage) -> Result<()> {
-        struct ChatStateEvent {
-            state: ChatState,
-            from: BareJid,
-        }
-
-        let mut chat_state: Option<ChatStateEvent> = None;
-
-        if let ReceivedMessage::Message(message) = &message {
-            if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
-                chat_state = Some(ChatStateEvent {
-                    state: state.clone(),
-                    from: from.to_bare(),
-                });
-            }
-        }
-
-        let message_is_carbon = message.is_carbon();
-        let now = Utc::now();
-
-        let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
-                message,
-                timestamp: now.into(),
-            }),
-            ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
-                message: carbon,
-                timestamp: now.into(),
-            }),
-        };
-
-        let parsed_message = match parsed_message {
-            Ok(message) => Some(message),
-            Err(err) => {
-                error!("Failed to parse received message: {}", err);
-                None
-            }
-        };
-
-        if parsed_message.is_none() && chat_state.is_none() {
-            // Nothing to do…
-            return Ok(());
-        }
-
-        if let Some(message) = &parsed_message {
-            debug!("Caching received message…");
-            self.inner.data_cache.insert_messages([message]).await?;
-
-            let conversation = if message_is_carbon {
-                &message.to
-            } else {
-                &message.from
-            };
-            self.send_event_for_message(conversation, message);
-        }
-
-        if let Some(chat_state) = chat_state {
-            self.inner
-                .data_cache
-                .insert_chat_state(&chat_state.from, &chat_state.state)
-                .await?;
-            self.send_event(ClientEvent::ComposingUsersChanged {
-                conversation: chat_state.from,
-            })
-        }
-
-        let Some(message) = parsed_message else {
+        let Some(from) = message.sender() else {
+            error!("Received message from unknown sender.");
             return Ok(());
         };
 
-        // Don't send delivery receipts for carbons or anything other than a regular message.
-        if message_is_carbon || !message.payload.is_message() {
+        let Some(room) = self.inner.connected_rooms.read().get(&from).cloned() else {
+            error!("Received message from sender for which we do not have a room.");
             return Ok(());
-        }
+        };
 
-        if let Some(message_id) = message.id.into_original_id() {
-            let chat = self.client.get_mod::<mods::Chat>();
-            chat.mark_message_received(message_id, message.from)?;
-        }
-
-        Ok(())
+        room.handle_received_message(message).await?;
+        return Ok(());
     }
 
     async fn did_send_message(&self, message: Message) -> Result<()> {
-        // TODO: Inject date from outside for testing
-        let timestamped_message = TimestampedMessage {
-            message,
-            timestamp: Utc::now().into(),
+        let Some(to) = &message.to else {
+            error!("Sent message to unknown recipient.");
+            return Ok(());
         };
 
-        let message = MessageLike::try_from(timestamped_message)?;
+        let Some(room) = self
+            .inner
+            .connected_rooms
+            .read()
+            .get(&to.to_bare())
+            .cloned()
+        else {
+            error!("Sent message to recipient for which we do not have a room.");
+            return Ok(());
+        };
 
-        debug!("Caching sent message…");
-        self.inner.data_cache.insert_messages([&message]).await?;
-        self.send_event_for_message(&message.to, &message);
-
+        room.handle_sent_message(message).await?;
         Ok(())
     }
 }
@@ -418,5 +375,31 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         map.get_highest_presence(&from.to_bare())
             .map(|entry| entry.presence.clone())
             .unwrap_or(types::Presence::unavailable())
+    }
+}
+
+impl<D: DataCache, A: AvatarCache> ClientEvent<D, A> {
+    pub(in crate::client) fn event_for_message(
+        room: ConnectedRoom<D, A>,
+        message: &MessageLike,
+    ) -> Self {
+        if let Some(ref target) = message.target {
+            if message.payload == Payload::Retraction {
+                ClientEvent::MessagesDeleted {
+                    room,
+                    message_ids: vec![target.as_ref().into()],
+                }
+            } else {
+                ClientEvent::MessagesUpdated {
+                    room,
+                    message_ids: vec![target.as_ref().into()],
+                }
+            }
+        } else {
+            ClientEvent::MessagesAppended {
+                room,
+                message_ids: vec![message.id.id().as_ref().into()],
+            }
+        }
     }
 }

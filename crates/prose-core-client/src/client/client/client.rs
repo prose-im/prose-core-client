@@ -3,24 +3,30 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use parking_lot::RwLock;
 use strum_macros::Display;
-use tracing::instrument;
+use tracing::{error, info, instrument};
+use xmpp_parsers::stanza_error::DefinedCondition;
 
-use prose_xmpp::mods::{Caps, Chat, Status};
-use prose_xmpp::ConnectionError;
+use prose_xmpp::mods::{Chat, Status};
+use prose_xmpp::stanza::ConferenceBookmark;
+use prose_xmpp::{mods, ConnectionError, IDProvider};
 use prose_xmpp::{Client as XMPPClient, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
+use crate::client::room::RoomEnvelope;
 use crate::data_cache::DataCache;
+use crate::types::muc;
 use crate::types::{AccountSettings, Availability, Capabilities, SoftwareVersion};
 use crate::util::PresenceMap;
-use crate::ClientDelegate;
+use crate::{CachePolicy, ClientDelegate, ClientEvent, ConnectionEvent};
 
 #[derive(Debug, thiserror::Error, Display)]
 pub enum ClientError {
@@ -29,18 +35,23 @@ pub enum ClientError {
 
 #[derive(Clone)]
 pub struct Client<D: DataCache + 'static, A: AvatarCache + 'static> {
-    pub(super) client: XMPPClient,
-    pub(super) inner: Arc<ClientInner<D, A>>,
+    pub(in crate::client) client: XMPPClient,
+    pub(in crate::client) inner: Arc<ClientInner<D, A>>,
 }
 
-pub(super) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> {
+pub(in crate::client) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> {
     pub caps: Capabilities,
     pub data_cache: D,
     pub avatar_cache: A,
+    pub is_observing_rooms: AtomicBool,
     pub time_provider: Arc<dyn TimeProvider>,
+    pub id_provider: Arc<dyn IDProvider>,
     pub software_version: SoftwareVersion,
     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
     pub presences: RwLock<PresenceMap>,
+    pub muc_service: RwLock<Option<muc::Service>>,
+    pub bookmarks: RwLock<HashMap<BareJid, ConferenceBookmark>>,
+    pub connected_rooms: RwLock<HashMap<BareJid, RoomEnvelope<D, A>>>,
 }
 
 impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
@@ -87,6 +98,16 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
                 msg: err.to_string(),
             })?;
 
+        self.gather_server_features()
+            .await
+            .map_err(|err| ConnectionError::Generic {
+                msg: err.to_string(),
+            })?;
+
+        self.send_event(ClientEvent::ConnectionStatusChanged {
+            event: ConnectionEvent::Connect,
+        });
+
         Ok(())
     }
 
@@ -104,6 +125,83 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    pub async fn start_observing_rooms(&self) -> Result<()> {
+        if self.inner.is_observing_rooms.swap(true, Ordering::Acquire) {
+            return Ok(());
+        }
+
+        let user_jid = self.connected_jid()?;
+
+        // Insert contacts as "Direct Message" rooms…
+        *self.inner.connected_rooms.write() = self
+            .load_contacts(CachePolicy::default())
+            .await?
+            .into_iter()
+            .map(|contact| {
+                (
+                    contact.jid.clone(),
+                    RoomEnvelope::from((contact, user_jid.clone(), self)),
+                )
+            })
+            .collect();
+
+        let bookmarks = match self.load_bookmarks().await {
+            Ok(bookmarks) => bookmarks,
+            Err(error) => {
+                error!("Failed to load bookmarks. Reason: {}", error.to_string());
+                Default::default()
+            }
+        };
+        let mut invalid_bookmarks = vec![];
+
+        for (jid, bookmark) in bookmarks.iter() {
+            let result = self
+                .enter_room(
+                    &jid,
+                    bookmark.conference.nick.as_deref(),
+                    bookmark.conference.password.as_deref(),
+                )
+                .await;
+
+            match result {
+                Ok(_) => (),
+                Err(error) if error.defined_condition() == Some(DefinedCondition::Gone) => {
+                    // The room does not exist anymore…
+                    invalid_bookmarks.push(bookmark.jid.to_bare());
+                }
+                Err(error) => error!(
+                    "Failed to enter room {}. Reason: {}",
+                    bookmark.jid,
+                    error.to_string()
+                ),
+            }
+        }
+
+        *self.inner.bookmarks.write() = bookmarks;
+
+        if !invalid_bookmarks.is_empty() {
+            self.inner
+                .connected_rooms
+                .write()
+                .retain(|room_jid, _| !invalid_bookmarks.contains(room_jid));
+
+            info!("Deleting {} invalid bookmarks…", invalid_bookmarks.len());
+            if let Err(error) = self
+                .remove_and_publish_bookmarks(invalid_bookmarks.as_slice())
+                .await
+            {
+                error!(
+                    "Failed to delete invalid bookmarks. Reason {}",
+                    error.to_string()
+                )
+            }
+        }
+
+        self.send_event(ClientEvent::RoomsChanged);
+
+        Ok(())
+    }
+
     pub async fn load_account_settings(&self) -> Result<AccountSettings> {
         Ok(self
             .inner
@@ -123,9 +221,29 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 }
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    pub async fn query_server_features(&self) -> Result<()> {
-        let caps = self.client.get_mod::<Caps>();
-        caps.query_server_features().await
+    async fn gather_server_features(&self) -> Result<()> {
+        let caps = self.client.get_mod::<mods::Caps>();
+        let disco_items = caps.query_server_disco_items(None).await?;
+
+        for item in disco_items.items {
+            let info = caps.query_disco_info(item.jid.clone(), None).await?;
+
+            if info
+                .identities
+                .iter()
+                .find(|ident| ident.category == "conference")
+                .is_none()
+            {
+                continue;
+            }
+
+            *self.inner.muc_service.write() = Some(muc::Service {
+                jid: item.jid.into_bare(),
+            });
+            break;
+        }
+
+        Ok(())
     }
 }
 

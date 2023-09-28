@@ -18,6 +18,7 @@ use prose_xmpp::ConnectionError;
 
 use crate::client::Client;
 use crate::types::BareJid;
+use crate::types::ConnectedRoomExt;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
@@ -39,9 +40,12 @@ export type ConnectionError = ConnectionTimedOutError | ConnectionInvalidCredent
 export interface ProseClientDelegate {
     clientConnected(): void
     clientDisconnected(client: ProseClient, error?: ConnectionError): void
+    
+    /// The number of available rooms has changed.
+    roomsChanged(client: ProseClient): void
 
     /// A user in `conversation` started or stopped typing.
-    composingUsersChanged(client: ProseClient, conversation: JID): void
+    composingUsersChanged(client: ProseClient, room: Room): void
 
     /// Infos about a contact have changed.
     contactChanged(client: ProseClient, jid: JID): void
@@ -50,13 +54,13 @@ export interface ProseClientDelegate {
     avatarChanged(client: ProseClient, jid: JID): void
 
     /// One or many messages were either received or sent.
-    messagesAppended(client: ProseClient, conversation: JID, messageIDs: string[]): void
+    messagesAppended(client: ProseClient, room: Room, messageIDs: string[]): void
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
-    messagesUpdated(client: ProseClient, conversation: JID, messageIDs: string[]): void
+    messagesUpdated(client: ProseClient, room: Room, messageIDs: string[]): void
 
     /// A message was deleted.
-    messagesDeleted(client: ProseClient, conversation: JID, messageIDs: string[]): void
+    messagesDeleted(client: ProseClient, room: Room, messageIDs: string[]): void
 }
 "#;
 
@@ -79,8 +83,11 @@ extern "C" {
     fn composing_users_changed(
         this: &JSDelegate,
         client: Client,
-        conversation: BareJid,
+        room: JsValue,
     ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "roomsChanged")]
+    fn rooms_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "contactChanged")]
     fn contact_changed(this: &JSDelegate, client: Client, jid: BareJid) -> Result<(), JsValue>;
@@ -92,7 +99,7 @@ extern "C" {
     fn messages_appended(
         this: &JSDelegate,
         client: Client,
-        conversation: BareJid,
+        room: JsValue,
         ids: Vec<JsValue>,
     ) -> Result<(), JsValue>;
 
@@ -100,7 +107,7 @@ extern "C" {
     fn messages_updated(
         this: &JSDelegate,
         client: Client,
-        conversation: BareJid,
+        room: JsValue,
         ids: Vec<JsValue>,
     ) -> Result<(), JsValue>;
 
@@ -108,7 +115,7 @@ extern "C" {
     fn messages_deleted(
         this: &JSDelegate,
         client: Client,
-        conversation: BareJid,
+        room: JsValue,
         ids: Vec<JsValue>,
     ) -> Result<(), JsValue>;
 }
@@ -172,7 +179,7 @@ impl ClientDelegate<WasmCache, WasmCache> for Delegate<WasmCache, WasmCache> {
     fn handle_event(
         &self,
         client: prose_core_client::Client<WasmCache, WasmCache>,
-        event: ClientEvent,
+        event: ClientEvent<WasmCache, WasmCache>,
     ) {
         match self.handle_event_throwing(client, event) {
             Ok(()) => (),
@@ -188,14 +195,14 @@ impl Delegate<WasmCache, WasmCache> {
     fn handle_event_throwing(
         &self,
         client: prose_core_client::Client<WasmCache, WasmCache>,
-        event: ClientEvent,
+        event: ClientEvent<WasmCache, WasmCache>,
     ) -> Result<(), JsValue> {
         let client = Client::from(client);
 
         match event {
-            ClientEvent::ComposingUsersChanged { conversation } => self
+            ClientEvent::ComposingUsersChanged { room } => self
                 .inner
-                .composing_users_changed(client, conversation.into())?,
+                .composing_users_changed(client, room.into_js_value())?,
             ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Connect,
             } => self.inner.client_connected(client)?,
@@ -204,32 +211,24 @@ impl Delegate<WasmCache, WasmCache> {
             } => self
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
+            ClientEvent::RoomsChanged => self.inner.rooms_changed(client)?,
             ClientEvent::ContactChanged { jid } => {
                 self.inner.contact_changed(client, jid.into())?
             }
             ClientEvent::AvatarChanged { jid } => self.inner.avatar_changed(client, jid.into())?,
-            ClientEvent::MessagesAppended {
-                conversation,
-                message_ids,
-            } => self.inner.messages_appended(
+            ClientEvent::MessagesAppended { room, message_ids } => self.inner.messages_appended(
                 client,
-                conversation.into(),
+                room.into_js_value(),
                 message_ids.into_js_array(),
             )?,
-            ClientEvent::MessagesUpdated {
-                conversation,
-                message_ids,
-            } => self.inner.messages_updated(
+            ClientEvent::MessagesUpdated { room, message_ids } => self.inner.messages_updated(
                 client,
-                conversation.into(),
+                room.into_js_value(),
                 message_ids.into_js_array(),
             )?,
-            ClientEvent::MessagesDeleted {
-                conversation,
-                message_ids,
-            } => self.inner.messages_deleted(
+            ClientEvent::MessagesDeleted { room, message_ids } => self.inner.messages_deleted(
                 client,
-                conversation.into(),
+                room.into_js_value(),
                 message_ids.into_js_array(),
             )?,
         }

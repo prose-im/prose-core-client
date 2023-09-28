@@ -8,10 +8,13 @@ use crate::{client, mods};
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     Bookmark(mods::bookmark::Event),
-    Client(client::Event),
+    Bookmark2(mods::bookmark2::Event),
     Caps(mods::caps::Event),
     Chat(mods::chat::Event),
+    Client(client::Event),
+    MUC(mods::muc::Event),
     Ping(mods::ping::Event),
     Profile(mods::profile::Event),
+    Roster(mods::roster::Event),
     Status(mods::status::Event),
 }

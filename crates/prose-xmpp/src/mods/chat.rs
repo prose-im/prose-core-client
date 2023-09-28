@@ -86,10 +86,11 @@ impl Chat {
         &self,
         to: impl Into<Jid>,
         body: impl Into<String>,
+        message_type: &MessageType,
         chat_state: Option<ChatState>,
     ) -> Result<()> {
         let mut stanza = Message::new()
-            .set_type(MessageType::Chat)
+            .set_type(message_type.clone())
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
@@ -106,8 +107,10 @@ impl Chat {
         id: message::Id,
         to: impl Into<Jid>,
         body: impl Into<String>,
+        message_type: &MessageType,
     ) -> Result<()> {
         let stanza = Message::new()
+            .set_type(message_type.clone())
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
@@ -116,9 +119,14 @@ impl Chat {
         self.send_message_stanza(stanza)
     }
 
-    pub fn send_chat_state(&self, to: impl Into<Jid>, chat_state: ChatState) -> Result<()> {
+    pub fn send_chat_state(
+        &self,
+        to: impl Into<Jid>,
+        chat_state: ChatState,
+        message_type: &MessageType,
+    ) -> Result<()> {
         let stanza = Message::new()
-            .set_type(MessageType::Chat)
+            .set_type(message_type.clone())
             .set_from(self.ctx.full_jid())
             .set_to(to)
             .set_chat_state(chat_state);
@@ -131,9 +139,10 @@ impl Chat {
         id: message::Id,
         to: impl Into<Jid>,
         reactions: impl IntoIterator<Item = Emoji>,
+        message_type: &MessageType,
     ) -> Result<()> {
         let stanza = Message::new()
-            .set_type(MessageType::Chat)
+            .set_type(message_type.clone())
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
@@ -146,9 +155,14 @@ impl Chat {
     }
 
     // https://xmpp.org/extensions/xep-0424.html
-    pub fn retract_message(&self, id: message::Id, to: impl Into<Jid>) -> Result<()> {
+    pub fn retract_message(
+        &self,
+        id: message::Id,
+        to: impl Into<Jid>,
+        message_type: &MessageType,
+    ) -> Result<()> {
         let stanza = Message::new()
-        .set_type(MessageType::Chat)
+        .set_type(message_type.clone())
         .set_id(self.ctx.generate_id().into())
         .set_from(self.ctx.full_jid())
         .set_to(to)
@@ -172,9 +186,14 @@ impl Chat {
         }
     }
 
-    pub fn mark_message_received(&self, id: message::Id, to: impl Into<Jid>) -> Result<()> {
+    pub fn mark_message_received(
+        &self,
+        id: message::Id,
+        to: impl Into<Jid>,
+        message_type: &MessageType,
+    ) -> Result<()> {
         let stanza = Message::new()
-            .set_type(MessageType::Chat)
+            .set_type(message_type.clone())
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid().clone())
             .set_to(to)

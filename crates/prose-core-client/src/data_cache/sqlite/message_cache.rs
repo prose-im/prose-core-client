@@ -43,7 +43,7 @@ impl MessageCache for SQLiteCache {
                     msg.id.id().to_string(),
                     msg.stanza_id.as_ref().map(|id| id.to_string()),
                     msg.target.as_ref().map(|t| t.to_string()),
-                    msg.to.to_string(),
+                    msg.to.as_ref().map(|to| to.to_string()),
                     msg.from.to_string(),
                     msg.timestamp,
                     serde_json::to_string(&msg.payload)?,
@@ -323,7 +323,9 @@ impl TryFrom<&rusqlite::Row<'_>> for MessageLike {
             target: row
                 .get::<_, Option<FromStrSql<message::Id>>>(2)?
                 .map(|t| t.0),
-            to: row.get::<_, FromStrSql<BareJid>>(3)?.0,
+            to: row
+                .get::<_, Option<FromStrSql<BareJid>>>(3)?
+                .map(|val| val.0),
             from: row.get::<_, FromStrSql<BareJid>>(4)?.0,
             timestamp: row.get(5)?,
             payload: serde_json::from_str(&row.get::<_, String>(6)?)

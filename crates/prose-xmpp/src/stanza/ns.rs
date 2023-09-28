@@ -36,3 +36,18 @@ pub const LAST_ACTIVITY: &str = "jabber:iq:last";
 
 /// XEP-0444: Message Reactions
 pub const REACTIONS: &str = "urn:xmpp:reactions:0";
+
+/// XEP-0045: Multi-User Chat
+pub const MUC_OWNER: &str = "http://jabber.org/protocol/muc#owner";
+
+/// XEP-0045: Multi-User Chat
+pub const MUC_ADMIN: &str = "http://jabber.org/protocol/muc#admin";
+
+/// XEP-0045: Multi-User Chat
+pub const MUC_ROOMCONFIG: &str = "http://jabber.org/protocol/muc#roomconfig";
+
+/// XEP-0045: Multi-User Chat
+pub const MUC_ROOMINFO: &str = "http://jabber.org/protocol/muc#roominfo";
+
+/// XEP-0249: Direct MUC Invitations
+pub const DIRECT_MUC_INVITATIONS: &str = "jabber:x:conference";

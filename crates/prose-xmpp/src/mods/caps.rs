@@ -5,7 +5,7 @@
 
 use anyhow::{bail, Result};
 use jid::Jid;
-use xmpp_parsers::disco::DiscoInfoQuery;
+use xmpp_parsers::disco::{DiscoInfoQuery, DiscoInfoResult, DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::presence::Presence;
 use xmpp_parsers::{disco, ns, presence};
@@ -13,7 +13,10 @@ use xmpp_parsers::{disco, ns, presence};
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
+use crate::util::RequestError;
 
+/// XEP-0115: Entity Capabilities
+/// https://xmpp.org/extensions/xep-0115.html
 #[derive(Default, Clone)]
 pub struct Caps {
     ctx: ModuleContext,
@@ -119,18 +122,49 @@ impl Caps {
             .send_stanza(Iq::from_result(id, Some(disco)).with_to(to.into()))
     }
 
-    pub async fn query_server_features(&self) -> Result<()> {
-        let stanza = self
-            .ctx
-            .send_iq(Iq::from_get(
-                self.ctx.generate_id(),
-                DiscoInfoQuery { node: None },
-            ))
-            .await?;
+    pub async fn query_server_disco_info(
+        &self,
+        node: Option<String>,
+    ) -> Result<DiscoInfoResult, RequestError> {
+        self.query_disco_info(self.ctx.server_jid(), node).await
+    }
 
-        if let Some(stanza) = stanza {
-            println!("{}", String::from(&stanza));
-        }
-        Ok(())
+    pub async fn query_server_disco_items(
+        &self,
+        node: Option<String>,
+    ) -> Result<DiscoItemsResult, RequestError> {
+        self.query_disco_items(self.ctx.server_jid(), node).await
+    }
+
+    pub async fn query_disco_items(
+        &self,
+        from: impl Into<Jid>,
+        node: Option<String>,
+    ) -> Result<DiscoItemsResult, RequestError> {
+        let response = self
+            .ctx
+            .send_iq(
+                Iq::from_get(self.ctx.generate_id(), DiscoItemsQuery { node }).with_to(from.into()),
+            )
+            .await?
+            .ok_or(RequestError::UnexpectedResponse)?;
+
+        Ok(DiscoItemsResult::try_from(response)?)
+    }
+
+    pub async fn query_disco_info(
+        &self,
+        from: impl Into<Jid>,
+        node: Option<String>,
+    ) -> Result<DiscoInfoResult, RequestError> {
+        let response = self
+            .ctx
+            .send_iq(
+                Iq::from_get(self.ctx.generate_id(), DiscoInfoQuery { node }).with_to(from.into()),
+            )
+            .await?
+            .ok_or(RequestError::UnexpectedResponse)?;
+
+        Ok(DiscoInfoResult::try_from(response)?)
     }
 }

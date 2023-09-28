@@ -7,8 +7,9 @@ use std::fmt::Debug;
 
 use anyhow::{format_err, Result};
 use jid::{BareJid, Jid};
-use tracing::{debug, instrument};
+use tracing::debug;
 use xmpp_parsers::mam::Complete;
+use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods::{Chat, MAM};
 use prose_xmpp::stanza::message;
@@ -23,12 +24,12 @@ use super::Client;
 const MESSAGE_PAGE_SIZE: u32 = 50;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn load_latest_messages(
         &self,
         from: &BareJid,
-        since: impl Into<Option<&MessageId>> + Debug,
-        load_from_server: bool,
+        _since: impl Into<Option<&MessageId>> + Debug,
+        _load_from_server: bool,
     ) -> Result<Vec<Message>> {
         debug!("Loading messages from server…");
 
@@ -52,7 +53,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(Message::reducing_messages(messages))
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn load_messages_before(
         &self,
         from: &BareJid,
@@ -145,7 +146,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         .await
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn load_messages_with_ids(
         &self,
         conversation: &BareJid,
@@ -171,17 +172,17 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         Ok(Message::reducing_messages(messages))
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn send_message(
         &self,
         to: impl Into<Jid> + Debug,
         body: impl Into<String> + Debug,
     ) -> Result<()> {
         let chat = self.client.get_mod::<Chat>();
-        chat.send_message(to, body, Some(ChatState::Active))
+        chat.send_message(to, body, &MessageType::Chat, Some(ChatState::Active))
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn update_message(
         &self,
         conversation: impl Into<Jid> + Debug,
@@ -189,10 +190,15 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         body: impl Into<String> + Debug,
     ) -> Result<()> {
         let chat = self.client.get_mod::<Chat>();
-        chat.update_message(id.into_inner().into(), conversation, body)
+        chat.update_message(
+            id.into_inner().into(),
+            conversation,
+            body,
+            &Default::default(),
+        )
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn set_user_is_composing(
         &self,
         conversation: impl Into<Jid> + Debug,
@@ -206,10 +212,11 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             } else {
                 ChatState::Paused
             },
+            &Default::default(),
         )
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn load_composing_users(&self, conversation: &BareJid) -> Result<Vec<BareJid>> {
         // We currently do not support multi-user chats. So either our conversation partner is
         // typing or they are not.
@@ -224,7 +231,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         }
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn toggle_reaction_to_message(
         &self,
         conversation: impl Into<Jid> + Debug,
@@ -260,27 +267,29 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         }
 
         let chat = self.client.get_mod::<Chat>();
-        chat.react_to_message(message_id, conversation, reactions)?;
+        chat.react_to_message(message_id, conversation, reactions, &Default::default())?;
 
         Ok(())
     }
 
-    #[instrument]
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn retract_message(
         &self,
         conversation: impl Into<Jid> + Debug,
         id: MessageId,
     ) -> Result<()> {
         let chat = self.client.get_mod::<Chat>();
-        chat.retract_message(id.into_inner().into(), conversation)?;
+        chat.retract_message(id.into_inner().into(), conversation, &Default::default())?;
         Ok(())
     }
 
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn save_draft(&self, conversation: &BareJid, text: Option<&str>) -> Result<()> {
         self.inner.data_cache.save_draft(conversation, text).await?;
         Ok(())
     }
 
+    #[deprecated(note = "Use the Room API instead.")]
     pub async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>> {
         Ok(self.inner.data_cache.load_draft(conversation).await?)
     }
@@ -320,7 +329,8 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
         })
     }
 
-    async fn load_message(
+    #[deprecated(note = "Use the Room API instead.")]
+    pub(super) async fn load_message(
         &self,
         conversation: &BareJid,
         message_id: &message::Id,

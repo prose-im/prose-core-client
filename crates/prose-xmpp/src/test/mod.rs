@@ -88,6 +88,7 @@ impl ClientTestAdditions for Client {
                 async {}
             }))
             .add_mod(mods::Bookmark::default())
+            .add_mod(mods::Bookmark2::default())
             .add_mod(mods::Caps::default())
             .add_mod(mods::Chat::default())
             .add_mod(mods::MAM::default())

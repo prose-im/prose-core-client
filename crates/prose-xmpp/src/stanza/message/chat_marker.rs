@@ -56,7 +56,7 @@ impl TryFrom<Element> for Received {
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("received", ns::CHAT_MARKERS)?;
         Ok(Received {
-            id: value.req_attr("id")?.into(),
+            id: value.attr_req("id")?.into(),
         })
     }
 }
@@ -75,7 +75,7 @@ impl TryFrom<Element> for Displayed {
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("displayed", ns::CHAT_MARKERS)?;
         Ok(Displayed {
-            id: value.req_attr("id")?.into(),
+            id: value.attr_req("id")?.into(),
         })
     }
 }
@@ -94,7 +94,7 @@ impl TryFrom<Element> for Acknowledged {
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("acknowledged", ns::CHAT_MARKERS)?;
         Ok(Acknowledged {
-            id: value.req_attr("id")?.into(),
+            id: value.attr_req("id")?.into(),
         })
     }
 }

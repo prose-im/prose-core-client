@@ -5,6 +5,7 @@
 
 use crate::ns;
 use jid::Jid;
+use minidom::Element;
 use xmpp_parsers::message::Message;
 use xmpp_parsers::pubsub::PubSubEvent;
 
@@ -35,5 +36,14 @@ impl TryFrom<Message> for PubSubMessage {
                 })
                 .collect::<Result<_, _>>()?,
         })
+    }
+}
+
+impl From<PubSubMessage> for Element {
+    fn from(value: PubSubMessage) -> Self {
+        Element::builder("message", ns::JABBER_CLIENT)
+            .attr("from", value.from)
+            .append_all(value.events)
+            .build()
     }
 }

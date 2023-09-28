@@ -10,7 +10,6 @@ use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use tracing::{debug, instrument};
 
-use prose_xmpp::mods::{Profile, Roster};
 use prose_xmpp::{mods, TimeProvider};
 
 use crate::avatar_cache::AvatarCache;
@@ -21,6 +20,13 @@ use crate::CachePolicy;
 use super::Client;
 
 impl<D: DataCache, A: AvatarCache> Client<D, A> {
+    pub async fn add_contact(&self, jid: &BareJid) -> Result<()> {
+        let roster_mod = self.client.get_mod::<mods::Roster>();
+        roster_mod.add_contact(jid, None, None).await?;
+        roster_mod.subscribe_to_presence(jid).await?;
+        Ok(())
+    }
+
     #[instrument]
     pub async fn load_user_profile(
         &self,
@@ -60,7 +66,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
 
     #[instrument]
     pub async fn load_user_metadata(&self, from: &BareJid) -> Result<UserMetadata> {
-        let profile = self.client.get_mod::<Profile>();
+        let profile = self.client.get_mod::<mods::Profile>();
 
         let from = self.inner.resolve_to_full_jid(from);
 
@@ -99,7 +105,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             }
 
             let connected_jid = self.connected_jid()?.to_bare();
-            let roster = self.client.get_mod::<Roster>();
+            let roster = self.client.get_mod::<mods::Roster>();
             let roster_items = roster
                 .load_roster()
                 .await?

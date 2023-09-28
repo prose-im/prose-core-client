@@ -94,7 +94,7 @@ impl Reaction {
     pub fn from_(&self) -> BareJidArray {
         self.from
             .iter()
-            .map(Clone::clone)
+            .cloned()
             .collect_into_js_array::<BareJidArray>()
     }
 }

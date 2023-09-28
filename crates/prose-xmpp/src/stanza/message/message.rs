@@ -7,21 +7,25 @@ use jid::Jid;
 use minidom::Element;
 use strum_macros::{Display, EnumString};
 use xmpp_parsers::delay::Delay;
-use xmpp_parsers::message::{Body, MessageType};
+use xmpp_parsers::message::{Body, MessageType, Subject};
 use xmpp_parsers::message_correct::Replace;
+use xmpp_parsers::stanza_error::StanzaError;
 
 use crate::ns;
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::stanza_id::{OriginId, StanzaId};
 use crate::stanza::message::{carbons, Fallback, Reactions};
 use crate::stanza::message::{chat_marker, mam};
+use crate::stanza::muc;
 use crate::util::id_string_macro::id_string;
 
 id_string!(Id);
 
 // We're redeclaring ChatState here since this makes it easier to work with when saving it to the
 // SQL db.
-#[derive(Debug, PartialEq, Display, EnumString, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, PartialEq, Display, EnumString, Clone, serde::Serialize, serde::Deserialize, Default,
+)]
 #[strum(serialize_all = "lowercase")]
 pub enum ChatState {
     /// User is actively participating in the chat session.
@@ -29,6 +33,7 @@ pub enum ChatState {
     /// User has not been actively participating in the chat session.
     Composing,
     /// User has effectively ended their participation in the chat session.
+    #[default]
     Gone,
     /// User is composing a message.
     Inactive,
@@ -36,7 +41,7 @@ pub enum ChatState {
     Paused,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct Message {
     pub from: Option<Jid>,
     pub to: Option<Jid>,
@@ -45,6 +50,7 @@ pub struct Message {
     pub origin_id: Option<OriginId>,
     pub r#type: MessageType,
     pub body: Option<String>,
+    pub subject: Option<String>,
     pub chat_state: Option<ChatState>,
     pub replace: Option<Id>,
     pub reactions: Option<Reactions>,
@@ -59,33 +65,14 @@ pub struct Message {
     pub sent_carbon: Option<carbons::Sent>,
     pub received_carbon: Option<carbons::Received>,
     pub store: Option<bool>,
+    pub direct_invite: Option<muc::DirectInvite>,
+    pub mediated_invite: Option<muc::MediatedInvite>,
+    pub error: Option<StanzaError>,
 }
 
 impl Message {
     pub fn new() -> Self {
-        Message {
-            from: None,
-            to: None,
-            id: None,
-            stanza_id: None,
-            origin_id: None,
-            r#type: MessageType::Chat,
-            body: None,
-            chat_state: None,
-            replace: None,
-            reactions: None,
-            fastening: None,
-            fallback: None,
-            delay: None,
-            markable: false,
-            displayed_marker: None,
-            received_marker: None,
-            acknowledged_marker: None,
-            archived_message: None,
-            sent_carbon: None,
-            received_carbon: None,
-            store: None,
-        }
+        Message::default()
     }
 }
 
@@ -98,6 +85,10 @@ impl TryFrom<xmpp_parsers::message::Message> for Message {
         message.body = root
             .get_best_body(vec![])
             .map(|(_, body)| body.0.to_string());
+
+        message.subject = root
+            .get_best_subject(vec![])
+            .map(|(_, subject)| subject.0.to_string());
 
         for payload in root.payloads.into_iter() {
             match payload {
@@ -145,6 +136,15 @@ impl TryFrom<xmpp_parsers::message::Message> for Message {
                 _ if payload.is("received", ns::CARBONS) => {
                     message.received_carbon = Some(carbons::Received::try_from(payload)?)
                 }
+                _ if payload.is("x", ns::DIRECT_MUC_INVITATIONS) => {
+                    message.direct_invite = Some(muc::DirectInvite::try_from(payload)?)
+                }
+                _ if payload.is("x", ns::MUC_USER) => {
+                    message.mediated_invite = Some(muc::MediatedInvite::try_from(payload)?)
+                }
+                _ if payload.is("error", ns::DEFAULT_NS) => {
+                    message.error = Some(StanzaError::try_from(payload)?)
+                }
                 _ => (),
             }
         }
@@ -182,6 +182,9 @@ impl From<Message> for xmpp_parsers::message::Message {
 
         if let Some(body) = value.body {
             message.bodies.insert("".into(), Body(body));
+        }
+        if let Some(subject) = value.subject {
+            message.subjects.insert("".into(), Subject(subject));
         }
         if let Some(stanza_id) = value.stanza_id {
             message.payloads.push(stanza_id.into())
@@ -239,6 +242,12 @@ impl From<Message> for xmpp_parsers::message::Message {
             message.payloads.push(
                 Element::builder(if store { "store" } else { "no-store" }, ns::HINTS).build(),
             );
+        }
+        if let Some(direct_invite) = value.direct_invite {
+            message.payloads.push(direct_invite.into())
+        }
+        if let Some(mediated_invite) = value.mediated_invite {
+            message.payloads.push(mediated_invite.into())
         }
         message
     }

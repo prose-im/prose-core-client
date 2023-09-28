@@ -13,22 +13,48 @@ pub enum RequestError {
     UnexpectedResponse,
     #[error("XMPP Error: {err:?}")]
     XMPP { err: StanzaError },
+    #[error(transparent)]
+    JidError(#[from] jid::Error),
     #[error("Request error: {msg}")]
     Generic { msg: String },
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ParseError {
+    #[error("Parse error: {msg}")]
+    Generic { msg: String },
+    #[error(transparent)]
+    XMPPParseError(#[from] xmpp_parsers::Error),
+}
+
+impl From<xmpp_parsers::Error> for RequestError {
+    fn from(value: xmpp_parsers::Error) -> Self {
+        Self::ParseError(value.into())
+    }
+}
+
+impl From<StanzaError> for RequestError {
+    fn from(value: StanzaError) -> Self {
+        Self::XMPP { err: value }
+    }
 }
 
 impl RequestError {
     pub fn is_item_not_found_err(&self) -> bool {
-        if let RequestError::XMPP {
-            err:
-                StanzaError {
-                    defined_condition: DefinedCondition::ItemNotFound,
-                    ..
-                },
+        self.defined_condition() == Some(DefinedCondition::ItemNotFound)
+    }
+
+    pub fn defined_condition(&self) -> Option<DefinedCondition> {
+        let RequestError::XMPP {
+            err: StanzaError {
+                defined_condition, ..
+            },
         } = self
-        {
-            return true;
-        }
-        false
+        else {
+            return None;
+        };
+        return Some(defined_condition.clone());
     }
 }

@@ -7,3 +7,4 @@ Cargo.lock
 
 .env
 .npmrc
+rustc-ice-*.txt

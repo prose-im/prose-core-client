@@ -32,12 +32,12 @@ impl ModuleContext {
         iq: Iq,
     ) -> impl Future<Output = Result<Option<Element>, RequestError>> {
         let future = RequestFuture::new_iq_request(&iq.id);
-        self.send_iq_with_future(iq, future)
+        self.send_stanza_with_future(iq, future)
     }
 
-    pub(crate) fn send_iq_with_future<T: Send + 'static, U: 'static>(
+    pub(crate) fn send_stanza_with_future<T: Send + 'static, U: 'static>(
         &self,
-        iq: Iq,
+        stanza: impl Into<Element>,
         future: RequestFuture<T, U>,
     ) -> impl Future<Output = Result<U, RequestError>> {
         self.inner.mod_futures.lock().push(ModFutureStateEntry {
@@ -45,7 +45,7 @@ impl ModuleContext {
             timestamp: self.inner.time_provider.now().into(),
         });
 
-        if let Err(err) = self.send_stanza(iq) {
+        if let Err(err) = self.send_stanza(stanza) {
             return RequestFuture::failed(RequestError::Generic {
                 msg: err.to_string(),
             });
@@ -66,7 +66,7 @@ impl ModuleContext {
             .jid
             .read()
             .as_ref()
-            .map(Clone::clone)
+            .cloned()
             .unwrap_or(FullJid::from_parts(
                 Some(&NodePart::new("placeholder").unwrap()),
                 &DomainPart::new("prose.org").unwrap(),
@@ -75,6 +75,10 @@ impl ModuleContext {
     }
     pub(crate) fn bare_jid(&self) -> BareJid {
         Jid::Full(self.full_jid()).into_bare()
+    }
+
+    pub(crate) fn server_jid(&self) -> BareJid {
+        BareJid::from_parts(None, &self.full_jid().domain())
     }
 
     pub(crate) fn generate_id(&self) -> String {
@@ -102,15 +106,10 @@ pub(super) struct ModuleContextInner {
 }
 
 impl ModuleContextInner {
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(not(feature = "test"))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
-        wasm_bindgen_futures::spawn_local(async move { fut.await });
-    }
-    #[cfg(all(not(target_arch = "wasm32"), not(feature = "test")))]
-    pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
-        let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
-        tokio::spawn(async move { fut.await });
+        crate::util::spawn(fut);
     }
 
     #[cfg(feature = "test")]

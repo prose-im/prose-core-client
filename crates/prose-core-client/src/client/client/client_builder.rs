@@ -3,13 +3,14 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use prose_xmpp::client::ConnectorProvider;
-use prose_xmpp::mods::{Bookmark, Caps, Chat, Profile, Roster, Status, MAM};
+use prose_xmpp::mods::{Bookmark, Bookmark2, Caps, Chat, Profile, Roster, Status, MAM, MUC};
 use prose_xmpp::{
     ns, Client as XMPPClient, ClientBuilder as XMPPClientBuilder, IDProvider, SystemTimeProvider,
-    TimeProvider,
+    TimeProvider, UUIDProvider,
 };
 
 use crate::avatar_cache::AvatarCache;
@@ -26,6 +27,7 @@ pub struct ClientBuilder<D, A> {
     data_cache: D,
     avatar_cache: A,
     time_provider: Arc<dyn TimeProvider>,
+    id_provider: Arc<dyn IDProvider>,
     software_version: SoftwareVersion,
     delegate: Option<Box<dyn ClientDelegate<D, A>>>,
 }
@@ -37,6 +39,7 @@ impl ClientBuilder<UndefinedDataCache, UndefinedAvatarCache> {
             data_cache: UndefinedDataCache {},
             avatar_cache: UndefinedAvatarCache {},
             time_provider: Arc::new(SystemTimeProvider::default()),
+            id_provider: Arc::new(UUIDProvider::default()),
             software_version: SoftwareVersion::default(),
             delegate: None,
         }
@@ -50,6 +53,7 @@ impl<A> ClientBuilder<UndefinedDataCache, A> {
             data_cache,
             avatar_cache: self.avatar_cache,
             time_provider: self.time_provider,
+            id_provider: self.id_provider,
             software_version: self.software_version,
             delegate: None,
         }
@@ -63,6 +67,7 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
             data_cache: self.data_cache,
             avatar_cache,
             time_provider: self.time_provider,
+            id_provider: self.id_provider,
             software_version: self.software_version,
             delegate: None,
         }
@@ -142,23 +147,30 @@ impl<D: DataCache, A: AvatarCache> ClientBuilder<D, A> {
             caps,
             data_cache: self.data_cache,
             avatar_cache: self.avatar_cache,
+            id_provider: self.id_provider.clone(),
             time_provider: self.time_provider.clone(),
             software_version: self.software_version,
             delegate: self.delegate,
             presences: Default::default(),
+            muc_service: Default::default(),
+            bookmarks: Default::default(),
+            connected_rooms: Default::default(),
+            is_observing_rooms: AtomicBool::new(false),
         });
 
         let event_inner = inner.clone();
 
         let client = self
             .builder
+            .add_mod(Bookmark2::default())
+            .add_mod(Bookmark::default())
             .add_mod(Caps::default())
-            .add_mod(MAM::default())
             .add_mod(Chat::default())
+            .add_mod(MAM::default())
+            .add_mod(MUC::default())
             .add_mod(Profile::default())
             .add_mod(Roster::default())
             .add_mod(Status::default())
-            .add_mod(Bookmark::default())
             .set_time_provider(self.time_provider)
             .set_event_handler(Box::new(move |xmpp_client, event| {
                 let client = Client {

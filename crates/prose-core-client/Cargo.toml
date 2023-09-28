@@ -17,7 +17,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 indexmap = "2.0.0"
 jid = { workspace = true, features = ["serde"] }
-once_cell = { workspace = true }
+minidom = { workspace = true }
 parking_lot = { workspace = true }
 prose-xmpp = { path = "../prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
@@ -59,3 +59,4 @@ uniffi = { workspace = true, features = ["build"] }
 [features]
 default = []
 test = ["prose-xmpp/test", "dep:auto_impl", "dep:tokio", "tokio/macros", "dep:auto_impl", "dep:insta"]
+debug = []

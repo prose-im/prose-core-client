@@ -3,37 +3,88 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
-use minidom::{Element, NSChoice};
+use crate::util::ParseError;
+use minidom::{Element, ElementBuilder, NSChoice};
 
 pub trait ElementExt {
-    fn expect_is<'a>(&self, name: impl AsRef<str>, ns: impl Into<NSChoice<'a>>) -> Result<()>;
+    fn expect_is<'a>(
+        &self,
+        name: impl AsRef<str>,
+        ns: impl Into<NSChoice<'a>>,
+    ) -> Result<(), ParseError>;
 
-    fn req_attr(&self, name: impl AsRef<str>) -> Result<&str>;
+    fn attr_req(&self, name: impl AsRef<str>) -> Result<&str, ParseError>;
+
+    fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, ParseError>;
+    fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, ParseError>;
+}
+
+pub trait ElementBuilderExt {
+    fn attr_bool(self, name: impl AsRef<str>, value: bool) -> ElementBuilder;
+    fn attr_bool_opt(self, name: impl AsRef<str>, value: Option<bool>) -> ElementBuilder;
 }
 
 impl ElementExt for Element {
-    fn expect_is<'a>(&self, name: impl AsRef<str>, ns: impl Into<NSChoice<'a>>) -> Result<()> {
+    fn expect_is<'a>(
+        &self,
+        name: impl AsRef<str>,
+        ns: impl Into<NSChoice<'a>>,
+    ) -> Result<(), ParseError> {
         let ns = ns.into();
         if !self.is(&name, ns) {
-            return Err(anyhow::format_err!(
-                "Expected element with name {} and namespace {}. Got {} and {} instead.",
-                name.as_ref(),
-                ns_choice_to_string(ns),
-                self.name(),
-                self.ns()
-            ));
+            return Err(ParseError::Generic {
+                msg: format!(
+                    "Expected element with name {} and namespace {}. Got {} and {} instead.",
+                    name.as_ref(),
+                    ns_choice_to_string(ns),
+                    self.name(),
+                    self.ns()
+                ),
+            });
         }
         Ok(())
     }
 
-    fn req_attr(&self, name: impl AsRef<str>) -> Result<&str> {
-        self.attr(name.as_ref()).ok_or(anyhow::format_err!(
-            "Missing required attribute {} in element {}.",
-            name.as_ref(),
-            self.name()
-        ))
+    fn attr_req(&self, name: impl AsRef<str>) -> Result<&str, ParseError> {
+        self.attr(name.as_ref()).ok_or(ParseError::Generic {
+            msg: format!(
+                "Missing required attribute {} in element {}.",
+                name.as_ref(),
+                self.name()
+            ),
+        })
     }
+
+    fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, ParseError> {
+        self.attr(name.as_ref()).map(parse_bool).transpose()
+    }
+
+    fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, ParseError> {
+        parse_bool(self.attr_req(name)?)
+    }
+}
+
+impl ElementBuilderExt for ElementBuilder {
+    fn attr_bool(self, name: impl AsRef<str>, value: bool) -> ElementBuilder {
+        self.attr(name.as_ref(), if value { "true" } else { "false" })
+    }
+
+    fn attr_bool_opt(self, name: impl AsRef<str>, value: Option<bool>) -> ElementBuilder {
+        let Some(true) = value else { return self };
+        self.attr_bool(name, true)
+    }
+}
+
+pub fn parse_bool(value: impl AsRef<str>) -> Result<bool, ParseError> {
+    Ok(match value.as_ref() {
+        "true" | "1" => true,
+        "false" | "0" => false,
+        _ => {
+            return Err(ParseError::Generic {
+                msg: format!("Unknown value '{}' 'continue' attribute", value.as_ref()),
+            })
+        }
+    })
 }
 
 fn ns_choice_to_string<'a>(ns: impl Into<NSChoice<'a>>) -> String {

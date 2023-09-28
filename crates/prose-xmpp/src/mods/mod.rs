@@ -12,9 +12,11 @@ use xmpp_parsers::presence::Presence;
 use xmpp_parsers::pubsub::PubSubEvent;
 
 pub use bookmark::Bookmark;
+pub use bookmark2::Bookmark as Bookmark2;
 pub use caps::Caps;
 pub use chat::Chat;
 pub use mam::MAM;
+pub use muc::MUC;
 pub use ping::Ping;
 pub use profile::{AvatarData, Profile};
 pub use roster::Roster;
@@ -25,9 +27,11 @@ use crate::stanza::{Message, PubSubMessage};
 use crate::util::{SendUnlessWasm, SyncUnlessWasm, XMPPElement};
 
 pub mod bookmark;
+pub mod bookmark2;
 pub mod caps;
 pub mod chat;
 pub mod mam;
+pub mod muc;
 pub mod ping;
 pub mod profile;
 pub mod roster;

@@ -251,7 +251,7 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
         id: "1000".into(),
         stanza_id: None,
         target: None,
-        to: BareJid::from_str("a@prose.org").unwrap(),
+        to: Some(BareJid::from_str("a@prose.org").unwrap()),
         from: BareJid::from_str("b@prose.org").unwrap(),
         timestamp: Utc
             .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
@@ -290,7 +290,7 @@ async fn test_loads_message_with_emoji() -> Result<()> {
             id: "1".into(),
             stanza_id: None,
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
@@ -305,7 +305,7 @@ async fn test_loads_message_with_emoji() -> Result<()> {
             id: "2".into(),
             stanza_id: None,
             target: Some("1".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 07, 16, 00, 01)
@@ -320,7 +320,7 @@ async fn test_loads_message_with_emoji() -> Result<()> {
             id: "3".into(),
             stanza_id: None,
             target: Some("1".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 07, 16, 00, 02)
@@ -359,7 +359,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "1000".into(),
             stanza_id: None,
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
@@ -374,7 +374,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "1001".into(),
             stanza_id: None,
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 07, 17, 00, 00)
@@ -389,7 +389,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "1".into(),
             stanza_id: None,
             target: Some("1000".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
@@ -402,7 +402,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "2".into(),
             stanza_id: None,
             target: Some("1001".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
@@ -415,7 +415,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "3".into(),
             stanza_id: None,
             target: Some("2000".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
@@ -428,7 +428,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "4".into(),
             stanza_id: None,
             target: Some("1000".into()),
-            to: BareJid::from_str("b@prose.org").unwrap(),
+            to: Some(BareJid::from_str("b@prose.org").unwrap()),
             from: BareJid::from_str("a@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 19, 00, 00)
@@ -441,7 +441,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "5".into(),
             stanza_id: None,
             target: Some("1000".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("c@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 20, 00, 00)
@@ -454,7 +454,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             id: "6".into(),
             stanza_id: None,
             target: Some("1000".into()),
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 21, 00, 00)
@@ -514,7 +514,7 @@ async fn test_load_messages_before() -> Result<()> {
             id: "1000".into(),
             stanza_id: Some("1".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
@@ -529,7 +529,7 @@ async fn test_load_messages_before() -> Result<()> {
             id: "2000".into(),
             stanza_id: Some("2".into()),
             target: None,
-            to: BareJid::from_str("b@prose.org").unwrap(),
+            to: Some(BareJid::from_str("b@prose.org").unwrap()),
             from: BareJid::from_str("a@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
@@ -544,7 +544,7 @@ async fn test_load_messages_before() -> Result<()> {
             id: "3000".into(),
             stanza_id: Some("3".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
@@ -559,7 +559,7 @@ async fn test_load_messages_before() -> Result<()> {
             id: "4000".into(),
             stanza_id: Some("4".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 19, 00, 00)
@@ -574,7 +574,7 @@ async fn test_load_messages_before() -> Result<()> {
             id: "5000".into(),
             stanza_id: Some("5".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("c@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
@@ -671,7 +671,7 @@ async fn test_load_messages_after() -> Result<()> {
             id: "1000".into(),
             stanza_id: Some("1".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 17, 00, 00)
@@ -686,7 +686,7 @@ async fn test_load_messages_after() -> Result<()> {
             id: "2000".into(),
             stanza_id: Some("2".into()),
             target: None,
-            to: BareJid::from_str("b@prose.org").unwrap(),
+            to: Some(BareJid::from_str("b@prose.org").unwrap()),
             from: BareJid::from_str("a@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
@@ -701,7 +701,7 @@ async fn test_load_messages_after() -> Result<()> {
             id: "3000".into(),
             stanza_id: Some("3".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("c@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)
@@ -716,7 +716,7 @@ async fn test_load_messages_after() -> Result<()> {
             id: "4000".into(),
             stanza_id: Some("4".into()),
             target: None,
-            to: BareJid::from_str("a@prose.org").unwrap(),
+            to: Some(BareJid::from_str("a@prose.org").unwrap()),
             from: BareJid::from_str("b@prose.org").unwrap(),
             timestamp: Utc
                 .with_ymd_and_hms(2023, 04, 08, 18, 00, 00)

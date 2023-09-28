@@ -66,7 +66,44 @@ impl MAM {
         );
 
         self.ctx
-            .send_iq_with_future(iq, RequestFuture::new_mam_request(id, query_id))
+            .send_stanza_with_future(iq, RequestFuture::new_mam_request(id, query_id))
+    }
+
+    pub fn load_messages_in_muc_chat<'a>(
+        &self,
+        room_id: &BareJid,
+        before: impl Into<Option<&'a stanza_id::Id>>,
+        after: impl Into<Option<&'a stanza_id::Id>>,
+        max_count: impl Into<Option<usize>>,
+    ) -> impl Future<Output = Result<(Vec<mam::ArchivedMessage>, mam::Fin), RequestError>> {
+        let query_id = mam::QueryId(self.ctx.generate_id());
+        let id = self.ctx.generate_id();
+
+        let mut before = before.into().map(ToString::to_string);
+        let after = after.into().map(ToString::to_string);
+
+        if before.is_none() && after.is_none() {
+            before = Some("".to_string())
+        }
+
+        let iq = Iq::from_set(
+            id.clone(),
+            mam::Query {
+                queryid: Some(query_id.clone()),
+                node: None,
+                form: None,
+                set: Some(SetQuery {
+                    max: max_count.into(),
+                    after,
+                    before,
+                    index: None,
+                }),
+            },
+        )
+        .with_to(room_id.clone().into());
+
+        self.ctx
+            .send_stanza_with_future(iq, RequestFuture::new_mam_request(id, query_id))
     }
 }
 
@@ -88,13 +125,17 @@ impl RequestFuture<MAMFutureState, (Vec<mam::ArchivedMessage>, mam::Fin)> {
             },
             |state, element| {
                 if let XMPPElement::IQ(iq) = element {
-                    let IqType::Result(Some(payload)) = &iq.payload else {
-                        return Ok(ElementReducerPoll::Pending);
-                    };
-
                     if iq.id != state.id {
                         return Ok(ElementReducerPoll::Pending);
                     }
+
+                    if let IqType::Error(error) = &iq.payload {
+                        return Err(error.clone().into());
+                    }
+
+                    let IqType::Result(Some(payload)) = &iq.payload else {
+                        return Ok(ElementReducerPoll::Pending);
+                    };
 
                     let Ok(fin) = mam::Fin::try_from(payload.clone()) else {
                         return Err(RequestError::UnexpectedResponse);

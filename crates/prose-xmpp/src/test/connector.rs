@@ -10,6 +10,8 @@ use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
+use xmpp_parsers::disco::DiscoItemsResult;
+use xmpp_parsers::iq::Iq;
 
 use crate::client::ConnectorProvider;
 use crate::connector::{
@@ -64,6 +66,23 @@ impl Connection {
         F: FnMut(&Element) -> Vec<Element> + Send + 'static,
     {
         *self.inner.stanza_handler.lock() = Some(Box::new(handler))
+    }
+
+    pub fn use_start_sequence_handler(&self) {
+        self.set_stanza_handler(|st| {
+            if st.name() != "iq" || st.attr("id") != Some("id-2") {
+                return vec![];
+            }
+
+            vec![Iq::from_result(
+                "id-2",
+                Some(DiscoItemsResult {
+                    node: None,
+                    items: vec![],
+                }),
+            )
+            .into()]
+        });
     }
 
     pub fn sent_stanzas(&self) -> Vec<Element> {
