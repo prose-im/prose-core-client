@@ -4,8 +4,9 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use jid::BareJid;
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use prose_xmpp::{ConnectionError, SendUnlessWasm, SyncUnlessWasm};
+use prose_xmpp::ConnectionError;
 
 use crate::avatar_cache::AvatarCache;
 use crate::data_cache::DataCache;

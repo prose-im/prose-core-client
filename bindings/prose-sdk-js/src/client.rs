@@ -12,7 +12,7 @@ use crate::types::{
 use base64::{engine::general_purpose, Engine as _};
 use jid::ResourcePart;
 use js_sys::Array;
-use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
+use prose_core_client::data_cache::indexed_db::{IndexedDBDataCache, PlatformCache};
 use prose_core_client::types::{SoftwareVersion, UserActivity};
 use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
 use std::rc::Rc;
@@ -103,7 +103,7 @@ impl Default for ClientConfig {
 
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
-    client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>,
+    client: ProseClient<Rc<PlatformCache>, Rc<PlatformCache>>,
 }
 
 #[wasm_bindgen(js_class = "ProseClient")]
@@ -361,8 +361,8 @@ impl Client {
     }
 }
 
-impl From<ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>> for Client {
-    fn from(client: ProseClient<Rc<IndexedDBDataCache>, Rc<IndexedDBDataCache>>) -> Self {
+impl From<ProseClient<Rc<PlatformCache>, Rc<PlatformCache>>> for Client {
+    fn from(client: ProseClient<Rc<PlatformCache>, Rc<PlatformCache>>) -> Self {
         Client { client }
     }
 }

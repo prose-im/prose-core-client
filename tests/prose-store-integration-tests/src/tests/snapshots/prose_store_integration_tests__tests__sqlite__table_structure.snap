@@ -1,0 +1,9 @@
+---
+source: tests/prose-store-integration-tests/src/tests/sqlite.rs
+assertion_line: 90
+expression: sql
+---
+CREATE TABLE "person" (
+            `key` TEXT PRIMARY KEY,
+            `data` TEXT
+        )

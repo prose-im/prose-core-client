@@ -19,12 +19,13 @@ pub use mam::MAM;
 pub use muc::MUC;
 pub use ping::Ping;
 pub use profile::{AvatarData, Profile};
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 pub use roster::Roster;
 pub use status::Status;
 
 use crate::client::ModuleContext;
 use crate::stanza::{Message, PubSubMessage};
-use crate::util::{SendUnlessWasm, SyncUnlessWasm, XMPPElement};
+use crate::util::XMPPElement;
 
 pub mod bookmark;
 pub mod bookmark2;

@@ -12,6 +12,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use jid::FullJid;
 use minidom::Element;
+use prose_wasm_utils::PinnedFuture;
 use tracing::{error, warn};
 
 use crate::client::builder::ClientBuilder;
@@ -20,7 +21,7 @@ use crate::client::{Event, ModuleLookup};
 use crate::connector::{ConnectionError, ConnectionEvent};
 use crate::mods;
 use crate::mods::AnyModule;
-use crate::util::{ModuleFuturePoll, PinnedFuture, XMPPElement};
+use crate::util::{ModuleFuturePoll, XMPPElement};
 use crate::Event as ClientEvent;
 
 #[derive(Clone)]

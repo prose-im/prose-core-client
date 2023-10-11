@@ -1,0 +1,18 @@
+[package]
+name = "prose-wasm-utils"
+version = "0.1.0"
+description = "Utils required for Wasm interop"
+license = "MPL-2.0"
+edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client"
+repository = "https://github.com/prose-im/prose-core-client.git"
+keywords = ["xmpp", "xmpp-client", "library"]
+categories = ["network-programming"]
+authors = ["Marc Bauer <mb@nesium.com>"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["rt"] }

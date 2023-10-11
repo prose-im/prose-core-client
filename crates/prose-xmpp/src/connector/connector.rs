@@ -3,13 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::{SendUnlessWasm, SyncUnlessWasm};
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
-
-use crate::util::PinnedFuture;
+use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum ConnectionError {

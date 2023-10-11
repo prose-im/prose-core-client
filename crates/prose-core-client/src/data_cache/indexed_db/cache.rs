@@ -5,17 +5,13 @@
 
 use crate::data_cache::data_cache::AccountCache;
 use async_trait::async_trait;
-use indexed_db_futures::prelude::*;
-use indexed_db_futures::web_sys::DomException;
-use indexed_db_futures::{IdbDatabase, IdbVersionChangeEvent};
-use thiserror::Error;
-use wasm_bindgen::JsValue;
+use prose_store::prelude::*;
 
-use crate::data_cache::indexed_db::idb_database_ext::IdbDatabaseExt;
 use crate::data_cache::DataCache;
 use crate::types::AccountSettings;
 
 pub(super) mod keys {
+    #[cfg(target_arch = "wasm32")]
     pub const DB_NAME: &str = "ProseCache";
 
     pub const SETTINGS_STORE: &str = "settings";
@@ -35,141 +31,143 @@ pub(super) mod keys {
     }
 
     pub mod messages {
-        pub const ID_INDEX: &str = "id_idx";
-        pub const TARGET_INDEX: &str = "target_idx";
-        pub const TIMESTAMP_INDEX: &str = "timestamp_idx";
+        pub const ID_INDEX: &str = "id";
+        pub const TARGET_INDEX: &str = "target";
+        pub const TIMESTAMP_INDEX: &str = "timestamp";
     }
 }
 
-#[derive(Error, Debug)]
-pub enum IndexedDBDataCacheError {
-    #[error("DomException {name}: {message}")]
-    DomException { name: String, message: String },
-
-    #[error(transparent)]
-    JSON(#[from] serde_json::error::Error),
-
-    #[error(transparent)]
-    JID(#[from] jid::Error),
-
-    #[error("Invalid DB Key")]
-    InvalidDBKey,
-
-    #[error("Invalid MessageId")]
+#[derive(Debug, thiserror::Error)]
+pub enum CacheError {
+    #[error("{msg}")]
+    Store { msg: String },
+    #[error("Invalid message id")]
     InvalidMessageId,
 }
 
-impl From<DomException> for IndexedDBDataCacheError {
-    fn from(value: DomException) -> Self {
-        IndexedDBDataCacheError::DomException {
-            name: value.name(),
-            message: value.message(),
+impl<T: StoreError> From<T> for CacheError {
+    fn from(value: T) -> Self {
+        Self::Store {
+            msg: value.to_string(),
         }
     }
 }
 
-pub(super) type Result<T, E = IndexedDBDataCacheError> = std::result::Result<T, E>;
-
-pub struct IndexedDBDataCache {
-    pub(super) db: IdbDatabase,
+pub struct IndexedDBDataCache<D: Driver> {
+    pub(super) db: Store<D>,
 }
 
-impl IndexedDBDataCache {
-    pub async fn new() -> Result<Self> {
-        let mut db_req = IdbDatabase::open_u32(keys::DB_NAME, 4)?;
+#[cfg(target_arch = "wasm32")]
+pub type PlatformCache = IndexedDBDataCache<IndexedDBDriver>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type PlatformCache = IndexedDBDataCache<SqliteDriver>;
 
-        db_req.set_on_upgrade_needed(Some(|evt: &IdbVersionChangeEvent| -> Result<(), JsValue> {
-            let old_version = evt.old_version() as u32;
-            let db = evt.db();
+#[cfg(target_arch = "wasm32")]
+impl PlatformCache {
+    pub async fn new() -> Result<Self, CacheError> {
+        Ok(Self::new_with_driver(IndexedDBDriver::new(keys::DB_NAME)).await?)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl PlatformCache {
+    pub async fn new(path: impl Into<std::path::PathBuf>) -> Result<Self, CacheError> {
+        Ok(Self::new_with_driver(SqliteDriver::new(path)).await?)
+    }
+
+    #[cfg(feature = "test")]
+    pub async fn temporary_cache() -> Result<Self, CacheError> {
+        let path = tempfile::tempdir().unwrap().path().join("test.sqlite");
+        let parent = path.parent().unwrap();
+        std::fs::create_dir_all(parent).unwrap();
+        println!("Opening DB at {:?}", path);
+
+        let cache = PlatformCache::new(path).await?;
+        cache.delete_all().await?;
+        Ok(cache)
+    }
+}
+
+impl<D: Driver> IndexedDBDataCache<D> {
+    pub async fn new_with_driver(driver: D) -> Result<Self, CacheError> {
+        let db = Store::open(driver, 4, |event| {
+            let old_version = event.old_version;
+            let tx = &event.tx;
 
             if old_version < 1 {
-                db.create_object_store(keys::AVATAR_METADATA_STORE)?;
-                db.create_object_store(keys::CHAT_STATE_STORE)?;
-                db.create_object_store(keys::DRAFTS_STORE)?;
-                db.create_object_store(keys::PRESENCE_STORE)?;
-                db.create_object_store(keys::ROSTER_ITEMS_STORE)?;
-                db.create_object_store(keys::SETTINGS_STORE)?;
-                db.create_object_store(keys::USER_PROFILE_STORE)?;
+                tx.create_collection(keys::AVATAR_METADATA_STORE)?;
+                tx.create_collection(keys::CHAT_STATE_STORE)?;
+                tx.create_collection(keys::DRAFTS_STORE)?;
+                tx.create_collection(keys::PRESENCE_STORE)?;
+                tx.create_collection(keys::ROSTER_ITEMS_STORE)?;
+                tx.create_collection(keys::SETTINGS_STORE)?;
+                tx.create_collection(keys::USER_PROFILE_STORE)?;
 
-                let store = db.create_object_store_with_params(
-                    keys::MESSAGES_STORE,
-                    &IdbObjectStoreParameters::new()
-                        .auto_increment(true)
-                        .key_path(Some(&IdbKeyPath::str("rowId"))),
+                let messages = tx.create_collection(keys::MESSAGES_STORE)?;
+
+                messages.add_index(
+                    IndexSpec::builder(keys::messages::ID_INDEX)
+                        .unique()
+                        .build(),
                 )?;
-                store.create_index_with_params(
-                    keys::messages::ID_INDEX,
-                    &IdbKeyPath::str("id"),
-                    &IdbIndexParameters::new().unique(true),
-                )?;
-                store.create_index_with_params(
-                    keys::messages::TARGET_INDEX,
-                    &IdbKeyPath::str("target"),
-                    &IdbIndexParameters::new().unique(false),
-                )?;
-                store.create_index_with_params(
-                    keys::messages::TIMESTAMP_INDEX,
-                    &IdbKeyPath::str("timestamp"),
-                    &IdbIndexParameters::new().unique(false),
-                )?;
+                messages.add_index(IndexSpec::builder(keys::messages::TARGET_INDEX).build())?;
+                messages.add_index(IndexSpec::builder(keys::messages::TIMESTAMP_INDEX).build())?;
             }
 
             if old_version < 2 {
-                db.create_object_store(keys::USER_ACTIVITY_STORE)?;
+                tx.create_collection(keys::USER_ACTIVITY_STORE)?;
             }
 
             if old_version < 3 {
-                db.create_object_store(keys::AVATAR_STORE)?;
+                tx.create_collection(keys::AVATAR_STORE)?;
             }
 
             if old_version < 4 {
-                db.delete_object_store(keys::ROSTER_ITEMS_STORE)?;
-                db.create_object_store(keys::ROSTER_ITEMS_STORE)?;
+                tx.delete_collection(keys::ROSTER_ITEMS_STORE)?;
+                tx.create_collection(keys::ROSTER_ITEMS_STORE)?;
             }
 
             Ok(())
-        }));
-
-        let db = db_req.into_future().await?;
+        })
+        .await?;
 
         // Clear (outdated) presence entries from our last session.
-        db.clear_stores(&[keys::PRESENCE_STORE, keys::CHAT_STATE_STORE])
-            .await?;
+        // db.clear_stores(&[keys::PRESENCE_STORE, keys::CHAT_STATE_STORE])
+        //     .await?;
 
         Ok(IndexedDBDataCache { db })
     }
 }
 
-#[async_trait(? Send)]
-impl AccountCache for IndexedDBDataCache {
-    type Error = IndexedDBDataCacheError;
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
+impl<D: Driver> AccountCache for IndexedDBDataCache<D> {
+    type Error = CacheError;
 
-    async fn delete_all(&self) -> Result<()> {
-        self.db
-            .clear_stores(&[
-                keys::AVATAR_METADATA_STORE,
-                keys::CHAT_STATE_STORE,
-                keys::DRAFTS_STORE,
-                keys::MESSAGES_STORE,
-                keys::PRESENCE_STORE,
-                keys::ROSTER_ITEMS_STORE,
-                keys::SETTINGS_STORE,
-                keys::USER_PROFILE_STORE,
-            ])
-            .await
+    async fn delete_all(&self) -> Result<(), Self::Error> {
+        self.db.truncate_all_collections().await?;
+        Ok(())
     }
 
-    async fn save_account_settings(&self, settings: &AccountSettings) -> Result<()> {
+    async fn save_account_settings(&self, settings: &AccountSettings) -> Result<(), Self::Error> {
         self.db
-            .set_value(keys::SETTINGS_STORE, keys::settings::ACCOUNT, settings)
-            .await
+            .transaction_for_reading_and_writing(&[keys::SETTINGS_STORE])
+            .await?
+            .writeable_collection(keys::SETTINGS_STORE)?
+            .put(keys::settings::ACCOUNT, settings)?;
+        Ok(())
     }
 
-    async fn load_account_settings(&self) -> Result<Option<AccountSettings>> {
-        self.db
-            .get_value(keys::SETTINGS_STORE, keys::settings::ACCOUNT)
-            .await
+    async fn load_account_settings(&self) -> Result<Option<AccountSettings>, Self::Error> {
+        let settings = self
+            .db
+            .transaction_for_reading(&[keys::SETTINGS_STORE])
+            .await?
+            .readable_collection(keys::SETTINGS_STORE)?
+            .get(keys::settings::ACCOUNT)
+            .await?;
+        Ok(settings)
     }
 }
 
-impl DataCache for IndexedDBDataCache {}
+impl<D: Driver> DataCache for IndexedDBDataCache<D> {}

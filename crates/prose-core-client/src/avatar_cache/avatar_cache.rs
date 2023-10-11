@@ -7,10 +7,10 @@ use async_trait::async_trait;
 #[cfg(target_arch = "wasm32")]
 use auto_impl::auto_impl;
 use jid::BareJid;
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use prose_xmpp::mods::AvatarData;
 use prose_xmpp::stanza::avatar;
-use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::types::AvatarMetadata;
 

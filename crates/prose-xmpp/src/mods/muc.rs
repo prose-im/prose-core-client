@@ -8,6 +8,7 @@ use std::future::Future;
 use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
+use prose_wasm_utils::SendUnlessWasm;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
@@ -21,12 +22,12 @@ use xmpp_parsers::stanza_error::StanzaError;
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
+use crate::ns;
 use crate::stanza::muc::mediated_invite::MediatedInvite;
 use crate::stanza::muc::query::{Destroy, Role};
 use crate::stanza::muc::{DirectInvite, Query};
 use crate::stanza::{muc, Message};
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
-use crate::{ns, SendUnlessWasm};
 
 /// XEP-0045: Multi-User Chat
 /// https://xmpp.org/extensions/xep-0045.html#disco-rooms
