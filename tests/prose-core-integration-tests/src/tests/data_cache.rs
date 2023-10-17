@@ -33,7 +33,7 @@ async fn cache() -> Result<PlatformCache> {
 
 #[cfg(target_arch = "wasm32")]
 async fn cache() -> Result<PlatformCache> {
-    let cache = PlatformCache::open().await?;
+    let cache = PlatformCache::new().await?;
     cache.delete_all().await?;
     Ok(cache)
 }
