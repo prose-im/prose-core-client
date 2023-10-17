@@ -37,7 +37,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     println!("Cached data can be found at {:?}", cache_path);
 
-    let data_cache = PlatformCache::open(&cache_path).await?;
+    let data_cache = PlatformCache::open(&cache_path.join("db.sqlite3")).await?;
     let image_cache = FsAvatarCache::new(&cache_path.join("Avatar"))?;
 
     let client = ClientBuilder::new()

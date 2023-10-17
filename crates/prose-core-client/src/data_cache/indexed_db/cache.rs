@@ -72,7 +72,7 @@ impl PlatformCache {
 #[cfg(not(target_arch = "wasm32"))]
 impl PlatformCache {
     pub async fn open(path: impl Into<std::path::PathBuf>) -> Result<Self, CacheError> {
-        Ok(Self::new_with_driver(SqliteDriver::new(path.into().join("db.sqlite3"))).await?)
+        Ok(Self::new_with_driver(SqliteDriver::new(path)).await?)
     }
 
     #[cfg(feature = "test")]
