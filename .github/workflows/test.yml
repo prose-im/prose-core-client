@@ -28,7 +28,7 @@ jobs:
         uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Verify versions
-        run: rustc --version && rustup --version && cargo --version
+        run: rustc --version && rustup --version && cargo --version && sqlite3 --version
 
       - name: Cache build context
         id: cache-cargo
