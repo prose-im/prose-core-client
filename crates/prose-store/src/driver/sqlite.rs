@@ -460,7 +460,7 @@ impl<'tx, Mode> SqliteCollection<'tx, Mode> {
 
     fn qualified_key_column(&self) -> Cow<String> {
         if self.is_index {
-            Cow::Owned(format!("`data` ->> '{}'", self.key_column))
+            Cow::Owned(format!("json_extract(`data`, '$.{}')", self.key_column))
         } else {
             Cow::Borrowed(&self.key_column)
         }
@@ -653,7 +653,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
         let conn = self.obj.lock()?;
         let index_type = if idx.unique { "UNIQUE INDEX" } else { "INDEX" };
         let sql = &format!(
-            "CREATE {index_type} 'prose_{index_name}_idx' ON '{table_name}'(`data` ->> '{index_column}')",
+            "CREATE {index_type} 'prose_{index_name}_idx' ON '{table_name}'(json_extract(`data`, '$.{index_column}'))",
             index_name = idx.key,
             table_name = self.name,
             index_column = idx.key
