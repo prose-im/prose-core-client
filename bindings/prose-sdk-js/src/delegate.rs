@@ -10,7 +10,7 @@ use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::avatar_cache::AvatarCache;
-use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::data_cache::DataCache;
 use prose_core_client::types::MessageId;
 use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent};
@@ -173,7 +173,7 @@ impl JSValueConvertible for Vec<MessageId> {
     }
 }
 
-type WasmCache = Rc<IndexedDBDataCache>;
+type WasmCache = Rc<PlatformCache>;
 
 impl ClientDelegate<WasmCache, WasmCache> for Delegate<WasmCache, WasmCache> {
     fn handle_event(

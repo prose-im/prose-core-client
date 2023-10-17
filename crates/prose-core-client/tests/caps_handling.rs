@@ -7,7 +7,7 @@ use anyhow::Result;
 use insta::assert_snapshot;
 use jid::{BareJid, FullJid};
 use prose_core_client::avatar_cache::NoopAvatarCache;
-use prose_core_client::data_cache::sqlite::SQLiteCache;
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::test::{ClientTestAdditions, ConnectedClient};
 use prose_core_client::types::{Availability, SoftwareVersion};
 use prose_core_client::{Client, ClientBuilder};
@@ -21,7 +21,7 @@ use std::sync::Arc;
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_start_sequence() -> Result<()> {
     let connection = Arc::new(test::Connection::default());
-    let data_cache = Arc::new(SQLiteCache::in_memory_cache());
+    let data_cache = Arc::new(PlatformCache::temporary_cache().await?);
 
     connection.use_start_sequence_handler();
 

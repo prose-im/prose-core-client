@@ -28,7 +28,7 @@ jobs:
         uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Verify versions
-        run: rustc --version && rustup --version && cargo --version
+        run: rustc --version && rustup --version && cargo --version && sqlite3 --version
 
       - name: Cache build context
         id: cache-cargo
@@ -58,8 +58,14 @@ jobs:
       - name: Test code
         run: cargo test --features test
 
-      - name: Run integration tests
+      - name: Run core-client integration tests
         run: cargo test --package prose-core-integration-tests
 
-      - name: Run Wasm integration tests
+      - name: Run store integration tests
+        run: cargo test --package prose-store-integration-tests
+
+      - name: Run Wasm core-client integration tests
         run: cargo xtask ci wasm
+
+      - name: Run Wasm store integration tests
+        run: cargo xtask ci wasm-store

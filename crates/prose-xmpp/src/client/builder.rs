@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
 use parking_lot::RwLock;
+use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
 
 use crate::client::client::ClientInner;
 use crate::client::module_context::ModuleContextInner;
@@ -19,7 +20,6 @@ use crate::client::{ConnectorProvider, EventHandler, ModuleContext, ModuleLookup
 use crate::connector::{Connection, ConnectionError, ConnectionEventHandler, Connector};
 use crate::deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 use crate::mods::AnyModule;
-use crate::util::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
 use crate::{mods, Client, Event};
 
 pub struct UndefinedConnector {}

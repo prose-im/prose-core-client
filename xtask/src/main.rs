@@ -18,6 +18,7 @@ pub(crate) mod paths {
     }
     pub mod tests {
         pub const INTEGRATION: &str = "prose-core-integration-tests";
+        pub const STORE: &str = "prose-store-integration-tests";
     }
 }
 

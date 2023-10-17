@@ -15,10 +15,9 @@ pub use message_builder::MessageBuilder;
 use prose_xmpp::test::{BareJidTestAdditions, IncrementingIDProvider};
 use prose_xmpp::{test, IDProvider, SystemTimeProvider, TimeProvider};
 
+use crate::data_cache::indexed_db::PlatformCache;
 use crate::types::{Availability, SoftwareVersion};
-use crate::{
-    avatar_cache::NoopAvatarCache, data_cache::sqlite::SQLiteCache, Client, ClientBuilder,
-};
+use crate::{avatar_cache::NoopAvatarCache, Client, ClientBuilder};
 
 mod constant_time_provider;
 mod message_builder;
@@ -49,14 +48,14 @@ impl DateTimeTestAdditions for Utc {
 }
 
 pub struct ConnectedClient {
-    pub client: Client<Arc<SQLiteCache>, NoopAvatarCache>,
+    pub client: Client<Arc<PlatformCache>, NoopAvatarCache>,
     pub connection: Arc<test::Connection>,
-    pub data_cache: Arc<SQLiteCache>,
+    pub data_cache: Arc<PlatformCache>,
     pub id_provider: Arc<IncrementingIDProvider>,
 }
 
 #[async_trait(?Send)]
-impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
+impl ClientTestAdditions for Client<PlatformCache, NoopAvatarCache> {
     async fn connected_client() -> Result<ConnectedClient> {
         Self::connected_client_with_time_provider(SystemTimeProvider::default()).await
     }
@@ -66,7 +65,7 @@ impl ClientTestAdditions for Client<SQLiteCache, NoopAvatarCache> {
     ) -> Result<ConnectedClient> {
         let connection = Arc::new(test::Connection::default());
         let id_provider = Arc::new(IncrementingIDProvider::new());
-        let data_cache = Arc::new(SQLiteCache::in_memory_cache());
+        let data_cache = Arc::new(PlatformCache::temporary_cache().await?);
 
         connection.use_start_sequence_handler();
 

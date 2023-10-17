@@ -10,7 +10,7 @@ use crate::types::{
 };
 use alloc::rc::Rc;
 use js_sys::Array;
-use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::room::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
 };
@@ -19,7 +19,7 @@ use tracing::info;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-type Cache = Rc<IndexedDBDataCache>;
+type Cache = Rc<PlatformCache>;
 type Result<T, E = JsError> = std::result::Result<T, E>;
 
 #[wasm_bindgen(typescript_custom_section)]

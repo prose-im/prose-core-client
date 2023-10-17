@@ -11,11 +11,11 @@ use parking_lot::RwLock;
 use crate::connector::ConnectionError;
 use crate::connector::Connector;
 use crate::mods::AnyModule;
-use crate::util::PinnedFuture;
 use crate::Event as ClientEvent;
 pub use builder::ClientBuilder;
 pub use client::Client;
 pub(crate) use module_context::ModuleContext;
+use prose_wasm_utils::PinnedFuture;
 
 mod builder;
 mod client;

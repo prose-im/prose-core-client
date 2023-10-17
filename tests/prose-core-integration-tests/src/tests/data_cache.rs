@@ -12,10 +12,7 @@ use jid::BareJid;
 use wasm_bindgen_test::wasm_bindgen_test as async_test;
 use xmpp_parsers::presence::Show;
 
-#[cfg(target_arch = "wasm32")]
-use prose_core_client::data_cache::indexed_db::IndexedDBDataCache;
-#[cfg(not(target_arch = "wasm32"))]
-use prose_core_client::data_cache::sqlite::{Connection, SQLiteCache};
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::data_cache::{AccountCache, ContactsCache, MessageCache};
 use prose_core_client::types::message_like::Payload;
 use prose_core_client::types::roster::{Group, Subscription};
@@ -28,15 +25,15 @@ use prose_xmpp::stanza::message;
 use tokio::test as async_test;
 
 #[cfg(not(target_arch = "wasm32"))]
-async fn cache() -> Result<SQLiteCache> {
-    Ok(SQLiteCache::open_with_connection(
-        Connection::open_in_memory()?,
-    )?)
+async fn cache() -> Result<PlatformCache> {
+    let cache = PlatformCache::temporary_cache().await?;
+    cache.delete_all().await?;
+    Ok(cache)
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn cache() -> Result<IndexedDBDataCache> {
-    let cache = IndexedDBDataCache::new().await?;
+async fn cache() -> Result<PlatformCache> {
+    let cache = PlatformCache::new().await?;
     cache.delete_all().await?;
     Ok(cache)
 }

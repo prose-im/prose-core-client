@@ -10,10 +10,10 @@ use auto_impl::auto_impl;
 use auto_impl::auto_impl;
 use chrono::{DateTime, Utc};
 use jid::BareJid;
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{stanza_id, ChatState};
-use prose_xmpp::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::types::{
     roster, AccountSettings, AvatarMetadata, Contact, MessageLike, Page, Presence, UserActivity,

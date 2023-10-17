@@ -12,13 +12,14 @@ use anyhow::Result;
 use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
+use prose_wasm_utils::PinnedFuture;
 use xmpp_parsers::iq::Iq;
 
 use crate::client::builder::UndefinedConnector;
 use crate::client::{ConnectorProvider, EventHandler, ModuleLookup};
 use crate::connector::Connection;
 use crate::deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
-use crate::util::{ModuleFutureState, PinnedFuture, RequestError, RequestFuture};
+use crate::util::{ModuleFutureState, RequestError, RequestFuture};
 use crate::Event;
 
 #[derive(Clone)]
@@ -109,7 +110,7 @@ impl ModuleContextInner {
     #[cfg(not(feature = "test"))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
-        crate::util::spawn(fut);
+        prose_wasm_utils::spawn(fut);
     }
 
     #[cfg(feature = "test")]

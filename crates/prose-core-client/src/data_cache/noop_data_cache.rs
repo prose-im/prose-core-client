@@ -6,10 +6,10 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use jid::BareJid;
+use prose_wasm_utils::SendUnlessWasm;
 use thiserror::Error;
 
 use prose_xmpp::stanza::message::{ChatState, Id};
-use prose_xmpp::SendUnlessWasm;
 
 use crate::data_cache::data_cache::AccountCache;
 use crate::data_cache::{ContactsCache, DataCache, MessageCache};

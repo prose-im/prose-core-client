@@ -5,163 +5,182 @@
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use indexed_db_futures::prelude::*;
 use jid::BareJid;
+use prose_store::prelude::*;
 use tracing::debug;
 
 use prose_xmpp::stanza::message::ChatState;
 
-use crate::data_cache::indexed_db::cache::{keys, IndexedDBDataCacheError};
-use crate::data_cache::indexed_db::idb_database_ext::{
-    IdbDatabaseExt, IdbObjectStoreExtGet, IdbObjectStoreExtSet,
-};
+use crate::data_cache::indexed_db::cache::{keys, CacheError};
 use crate::data_cache::indexed_db::IndexedDBDataCache;
 use crate::data_cache::ContactsCache;
 use crate::types::{
     roster, Availability, AvatarMetadata, Contact, Presence, UserActivity, UserProfile,
 };
 
-use super::cache::Result;
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
+impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
+    type Error = CacheError;
 
-#[async_trait(? Send)]
-impl ContactsCache for IndexedDBDataCache {
-    type Error = IndexedDBDataCacheError;
-
-    async fn set_roster_update_time(&self, timestamp: &DateTime<Utc>) -> Result<()> {
+    async fn set_roster_update_time(&self, timestamp: &DateTime<Utc>) -> Result<(), Self::Error> {
         self.db
-            .set_value(
-                keys::SETTINGS_STORE,
-                keys::settings::ROSTER_UPDATE,
-                &timestamp,
-            )
-            .await
-    }
-
-    async fn roster_update_time(&self) -> Result<Option<DateTime<Utc>>> {
-        self.db
-            .get_value(keys::SETTINGS_STORE, keys::settings::ROSTER_UPDATE)
-            .await
-    }
-
-    async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<()> {
-        debug!("Store {} roster items.", items.len());
-
-        let tx = self.db.transaction_on_one_with_mode(
-            keys::ROSTER_ITEMS_STORE,
-            IdbTransactionMode::Readwrite,
-        )?;
-        let store = tx.object_store(keys::ROSTER_ITEMS_STORE)?;
-
-        for item in items {
-            store.set_value(item.jid.to_string(), &item)?;
-        }
-
-        tx.await.into_result()?;
+            .transaction_for_reading_and_writing(&[keys::SETTINGS_STORE])
+            .await?
+            .writeable_collection(keys::SETTINGS_STORE)?
+            .put(keys::settings::ROSTER_UPDATE, &timestamp)?;
         Ok(())
     }
 
-    async fn insert_user_profile(&self, jid: &BareJid, profile: &UserProfile) -> Result<()> {
+    async fn roster_update_time(&self) -> Result<Option<DateTime<Utc>>, Self::Error> {
+        let time = self
+            .db
+            .transaction_for_reading(&[keys::SETTINGS_STORE])
+            .await?
+            .readable_collection(keys::SETTINGS_STORE)?
+            .get(keys::settings::ROSTER_UPDATE)
+            .await?;
+        Ok(time)
+    }
+
+    async fn insert_roster_items(&self, items: &[roster::Item]) -> Result<(), Self::Error> {
+        debug!("Store {} roster items.", items.len());
+
+        let tx = self
+            .db
+            .transaction_for_reading_and_writing(&[keys::ROSTER_ITEMS_STORE])
+            .await?;
+
+        {
+            let collection = tx.writeable_collection(keys::ROSTER_ITEMS_STORE)?;
+            for item in items {
+                collection.put(&item.jid.to_string(), &item)?;
+            }
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn insert_user_profile(
+        &self,
+        jid: &BareJid,
+        profile: &UserProfile,
+    ) -> Result<(), Self::Error> {
         debug!("Store profile for {}.", jid);
         self.db
-            .set_value(keys::USER_PROFILE_STORE, jid.to_string(), &profile)
-            .await
+            .put(keys::USER_PROFILE_STORE, &jid.to_string(), &profile)
+            .await?;
+        Ok(())
     }
 
-    async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
-        self.db
-            .get_value(keys::USER_PROFILE_STORE, jid.to_string())
-            .await
+    async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>, Self::Error> {
+        let profile = self
+            .db
+            .get(keys::USER_PROFILE_STORE, &jid.to_string())
+            .await?;
+        Ok(profile)
     }
 
-    async fn delete_user_profile(&self, jid: &BareJid) -> Result<()> {
+    async fn delete_user_profile(&self, jid: &BareJid) -> Result<(), Self::Error> {
         self.db
-            .delete_value(keys::USER_PROFILE_STORE, jid.to_string())
-            .await
+            .delete(keys::USER_PROFILE_STORE, &jid.to_string())
+            .await?;
+        Ok(())
     }
 
-    async fn insert_avatar_metadata(&self, jid: &BareJid, metadata: &AvatarMetadata) -> Result<()> {
+    async fn insert_avatar_metadata(
+        &self,
+        jid: &BareJid,
+        metadata: &AvatarMetadata,
+    ) -> Result<(), Self::Error> {
         self.db
-            .set_value(keys::AVATAR_METADATA_STORE, jid.to_string(), metadata)
-            .await
+            .put(keys::AVATAR_METADATA_STORE, &jid.to_string(), metadata)
+            .await?;
+        Ok(())
     }
 
-    async fn load_avatar_metadata(&self, jid: &BareJid) -> Result<Option<AvatarMetadata>> {
-        self.db
-            .get_value(keys::AVATAR_METADATA_STORE, jid.to_string())
-            .await
+    async fn load_avatar_metadata(
+        &self,
+        jid: &BareJid,
+    ) -> Result<Option<AvatarMetadata>, Self::Error> {
+        let metadata = self
+            .db
+            .get(keys::AVATAR_METADATA_STORE, &jid.to_string())
+            .await?;
+        Ok(metadata)
     }
 
-    async fn insert_presence(&self, jid: &BareJid, presence: &Presence) -> Result<()> {
+    async fn insert_presence(&self, jid: &BareJid, presence: &Presence) -> Result<(), Self::Error> {
         self.db
-            .set_value(keys::PRESENCE_STORE, jid.to_string(), &presence)
-            .await
+            .put(keys::PRESENCE_STORE, &jid.to_string(), &presence)
+            .await?;
+        Ok(())
     }
 
     async fn insert_user_activity(
         &self,
         jid: &BareJid,
         user_activity: &Option<UserActivity>,
-    ) -> Result<()> {
+    ) -> Result<(), Self::Error> {
         if let Some(user_activity) = user_activity {
             self.db
-                .set_value(keys::USER_ACTIVITY_STORE, jid.to_string(), &user_activity)
-                .await
+                .put(keys::USER_ACTIVITY_STORE, &jid.to_string(), &user_activity)
+                .await?;
         } else {
             self.db
-                .delete_value(keys::USER_ACTIVITY_STORE, jid.to_string())
-                .await
+                .delete(keys::USER_ACTIVITY_STORE, &jid.to_string())
+                .await?;
         }
+        Ok(())
     }
 
-    async fn insert_chat_state(&self, jid: &BareJid, chat_state: &ChatState) -> Result<()> {
+    async fn insert_chat_state(
+        &self,
+        jid: &BareJid,
+        chat_state: &ChatState,
+    ) -> Result<(), Self::Error> {
         self.db
-            .set_value(keys::CHAT_STATE_STORE, jid.to_string(), &chat_state)
-            .await
+            .put(keys::CHAT_STATE_STORE, &jid.to_string(), &chat_state)
+            .await?;
+        Ok(())
     }
 
-    async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>> {
-        self.db
-            .get_value(keys::CHAT_STATE_STORE, jid.to_string())
-            .await
+    async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>, Self::Error> {
+        let chat_state = self
+            .db
+            .get(keys::CHAT_STATE_STORE, &jid.to_string())
+            .await?;
+        Ok(chat_state)
     }
 
-    async fn load_contacts(&self) -> Result<Vec<Contact>> {
-        let tx = self.db.transaction_on_multi_with_mode(
-            &[
+    async fn load_contacts(&self) -> Result<Vec<Contact>, Self::Error> {
+        let tx = self
+            .db
+            .transaction_for_reading(&[
                 keys::USER_PROFILE_STORE,
                 keys::ROSTER_ITEMS_STORE,
                 keys::PRESENCE_STORE,
                 keys::USER_ACTIVITY_STORE,
-            ],
-            IdbTransactionMode::Readonly,
-        )?;
+            ])
+            .await?;
 
-        let roster_items_store = tx.object_store(keys::ROSTER_ITEMS_STORE)?;
-        let user_profile_store = tx.object_store(keys::USER_PROFILE_STORE)?;
-        let presence_store = tx.object_store(keys::PRESENCE_STORE)?;
-        let activity_store = tx.object_store(keys::USER_ACTIVITY_STORE)?;
+        let roster_items = tx.readable_collection(keys::ROSTER_ITEMS_STORE)?;
+        let user_profiles = tx.readable_collection(keys::USER_PROFILE_STORE)?;
+        let presences = tx.readable_collection(keys::PRESENCE_STORE)?;
+        let activities = tx.readable_collection(keys::USER_ACTIVITY_STORE)?;
 
-        let jids = roster_items_store.get_all_keys()?.await?;
+        let jids = roster_items.all_keys().await?;
         let mut contacts = vec![];
 
-        for jid in jids {
-            let jid_str = jid
-                .as_string()
-                .ok_or(IndexedDBDataCacheError::InvalidDBKey)?;
-
-            let roster_item = roster_items_store
-                .get_value::<roster::Item>(&jid_str)
-                .await?;
-
-            let Some(roster_item) = roster_item else {
+        for jid_str in jids {
+            let Some(roster_item) = roster_items.get::<_, roster::Item>(&jid_str).await? else {
                 continue;
             };
 
-            let user_profile = user_profile_store
-                .get_value::<UserProfile>(&jid_str)
-                .await?;
-            let presence = presence_store.get_value::<Presence>(&jid_str).await?;
-            let user_activity = activity_store.get_value::<UserActivity>(&jid_str).await?;
+            let user_profile = user_profiles.get::<_, UserProfile>(&jid_str).await?;
+            let presence = presences.get::<_, Presence>(&jid_str).await?;
+            let user_activity = activities.get(&jid_str).await?;
 
             let availability = presence.map(|presence| {
                 Availability::from((
