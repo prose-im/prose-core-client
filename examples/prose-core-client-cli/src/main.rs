@@ -15,7 +15,7 @@ use common::{enable_debug_logging, load_credentials, Level};
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::convert::IntoAttributeValue;
-use prose_core_client::data_cache::sqlite::SQLiteCache;
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::room::Occupant;
 use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact, Message};
 use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
@@ -26,7 +26,7 @@ use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use url::Url;
 
-type Client = prose_core_client::Client<SQLiteCache, FsAvatarCache>;
+type Client = prose_core_client::Client<PlatformCache, FsAvatarCache>;
 
 async fn configure_client() -> Result<(BareJid, Client)> {
     let cache_path = env::current_dir()?
@@ -37,7 +37,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     println!("Cached data can be found at {:?}", cache_path);
 
-    let data_cache = SQLiteCache::open(&cache_path)?;
+    let data_cache = PlatformCache::open(&cache_path).await?;
     let image_cache = FsAvatarCache::new(&cache_path.join("Avatar"))?;
 
     let client = ClientBuilder::new()
@@ -197,8 +197,8 @@ impl Display for JidWithName {
     }
 }
 
-impl From<ConnectedRoom<SQLiteCache, FsAvatarCache>> for JidWithName {
-    fn from(value: ConnectedRoom<SQLiteCache, FsAvatarCache>) -> Self {
+impl From<ConnectedRoom<PlatformCache, FsAvatarCache>> for JidWithName {
+    fn from(value: ConnectedRoom<PlatformCache, FsAvatarCache>) -> Self {
         Self {
             jid: value.to_generic_room().jid().clone(),
             name: format!(
@@ -232,7 +232,7 @@ impl From<Contact> for JidWithName {
     }
 }
 
-struct ConnectedRoomEnvelope(ConnectedRoom<SQLiteCache, FsAvatarCache>);
+struct ConnectedRoomEnvelope(ConnectedRoom<PlatformCache, FsAvatarCache>);
 
 impl Display for ConnectedRoomEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -322,13 +322,13 @@ async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
     Ok(select_multiple_jids_from_list(contacts))
 }
 
-async fn select_room(client: &Client) -> Result<ConnectedRoom<SQLiteCache, FsAvatarCache>> {
+async fn select_room(client: &Client) -> Result<ConnectedRoom<PlatformCache, FsAvatarCache>> {
     let mut rooms = client.connected_rooms();
     rooms.sort_by(compare_room_envelopes);
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
 
-async fn select_muc_room(client: &Client) -> Result<ConnectedRoom<SQLiteCache, FsAvatarCache>> {
+async fn select_muc_room(client: &Client) -> Result<ConnectedRoom<PlatformCache, FsAvatarCache>> {
     let mut rooms = client
         .connected_rooms()
         .into_iter()
@@ -555,10 +555,10 @@ fn format_opt<T: Display>(value: Option<T>) -> String {
 }
 
 fn compare_room_envelopes(
-    lhs: &ConnectedRoom<SQLiteCache, FsAvatarCache>,
-    rhs: &ConnectedRoom<SQLiteCache, FsAvatarCache>,
+    lhs: &ConnectedRoom<PlatformCache, FsAvatarCache>,
+    rhs: &ConnectedRoom<PlatformCache, FsAvatarCache>,
 ) -> Ordering {
-    fn sort_order(envelope: &ConnectedRoom<SQLiteCache, FsAvatarCache>) -> i32 {
+    fn sort_order(envelope: &ConnectedRoom<PlatformCache, FsAvatarCache>) -> i32 {
         match envelope {
             ConnectedRoom::DirectMessage(_) => 0,
             ConnectedRoom::Group(_) => 1,
@@ -585,11 +585,11 @@ fn compare_room_envelopes(
 
 struct Delegate {}
 
-impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
+impl ClientDelegate<PlatformCache, FsAvatarCache> for Delegate {
     fn handle_event(
         &self,
-        client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
-        event: ClientEvent<SQLiteCache, FsAvatarCache>,
+        client: prose_core_client::Client<PlatformCache, FsAvatarCache>,
+        event: ClientEvent<PlatformCache, FsAvatarCache>,
     ) {
         tokio::spawn(async move {
             match Self::_handle_event(client, event).await {
@@ -602,8 +602,8 @@ impl ClientDelegate<SQLiteCache, FsAvatarCache> for Delegate {
 
 impl Delegate {
     async fn _handle_event(
-        _client: prose_core_client::Client<SQLiteCache, FsAvatarCache>,
-        event: ClientEvent<SQLiteCache, FsAvatarCache>,
+        _client: prose_core_client::Client<PlatformCache, FsAvatarCache>,
+        event: ClientEvent<PlatformCache, FsAvatarCache>,
     ) -> Result<()> {
         match event {
             ClientEvent::MessagesAppended { room, message_ids } => {
@@ -641,7 +641,7 @@ impl StringExt for String {
     }
 }
 
-impl ConnectedRoomExt for ConnectedRoom<SQLiteCache, FsAvatarCache> {
+impl ConnectedRoomExt for ConnectedRoom<PlatformCache, FsAvatarCache> {
     fn kind(&self) -> String {
         match self {
             ConnectedRoom::DirectMessage(_) => "💬",
