@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::uniffi_types::JID;
-use prose_core_client::data_cache::sqlite::SQLiteCache;
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::types::MessageId;
 use prose_core_client::{ConnectionEvent, FsAvatarCache};
 
@@ -40,8 +40,8 @@ pub enum ClientEvent {
     },
 }
 
-impl From<prose_core_client::ClientEvent<SQLiteCache, FsAvatarCache>> for ClientEvent {
-    fn from(_value: prose_core_client::ClientEvent<SQLiteCache, FsAvatarCache>) -> Self {
+impl From<prose_core_client::ClientEvent<PlatformCache, FsAvatarCache>> for ClientEvent {
+    fn from(_value: prose_core_client::ClientEvent<PlatformCache, FsAvatarCache>) -> Self {
         todo!("FIXME")
         // match value {
         //     ProseClientEvent::ComposingUsersChanged { room } => {

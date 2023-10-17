@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use prose_core_client::avatar_cache::fs_avatar_cache::FsAvatarCacheError;
-use prose_core_client::data_cache::sqlite::SQLiteCacheError;
+use prose_core_client::data_cache::indexed_db::CacheError;
 pub use uniffi_api::*;
 
 mod account_bookmarks_client;
@@ -25,8 +25,8 @@ impl From<anyhow::Error> for ClientError {
     }
 }
 
-impl From<SQLiteCacheError> for ClientError {
-    fn from(e: SQLiteCacheError) -> Self {
+impl From<CacheError> for ClientError {
+    fn from(e: CacheError) -> Self {
         ClientError::Generic { msg: e.to_string() }
     }
 }

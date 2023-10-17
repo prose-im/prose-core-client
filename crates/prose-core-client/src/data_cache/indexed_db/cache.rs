@@ -71,7 +71,7 @@ impl PlatformCache {
 
 #[cfg(not(target_arch = "wasm32"))]
 impl PlatformCache {
-    pub async fn new(path: impl Into<std::path::PathBuf>) -> Result<Self, CacheError> {
+    pub async fn open(path: impl Into<std::path::PathBuf>) -> Result<Self, CacheError> {
         Ok(Self::new_with_driver(SqliteDriver::new(path)).await?)
     }
 
@@ -82,7 +82,7 @@ impl PlatformCache {
         std::fs::create_dir_all(parent).unwrap();
         println!("Opening DB at {:?}", path);
 
-        let cache = PlatformCache::new(path).await?;
+        let cache = PlatformCache::open(path).await?;
         cache.delete_all().await?;
         Ok(cache)
     }

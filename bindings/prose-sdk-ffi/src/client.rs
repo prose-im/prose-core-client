@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use jid::BareJid;
-use prose_core_client::data_cache::sqlite::SQLiteCache;
+use prose_core_client::data_cache::indexed_db::PlatformCache;
 use prose_core_client::types::AccountSettings;
 use prose_core_client::{
     CachePolicy, Client as ProseClient, ClientBuilder, ClientDelegate as ProseClientDelegate,
@@ -24,7 +24,7 @@ pub trait ClientDelegate: Send + Sync {
 
 pub struct Client {
     jid: JID,
-    client: ProseClient<SQLiteCache, FsAvatarCache>,
+    client: ProseClient<PlatformCache, FsAvatarCache>,
 }
 
 impl Client {
@@ -33,22 +33,30 @@ impl Client {
         cache_dir: String,
         delegate: Option<Box<dyn ClientDelegate>>,
     ) -> Result<Self, ClientError> {
-        let cache_dir = Path::new(&cache_dir).join(jid.to_string());
-        info!("Caching data at {:?}", cache_dir);
-        fs::create_dir_all(&cache_dir).map_err(anyhow::Error::new)?;
+        todo!("FIXME")
 
-        let delegate = delegate.map(|d| {
-            Box::new(DelegateWrapper(d)) as Box<dyn ProseClientDelegate<SQLiteCache, FsAvatarCache>>
-        });
+        // #[uniffi::export] supports async but doesn't support static methods and
+        // the UDL allows static methods but no async methods. Meh.
+        // So we need to break this method up so that the async part runs after the
+        // constructor in a separate method.
 
-        Ok(Client {
-            jid,
-            client: ClientBuilder::new()
-                .set_data_cache(SQLiteCache::open(&cache_dir)?)
-                .set_avatar_cache(FsAvatarCache::new(&cache_dir.join("Avatars"))?)
-                .set_delegate(delegate)
-                .build(),
-        })
+        // let cache_dir = Path::new(&cache_dir).join(jid.to_string());
+        // info!("Caching data at {:?}", cache_dir);
+        // fs::create_dir_all(&cache_dir).map_err(anyhow::Error::new)?;
+        //
+        // let delegate = delegate.map(|d| {
+        //     Box::new(DelegateWrapper(d))
+        //         as Box<dyn ProseClientDelegate<PlatformCache, FsAvatarCache>>
+        // });
+        //
+        // Ok(Client {
+        //     jid,
+        //     client: ClientBuilder::new()
+        //         .set_data_cache(PlatformCache::open(&cache_dir).await?)
+        //         .set_avatar_cache(FsAvatarCache::new(&cache_dir.join("Avatars"))?)
+        //         .set_delegate(delegate)
+        //         .build(),
+        // })
     }
 }
 
@@ -251,11 +259,11 @@ impl Client {
 
 struct DelegateWrapper(Box<dyn ClientDelegate>);
 
-impl ProseClientDelegate<SQLiteCache, FsAvatarCache> for DelegateWrapper {
+impl ProseClientDelegate<PlatformCache, FsAvatarCache> for DelegateWrapper {
     fn handle_event(
         &self,
-        _client: ProseClient<SQLiteCache, FsAvatarCache>,
-        event: prose_core_client::ClientEvent<SQLiteCache, FsAvatarCache>,
+        _client: ProseClient<PlatformCache, FsAvatarCache>,
+        event: prose_core_client::ClientEvent<PlatformCache, FsAvatarCache>,
     ) {
         self.0.handle_event(event.into())
     }

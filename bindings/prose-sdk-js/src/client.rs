@@ -113,7 +113,7 @@ impl Client {
         delegate: JSDelegate,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
-        let cache = Rc::new(IndexedDBDataCache::new().await?);
+        let cache = Rc::new(IndexedDBDataCache::open().await?);
         let config = config.unwrap_or_default();
 
         let software_version = SoftwareVersion {
