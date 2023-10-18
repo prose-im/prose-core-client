@@ -58,7 +58,7 @@ impl<D: Driver> AvatarCache for IndexedDBDataCache<D> {
 
         let avatar_metadata = tx
             .readable_collection(keys::AVATAR_METADATA_STORE)?
-            .get::<_, AvatarMetadata>(&jid.to_string())
+            .get::<_, AvatarMetadata>(&jid)
             .await?;
         let base64_data = tx
             .readable_collection(keys::AVATAR_STORE)?

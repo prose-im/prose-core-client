@@ -2,18 +2,16 @@ use super::Driver;
 use crate::driver::{ReadMode, ReadOnly, ReadWrite, WriteMode};
 use crate::prelude::Error::NotMemberOfTransaction;
 use crate::{
-    Collection, Database, IndexSpec, IndexedCollection, KeyType, Query, QueryDirection,
+    Collection, Database, IndexSpec, IndexedCollection, KeyType, Query, QueryDirection, RawKey,
     ReadTransaction, ReadableCollection, StoreError, Transaction, UpgradeTransaction,
     VersionChangeEvent, WritableCollection, WriteTransaction,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, Local};
 use deadpool_sqlite::{
     Config, CreatePoolError, Hook, InteractError, Manager, Pool, PoolError, Runtime,
 };
 use parking_lot::RwLock;
 use prose_wasm_utils::SendUnlessWasm;
-use rusqlite::types::ToSqlOutput;
 use rusqlite::{params, DropBehavior, OptionalExtension, ToSql, TransactionBehavior};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -479,6 +477,11 @@ impl<'tx, Mode> SqliteCollection<'tx, Mode> {
             QueryDirection::Forward,
             None,
         );
+
+        let params = params
+            .into_iter()
+            .map(|key| key.to_raw_key())
+            .collect::<Vec<_>>();
         let params: Vec<&dyn ToSql> = params.iter().map(|k| k as &dyn ToSql).collect();
 
         Ok(conn.query_row(
@@ -535,7 +538,7 @@ where
         );
         let mut statement = conn.prepare(&sql)?;
         let data = statement
-            .query_row(params![format_key(key)?], |row| row.get::<_, String>(0))
+            .query_row(params![key.to_raw_key()], |row| row.get::<_, String>(0))
             .optional()?;
         let result = data.map(|data| serde_json::from_str(&data)).transpose()?;
 
@@ -549,7 +552,7 @@ where
             self.name,
             self.qualified_key_column()
         ))?;
-        Ok(statement.query_row(params![format_key(key)?], |row| row.get(0))?)
+        Ok(statement.query_row(params![key.to_raw_key()], |row| row.get(0))?)
     }
 
     async fn all_keys(&self) -> Result<Vec<String>, Self::Error> {
@@ -614,8 +617,8 @@ where
         );
         let params = params
             .into_iter()
-            .map(format_key)
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|key| key.to_raw_key())
+            .collect::<Vec<_>>();
         let params: Vec<&dyn ToSql> = params.iter().map(|k| k as &dyn ToSql).collect();
 
         let mut statement = conn.prepare(&sql)?;
@@ -674,7 +677,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
             r#"INSERT INTO "{}" (`key`, `data`) VALUES (?, ?)"#,
             self.name
         ))?;
-        statement.execute(params![key, &serde_json::to_string(value)?])?;
+        statement.execute(params![key.to_raw_key(), &serde_json::to_string(value)?])?;
         Ok(())
     }
 
@@ -688,7 +691,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
             r#"INSERT OR REPLACE INTO "{}" (`key`, `data`) VALUES (?, ?)"#,
             self.name
         ))?;
-        statement.execute(params![key, &serde_json::to_string(value)?])?;
+        statement.execute(params![key.to_raw_key(), &serde_json::to_string(value)?])?;
         Ok(())
     }
 
@@ -696,7 +699,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
         let conn = self.obj.lock()?;
         let mut statement =
             conn.prepare(&format!(r#"DELETE FROM {} WHERE `key` = ?"#, self.name))?;
-        statement.execute(params![key])?;
+        statement.execute(params![key.to_raw_key()])?;
         Ok(())
     }
 
@@ -812,6 +815,8 @@ impl<T: KeyType> Query<T> {
         };
 
         let (predicate, params) = match self {
+            Query::All => ("".to_string(), vec![]),
+
             Query::Range {
                 start: Bound::Included(start),
                 end: Bound::Included(end),
@@ -870,39 +875,14 @@ impl<T: KeyType> Query<T> {
     }
 }
 
-trait ToParam {
-    fn to_param(&self) -> ToSqlOutput;
-}
+impl ToSql for RawKey {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
+        use rusqlite::types::{ToSqlOutput, ValueRef};
 
-impl ToParam for DateTime<Local> {
-    fn to_param(&self) -> ToSqlOutput {
-        todo!()
-    }
-}
-
-fn format_key<K: KeyType + ?Sized>(key: &K) -> Result<String, Error> {
-    // We have to encode the values ourself. Otherwise rusqlite encodes e.g. DateTime
-    // differently than the default would be. Say you had the following struct:
-    //
-    // #[derive(Serialize, Deserialize)]
-    // struct MyStruct { timestamp: DateTime<Utc> }
-    //
-    // The following payload would be inserted into the SQLite table:
-    // {"timestamp":"2023-07-20T18:00:00Z"}
-    //
-    // Now if you try to fetch your struct, rusqlite would then format the query
-    // parameter differently:
-    // SELECT `key`, `data` FROM 'book' WHERE `data` ->> 'timestamp' = '2023-07-21 18:00:00+00:00' ORDER BY `data` ->> 'published_at' ASC
-    let value = serde_json::to_string(key).map(|mut p| {
-        // But we need to get rid of the surrounding quotes that serde may add, if the
-        // result is a String. This is a dirty workaround for something that would need to be
-        // solved with a lot of generics and macros…
-        // See https://github.com/rusqlite/rusqlite/blob/476a02a5954224a224eaf7dadb918c2033b932bc/src/types/to_sql.rs#L174
-        if p.ends_with(r#"""#) {
-            p.remove(0);
-            p.pop();
+        match self {
+            RawKey::Integer(value) => Ok(ToSqlOutput::Borrowed(ValueRef::Integer(value.clone()))),
+            RawKey::Real(value) => Ok(ToSqlOutput::Borrowed(ValueRef::Real(value.clone()))),
+            RawKey::Text(value) => Ok(ToSqlOutput::Borrowed(ValueRef::Text(value.as_bytes()))),
         }
-        p
-    })?;
-    Ok(value)
+    }
 }

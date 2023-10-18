@@ -250,7 +250,7 @@ where
     ) -> Result<Option<V>, Self::Error> {
         let value: Option<V> = self
             .store
-            .get(&<JsValue as JsValueSerdeExt>::from_serde(key)?)?
+            .get(&key.to_js_value()?)?
             .await?
             .map(|value| JsValueSerdeExt::into_serde(&value))
             .transpose()?;
@@ -258,11 +258,7 @@ where
     }
 
     async fn contains_key<K: KeyType + ?Sized>(&self, key: &K) -> Result<bool, Self::Error> {
-        let contains_key = self
-            .store
-            .get_key(&<JsValue as JsValueSerdeExt>::from_serde(key)?)?
-            .await?
-            .is_some();
+        let contains_key = self.store.get_key(&key.to_js_value()?)?.await?.is_some();
         Ok(contains_key)
     }
 
@@ -352,7 +348,7 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
         key: &K,
         value: &V,
     ) -> Result<(), Self::Error> {
-        let key = <JsValue as JsValueSerdeExt>::from_serde(key)?;
+        let key = key.to_js_value()?;
 
         // We mimic SQLite behavior here which raises an error immediately when a duplicate key is
         // inserted, unlike IndexedDB which does not raise an error until the transaction
@@ -372,15 +368,14 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
         value: &V,
     ) -> Result<(), Self::Error> {
         self.store.put_key_val(
-            &<JsValue as JsValueSerdeExt>::from_serde(key)?,
+            &key.to_js_value()?,
             &<JsValue as JsValueSerdeExt>::from_serde(value)?,
         )?;
         Ok(())
     }
 
     fn delete<K: KeyType + ?Sized>(&self, key: &K) -> Result<(), Self::Error> {
-        self.store
-            .delete(&<JsValue as JsValueSerdeExt>::from_serde(key)?)?;
+        self.store.delete(&key.to_js_value()?)?;
         Ok(())
     }
 
@@ -395,13 +390,15 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
 
     fn try_from(value: Query<T>) -> Result<Option<IdbKeyRange>, Self::Error> {
         let result = match value {
+            Query::All => None,
+
             Query::Range {
                 start: Bound::Included(start),
                 end: Bound::Included(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &to_js_value(&start)?,
-                    &to_js_value(&end)?,
+                    &start.to_js_value()?,
+                    &end.to_js_value()?,
                     false,
                     false,
                 )
@@ -417,8 +414,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Excluded(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &to_js_value(&start)?,
-                    &to_js_value(&end)?,
+                    &start.to_js_value()?,
+                    &end.to_js_value()?,
                     false,
                     true,
                 )
@@ -433,7 +430,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Included(start),
                 end: Bound::Unbounded,
             } => Some(
-                IdbKeyRange::lower_bound_with_open(&to_js_value(&start)?, false).map_err(|_| {
+                IdbKeyRange::lower_bound_with_open(&start.to_js_value()?, false).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::lowerBound (false) from {:?}",
                         start
@@ -446,8 +443,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Included(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &to_js_value(&start)?,
-                    &to_js_value(&end)?,
+                    &start.to_js_value()?,
+                    &end.to_js_value()?,
                     true,
                     false,
                 )
@@ -463,8 +460,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Excluded(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &to_js_value(&start)?,
-                    &to_js_value(&end)?,
+                    &start.to_js_value()?,
+                    &end.to_js_value()?,
                     true,
                     true,
                 )
@@ -479,7 +476,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Excluded(start),
                 end: Bound::Unbounded,
             } => Some(
-                IdbKeyRange::lower_bound_with_open(&to_js_value(&start)?, true).map_err(|_| {
+                IdbKeyRange::lower_bound_with_open(&start.to_js_value()?, true).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::lowerBound (true) from {:?}",
                         start
@@ -491,7 +488,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Unbounded,
                 end: Bound::Included(end),
             } => Some(
-                IdbKeyRange::upper_bound_with_open(&to_js_value(&end)?, false).map_err(|_| {
+                IdbKeyRange::upper_bound_with_open(&end.to_js_value()?, false).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::upperBound (false) from {:?}",
                         false
@@ -502,7 +499,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Unbounded,
                 end: Bound::Excluded(end),
             } => Some(
-                IdbKeyRange::upper_bound_with_open(&to_js_value(&end)?, true).map_err(|_| {
+                IdbKeyRange::upper_bound_with_open(&end.to_js_value()?, true).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::upperBound (false) from {:?}",
                         false
@@ -514,7 +511,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Unbounded,
             } => None,
 
-            Query::Only(value) => Some(IdbKeyRange::only(&to_js_value(&value)?).map_err(|_| {
+            Query::Only(value) => Some(IdbKeyRange::only(&value.to_js_value()?).map_err(|_| {
                 Error::IndexedDB(format!(
                     "Failed to build IdbKeyRange::only from {:?}",
                     value
@@ -526,7 +523,13 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
     }
 }
 
-fn to_js_value<T: Serialize + Debug + ?Sized>(value: &T) -> Result<JsValue, Error> {
-    <JsValue as JsValueSerdeExt>::from_serde(&value)
-        .map_err(|_| Error::IndexedDB(format!("Failed to convert {:?} to a JsValue.", value)))
+trait KeyTypeExt {
+    fn to_js_value(&self) -> Result<JsValue, Error>;
+}
+
+impl<T: KeyType + ?Sized> KeyTypeExt for T {
+    fn to_js_value(&self) -> Result<JsValue, Error> {
+        <JsValue as JsValueSerdeExt>::from_serde(&self.to_raw_key())
+            .map_err(|_| Error::IndexedDB(format!("Failed to convert {:?} to a JsValue.", self)))
+    }
 }

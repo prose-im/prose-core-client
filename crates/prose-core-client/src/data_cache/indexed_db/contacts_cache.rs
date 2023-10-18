@@ -54,7 +54,7 @@ impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
         {
             let collection = tx.writeable_collection(keys::ROSTER_ITEMS_STORE)?;
             for item in items {
-                collection.put(&item.jid.to_string(), &item)?;
+                collection.put(&item.jid, &item)?;
             }
         }
 
@@ -68,24 +68,17 @@ impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
         profile: &UserProfile,
     ) -> Result<(), Self::Error> {
         debug!("Store profile for {}.", jid);
-        self.db
-            .put(keys::USER_PROFILE_STORE, &jid.to_string(), &profile)
-            .await?;
+        self.db.put(keys::USER_PROFILE_STORE, jid, &profile).await?;
         Ok(())
     }
 
     async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>, Self::Error> {
-        let profile = self
-            .db
-            .get(keys::USER_PROFILE_STORE, &jid.to_string())
-            .await?;
+        let profile = self.db.get(keys::USER_PROFILE_STORE, jid).await?;
         Ok(profile)
     }
 
     async fn delete_user_profile(&self, jid: &BareJid) -> Result<(), Self::Error> {
-        self.db
-            .delete(keys::USER_PROFILE_STORE, &jid.to_string())
-            .await?;
+        self.db.delete(keys::USER_PROFILE_STORE, jid).await?;
         Ok(())
     }
 
@@ -95,7 +88,7 @@ impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
         metadata: &AvatarMetadata,
     ) -> Result<(), Self::Error> {
         self.db
-            .put(keys::AVATAR_METADATA_STORE, &jid.to_string(), metadata)
+            .put(keys::AVATAR_METADATA_STORE, jid, metadata)
             .await?;
         Ok(())
     }
@@ -104,17 +97,12 @@ impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
         &self,
         jid: &BareJid,
     ) -> Result<Option<AvatarMetadata>, Self::Error> {
-        let metadata = self
-            .db
-            .get(keys::AVATAR_METADATA_STORE, &jid.to_string())
-            .await?;
+        let metadata = self.db.get(keys::AVATAR_METADATA_STORE, jid).await?;
         Ok(metadata)
     }
 
     async fn insert_presence(&self, jid: &BareJid, presence: &Presence) -> Result<(), Self::Error> {
-        self.db
-            .put(keys::PRESENCE_STORE, &jid.to_string(), &presence)
-            .await?;
+        self.db.put(keys::PRESENCE_STORE, jid, &presence).await?;
         Ok(())
     }
 
@@ -125,12 +113,10 @@ impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
     ) -> Result<(), Self::Error> {
         if let Some(user_activity) = user_activity {
             self.db
-                .put(keys::USER_ACTIVITY_STORE, &jid.to_string(), &user_activity)
+                .put(keys::USER_ACTIVITY_STORE, jid, &user_activity)
                 .await?;
         } else {
-            self.db
-                .delete(keys::USER_ACTIVITY_STORE, &jid.to_string())
-                .await?;
+            self.db.delete(keys::USER_ACTIVITY_STORE, jid).await?;
         }
         Ok(())
     }
@@ -141,16 +127,13 @@ impl<D: Driver> ContactsCache for IndexedDBDataCache<D> {
         chat_state: &ChatState,
     ) -> Result<(), Self::Error> {
         self.db
-            .put(keys::CHAT_STATE_STORE, &jid.to_string(), &chat_state)
+            .put(keys::CHAT_STATE_STORE, jid, &chat_state)
             .await?;
         Ok(())
     }
 
     async fn load_chat_state(&self, jid: &BareJid) -> Result<Option<ChatState>, Self::Error> {
-        let chat_state = self
-            .db
-            .get(keys::CHAT_STATE_STORE, &jid.to_string())
-            .await?;
+        let chat_state = self.db.get(keys::CHAT_STATE_STORE, jid).await?;
         Ok(chat_state)
     }
 

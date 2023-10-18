@@ -264,22 +264,15 @@ impl<D: Driver> MessageCache for IndexedDBDataCache<D> {
         text: Option<&str>,
     ) -> Result<(), Self::Error> {
         if let Some(text) = text {
-            self.db
-                .put(keys::DRAFTS_STORE, &conversation.to_string(), &text)
-                .await?;
+            self.db.put(keys::DRAFTS_STORE, conversation, &text).await?;
         } else {
-            self.db
-                .delete(keys::DRAFTS_STORE, &conversation.to_string())
-                .await?;
+            self.db.delete(keys::DRAFTS_STORE, conversation).await?;
         }
         Ok(())
     }
 
     async fn load_draft(&self, conversation: &BareJid) -> Result<Option<String>, Self::Error> {
-        let draft = self
-            .db
-            .get(keys::DRAFTS_STORE, &conversation.to_string())
-            .await?;
+        let draft = self.db.get(keys::DRAFTS_STORE, conversation).await?;
         Ok(draft)
     }
 }

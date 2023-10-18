@@ -1,9 +1,9 @@
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, Local, NaiveDate, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use std::error::Error;
+use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
 
@@ -226,25 +226,158 @@ pub enum QueryDirection {
     Backward,
 }
 
-#[cfg(target_arch = "wasm32")]
-pub trait KeyType: std::fmt::Display + Serialize + std::fmt::Debug {}
-#[cfg(not(target_arch = "wasm32"))]
-pub trait KeyType: std::fmt::Display + Serialize + rusqlite::ToSql + Send + Sync {}
+pub trait KeyType: Send + Sync + Debug {
+    fn to_raw_key(&self) -> RawKey;
+}
 
-impl KeyType for i32 {}
-impl KeyType for i64 {}
-impl KeyType for f32 {}
-impl KeyType for f64 {}
-impl KeyType for String {}
-impl KeyType for &String {}
-impl KeyType for str {}
-impl KeyType for &str {}
-impl KeyType for NaiveDate {}
-impl KeyType for DateTime<Local> {}
-impl KeyType for DateTime<Utc> {}
-impl KeyType for DateTime<FixedOffset> {}
+macro_rules! to_raw_key(
+    ($t:ty) => (
+        impl KeyType for $t {
+            #[inline]
+            fn to_raw_key(&self) -> RawKey {
+                RawKey::from(*self)
+            }
+        }
+    )
+);
+
+macro_rules! to_raw_key_str(
+    ($t:ty) => (
+        impl KeyType for $t {
+            #[inline]
+            fn to_raw_key(&self) -> RawKey {
+                RawKey::from(self.to_string())
+            }
+        }
+    )
+);
+
+#[derive(Debug)]
+pub enum RawKey {
+    Integer(i64),
+    Real(f64),
+    Text(String),
+}
+
+impl Serialize for RawKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            RawKey::Integer(ref i) => serializer.serialize_i64(*i),
+            RawKey::Real(ref f) => serializer.serialize_f64(*f),
+            RawKey::Text(ref s) => serializer.serialize_str(s),
+        }
+    }
+}
+
+impl From<i32> for RawKey {
+    fn from(value: i32) -> Self {
+        Self::Integer(value.into())
+    }
+}
+
+impl From<i64> for RawKey {
+    fn from(value: i64) -> Self {
+        Self::Integer(value)
+    }
+}
+
+impl From<f32> for RawKey {
+    fn from(value: f32) -> Self {
+        Self::Real(value.into())
+    }
+}
+
+impl From<f64> for RawKey {
+    fn from(value: f64) -> Self {
+        Self::Real(value)
+    }
+}
+
+impl From<String> for RawKey {
+    fn from(value: String) -> Self {
+        Self::Text(value)
+    }
+}
+
+impl From<&String> for RawKey {
+    fn from(value: &String) -> Self {
+        Self::Text(value.to_owned())
+    }
+}
+
+impl<'a> From<&str> for RawKey {
+    fn from(value: &str) -> Self {
+        Self::Text(value.to_string())
+    }
+}
+
+impl KeyType for str {
+    fn to_raw_key(&self) -> RawKey {
+        RawKey::Text(self.to_string())
+    }
+}
+
+impl KeyType for String {
+    fn to_raw_key(&self) -> RawKey {
+        RawKey::Text(self.clone())
+    }
+}
+
+to_raw_key!(i32);
+to_raw_key!(i64);
+to_raw_key!(f32);
+to_raw_key!(f64);
+to_raw_key!(&String);
+to_raw_key!(&str);
+
+#[cfg(feature = "chrono")]
+mod chrono {
+    use super::{KeyType, RawKey};
+    use chrono::{DateTime, FixedOffset, Local, NaiveDate, SecondsFormat, Utc};
+
+    impl KeyType for DateTime<Local> {
+        fn to_raw_key(&self) -> RawKey {
+            RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, true))
+        }
+    }
+
+    impl KeyType for DateTime<FixedOffset> {
+        fn to_raw_key(&self) -> RawKey {
+            RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, false))
+        }
+    }
+
+    impl KeyType for DateTime<Utc> {
+        fn to_raw_key(&self) -> RawKey {
+            RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, true))
+        }
+    }
+
+    impl KeyType for NaiveDate {
+        fn to_raw_key(&self) -> RawKey {
+            RawKey::Text(self.format("%Y-%m-%d").to_string())
+        }
+    }
+}
+
+#[cfg(feature = "jid")]
+mod jid {
+    use super::{KeyType, RawKey};
+    use jid::{BareJid, FullJid, Jid};
+
+    to_raw_key_str!(BareJid);
+    to_raw_key_str!(&BareJid);
+    to_raw_key_str!(FullJid);
+    to_raw_key_str!(&FullJid);
+    to_raw_key_str!(Jid);
+    to_raw_key_str!(&Jid);
+}
 
 pub enum Query<T: KeyType> {
+    All,
     Range { start: Bound<T>, end: Bound<T> },
     Only(T),
 }

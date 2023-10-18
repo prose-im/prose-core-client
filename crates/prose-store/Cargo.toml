@@ -12,11 +12,12 @@ authors = ["Marc Bauer <mb@nesium.com>"]
 
 [dependencies]
 async-trait = { workspace = true }
-chrono = { workspace = true, features = ["serde", "wasmbind"] }
+chrono = { workspace = true, features = ["serde", "wasmbind"], optional = true }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
+jid = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 deadpool = "0.10"
@@ -37,4 +38,6 @@ tempfile = { workspace = true }
 
 [features]
 default = []
-test = ["tokio"]
+test = ["dep:tokio"]
+chrono = ["dep:chrono"]
+jid = ["dep:jid"]

@@ -19,7 +19,7 @@ indexmap = "2.0.0"
 jid = { workspace = true, features = ["serde"] }
 minidom = { workspace = true }
 parking_lot = { workspace = true }
-prose-store = { path = "../prose-store" }
+prose-store = { path = "../prose-store", features = ["chrono", "jid"] }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 prose-xmpp = { path = "../prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
