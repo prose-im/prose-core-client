@@ -1,8 +1,11 @@
 pub use crate::{
-    driver::Driver, store::Store, Database, IndexSpec, IndexedCollection, Query, QueryDirection,
-    ReadTransaction, ReadableCollection, StoreError, UpgradeTransaction, WritableCollection,
-    WriteTransaction,
+    driver::Driver,
+    repository::{Entity, Repository},
+    store::Store,
+    Database, IndexSpec, IndexedCollection, Query, QueryDirection, ReadTransaction,
+    ReadableCollection, StoreError, UpgradeTransaction, WritableCollection, WriteTransaction,
 };
+pub use prose_store_entity_macro::entity;
 
 #[cfg(target_arch = "wasm32")]
 pub use crate::driver::indexed_db::{Error, IndexedDBDriver};

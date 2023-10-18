@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+mod repository;
 #[cfg(not(target_arch = "wasm32"))]
 mod sqlite;
 
@@ -12,9 +13,9 @@ use prose_store::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::test as async_test;
+pub use tokio::test as async_test;
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen_test::wasm_bindgen_test as async_test;
+pub use wasm_bindgen_test::wasm_bindgen_test as async_test;
 
 pub mod collections {
     pub const PERSON: &str = "person";
@@ -82,20 +83,33 @@ impl Camera {
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn store() -> Result<Store<IndexedDBDriver>> {
-    open_store(IndexedDBDriver::new("test-db")).await
+type PlatformDriver = IndexedDBDriver;
+#[cfg(not(target_arch = "wasm32"))]
+type PlatformDriver = SqliteDriver;
+
+#[cfg(target_arch = "wasm32")]
+pub fn platform_driver(name: impl AsRef<str>) -> IndexedDBDriver {
+    IndexedDBDriver::new(name)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub async fn store() -> Result<Store<SqliteDriver>> {
+pub fn platform_driver(_name: impl AsRef<str>) -> SqliteDriver {
     let path = tempfile::tempdir().unwrap().path().join("test.sqlite");
     let parent = path.parent().unwrap();
     std::fs::create_dir_all(parent).unwrap();
     println!("Opening DB at {:?}", path);
-    open_store(SqliteDriver::new(path)).await
+    SqliteDriver::new(path)
 }
 
-async fn open_store<T: Driver>(driver: T) -> Result<Store<T>> {
+async fn store() -> Result<Store<PlatformDriver>> {
+    let driver = platform_driver(
+        std::path::Path::new(file!())
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .unwrap(),
+    );
+
     let store = Store::open(driver, 1, |event| {
         let store = event.tx.create_collection(collections::PERSON)?;
         store.add_index(IndexSpec::builder(collections::person::BIRTHDAY).build())?;

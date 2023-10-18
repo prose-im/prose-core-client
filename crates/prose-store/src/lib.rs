@@ -9,6 +9,7 @@ use std::ops::{Bound, RangeBounds};
 
 mod driver;
 pub mod prelude;
+mod repository;
 mod store;
 
 pub trait StoreError: Error {}
@@ -226,7 +227,7 @@ pub enum QueryDirection {
     Backward,
 }
 
-pub trait KeyType: Send + Sync + Debug {
+pub trait KeyType: Send + Sync + Debug + PartialEq {
     fn to_raw_key(&self) -> RawKey;
 }
 
