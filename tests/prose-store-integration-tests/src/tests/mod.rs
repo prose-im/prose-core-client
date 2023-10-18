@@ -8,7 +8,7 @@ mod repository;
 mod sqlite;
 
 use anyhow::Result;
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, FixedOffset, Local, NaiveDate, TimeZone, Utc};
 use prose_store::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -394,74 +394,123 @@ async fn test_set_conflict_in_unique_index() -> Result<()> {
 }
 
 #[async_test]
-async fn test_date_time() -> Result<()> {
-    let store = store().await?;
+async fn test_chrono_types() -> Result<()> {
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct NaiveDateContainer {
+        value: NaiveDate,
+    }
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct LocalDateTimeContainer {
+        value: DateTime<Local>,
+    }
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct FixedOffsetDateTimeContainer {
+        value: DateTime<FixedOffset>,
+    }
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct UtcDateTimeContainer {
+        value: DateTime<Utc>,
+    }
+
+    let naive_date = NaiveDate::from_ymd_opt(2020, 10, 18).unwrap();
+    let local_date_time: DateTime<Local> = Utc
+        .with_ymd_and_hms(2021, 10, 17, 19, 10, 00)
+        .unwrap()
+        .into();
+    let fixed_offset_date_time: DateTime<FixedOffset> = Utc
+        .with_ymd_and_hms(2022, 09, 15, 16, 10, 00)
+        .unwrap()
+        .into();
+    let utc_date_time = Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap();
+
+    let store = Store::open(platform_driver("chrono-types"), 1, |event| {
+        let collection = event.tx.create_collection("chrono-types")?;
+        collection.add_index(IndexSpec::builder("value").build())?;
+        Ok(())
+    })
+    .await?;
+    store.truncate_all_collections().await?;
 
     let tx = store
-        .transaction_for_reading_and_writing(&[collections::BOOK])
+        .transaction_for_reading_and_writing(&["chrono-types"])
         .await?;
+    let collection = tx.writeable_collection("chrono-types")?;
+    let values = collection.index("value")?;
 
-    let books = tx.writeable_collection(collections::BOOK)?;
-    let publish_dates = books.index(collections::book::PUBLISHED_AT)?;
-
-    books.put(
-        "id-1",
-        &Book {
-            title: "Book 1".to_string(),
-            published_at: Utc.with_ymd_and_hms(2023, 7, 20, 18, 00, 00).unwrap(),
-        },
-    )?;
-    books.put(
-        "id-2",
-        &Book {
-            title: "Book 2".to_string(),
-            published_at: Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap(),
-        },
-    )?;
-    books.put(
-        "id-3",
-        &Book {
-            title: "Book 3".to_string(),
-            published_at: Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap(),
-        },
-    )?;
-    books.put(
-        "id-4",
-        &Book {
-            title: "Book 4".to_string(),
-            published_at: Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap(),
-        },
-    )?;
-
-    let value = publish_dates
-        .get_all_filtered::<Book, _>(
-            Query::Only(Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap()),
-            Default::default(),
-            None,
-            |_, book| Some(book.title),
+    collection
+        .set(
+            &naive_date,
+            &NaiveDateContainer {
+                value: naive_date.clone(),
+            },
+        )
+        .await?;
+    collection
+        .set(
+            &local_date_time,
+            &LocalDateTimeContainer {
+                value: local_date_time.clone(),
+            },
+        )
+        .await?;
+    collection
+        .set(
+            &fixed_offset_date_time,
+            &FixedOffsetDateTimeContainer {
+                value: fixed_offset_date_time.clone(),
+            },
+        )
+        .await?;
+    collection
+        .set(
+            &utc_date_time,
+            &UtcDateTimeContainer {
+                value: utc_date_time.clone(),
+            },
         )
         .await?;
 
     assert_eq!(
-        value,
-        [
-            "Book 2".to_string(),
-            "Book 3".to_string(),
-            "Book 4".to_string()
-        ]
+        values
+            .get_all_values::<NaiveDateContainer>(Query::Only(naive_date), Default::default(), None)
+            .await?,
+        vec![NaiveDateContainer { value: naive_date }]
     );
-
     assert_eq!(
-        publish_dates
-            .get::<_, Book>(&Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap())
-            .await?
-            .map(|book| book.title),
-        Some("Book 2".to_string())
+        values
+            .get_all_values::<LocalDateTimeContainer>(
+                Query::Only(local_date_time),
+                Default::default(),
+                None
+            )
+            .await?,
+        vec![LocalDateTimeContainer {
+            value: local_date_time,
+        }]
     );
-    assert!(
-        publish_dates
-            .contains_key(&Utc.with_ymd_and_hms(2023, 7, 21, 18, 00, 00).unwrap())
-            .await?
+    assert_eq!(
+        values
+            .get_all_values::<FixedOffsetDateTimeContainer>(
+                Query::Only(fixed_offset_date_time),
+                Default::default(),
+                None
+            )
+            .await?,
+        vec![FixedOffsetDateTimeContainer {
+            value: fixed_offset_date_time.clone(),
+        }]
+    );
+    assert_eq!(
+        values
+            .get_all_values::<UtcDateTimeContainer>(
+                Query::Only(utc_date_time),
+                Default::default(),
+                None
+            )
+            .await?,
+        vec![UtcDateTimeContainer {
+            value: utc_date_time.clone(),
+        }]
     );
 
     Ok(())
