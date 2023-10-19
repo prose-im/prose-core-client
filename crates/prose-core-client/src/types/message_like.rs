@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, Utc};
 use jid::BareJid;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -25,7 +25,7 @@ pub struct MessageLike {
     pub target: Option<message::Id>,
     pub to: Option<BareJid>,
     pub from: BareJid,
-    pub timestamp: DateTime<FixedOffset>,
+    pub timestamp: DateTime<Utc>,
     pub payload: Payload,
     pub is_first_message: bool,
 }
@@ -98,7 +98,7 @@ impl Payload {
 /// or sent message (or more generally: a message not loaded from MAM).
 pub struct TimestampedMessage<T> {
     pub message: T,
-    pub timestamp: DateTime<FixedOffset>,
+    pub timestamp: DateTime<Utc>,
 }
 
 impl TryFrom<TimestampedMessage<Carbon>> for MessageLike {
@@ -135,7 +135,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
         let timestamp = msg
             .delay
             .as_ref()
-            .map(|delay| delay.stamp.0)
+            .map(|delay| delay.stamp.0.into())
             .unwrap_or(envelope.timestamp);
         let TargetedPayload {
             target: refs,
@@ -148,7 +148,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             target: refs,
             to: to.map(|jid| jid.to_bare()),
             from: from.to_bare(),
-            timestamp: timestamp.clone(),
+            timestamp: timestamp.into(),
             payload,
             is_first_message: false,
         })
@@ -200,7 +200,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             target: refs,
             to: to.map(|jid| jid.to_bare()),
             from: from.to_bare(),
-            timestamp: timestamp.0,
+            timestamp: timestamp.0.into(),
             payload,
             is_first_message: false,
         })

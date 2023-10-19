@@ -307,7 +307,7 @@ impl<D: DataCache, A: AvatarCache> Client<D, A> {
             Request::EntityTime { from, id } => {
                 let profile = self.client.get_mod::<mods::Profile>();
                 profile
-                    .send_entity_time_response(self.inner.time_provider.now(), from, id)
+                    .send_entity_time_response(self.inner.time_provider.now().into(), from, id)
                     .await?
             }
             Request::SoftwareVersion { from, id } => {

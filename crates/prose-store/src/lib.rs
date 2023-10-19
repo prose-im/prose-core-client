@@ -337,20 +337,12 @@ to_raw_key!(&str);
 #[cfg(feature = "chrono")]
 mod chrono {
     use super::{KeyType, RawKey};
-    use chrono::{DateTime, FixedOffset, Local, NaiveDate, SecondsFormat, Utc};
+    use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
 
-    impl KeyType for DateTime<Local> {
-        fn to_raw_key(&self) -> RawKey {
-            RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, true))
-        }
-    }
-
-    impl KeyType for DateTime<FixedOffset> {
-        fn to_raw_key(&self) -> RawKey {
-            RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, false))
-        }
-    }
-
+    /// N.B: DateTime<Local> and DateTime<FixedOffset> are not supported as keys, since these get
+    /// encoded with their timezone, i.e. "2022-09-15T16:10:00+07:00".
+    /// If you'd want to fetch an object for that key you'd have to create a DateTime with the
+    /// exact same timezone, otherwise your query wouldn't match.
     impl KeyType for DateTime<Utc> {
         fn to_raw_key(&self) -> RawKey {
             RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, true))

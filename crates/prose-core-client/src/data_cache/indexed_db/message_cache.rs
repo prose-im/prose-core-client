@@ -6,7 +6,7 @@
 use std::usize;
 
 use async_trait::async_trait;
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use jid::BareJid;
 use prose_store::prelude::*;
 use prose_wasm_utils::SendUnlessWasm;
@@ -58,7 +58,7 @@ impl<D: Driver> MessageCache for IndexedDBDataCache<D> {
         include_targeted_messages: bool,
     ) -> Result<Vec<MessageLike>, Self::Error> {
         let mut messages: Vec<MessageLike> = vec![];
-        let distant_past: DateTime<FixedOffset> = Utc.timestamp_opt(0, 0).unwrap().into();
+        let distant_past = Utc.timestamp_opt(0, 0).unwrap();
 
         let tx = self
             .db
@@ -85,7 +85,7 @@ impl<D: Driver> MessageCache for IndexedDBDataCache<D> {
             targets: &[message::Id],
             conversation: &BareJid,
             newer_than_id: &Option<&message::Id>,
-            newer_than: DateTime<FixedOffset>,
+            newer_than: DateTime<Utc>,
             messages: &mut Vec<MessageLike>,
         ) -> Result<(), CacheError> {
             for target in targets {

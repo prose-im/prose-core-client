@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use chrono::{DateTime, FixedOffset, Utc};
+use chrono::{DateTime, Utc};
 use jid::BareJid;
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
@@ -22,7 +22,7 @@ pub struct MessageBuilder {
     from: BareJid,
     to: BareJid,
     body: String,
-    timestamp: DateTime<FixedOffset>,
+    timestamp: DateTime<Utc>,
     is_read: bool,
     is_edited: bool,
     is_delivered: bool,
@@ -47,7 +47,7 @@ impl MessageBuilder {
         }
     }
 
-    pub fn set_timestamp(mut self, ts: DateTime<FixedOffset>) -> Self {
+    pub fn set_timestamp(mut self, ts: DateTime<Utc>) -> Self {
         self.timestamp = ts;
         self
     }
@@ -89,7 +89,7 @@ impl MessageBuilder {
                 forwarded: Forwarded {
                     delay: Some(Delay {
                         from: None,
-                        stamp: date::DateTime(self.timestamp),
+                        stamp: date::DateTime(self.timestamp.into()),
                         data: None,
                     }),
                     stanza: Some(Box::new(

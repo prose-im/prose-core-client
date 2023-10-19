@@ -1,8 +1,8 @@
-use chrono::{DateTime, FixedOffset, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
 use prose_xmpp::TimeProvider;
 
 pub struct ConstantTimeProvider {
-    pub time: DateTime<FixedOffset>,
+    pub time: DateTime<Utc>,
 }
 
 impl ConstantTimeProvider {
@@ -17,7 +17,7 @@ impl ConstantTimeProvider {
 }
 
 impl TimeProvider for ConstantTimeProvider {
-    fn now(&self) -> DateTime<FixedOffset> {
+    fn now(&self) -> DateTime<Utc> {
         self.time.clone()
     }
 }
