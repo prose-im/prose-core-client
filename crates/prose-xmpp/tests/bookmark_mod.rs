@@ -58,7 +58,7 @@ async fn test_loads_bookmarks() -> Result<()> {
         bookmarks,
         vec![
             ConferenceBookmark {
-                jid: jid_str!("theplay@conference.shakespeare.lit"),
+                jid: jid!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
                     autojoin: Autojoin::True,
                     name: Some("The Play's the Thing".to_string()),
@@ -68,7 +68,7 @@ async fn test_loads_bookmarks() -> Result<()> {
                 }
             },
             ConferenceBookmark {
-                jid: jid_str!("orchard@conference.shakespeare.lit"),
+                jid: jid!("orchard@conference.shakespeare.lit"),
                 conference: Conference {
                     autojoin: Autojoin::True,
                     name: Some("The Orcard".to_string()),
@@ -123,7 +123,7 @@ async fn test_loads_legacy_bookmarks() -> Result<()> {
     assert_eq!(
         bookmarks,
         vec![ConferenceBookmark {
-            jid: jid_str!("theplay@conference.shakespeare.lit"),
+            jid: jid!("theplay@conference.shakespeare.lit"),
             conference: Conference {
                 autojoin: Autojoin::True,
                 name: Some("The Play's the Thing".to_string()),
@@ -149,7 +149,7 @@ async fn test_publishes_bookmark() -> Result<()> {
 
     bookmark
         .publish_bookmark(
-            jid_str!("room@prose.org"),
+            jid!("room@prose.org"),
             Conference {
                 autojoin: Autojoin::True,
                 name: Some("Room Name".to_string()),
@@ -179,7 +179,7 @@ async fn test_publishes_legacy_bookmarks() -> Result<()> {
 
     bookmark
         .publish_bookmarks(vec![ConferenceBookmark {
-            jid: jid_str!("room@prose.org"),
+            jid: jid!("room@prose.org"),
             conference: Conference {
                 autojoin: Autojoin::True,
                 name: Some("Room Name".to_string()),
@@ -207,9 +207,7 @@ async fn test_retracts_bookmark() -> Result<()> {
 
     connection.set_stanza_handler(|_| vec![Iq::from_result("id-1", None::<pubsub::PubSub>).into()]);
 
-    bookmark
-        .retract_bookmark(jid_str!("room@prose.org"))
-        .await?;
+    bookmark.retract_bookmark(jid!("room@prose.org")).await?;
 
     let sent_stanzas = connection.sent_stanza_strings();
     assert_eq!(sent_stanzas.len(), 1);
@@ -248,7 +246,7 @@ async fn test_bookmarks_published_event() -> Result<()> {
         sent_events[0],
         Event::Bookmark2(mods::bookmark2::Event::BookmarksPublished {
             bookmarks: vec![ConferenceBookmark {
-                jid: jid_str!("theplay@conference.shakespeare.lit"),
+                jid: jid!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
                     autojoin: Autojoin::True,
                     name: Some("The Play's the Thing".to_string()),
@@ -293,7 +291,7 @@ async fn test_legacy_bookmark_event() -> Result<()> {
         sent_events[0],
         Event::Bookmark(mods::bookmark::Event::BookmarksChanged {
             bookmarks: vec![ConferenceBookmark {
-                jid: jid_str!("theplay@conference.shakespeare.lit"),
+                jid: jid!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
                     autojoin: Autojoin::True,
                     name: Some("The Play's the Thing".to_string()),
@@ -331,7 +329,7 @@ async fn test_bookmarks_retracted_event() -> Result<()> {
     assert_eq!(
         sent_events[0],
         Event::Bookmark2(mods::bookmark2::Event::BookmarksRetracted {
-            jids: vec![jid_str!("theplay@conference.shakespeare.lit")]
+            jids: vec![jid!("theplay@conference.shakespeare.lit")]
         })
     );
 

@@ -83,11 +83,6 @@ impl Camera {
 }
 
 #[cfg(target_arch = "wasm32")]
-type PlatformDriver = IndexedDBDriver;
-#[cfg(not(target_arch = "wasm32"))]
-type PlatformDriver = SqliteDriver;
-
-#[cfg(target_arch = "wasm32")]
 pub fn platform_driver(name: impl AsRef<str>) -> IndexedDBDriver {
     IndexedDBDriver::new(name)
 }

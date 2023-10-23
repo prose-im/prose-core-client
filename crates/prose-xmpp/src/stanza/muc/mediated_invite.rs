@@ -135,7 +135,7 @@ mod tests {
             invite,
             MediatedInvite {
                 invites: vec![Invite {
-                    from: Some(jid_str!("crone1@shakespeare.lit/desktop")),
+                    from: Some(jid!("crone1@shakespeare.lit/desktop")),
                     to: None,
                     reason: Some("Hey Hecate, this is the place for all good witches!".to_string()),
                 }],
@@ -150,7 +150,7 @@ mod tests {
     fn test_serialize_mediated_invite() -> Result<()> {
         let invite = MediatedInvite {
             invites: vec![Invite {
-                from: Some(jid_str!("crone1@shakespeare.lit/desktop")),
+                from: Some(jid!("crone1@shakespeare.lit/desktop")),
                 to: None,
                 reason: Some("Hey Hecate, this is the place for all good witches!".to_string()),
             }],

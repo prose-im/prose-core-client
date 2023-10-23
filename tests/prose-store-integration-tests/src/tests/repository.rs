@@ -1,5 +1,6 @@
 use crate::tests::{async_test, platform_driver, PlatformDriver};
 use anyhow::Result;
+use async_trait::async_trait;
 use jid::BareJid;
 use prose_store::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -175,7 +176,7 @@ async fn test_update_entry() -> Result<()> {
     );
 
     repo.entry(&User::applicant().id)
-        .insert_if_needed_with(|| panic!("Should not be called"))
+        .insert_if_needed_with(|_| panic!("Should not be called"))
         .and_update(|user| user.company = None)
         .await?;
 
@@ -185,4 +186,95 @@ async fn test_update_entry() -> Result<()> {
     );
 
     Ok(())
+}
+
+#[async_test]
+async fn test_update_entry_in_async_trait_compiles() -> Result<()> {
+    let wrapper = RepoWrapper1::new().await?;
+    wrapper.update_company(Company::junior_developer()).await?;
+
+    let wrapper = RepoWrapper2::new().await?;
+    wrapper.update_company(Company::junior_developer()).await?;
+
+    Ok(())
+}
+
+#[async_trait]
+trait RepoWrapperTrait {
+    async fn update_company(&self, company: Company) -> Result<()>;
+}
+
+struct RepoWrapper1 {
+    repo: Repository<PlatformDriver, User>,
+}
+
+impl RepoWrapper1 {
+    async fn new() -> Result<Self> {
+        Ok(Self {
+            repo: Repository::new(store().await?),
+        })
+    }
+}
+
+struct RepoWrapper2 {
+    store: Store<PlatformDriver>,
+}
+
+impl RepoWrapper2 {
+    async fn new() -> Result<Self> {
+        Ok(Self {
+            store: store().await?,
+        })
+    }
+}
+
+// This code doesn't compile due to a 'higher-ranked lifetime error'.
+// See: https://github.com/rust-lang/rust/issues/102211
+
+// #[async_trait]
+// impl RepoWrapperTrait for RepoWrapper1 {
+//     async fn update_company(&self, company: Company) -> Result<()> {
+//         self.repo
+//             .entry(&User::applicant().id)
+//             .insert_if_needed(User::applicant())
+//             .and_update(|user| user.company = Some(company))
+//             .await?;
+//         Ok(())
+//     }
+// }
+
+#[async_trait]
+impl RepoWrapperTrait for RepoWrapper1 {
+    async fn update_company(&self, company: Company) -> Result<()> {
+        // This is the ugly workaround for the code above which doesn't compile.
+        let tx = self
+            .repo
+            .store()
+            .transaction_for_reading_and_writing(&[User::collection()])
+            .await?;
+        let collection = tx.writeable_collection(User::collection())?;
+        let id = User::applicant().id;
+        let mut user = collection
+            .get::<_, User>(&id)
+            .await?
+            .unwrap_or_else(|| User::applicant());
+        user.company = Some(company);
+        collection.put(&id, &user)?;
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl RepoWrapperTrait for RepoWrapper2 {
+    // This is a slightly more elegant workaround for the code above which doesn't compile.
+    async fn update_company(&self, company: Company) -> Result<()> {
+        upsert!(
+            User,
+            store: self.store,
+            id: &User::applicant().id,
+            insert_if_needed: || User::applicant(),
+            update: |user: &mut User| user.company = Some(company)
+        );
+        Ok(())
+    }
 }

@@ -5,8 +5,9 @@
 
 use minidom::Element;
 
+use prose_utils::id_string;
+
 use crate::stanza::message;
-use crate::util::id_string_macro::id_string;
 
 id_string!(Emoji);
 

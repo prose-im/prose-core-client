@@ -7,8 +7,9 @@ use minidom::Element;
 pub use xmpp_parsers::avatar::Data;
 use xmpp_parsers::pubsub::PubSubPayload;
 
+use prose_utils::id_string;
+
 use crate::ns;
-use crate::util::id_string_macro::id_string;
 use crate::util::ElementExt;
 
 id_string!(ImageId);

@@ -5,16 +5,28 @@
 
 use chrono::{DateTime, Utc};
 use jid::BareJid;
+use prose_xmpp::stanza::message;
+use std::str::FromStr;
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::{date, mam, Element};
 
+use crate::domain::messaging::models::{
+    Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
+};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
 
 use crate::test::{BareJidTestAdditions, DateTimeTestAdditions};
-use crate::types::message_like::{MessageLikeId, Payload};
-use crate::types::{Message, MessageId, MessageLike, Reaction, StanzaId};
+
+impl<T> From<T> for MessageLikeId
+where
+    T: Into<String>,
+{
+    fn from(s: T) -> MessageLikeId {
+        MessageLikeId::from_str(&s.into()).unwrap()
+    }
+}
 
 pub struct MessageBuilder {
     id: MessageId,
@@ -76,7 +88,22 @@ impl MessageBuilder {
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
-            payload: Payload::Message { body: self.body },
+            payload: MessageLikePayload::Message { body: self.body },
+            is_first_message: self.is_first_message,
+        }
+    }
+
+    pub fn build_reaction_to(self, target: &MessageId, emoji: &[message::Emoji]) -> MessageLike {
+        MessageLike {
+            id: MessageLikeId::new(Some(self.id)),
+            stanza_id: self.stanza_id,
+            target: Some(target.clone()),
+            to: Some(self.to),
+            from: self.from,
+            timestamp: self.timestamp,
+            payload: MessageLikePayload::Reaction {
+                emojis: emoji.iter().cloned().collect(),
+            },
             is_first_message: self.is_first_message,
         }
     }
@@ -94,7 +121,7 @@ impl MessageBuilder {
                     }),
                     stanza: Some(Box::new(
                         prose_xmpp::stanza::Message::new()
-                            .set_id(self.id)
+                            .set_id(self.id.as_ref().into())
                             .set_type(MessageType::Chat)
                             .set_to(self.to)
                             .set_from(self.from)

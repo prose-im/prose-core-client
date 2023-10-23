@@ -33,9 +33,23 @@ where
 }
 
 #[macro_export]
-macro_rules! jid_str {
+macro_rules! jid {
     ($jid:expr) => {
         $jid.parse::<jid::Jid>().unwrap()
+    };
+}
+
+#[macro_export]
+macro_rules! bare {
+    ($jid:expr) => {
+        $jid.parse::<jid::BareJid>().unwrap()
+    };
+}
+
+#[macro_export]
+macro_rules! full {
+    ($jid:expr) => {
+        $jid.parse::<jid::FullJid>().unwrap()
     };
 }
 

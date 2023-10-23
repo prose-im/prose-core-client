@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::event::Event as ClientEvent;
 use anyhow::Result;
 use jid::BareJid;
 use minidom::Element;
@@ -11,6 +10,7 @@ use xmpp_parsers::iq::{Iq, IqGetPayload, IqSetPayload};
 use xmpp_parsers::presence::{Presence, Type};
 
 use crate::client::ModuleContext;
+use crate::event::Event as ClientEvent;
 use crate::mods::roster::Event::PresenceSubscriptionRequest;
 use crate::mods::Module;
 use crate::ns;

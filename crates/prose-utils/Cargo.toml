@@ -1,0 +1,11 @@
+[package]
+name = "prose-utils"
+version = "0.1.0"
+description = "Shared utils"
+license = "MPL-2.0"
+edition = "2021"
+homepage = "https://github.com/prose-im/prose-core-client"
+repository = "https://github.com/prose-im/prose-core-client.git"
+keywords = ["xmpp", "xmpp-client", "library"]
+categories = ["network-programming"]
+authors = ["Marc Bauer <mb@nesium.com>"]

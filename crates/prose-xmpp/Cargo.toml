@@ -22,6 +22,7 @@ insta = { workspace = true, features = ["json"], optional = true }
 jid = { workspace = true }
 minidom = { workspace = true }
 parking_lot = { workspace = true }
+prose-utils = { path = "../prose-utils" }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 serde = { workspace = true, features = ["derive"] }
 sha1 = { workspace = true }

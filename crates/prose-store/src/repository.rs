@@ -1,16 +1,20 @@
 use crate::prelude::{Driver, Store};
 use crate::{
-    Database, KeyType, Query, QueryDirection, ReadTransaction, ReadableCollection,
+    Database, IndexSpec, KeyType, Query, QueryDirection, ReadTransaction, ReadableCollection,
     WritableCollection, WriteTransaction,
 };
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use std::marker::PhantomData;
 
-pub trait Entity: Serialize + for<'de> Deserialize<'de> + Send + Sync {
+pub trait Entity: Serialize + DeserializeOwned + Send + Sync {
     type ID: KeyType;
 
     fn id(&self) -> &Self::ID;
     fn collection() -> &'static str;
+    fn indexes() -> Vec<IndexSpec> {
+        vec![]
+    }
 }
 
 pub struct Repository<D: Driver, E: Entity> {
@@ -61,27 +65,37 @@ impl<D: Driver, E: Entity> Repository<D, E> {
     }
 }
 
+impl<D: Driver, E: Entity> Repository<D, E> {
+    pub fn store(&self) -> &Store<D> {
+        &self.store
+    }
+
+    pub fn collection_name(&self) -> &str {
+        E::collection()
+    }
+}
+
 pub struct Entry<'r, 'k, D: Driver, E: Entity> {
     store: &'r Store<D>,
     key: &'k E::ID,
-    value: Option<Box<dyn FnOnce() -> E>>,
+    value: Option<Box<dyn FnOnce(&'k E::ID) -> E + Send + Sync>>,
 }
 
 impl<'r, 'k, D: Driver, E: Entity + 'static> Entry<'r, 'k, D, E> {
     pub fn insert_if_needed(self, value: E) -> Self {
-        self.insert_if_needed_with(|| value)
+        self.insert_if_needed_with(|_| value)
     }
 
     pub fn insert_default_if_needed(self) -> Self
     where
         E: Default,
     {
-        self.insert_if_needed_with(|| E::default())
+        self.insert_if_needed_with(|_| E::default())
     }
 
     pub fn insert_if_needed_with<F>(self, f: F) -> Self
     where
-        F: FnOnce() -> E + 'static,
+        F: FnOnce(&'k E::ID) -> E + 'static + Send + Sync,
     {
         Self {
             store: self.store,
@@ -92,7 +106,7 @@ impl<'r, 'k, D: Driver, E: Entity + 'static> Entry<'r, 'k, D, E> {
 
     pub async fn and_update<F>(self, f: F) -> Result<(), D::Error>
     where
-        F: FnOnce(&mut E) + 'static,
+        F: FnOnce(&mut E) + 'static + Send + Sync,
     {
         let tx = self
             .store
@@ -104,7 +118,7 @@ impl<'r, 'k, D: Driver, E: Entity + 'static> Entry<'r, 'k, D, E> {
             let Some(mut value) = collection
                 .get::<_, E>(self.key)
                 .await?
-                .or_else(|| self.value.map(|f| (f)()))
+                .or_else(|| self.value.map(|f| (f)(&self.key)))
             else {
                 return Ok(());
             };

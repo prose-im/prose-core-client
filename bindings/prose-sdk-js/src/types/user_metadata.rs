@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use chrono::{FixedOffset, Utc};
-use prose_core_client::types::user_metadata;
+use prose_core_client::mods::domain::user_info::models::user_metadata;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]

@@ -11,13 +11,14 @@ use xmpp_parsers::message::{Body, MessageType, Subject};
 use xmpp_parsers::message_correct::Replace;
 use xmpp_parsers::stanza_error::StanzaError;
 
+use prose_utils::id_string;
+
 use crate::ns;
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::stanza_id::{OriginId, StanzaId};
 use crate::stanza::message::{carbons, Fallback, Reactions};
 use crate::stanza::message::{chat_marker, mam};
 use crate::stanza::muc;
-use crate::util::id_string_macro::id_string;
 
 id_string!(Id);
 
