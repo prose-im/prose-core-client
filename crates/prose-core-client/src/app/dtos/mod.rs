@@ -6,3 +6,10 @@
 pub use contact::Contact;
 
 mod contact;
+
+pub use crate::domain::{
+    messaging::models::Message,
+    rooms::models::Occupant,
+    shared::models::Availability,
+    user_profiles::models::{Address, UserProfile},
+};

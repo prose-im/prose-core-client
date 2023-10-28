@@ -54,7 +54,7 @@ impl AccountService {
         self.account_settings_repo
             .update(
                 &self.ctx.connected_jid()?.into_bare(),
-                Box::new(|settings| settings.availability = availability),
+                Box::new(|settings| settings.availability = Some(availability)),
             )
             .await?;
         Ok(())

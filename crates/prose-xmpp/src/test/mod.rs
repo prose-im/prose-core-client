@@ -90,7 +90,7 @@ pub struct ConnectedClient {
 impl ClientTestAdditions for Client {
     async fn connected_client() -> Result<ConnectedClient> {
         let connection = Arc::new(Connection::default());
-        let id_provider = Arc::new(IncrementingIDProvider::new());
+        let id_provider = Arc::new(IncrementingIDProvider::new("id"));
         let sent_events = Arc::new(RwLock::new(vec![]));
 
         let handler_events = sent_events.clone();

@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use account_service::AccountService;
+pub(crate) use connection_service::ConnectionService;
 pub use contacts_service::ContactsService;
 pub(crate) use room::RoomInner;
 pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
@@ -13,6 +14,7 @@ pub(crate) use rooms_service::{CreateOrEnterRoomRequest, CreateOrEnterRoomReques
 pub use user_data_service::UserDataService;
 
 mod account_service;
+mod connection_service;
 mod contacts_service;
 mod room;
 mod room_envelope;

@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use jid::BareJid;
 use xmpp_parsers::mam::Fin;
 
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
 use crate::domain::messaging::models::StanzaId;
@@ -15,7 +16,7 @@ use crate::domain::shared::models::RoomType;
 
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait MessageArchiveService {
+pub trait MessageArchiveService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_messages(
         &self,
         room_jid: &BareJid,

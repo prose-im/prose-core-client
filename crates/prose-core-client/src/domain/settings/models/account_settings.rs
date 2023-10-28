@@ -6,15 +6,10 @@
 use crate::domain::shared::models::Availability;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Default)]
 pub struct AccountSettings {
-    pub availability: Availability,
-}
-
-impl Default for AccountSettings {
-    fn default() -> Self {
-        AccountSettings {
-            availability: Availability::Available,
-        }
-    }
+    /// The last configured availability
+    pub availability: Option<Availability>,
+    /// The generated resource string use to form a FullJid
+    pub resource: Option<String>,
 }

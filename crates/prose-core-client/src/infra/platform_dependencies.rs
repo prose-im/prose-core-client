@@ -85,6 +85,7 @@ impl From<PlatformDependencies> for AppDependencies {
             app_service,
             avatar_repo: Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache)),
             bookmarks_repo: Arc::new(CachingBookmarksRepository::new(d.xmpp.clone())),
+            connection_service: d.xmpp.clone(),
             contacts_repo: Arc::new(CachingContactsRepository::new(d.xmpp.clone())),
             contacts_service: d.xmpp.clone(),
             ctx: Arc::new(d.ctx),

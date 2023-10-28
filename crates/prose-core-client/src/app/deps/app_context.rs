@@ -9,11 +9,11 @@ use anyhow::Result;
 use jid::{BareJid, FullJid};
 use parking_lot::RwLock;
 
+use crate::domain::connection::models::ConnectionProperties;
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 
 pub struct AppContext {
-    pub connected_jid: RwLock<Option<FullJid>>,
-    pub muc_service: RwLock<Option<BareJid>>,
+    pub connection_properties: RwLock<Option<ConnectionProperties>>,
     pub capabilities: Capabilities,
     pub software_version: SoftwareVersion,
     pub is_observing_rooms: AtomicBool,
@@ -22,8 +22,7 @@ pub struct AppContext {
 impl AppContext {
     pub fn new(capabilities: Capabilities, software_version: SoftwareVersion) -> Self {
         Self {
-            connected_jid: Default::default(),
-            muc_service: Default::default(),
+            connection_properties: Default::default(),
             capabilities,
             software_version,
             is_observing_rooms: Default::default(),
@@ -33,15 +32,20 @@ impl AppContext {
 
 impl AppContext {
     pub fn connected_jid(&self) -> Result<FullJid> {
-        self.connected_jid.read().clone().ok_or(anyhow::anyhow!(
-            "Failed to read the user's JID since the client is not connected."
-        ))
+        self.connection_properties
+            .read()
+            .as_ref()
+            .map(|p| p.connected_jid.clone())
+            .ok_or(anyhow::anyhow!(
+                "Failed to read the user's JID since the client is not connected."
+            ))
     }
 
     pub fn muc_service(&self) -> Result<BareJid> {
-        self.muc_service
+        self.connection_properties
             .read()
-            .clone()
+            .as_ref()
+            .and_then(|p| p.server_features.muc_service.clone())
             .ok_or(anyhow::anyhow!("Server does not support MUC (XEP-0045)"))
     }
 }

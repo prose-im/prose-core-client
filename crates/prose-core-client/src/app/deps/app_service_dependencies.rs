@@ -15,5 +15,6 @@ pub type DynEventDispatcher = Arc<ClientEventDispatcher>;
 pub struct AppServiceDependencies {
     pub time_provider: DynTimeProvider,
     pub id_provider: DynIDProvider,
+    pub short_id_provider: DynIDProvider,
     pub event_dispatcher: DynEventDispatcher,
 }

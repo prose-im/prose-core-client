@@ -3,7 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use nano_id_provider::NanoIDProvider;
+use jid::BareJid;
 
-mod nano_id_provider;
-mod request_handling_service;
+#[derive(Default)]
+pub struct ServerFeatures {
+    pub muc_service: Option<BareJid>,
+}

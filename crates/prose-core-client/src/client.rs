@@ -6,9 +6,15 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+use anyhow::Result;
+use jid::BareJid;
 
-use crate::app::services::{AccountService, ContactsService, RoomsService, UserDataService};
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+use prose_xmpp::ConnectionError;
+
+use crate::app::services::{
+    AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
+};
 use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDriver};
 use crate::ClientEvent;
 
@@ -28,6 +34,7 @@ impl Client {
 }
 
 pub struct ClientInner {
+    pub(crate) connection: ConnectionService,
     pub account: AccountService,
     pub contacts: ContactsService,
     pub rooms: RoomsService,
@@ -48,112 +55,25 @@ impl Deref for Client {
     }
 }
 
-// use std::collections::HashMap;
-// use std::fmt::{Debug, Formatter};
-// use std::sync::atomic::{AtomicBool, Ordering};
-// use std::sync::Arc;
-//
-// use anyhow::Result;
-// use jid::{BareJid, FullJid, Jid};
-// use parking_lot::RwLock;
-// use strum_macros::Display;
-// use tracing::{error, info, instrument};
-// use xmpp_parsers::stanza_error::DefinedCondition;
-//
-// use prose_xmpp::mods::{Chat, Status};
-// use prose_xmpp::stanza::ConferenceBookmark;
-// use prose_xmpp::{mods, ConnectionError, IDProvider};
-// use prose_xmpp::{Client as XMPPClient, TimeProvider};
-//
-// use crate::domain::general::models::{Capabilities, SoftwareVersion};
-// use crate::domain::settings::models::AccountSettings;
-// use crate::domain::shared::models::Availability;
-//
-// #[derive(Debug, thiserror::Error, Display)]
-// pub enum ClientError {
-//     NotConnected,
-// }
-//
-// #[derive(Clone)]
-// pub struct Client<D: DataCache + 'static, A: AvatarCache + 'static> {
-//     pub(in crate::client) client: XMPPClient,
-//     pub(in crate::client) inner: Arc<ClientInner<D, A>>,
-// }
-//
-// pub(in crate::client) struct ClientInner<D: DataCache + 'static, A: AvatarCache + 'static> {
-//     pub caps: Capabilities,
-//     pub data_cache: D,
-//     pub avatar_cache: A,
-//     pub is_observing_rooms: AtomicBool,
-//     pub time_provider: Arc<dyn TimeProvider>,
-//     pub id_provider: Arc<dyn IDProvider>,
-//     pub software_version: SoftwareVersion,
-//     pub delegate: Option<Box<dyn ClientDelegate<D, A>>>,
-//     pub muc_service: RwLock<Option<muc::Service>>,
-//     pub bookmarks: RwLock<HashMap<BareJid, ConferenceBookmark>>,
-//     pub connected_rooms: RwLock<HashMap<BareJid, RoomEnvelope<D, A>>>,
-// }
-//
-// impl<D: DataCache, A: AvatarCache> Debug for Client<D, A> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "Client")
-//     }
-// }
-//
-// impl<D: DataCache, A: AvatarCache> Client<D, A> {
-//     pub fn connected_jid(&self) -> Result<FullJid> {
-//         self.client
-//             .connected_jid()
-//             .ok_or(ClientError::NotConnected.into())
-//     }
-// }
-//
-// impl<D: DataCache, A: AvatarCache> Client<D, A> {
-//     #[instrument(skip(password))]
-//     pub async fn connect(
-//         &self,
-//         jid: &FullJid,
-//         password: impl AsRef<str>,
-//         availability: Availability,
-//     ) -> Result<(), ConnectionError> {
-//         self.client.connect(jid, password).await?;
-//
-//         let show: xmpp_parsers::presence::Show =
-//             availability
-//                 .try_into()
-//                 .map_err(|err: anyhow::Error| ConnectionError::Generic {
-//                     msg: err.to_string(),
-//                 })?;
-//
-//         let status_mod = self.client.get_mod::<Status>();
-//         status_mod
-//             .send_presence(Some(show), None, Some((&self.inner.caps).into()))
-//             .map_err(|err| ConnectionError::Generic {
-//                 msg: err.to_string(),
-//             })?;
-//
-//         let chat = self.client.get_mod::<Chat>();
-//         chat.set_message_carbons_enabled(true)
-//             .map_err(|err| ConnectionError::Generic {
-//                 msg: err.to_string(),
-//             })?;
-//
-//         self.gather_server_features()
-//             .await
-//             .map_err(|err| ConnectionError::Generic {
-//                 msg: err.to_string(),
-//             })?;
-//
-//         // self.send_event(ClientEvent::ConnectionStatusChanged {
-//         //     event: ConnectionEvent::Connect,
-//         // });
-//
-//         Ok(())
-//     }
-//
-//     pub async fn disconnect(&self) {
-//         self.client.disconnect()
-//     }
+impl Client {
+    pub async fn connect(
+        &self,
+        jid: &BareJid,
+        password: impl AsRef<str>,
+    ) -> Result<(), ConnectionError> {
+        self.connection.connect(jid, password).await
+    }
+
+    pub async fn disconnect(&self) {
+        self.connection.disconnect().await
+    }
+
+    pub async fn start_observing_rooms(&self) -> Result<()> {
+        // TODO!
+        Ok(())
+    }
+}
+
 // }
 //
 // impl<D: DataCache, A: AvatarCache> Client<D, A> {
@@ -284,13 +204,5 @@ impl Deref for Client {
 //         }
 //
 //         Ok(())
-//     }
-// }
-//
-// impl<D: DataCache, A: AvatarCache> ClientInner<D, A> {
-//     /// Tries to resolve `jid` to a FullJid by appending the available resource with the highest
-//     /// priority. If no available resource is found, returns `jid` as a `Jid`.
-//     pub(super) fn resolve_to_full_jid(&self, jid: &BareJid) -> Jid {
-//         todo!()
 //     }
 // }

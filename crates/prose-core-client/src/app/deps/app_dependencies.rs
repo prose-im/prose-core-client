@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::app::deps::app_context::AppContext;
 use crate::domain::account::services::UserAccountService;
+use crate::domain::connection::services::ConnectionService;
 use crate::domain::contacts::repos::ContactsRepository;
 use crate::domain::contacts::services::ContactsService;
 use crate::domain::general::services::RequestHandlingService;
@@ -25,16 +26,13 @@ use crate::domain::user_profiles::services::UserProfileService;
 
 use super::app_service_dependencies::AppServiceDependencies;
 
-pub(crate) use super::app_service_dependencies::{
-    DynEventDispatcher, DynIDProvider, DynTimeProvider,
-};
-
 pub(crate) type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
 pub(crate) type DynAppContext = Arc<AppContext>;
 pub(crate) type DynAppServiceDependencies = Arc<AppServiceDependencies>;
 pub(crate) type DynAvatarRepository = Arc<dyn AvatarRepository>;
 pub(crate) type DynBookmarksRepository = Arc<dyn BookmarksRepository>;
 pub(crate) type DynBookmarksService = Arc<dyn BookmarksService>;
+pub(crate) type DynConnectionService = Arc<dyn ConnectionService>;
 pub(crate) type DynContactsRepository = Arc<dyn ContactsRepository>;
 pub(crate) type DynContactsService = Arc<dyn ContactsService>;
 pub(crate) type DynDraftsRepository = Arc<dyn DraftsRepository>;
@@ -57,6 +55,7 @@ pub struct AppDependencies {
     pub app_service: DynAppServiceDependencies,
     pub avatar_repo: DynAvatarRepository,
     pub bookmarks_repo: DynBookmarksRepository,
+    pub connection_service: DynConnectionService,
     pub contacts_repo: DynContactsRepository,
     pub contacts_service: DynContactsService,
     pub ctx: DynAppContext,

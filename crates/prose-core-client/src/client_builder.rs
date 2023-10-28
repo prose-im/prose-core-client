@@ -16,10 +16,13 @@ use crate::app::event_handlers::{
     ClientEventDispatcher, ConnectionEventHandler, RequestsEventHandler, UserStateEventHandler,
     XMPPEventHandlerQueue,
 };
-use crate::app::services::{AccountService, ContactsService, RoomsService, UserDataService};
+use crate::app::services::{
+    AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
+};
 use crate::client::ClientInner;
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
 use crate::infra::avatars::AvatarCache;
+use crate::infra::general::NanoIDProvider;
 use crate::infra::platform_dependencies::{open_store, PlatformDependencies};
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
 use crate::{Client, ClientDelegate};
@@ -38,7 +41,7 @@ pub struct ClientBuilder<D, A> {
 }
 
 impl ClientBuilder<UndefinedDriver, UndefinedAvatarCache> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         ClientBuilder {
             builder: XMPPClient::builder(),
             driver: UndefinedDriver {},
@@ -166,6 +169,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
         let app_service_deps = AppServiceDependencies {
             time_provider: self.time_provider,
             id_provider: self.id_provider,
+            short_id_provider: Arc::new(NanoIDProvider::default()),
             event_dispatcher: event_dispatcher.clone(),
         };
 
@@ -186,6 +190,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
         ]);
 
         let client_inner = Arc::new(ClientInner {
+            connection: ConnectionService::from(&dependencies),
             account: AccountService::from(&dependencies),
             contacts: ContactsService::from(&dependencies),
             rooms: RoomsService::from(&dependencies),

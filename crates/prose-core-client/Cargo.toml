@@ -18,6 +18,7 @@ base64 = { workspace = true }
 indexmap = "2.0.0"
 jid = { workspace = true, features = ["serde"] }
 minidom = { workspace = true }
+nanoid = "0.4"
 parking_lot = { workspace = true }
 paste = "1.0"
 prose-proc-macros = { path = "../prose-proc-macros" }

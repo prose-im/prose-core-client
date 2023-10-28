@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use client::{Client, ClientDelegate};
-pub use client_event::ClientEvent;
+pub use client_event::{ClientEvent, RoomEventType};
 #[cfg(not(target_arch = "wasm32"))]
 pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient};
 
@@ -21,9 +21,11 @@ pub mod domain;
 #[cfg(not(feature = "test"))]
 pub(crate) mod domain;
 
-#[cfg(feature = "test")]
 pub mod infra;
-#[cfg(not(feature = "test"))]
-pub(crate) mod infra;
 
 pub(crate) mod util;
+
+#[cfg(target_arch = "wasm32")]
+pub use prose_store::prelude::IndexedDBDriver;
+#[cfg(not(target_arch = "wasm32"))]
+pub use prose_store::prelude::SqliteDriver;

@@ -5,6 +5,7 @@
 
 pub mod account;
 pub mod avatars;
+pub mod connection;
 pub mod contacts;
 pub mod general;
 pub mod messaging;

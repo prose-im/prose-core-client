@@ -17,6 +17,8 @@ use crate::app::deps::{AppContext, AppDependencies, AppServiceDependencies};
 use crate::app::event_handlers::ClientEventDispatcher;
 use crate::app::services::RoomInner;
 use crate::domain::account::services::mocks::MockUserAccountService;
+use crate::domain::connection::models::{ConnectionProperties, ServerFeatures};
+use crate::domain::connection::services::mocks::MockConnectionService;
 use crate::domain::contacts::repos::mocks::MockContactsRepository;
 use crate::domain::contacts::services::mocks::MockContactsService;
 use crate::domain::general::models::Capabilities;
@@ -47,23 +49,28 @@ pub fn mock_account_jid() -> FullJid {
     full!("jane.doe@prose.org/macOS")
 }
 
-impl AppServiceDependencies {
-    pub fn mock() -> Self {
+impl Default for AppServiceDependencies {
+    fn default() -> Self {
         Self {
             time_provider: Arc::new(ConstantTimeProvider {
                 time: mock_reference_date(),
             }),
-            id_provider: Arc::new(IncrementingIDProvider::new()),
+            id_provider: Arc::new(IncrementingIDProvider::new("id")),
+            short_id_provider: Arc::new(IncrementingIDProvider::new("short-id")),
             event_dispatcher: Arc::new(ClientEventDispatcher::new(None)),
         }
     }
 }
 
-impl AppContext {
-    pub fn mock(jid: Option<FullJid>) -> Self {
+impl Default for AppContext {
+    fn default() -> Self {
         AppContext {
-            connected_jid: RwLock::new(jid),
-            muc_service: RwLock::new(Some(mock_muc_service())),
+            connection_properties: RwLock::new(Some(ConnectionProperties {
+                connected_jid: mock_account_jid(),
+                server_features: ServerFeatures {
+                    muc_service: Some(mock_muc_service()),
+                },
+            })),
             capabilities: Capabilities::new("Prose", "https://prose.org", vec![]),
             software_version: Default::default(),
             is_observing_rooms: Default::default(),
@@ -71,11 +78,13 @@ impl AppContext {
     }
 }
 
+#[derive(Default)]
 pub struct MockAppDependencies {
     pub account_settings_repo: MockAccountSettingsRepository,
     pub app_service: AppServiceDependencies,
     pub avatar_repo: MockAvatarRepository,
     pub bookmarks_repo: MockBookmarksRepository,
+    pub connection_service: MockConnectionService,
     pub contacts_repo: MockContactsRepository,
     pub contacts_service: MockContactsService,
     pub ctx: AppContext,
@@ -92,33 +101,6 @@ pub struct MockAppDependencies {
     pub user_info_service: MockUserInfoService,
     pub user_profile_repo: MockUserProfileRepository,
     pub user_profile_service: MockUserProfileService,
-}
-
-impl Default for MockAppDependencies {
-    fn default() -> Self {
-        MockAppDependencies {
-            account_settings_repo: Default::default(),
-            app_service: AppServiceDependencies::mock(),
-            avatar_repo: Default::default(),
-            bookmarks_repo: Default::default(),
-            contacts_repo: Default::default(),
-            contacts_service: Default::default(),
-            ctx: AppContext::mock(Some(mock_account_jid())),
-            drafts_repo: Default::default(),
-            messages_repo: Default::default(),
-            request_handling_service: Default::default(),
-            room_management_service: Default::default(),
-            message_archive_service: Default::default(),
-            messaging_service: Default::default(),
-            room_participation_service: Default::default(),
-            room_topic_service: Default::default(),
-            user_account_service: Default::default(),
-            user_info_repo: Default::default(),
-            user_info_service: Default::default(),
-            user_profile_repo: Default::default(),
-            user_profile_service: Default::default(),
-        }
-    }
 }
 
 impl MockAppDependencies {
@@ -166,6 +148,7 @@ impl From<MockAppDependencies> for AppDependencies {
             app_service,
             avatar_repo: Arc::new(mock.avatar_repo),
             bookmarks_repo: Arc::new(mock.bookmarks_repo),
+            connection_service: Arc::new(mock.connection_service),
             contacts_repo: Arc::new(mock.contacts_repo),
             contacts_service: Arc::new(mock.contacts_service),
             ctx: Arc::new(mock.ctx),
