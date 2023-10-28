@@ -22,14 +22,10 @@ mod message_builder;
 mod mock_app_dependencies;
 
 pub mod mock_data {
-    pub use super::mock_app_dependencies::mock_account_jid as account_jid;
-    pub use super::mock_app_dependencies::mock_muc_service as muc_service;
-    pub use super::mock_app_dependencies::mock_reference_date as reference_date;
-}
-
-pub trait DateTimeTestAdditions {
-    fn test_timestamp() -> DateTime<FixedOffset>;
-    fn test_timestamp_adding(seconds: u32) -> DateTime<FixedOffset>;
+    pub use super::mock_app_dependencies::{
+        mock_account_jid as account_jid, mock_muc_service as muc_service,
+        mock_reference_date as reference_date,
+    };
 }
 
 // #[async_trait(?Send)]
@@ -39,18 +35,6 @@ pub trait DateTimeTestAdditions {
 //         time_provider: T,
 //     ) -> Result<ConnectedClient>;
 // }
-
-impl DateTimeTestAdditions for Utc {
-    fn test_timestamp() -> DateTime<FixedOffset> {
-        Utc.with_ymd_and_hms(2023, 06, 02, 17, 00, 00)
-            .unwrap()
-            .into()
-    }
-
-    fn test_timestamp_adding(seconds: u32) -> DateTime<FixedOffset> {
-        Self::test_timestamp() + Duration::seconds(seconds as i64)
-    }
-}
 
 // pub struct ConnectedClient {
 //     pub client: Client<Arc<PlatformCache>, NoopAvatarCache>,
