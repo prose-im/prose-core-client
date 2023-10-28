@@ -7,16 +7,24 @@ use std::sync::Arc;
 
 use prose_store::prelude::*;
 
-use crate::app::deps::AppServiceDependencies;
+use crate::app::deps::{AppContext, AppDependencies, AppServiceDependencies};
+use crate::app::services::RoomInner;
+use crate::domain::rooms::services::RoomFactory;
 use crate::infra::avatars::AvatarCache;
-use crate::infra::messaging::{DraftsRecord, MessagesRecord};
-use crate::infra::settings::AccountSettingsRecord;
-use crate::infra::user_info::UserInfoRecord;
-use crate::infra::user_profile::UserProfileRecord;
+use crate::infra::contacts::CachingContactsRepository;
+use crate::infra::messaging::{
+    CachingMessageRepository, DraftsRecord, DraftsRepository, MessagesRecord,
+};
+use crate::infra::rooms::CachingBookmarksRepository;
+use crate::infra::settings::{AccountSettingsRecord, AccountSettingsRepository};
+use crate::infra::user_info::caching_avatar_repository::CachingAvatarRepository;
+use crate::infra::user_info::{CachingUserInfoRepository, UserInfoRecord};
+use crate::infra::user_profile::{CachingUserProfileRepository, UserProfileRecord};
 use crate::infra::xmpp::XMPPClient;
 
-pub struct PlatformDependencies {
-    pub app_service: AppServiceDependencies,
+pub(crate) struct PlatformDependencies {
+    pub ctx: AppContext,
+    pub app_service_deps: AppServiceDependencies,
     pub store: Store<PlatformDriver>,
     pub xmpp: Arc<XMPPClient>,
     pub avatar_cache: Box<dyn AvatarCache>,
@@ -45,32 +53,61 @@ fn create_collection<D: Driver, E: Entity>(tx: &D::UpgradeTransaction<'_>) -> Re
     Ok(())
 }
 
-// impl From<PlatformDependencies> for AppDependencies {
-//     fn from(d: PlatformDependencies) -> Self {
-//         Self {
-//             account_settings_repo: Arc::new(infra::settings::AccountSettingsRepository {
-//                 store: d.store.clone(),
-//             }),
-//             app_service: d.app_service,
-//             avatar_repo: d.avatar_repo,
-//             bookmarks_repo: (),
-//             contacts_repo: Arc::new(()),
-//             contacts_service: Arc::new(()),
-//             ctx: Arc::new(AppContext {}),
-//             drafts_repo: DraftsRepository {},
-//             request_handling_service: Arc::new(()),
-//             room_factory: (),
-//             room_management_service: Arc::new(()),
-//             room_message_archive_service: Arc::new(()),
-//             room_messages_repo: MessagesRepository {},
-//             room_messaging_service: Arc::new(()),
-//             room_participation_service: Arc::new(()),
-//             room_topic_service: Arc::new(()),
-//             user_account_service: Arc::new(()),
-//             user_info_repo: Arc::new(()),
-//             user_info_service: Arc::new(()),
-//             user_profile_repo: Arc::new(()),
-//             user_profile_service: Arc::new(()),
-//         }
-//     }
-// }
+impl From<PlatformDependencies> for AppDependencies {
+    fn from(d: PlatformDependencies) -> Self {
+        let app_service = Arc::new(d.app_service_deps);
+        let messages_repo = Arc::new(CachingMessageRepository::new(d.store.clone()));
+        let drafts_repo = Arc::new(DraftsRepository::new(d.store.clone()));
+
+        let room_factory = {
+            let xmpp = d.xmpp.clone();
+            let deps = app_service.clone();
+            let message_repo = messages_repo.clone();
+            let drafts_repo = drafts_repo.clone();
+
+            RoomFactory::new(move |data| {
+                RoomInner {
+                    data: data.clone(),
+                    deps: deps.clone(),
+                    messaging_service: xmpp.clone(),
+                    message_archive_service: xmpp.clone(),
+                    participation_service: xmpp.clone(),
+                    topic_service: xmpp.clone(),
+                    message_repo: message_repo.clone(),
+                    drafts_repo: drafts_repo.clone(),
+                }
+                .into()
+            })
+        };
+
+        Self {
+            account_settings_repo: Arc::new(AccountSettingsRepository::new(d.store.clone())),
+            app_service,
+            avatar_repo: Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache)),
+            bookmarks_repo: Arc::new(CachingBookmarksRepository::new(d.xmpp.clone())),
+            contacts_repo: Arc::new(CachingContactsRepository::new(d.xmpp.clone())),
+            contacts_service: d.xmpp.clone(),
+            ctx: Arc::new(d.ctx),
+            drafts_repo,
+            request_handling_service: d.xmpp.clone(),
+            room_factory,
+            room_management_service: d.xmpp.clone(),
+            message_archive_service: d.xmpp.clone(),
+            messages_repo,
+            messaging_service: d.xmpp.clone(),
+            room_participation_service: d.xmpp.clone(),
+            room_topic_service: d.xmpp.clone(),
+            user_account_service: d.xmpp.clone(),
+            user_info_repo: Arc::new(CachingUserInfoRepository::new(
+                d.store.clone(),
+                d.xmpp.clone(),
+            )),
+            user_info_service: d.xmpp.clone(),
+            user_profile_repo: Arc::new(CachingUserProfileRepository::new(
+                d.store.clone(),
+                d.xmpp.clone(),
+            )),
+            user_profile_service: d.xmpp.clone(),
+        }
+    }
+}

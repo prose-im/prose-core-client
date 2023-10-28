@@ -8,6 +8,7 @@ use std::sync::atomic::Ordering;
 use anyhow::Result;
 use async_trait::async_trait;
 
+use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{client, Event};
 
 use crate::app::deps::{DynAppContext, DynAppServiceDependencies};
@@ -15,9 +16,12 @@ use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::ConnectionEvent;
 use crate::ClientEvent;
 
-pub struct ConnectionEventHandler {
+#[derive(InjectDependencies)]
+pub(crate) struct ConnectionEventHandler {
+    #[inject]
     ctx: DynAppContext,
-    deps: DynAppServiceDependencies,
+    #[inject]
+    app_service: DynAppServiceDependencies,
 }
 
 #[async_trait]
@@ -37,7 +41,7 @@ impl XMPPEventHandler for ConnectionEventHandler {
                 }
                 client::Event::Disconnected { error } => {
                     self.ctx.is_observing_rooms.store(false, Ordering::Relaxed);
-                    self.deps.event_dispatcher.dispatch_event(
+                    self.app_service.event_dispatcher.dispatch_event(
                         ClientEvent::ConnectionStatusChanged {
                             event: ConnectionEvent::Disconnect { error },
                         },

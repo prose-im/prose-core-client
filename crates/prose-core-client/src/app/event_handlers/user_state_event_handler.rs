@@ -9,6 +9,7 @@ use jid::Jid;
 use tracing::debug;
 use xmpp_parsers::presence::Presence;
 
+use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::{profile, status};
 use prose_xmpp::stanza::{avatar, UserActivity, VCard4};
 use prose_xmpp::Event;
@@ -22,11 +23,16 @@ use crate::domain::user_info::models::{
 };
 use crate::ClientEvent;
 
-pub struct UserStateEventHandler {
-    deps: DynAppServiceDependencies,
-    avatar_repository: DynAvatarRepository,
-    user_info_repository: DynUserInfoRepository,
-    user_profile_repository: DynUserProfileRepository,
+#[derive(InjectDependencies)]
+pub(crate) struct UserStateEventHandler {
+    #[inject]
+    app_service: DynAppServiceDependencies,
+    #[inject]
+    avatar_repo: DynAvatarRepository,
+    #[inject]
+    user_info_repo: DynUserInfoRepository,
+    #[inject]
+    user_profile_repo: DynUserProfileRepository,
 }
 
 #[async_trait]
@@ -74,11 +80,11 @@ impl UserStateEventHandler {
             return Ok(());
         };
 
-        self.user_info_repository
+        self.user_info_repo
             .set_user_presence(from, &DomainPresence::from(presence.clone()))
             .await?;
 
-        self.deps
+        self.app_service
             .event_dispatcher
             .dispatch_event(ClientEvent::ContactChanged {
                 jid: from.to_bare(),
@@ -91,10 +97,10 @@ impl UserStateEventHandler {
         debug!("New vcard for {} {:?}", from, vcard);
 
         let from = from.into_bare();
-        self.user_profile_repository
+        self.user_profile_repo
             .set(&from, &vcard.try_into()?)
             .await?;
-        self.deps
+        self.app_service
             .event_dispatcher
             .dispatch_event(ClientEvent::ContactChanged { jid: from });
 
@@ -118,14 +124,14 @@ impl UserStateEventHandler {
 
         let from = from.into_bare();
 
-        self.user_info_repository
+        self.user_info_repo
             .set_avatar_metadata(&from, &metadata)
             .await?;
-        self.avatar_repository
+        self.avatar_repo
             .precache_avatar_image(&from, &metadata.to_info())
             .await?;
 
-        self.deps
+        self.app_service
             .event_dispatcher
             .dispatch_event(ClientEvent::AvatarChanged { jid: from });
 
@@ -135,10 +141,10 @@ impl UserStateEventHandler {
     async fn user_activity_did_change(&self, from: Jid, user_activity: UserActivity) -> Result<()> {
         let jid = from.into_bare();
         let user_activity = DomainUserActivity::try_from(user_activity)?;
-        self.user_info_repository
+        self.user_info_repo
             .set_user_activity(&jid, Some(&user_activity))
             .await?;
-        self.deps
+        self.app_service
             .event_dispatcher
             .dispatch_event(ClientEvent::ContactChanged { jid });
         Ok(())

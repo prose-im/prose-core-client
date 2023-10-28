@@ -96,8 +96,8 @@ pub fn inject_deps(stream: TokenStream) -> TokenStream {
 
     let name = &input.ident;
     let expanded = quote! {
-        impl From<&AppDependencies> for #name {
-            fn from(deps: &AppDependencies) -> Self {
+        impl From<&crate::app::deps::AppDependencies> for #name {
+            fn from(deps: &crate::app::deps::AppDependencies) -> Self {
                 Self {
                     #(#field_initialization,)*
                 }

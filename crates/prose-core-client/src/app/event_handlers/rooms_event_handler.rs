@@ -27,12 +27,12 @@ use crate::client_event::RoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload, TimestampedMessage};
 use crate::ClientEvent;
 
-pub struct RoomsEventHandler {
+pub(crate) struct RoomsEventHandler {
     rooms_service: RoomsService,
     room_factory: DynRoomFactory,
     messaging_service: DynMessagingService,
     messages_repo: DynMessagesRepository,
-    deps: DynAppServiceDependencies,
+    app_service: DynAppServiceDependencies,
 }
 
 #[async_trait]
@@ -176,7 +176,7 @@ impl RoomsEventHandler {
         }
 
         let message_is_carbon = message.is_carbon();
-        let now = self.deps.time_provider.now();
+        let now = self.app_service.time_provider.now();
 
         let parsed_message: Result<MessageLike> = match message {
             ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
@@ -206,7 +206,7 @@ impl RoomsEventHandler {
             debug!("Caching received message…");
             self.messages_repo.append(&from, &[message]).await?;
 
-            self.deps
+            self.app_service
                 .event_dispatcher
                 .dispatch_event(ClientEvent::RoomChanged {
                     room: self.room_factory.build(room.clone()),
@@ -219,7 +219,7 @@ impl RoomsEventHandler {
                 .write()
                 .set_occupant_chat_state(&chat_state.from, &now, chat_state.state);
 
-            self.deps
+            self.app_service
                 .event_dispatcher
                 .dispatch_event(ClientEvent::RoomChanged {
                     room: self.room_factory.build(room.clone()),
@@ -260,13 +260,13 @@ impl RoomsEventHandler {
 
         let message = MessageLike::try_from(TimestampedMessage {
             message,
-            timestamp: self.deps.time_provider.now(),
+            timestamp: self.app_service.time_provider.now(),
         })?;
 
         debug!("Caching sent message…");
         self.messages_repo.append(&to, &[&message]).await?;
 
-        self.deps
+        self.app_service
             .event_dispatcher
             .dispatch_event(ClientEvent::RoomChanged {
                 room: self.room_factory.build(room),

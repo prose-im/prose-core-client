@@ -10,13 +10,22 @@ use async_trait::async_trait;
 use jid::BareJid;
 use parking_lot::RwLock;
 
+use crate::app::deps::DynBookmarksService;
 use crate::domain::rooms::models::Bookmark;
 use crate::domain::rooms::repos::BookmarksRepository;
-use crate::domain::rooms::services::BookmarksService;
 
 pub struct CachingBookmarksRepository {
-    store: Box<dyn BookmarksService>,
+    service: DynBookmarksService,
     bookmarks: RwLock<Option<HashMap<BareJid, Bookmark>>>,
+}
+
+impl CachingBookmarksRepository {
+    pub fn new(service: DynBookmarksService) -> Self {
+        Self {
+            service,
+            bookmarks: Default::default(),
+        }
+    }
 }
 
 #[async_trait]
@@ -57,7 +66,7 @@ impl CachingBookmarksRepository {
             return Ok(());
         }
         let bookmarks = self
-            .store
+            .service
             .load_bookmarks()
             .await?
             .into_iter()
@@ -86,7 +95,7 @@ impl CachingBookmarksRepository {
         let bookmarks = mutated_bookmarks.values().cloned().collect::<Vec<_>>();
         self.bookmarks.write().replace(mutated_bookmarks);
 
-        self.store.publish_bookmarks(bookmarks.as_slice()).await?;
+        self.service.publish_bookmarks(bookmarks.as_slice()).await?;
 
         Ok(())
     }

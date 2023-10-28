@@ -14,8 +14,17 @@ use crate::domain::user_info::repos::AvatarRepository as DomainAvatarRepository;
 use crate::infra::avatars::AvatarCache;
 
 pub struct CachingAvatarRepository {
-    pub(crate) user_info_service: DynUserInfoService,
-    pub(crate) avatar_cache: Box<dyn AvatarCache>,
+    user_info_service: DynUserInfoService,
+    avatar_cache: Box<dyn AvatarCache>,
+}
+
+impl CachingAvatarRepository {
+    pub fn new(user_info_service: DynUserInfoService, avatar_cache: Box<dyn AvatarCache>) -> Self {
+        Self {
+            user_info_service,
+            avatar_cache,
+        }
+    }
 }
 
 #[async_trait]

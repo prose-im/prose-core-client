@@ -3,12 +3,10 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use app_dependencies::*;
+pub(crate) use app_context::AppContext;
+pub(crate) use app_dependencies::*;
 pub(crate) use app_service_dependencies::AppServiceDependencies;
 
 mod app_context;
 mod app_dependencies;
 mod app_service_dependencies;
-
-#[cfg(feature = "test")]
-pub use app_context::AppContext;

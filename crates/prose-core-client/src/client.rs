@@ -3,11 +3,14 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::ops::Deref;
+use std::sync::Arc;
+
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+
 use crate::app::services::{AccountService, ContactsService, RoomsService, UserDataService};
 use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDriver};
 use crate::ClientEvent;
-use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
-use std::sync::Arc;
 
 #[derive(Clone)]
 pub struct Client {
@@ -24,7 +27,7 @@ impl Client {
     }
 }
 
-pub(crate) struct ClientInner {
+pub struct ClientInner {
     pub account: AccountService,
     pub contacts: ContactsService,
     pub rooms: RoomsService,
@@ -34,6 +37,14 @@ pub(crate) struct ClientInner {
 impl From<Arc<ClientInner>> for Client {
     fn from(inner: Arc<ClientInner>) -> Self {
         Client { inner }
+    }
+}
+
+impl Deref for Client {
+    type Target = ClientInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 

@@ -15,6 +15,7 @@ use sha1::{Digest, Sha1};
 use tracing::{error, info};
 use xmpp_parsers::stanza_error::DefinedCondition;
 
+use prose_proc_macros::InjectDependencies;
 use prose_wasm_utils::PinnedFuture;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
@@ -28,18 +29,24 @@ use crate::domain::rooms::models::{Bookmark, RoomConfig, RoomError, RoomInternal
 use crate::util::StringExt;
 use crate::ClientEvent;
 
+#[derive(InjectDependencies)]
 pub struct RoomsService {
     rooms: RwLock<HashMap<BareJid, Arc<RoomInternals>>>,
-    mgmt_service: DynRoomManagementService,
+    #[inject]
+    room_management_service: DynRoomManagementService,
+    #[inject]
     user_profile_service: DynUserProfileService,
-    participation_service: DynRoomParticipationService,
+    #[inject]
+    room_participation_service: DynRoomParticipationService,
+    #[inject]
     room_factory: DynRoomFactory,
+    #[inject]
     bookmarks_repo: DynBookmarksRepository,
+    #[inject]
     ctx: DynAppContext,
-    deps: DynAppServiceDependencies,
+    #[inject]
+    app_service: DynAppServiceDependencies,
 }
-
-struct ConnectedRoom {}
 
 impl RoomsService {
     pub async fn connected_rooms(&self) -> Vec<RoomEnvelope> {
@@ -58,7 +65,7 @@ impl RoomsService {
 
     pub async fn load_public_rooms(&self) -> Result<Vec<mods::muc::Room>> {
         Ok(self
-            .mgmt_service
+            .room_management_service
             .load_public_rooms(&self.ctx.muc_service()?)
             .await?)
     }
@@ -160,7 +167,7 @@ impl RoomsService {
     }
 
     pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
-        self.mgmt_service.destroy_room(room_jid).await?;
+        self.room_management_service.destroy_room(room_jid).await?;
         Ok(())
     }
 }
@@ -244,7 +251,7 @@ impl RoomsService {
                     // different people can create private channels with the same name without
                     // creating a conflict. A conflict might also potentially be a security
                     // issue if jid would contain sensitive information.
-                    let channel_id = self.deps.id_provider.new_id();
+                    let channel_id = self.app_service.id_provider.new_id();
 
                     self.create_or_join_room_with_config(
                         &service,
@@ -355,7 +362,7 @@ impl RoomsService {
         }
 
         if notify_delegate {
-            self.deps
+            self.app_service
                 .event_dispatcher
                 .dispatch_event(ClientEvent::RoomsChanged);
         }
@@ -422,7 +429,7 @@ impl RoomsService {
                     info!("Update participant affiliations…");
                     let room_jid = room_metadata.room_jid.to_bare();
                     let room_has_been_created = room_metadata.room_has_been_created();
-                    let service = self.mgmt_service.clone();
+                    let service = self.room_management_service.clone();
 
                     async move {
                         let owners = participants_including_self.iter().collect::<Vec<_>>();
@@ -447,7 +454,7 @@ impl RoomsService {
         if send_invites && metadata.room_has_been_created() {
             info!("Sending invites for created group…");
             let participants = participants.iter().collect::<Vec<_>>();
-            self.participation_service
+            self.room_participation_service
                 .invite_users_to_room(&metadata.room_jid.to_bare(), participants.as_slice())
                 .await?;
         }
@@ -496,7 +503,7 @@ impl RoomsService {
             // Try to create or enter the room and configure it…
             let room_config = config.clone();
             let result = self
-                .mgmt_service
+                .room_management_service
                 .create_reserved_room(
                     &full_room_jid,
                     Box::new(|form| {
@@ -545,7 +552,7 @@ impl RoomsService {
                     self.rooms.write().remove(&room_jid);
                     // If the validation failed and we've created the room we'll destroy it again.
                     if room_has_been_created {
-                        _ = self.mgmt_service.destroy_room(&room_jid).await;
+                        _ = self.room_management_service.destroy_room(&room_jid).await;
                     }
                     return Err(error.into());
                 }
@@ -559,7 +566,7 @@ impl RoomsService {
                     // Again, if the additional configuration fails and we've created the room
                     // we'll destroy it again.
                     if room_has_been_created {
-                        _ = self.mgmt_service.destroy_room(&room_jid).await;
+                        _ = self.room_management_service.destroy_room(&room_jid).await;
                     }
                     return Err(error.into());
                 }
@@ -596,7 +603,7 @@ impl RoomsService {
                 room_jid, nickname
             );
             return match self
-                .mgmt_service
+                .room_management_service
                 .join_room(&room_jid.with_resource_str(&nickname)?, password)
                 .await
             {

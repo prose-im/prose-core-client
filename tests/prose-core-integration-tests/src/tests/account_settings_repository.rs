@@ -15,9 +15,7 @@ use crate::tests::{async_test, store};
 
 #[async_test]
 async fn test_save_and_load_account_settings() -> Result<()> {
-    let repo = AccountSettingsRepository {
-        store: store().await?,
-    };
+    let repo = AccountSettingsRepository::new(store().await?);
 
     assert_eq!(
         repo.get(&bare!("a@prose.org")).await?,

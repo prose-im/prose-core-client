@@ -20,7 +20,13 @@ pub struct AccountSettingsRecord {
 }
 
 pub struct AccountSettingsRepository {
-    pub store: Store<PlatformDriver>,
+    store: Store<PlatformDriver>,
+}
+
+impl AccountSettingsRepository {
+    pub fn new(store: Store<PlatformDriver>) -> Self {
+        Self { store }
+    }
 }
 
 #[async_trait]

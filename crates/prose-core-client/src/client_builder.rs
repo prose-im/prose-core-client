@@ -11,8 +11,13 @@ use prose_store::prelude::PlatformDriver;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
-use crate::app::deps::AppServiceDependencies;
-use crate::app::event_handlers::{ClientEventDispatcher, XMPPEventHandlerQueue};
+use crate::app::deps::{AppContext, AppDependencies, AppServiceDependencies};
+use crate::app::event_handlers::{
+    ClientEventDispatcher, ConnectionEventHandler, RequestsEventHandler, UserStateEventHandler,
+    XMPPEventHandlerQueue,
+};
+use crate::app::services::{AccountService, ContactsService, RoomsService, UserDataService};
+use crate::client::ClientInner;
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
 use crate::infra::avatars::AvatarCache;
 use crate::infra::platform_dependencies::{open_store, PlatformDependencies};
@@ -103,7 +108,7 @@ impl<D, A> ClientBuilder<D, A> {
 
 impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
     pub async fn build(self) -> Result<Client> {
-        let caps = Capabilities::new(
+        let capabilities = Capabilities::new(
             self.software_version.name.clone(),
             "https://prose.org",
             vec![
@@ -158,56 +163,37 @@ impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
 
         let event_dispatcher = Arc::new(ClientEventDispatcher::new(self.delegate));
 
-        let app_service = AppServiceDependencies {
+        let app_service_deps = AppServiceDependencies {
             time_provider: self.time_provider,
             id_provider: self.id_provider,
-            event_dispatcher,
+            event_dispatcher: event_dispatcher.clone(),
         };
 
-        let platform_deps = PlatformDependencies {
-            app_service,
+        let dependencies: AppDependencies = PlatformDependencies {
+            ctx: AppContext::new(capabilities, self.software_version),
+            app_service_deps,
             store: open_store(self.driver).await?,
             xmpp: xmpp_client.clone(),
             avatar_cache: Box::new(self.avatar_cache),
-        };
+        }
+        .into();
 
-        // let inner = Arc::new(ClientInner {
-        //     caps,
-        //     data_cache: self.data_cache,
-        //     avatar_cache: self.avatar_cache,
-        //     id_provider: self.id_provider.clone(),
-        //     time_provider: self.time_provider.clone(),
-        //     software_version: self.software_version,
-        //     delegate: self.delegate,
-        //     muc_service: Default::default(),
-        //     bookmarks: Default::default(),
-        //     connected_rooms: Default::default(),
-        //     is_observing_rooms: AtomicBool::new(false),
-        // });
-        //
-        // let event_inner = inner.clone();
-        //
-        // let client = self
-        //     .builder
-        //     .add_mod(Bookmark2::default())
-        //     .add_mod(Bookmark::default())
-        //     .add_mod(Caps::default())
-        //     .add_mod(Chat::default())
-        //     .add_mod(MAM::default())
-        //     .add_mod(MUC::default())
-        //     .add_mod(Profile::default())
-        //     .add_mod(Roster::default())
-        //     .add_mod(Status::default())
-        //     .set_time_provider(self.time_provider)
-        //     // .set_event_handler(Box::new(move |xmpp_client, event| {
-        //     //     let client = Client {
-        //     //         client: xmpp_client,
-        //     //         inner: event_inner.clone(),
-        //     //     };
-        //     //     async move { client.handle_event(event).await }
-        //     // }))
-        //     .build();
+        handler_queue.set_handlers(vec![
+            Box::new(ConnectionEventHandler::from(&dependencies)),
+            Box::new(RequestsEventHandler::from(&dependencies)),
+            Box::new(UserStateEventHandler::from(&dependencies)),
+            // Box::new(RoomsEventHandler::from(&dependencies)),
+        ]);
 
-        todo!()
+        let client_inner = Arc::new(ClientInner {
+            account: AccountService::from(&dependencies),
+            contacts: ContactsService::from(&dependencies),
+            rooms: RoomsService::from(&dependencies),
+            user_data: UserDataService::from(&dependencies),
+        });
+
+        event_dispatcher.set_client_inner(Arc::downgrade(&client_inner));
+
+        Ok(Client::from(client_inner))
     }
 }

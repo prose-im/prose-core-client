@@ -14,7 +14,8 @@ use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
 use crate::domain::messaging::services::{MessageArchiveService, MessagingService};
 use crate::domain::rooms::repos::BookmarksRepository;
 use crate::domain::rooms::services::{
-    RoomFactory, RoomManagementService, RoomParticipationService, RoomTopicService,
+    BookmarksService, RoomFactory, RoomManagementService, RoomParticipationService,
+    RoomTopicService,
 };
 use crate::domain::settings::repos::AccountSettingsRepository;
 use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
@@ -24,13 +25,16 @@ use crate::domain::user_profiles::services::UserProfileService;
 
 use super::app_service_dependencies::AppServiceDependencies;
 
-pub use super::app_service_dependencies::{DynEventDispatcher, DynIDProvider, DynTimeProvider};
+pub(crate) use super::app_service_dependencies::{
+    DynEventDispatcher, DynIDProvider, DynTimeProvider,
+};
 
 pub(crate) type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
 pub(crate) type DynAppContext = Arc<AppContext>;
 pub(crate) type DynAppServiceDependencies = Arc<AppServiceDependencies>;
 pub(crate) type DynAvatarRepository = Arc<dyn AvatarRepository>;
 pub(crate) type DynBookmarksRepository = Arc<dyn BookmarksRepository>;
+pub(crate) type DynBookmarksService = Arc<dyn BookmarksService>;
 pub(crate) type DynContactsRepository = Arc<dyn ContactsRepository>;
 pub(crate) type DynContactsService = Arc<dyn ContactsService>;
 pub(crate) type DynDraftsRepository = Arc<dyn DraftsRepository>;

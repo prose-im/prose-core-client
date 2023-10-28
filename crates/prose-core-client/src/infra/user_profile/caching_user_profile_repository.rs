@@ -21,8 +21,17 @@ pub struct UserProfileRecord {
 }
 
 pub struct CachingUserProfileRepository {
-    pub store: Store<PlatformDriver>,
-    pub user_profile_service: DynUserProfileService,
+    store: Store<PlatformDriver>,
+    user_profile_service: DynUserProfileService,
+}
+
+impl CachingUserProfileRepository {
+    pub fn new(store: Store<PlatformDriver>, user_profile_service: DynUserProfileService) -> Self {
+        Self {
+            store,
+            user_profile_service,
+        }
+    }
 }
 
 #[async_trait]

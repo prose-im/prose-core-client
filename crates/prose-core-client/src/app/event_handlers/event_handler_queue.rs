@@ -20,6 +20,13 @@ impl XMPPEventHandlerQueue {
         }
     }
 
+    pub fn set_handlers(&self, handlers: Vec<Box<dyn XMPPEventHandler>>) {
+        self.handlers
+            .set(handlers)
+            .map_err(|_| ())
+            .expect("Tried to applied handlers XMPPEventHandlerQueue more than once");
+    }
+
     pub async fn handle_event(&self, event: XMPPEvent) {
         let mut event = event;
         let handlers = self

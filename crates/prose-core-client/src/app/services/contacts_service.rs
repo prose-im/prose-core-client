@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use jid::BareJid;
+
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::*;

@@ -20,6 +20,18 @@ pub struct AppContext {
 }
 
 impl AppContext {
+    pub fn new(capabilities: Capabilities, software_version: SoftwareVersion) -> Self {
+        Self {
+            connected_jid: Default::default(),
+            muc_service: Default::default(),
+            capabilities,
+            software_version,
+            is_observing_rooms: Default::default(),
+        }
+    }
+}
+
+impl AppContext {
     pub fn connected_jid(&self) -> Result<FullJid> {
         self.connected_jid.read().clone().ok_or(anyhow::anyhow!(
             "Failed to read the user's JID since the client is not connected."

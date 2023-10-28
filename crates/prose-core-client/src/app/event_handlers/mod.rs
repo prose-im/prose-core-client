@@ -7,9 +7,13 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 pub(crate) use client_event_dispatcher::ClientEventDispatcher;
+pub(crate) use connection_event_handler::ConnectionEventHandler;
 pub(crate) use event_handler_queue::XMPPEventHandlerQueue;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 pub(crate) use prose_xmpp::Event as XMPPEvent;
+pub(crate) use requests_event_handler::RequestsEventHandler;
+pub(crate) use rooms_event_handler::RoomsEventHandler;
+pub(crate) use user_state_event_handler::UserStateEventHandler;
 
 mod client_event_dispatcher;
 mod connection_event_handler;

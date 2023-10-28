@@ -24,9 +24,19 @@ pub struct UserInfoRecord {
 }
 
 pub struct CachingUserInfoRepository {
-    pub store: Store<PlatformDriver>,
-    pub user_info_service: DynUserInfoService,
-    pub presences: RwLock<PresenceMap>,
+    store: Store<PlatformDriver>,
+    user_info_service: DynUserInfoService,
+    presences: RwLock<PresenceMap>,
+}
+
+impl CachingUserInfoRepository {
+    pub fn new(store: Store<PlatformDriver>, user_info_service: DynUserInfoService) -> Self {
+        Self {
+            store,
+            user_info_service,
+            presences: Default::default(),
+        }
+    }
 }
 
 #[async_trait]

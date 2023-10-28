@@ -7,6 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use tracing::info;
 
+use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::{caps, ping, profile, roster};
 use prose_xmpp::Event;
 
@@ -15,10 +16,14 @@ use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::general::services::SubscriptionResponse;
 
 /// Handles various server requests.
-pub struct RequestsEventHandler {
-    req_service: DynRequestHandlingService,
+#[derive(InjectDependencies)]
+pub(crate) struct RequestsEventHandler {
+    #[inject]
+    request_handling_service: DynRequestHandlingService,
+    #[inject]
     ctx: DynAppContext,
-    deps: DynAppServiceDependencies,
+    #[inject]
+    app_service: DynAppServiceDependencies,
 }
 
 #[async_trait]
@@ -31,7 +36,7 @@ impl XMPPEventHandler for RequestsEventHandler {
         match event {
             Event::Caps(event) => match event {
                 caps::Event::DiscoInfoQuery { from, id, node } => {
-                    self.req_service
+                    self.request_handling_service
                         .respond_to_disco_info_query(&from, &id, &self.ctx.capabilities)
                         .await?;
                     Ok(None)
@@ -40,25 +45,31 @@ impl XMPPEventHandler for RequestsEventHandler {
             },
             Event::Ping(event) => match event {
                 ping::Event::Ping { from, id } => {
-                    self.req_service.respond_to_ping(&from, &id).await?;
+                    self.request_handling_service
+                        .respond_to_ping(&from, &id)
+                        .await?;
                     Ok(None)
                 }
             },
             Event::Profile(event) => match event {
                 profile::Event::EntityTimeQuery { from, id } => {
-                    self.req_service
-                        .respond_to_entity_time_request(&from, &id, &self.deps.time_provider.now())
+                    self.request_handling_service
+                        .respond_to_entity_time_request(
+                            &from,
+                            &id,
+                            &self.app_service.time_provider.now(),
+                        )
                         .await?;
                     Ok(None)
                 }
                 profile::Event::SoftwareVersionQuery { from, id } => {
-                    self.req_service
+                    self.request_handling_service
                         .respond_to_software_version_request(&from, &id, &self.ctx.software_version)
                         .await?;
                     Ok(None)
                 }
                 profile::Event::LastActivityQuery { from, id } => {
-                    self.req_service
+                    self.request_handling_service
                         .respond_to_last_activity_request(&from, &id, 0)
                         .await?;
                     Ok(None)
@@ -68,7 +79,7 @@ impl XMPPEventHandler for RequestsEventHandler {
             Event::Roster(event) => match event {
                 roster::Event::PresenceSubscriptionRequest { from } => {
                     info!("Approving presence subscription request from {}…", from);
-                    self.req_service
+                    self.request_handling_service
                         .respond_to_presence_subscription_request(
                             &from,
                             SubscriptionResponse::Approve,

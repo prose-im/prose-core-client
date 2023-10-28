@@ -9,25 +9,32 @@ use crate::client::ClientInner;
 use crate::{ClientDelegate, ClientEvent};
 
 pub struct ClientEventDispatcher {
-    client: OnceLock<Weak<ClientInner>>,
+    client_inner: OnceLock<Weak<ClientInner>>,
     delegate: Option<Box<dyn ClientDelegate>>,
 }
 
 impl ClientEventDispatcher {
     pub fn new(delegate: Option<Box<dyn ClientDelegate>>) -> Self {
         Self {
-            client: Default::default(),
+            client_inner: Default::default(),
             delegate,
         }
     }
 
-    pub fn dispatch_event(&self, event: ClientEvent) {
+    pub(crate) fn set_client_inner(&self, client_inner: Weak<ClientInner>) {
+        self.client_inner
+            .set(client_inner)
+            .map_err(|_| ())
+            .expect("Tried to set client_inner on ClientEventDispatcher more than once");
+    }
+
+    pub(crate) fn dispatch_event(&self, event: ClientEvent) {
         let Some(ref delegate) = self.delegate else {
             return;
         };
 
         let Some(client_inner) = self
-            .client
+            .client_inner
             .get()
             .expect("ClientInner was not set on ClientEventDispatcher")
             .upgrade()
