@@ -13,8 +13,8 @@ use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider}
 
 use crate::app::deps::{AppContext, AppDependencies, AppServiceDependencies};
 use crate::app::event_handlers::{
-    ClientEventDispatcher, ConnectionEventHandler, RequestsEventHandler, RoomsEventHandler,
-    UserStateEventHandler, XMPPEventHandlerQueue,
+    ClientEventDispatcher, ConnectionEventHandler, MessagesEventHandler, RequestsEventHandler,
+    RoomsEventHandler, UserStateEventHandler, XMPPEventHandlerQueue,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
@@ -186,6 +186,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
             Box::new(ConnectionEventHandler::from(&dependencies)),
             Box::new(RequestsEventHandler::from(&dependencies)),
             Box::new(UserStateEventHandler::from(&dependencies)),
+            Box::new(MessagesEventHandler::from(&dependencies)),
             Box::new(RoomsEventHandler::from(&dependencies)),
         ]);
 
