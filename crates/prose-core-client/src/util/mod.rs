@@ -6,7 +6,9 @@
 pub(crate) use form_config::FormConfig;
 pub(crate) use string_ext::StringExt;
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod account_bookmarks_client;
+
 pub(crate) mod form_config;
 pub(crate) mod jid_ext;
 pub(crate) mod string_ext;

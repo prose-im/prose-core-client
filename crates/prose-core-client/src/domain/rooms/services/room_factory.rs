@@ -9,19 +9,19 @@ use crate::app::services::{RoomEnvelope, RoomInner};
 use crate::domain::rooms::models::RoomInternals;
 use crate::domain::shared::models::RoomType;
 
+#[cfg(target_arch = "wasm32")]
+pub type RoomBuilder = Arc<dyn Fn(Arc<RoomInternals>) -> RoomInner>;
+#[cfg(not(target_arch = "wasm32"))]
+pub type RoomBuilder = Arc<dyn Fn(Arc<RoomInternals>) -> RoomInner + Send + Sync>;
+
 #[derive(Clone)]
 pub struct RoomFactory {
-    builder: Arc<dyn Fn(Arc<RoomInternals>) -> RoomInner + Send + Sync>,
+    builder: RoomBuilder,
 }
 
 impl RoomFactory {
-    pub fn new<F>(builder: F) -> Self
-    where
-        F: Fn(Arc<RoomInternals>) -> RoomInner + Send + Sync + 'static,
-    {
-        RoomFactory {
-            builder: Arc::new(builder),
-        }
+    pub fn new(builder: RoomBuilder) -> Self {
+        RoomFactory { builder }
     }
 
     pub fn build(&self, room: Arc<RoomInternals>) -> RoomEnvelope {

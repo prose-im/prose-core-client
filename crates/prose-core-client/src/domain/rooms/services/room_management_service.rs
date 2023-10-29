@@ -17,6 +17,7 @@ use crate::domain::rooms::services::RoomParticipationService;
 type ConfigureRoomHandler =
     Box<dyn FnOnce(DataForm) -> PinnedFuture<anyhow::Result<RoomConfigResponse>> + 'static + Send>;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 pub trait RoomManagementService:
     RoomParticipationService + SendUnlessWasm + SyncUnlessWasm

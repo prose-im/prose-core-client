@@ -18,6 +18,7 @@ use crate::infra::xmpp::XMPPClient;
 
 const MESSAGE_PAGE_SIZE: u32 = 50;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl MessageArchiveService for XMPPClient {
     async fn load_messages(

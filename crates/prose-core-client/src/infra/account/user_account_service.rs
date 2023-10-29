@@ -16,6 +16,7 @@ use crate::domain::user_info::models::{AvatarMetadata, UserActivity};
 use crate::domain::user_profiles::models::UserProfile;
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserAccountService for XMPPClient {
     async fn set_avatar_metadata(&self, metadata: &AvatarMetadata) -> Result<()> {

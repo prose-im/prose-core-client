@@ -18,6 +18,7 @@ use crate::domain::user_info::models::AvatarMetadata;
 use crate::domain::user_info::services::UserInfoService;
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserInfoService for XMPPClient {
     async fn load_latest_avatar_metadata(&self, from: &BareJid) -> Result<Option<AvatarMetadata>> {

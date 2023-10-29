@@ -35,6 +35,7 @@ pub(crate) struct UserStateEventHandler {
     user_profile_repo: DynUserProfileRepository,
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl XMPPEventHandler for UserStateEventHandler {
     fn name(&self) -> &'static str {

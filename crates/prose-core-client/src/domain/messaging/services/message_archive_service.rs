@@ -14,6 +14,7 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use crate::domain::messaging::models::StanzaId;
 use crate::domain::shared::models::RoomType;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait MessageArchiveService: SendUnlessWasm + SyncUnlessWasm {

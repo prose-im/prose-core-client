@@ -17,6 +17,7 @@ use crate::domain::rooms::models::{RoomError, RoomMetadata, RoomSettings};
 use crate::domain::rooms::services::RoomManagementService;
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RoomManagementService for XMPPClient {
     async fn load_public_rooms(&self, muc_service: &BareJid) -> Result<Vec<Room>, RoomError> {

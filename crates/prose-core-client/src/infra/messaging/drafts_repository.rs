@@ -27,6 +27,7 @@ pub struct DraftsRecord {
     pub text: String,
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl DomainDraftsRepository for DraftsRepository {
     async fn get(&self, room_id: &BareJid) -> anyhow::Result<Option<String>> {

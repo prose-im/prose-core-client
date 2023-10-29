@@ -24,6 +24,7 @@ pub(crate) struct ConnectionEventHandler {
     app_service: DynAppServiceDependencies,
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl XMPPEventHandler for ConnectionEventHandler {
     fn name(&self) -> &'static str {

@@ -28,6 +28,7 @@ pub(crate) struct RoomsEventHandler {
     rooms_domain_service: DynRoomsDomainService,
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl XMPPEventHandler for RoomsEventHandler {
     fn name(&self) -> &'static str {

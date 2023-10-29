@@ -26,6 +26,7 @@ impl CachingContactsRepository {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ContactsRepository for CachingContactsRepository {
     async fn get_all(&self, account_jid: &BareJid) -> Result<Vec<Contact>> {

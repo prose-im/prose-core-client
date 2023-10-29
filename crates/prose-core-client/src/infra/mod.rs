@@ -17,6 +17,7 @@ pub mod user_profile;
 pub mod xmpp;
 
 pub(crate) mod constants {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) use super::avatars::{
         IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
     };

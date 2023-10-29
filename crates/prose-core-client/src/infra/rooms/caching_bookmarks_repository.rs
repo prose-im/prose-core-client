@@ -28,6 +28,7 @@ impl CachingBookmarksRepository {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl BookmarksRepository for CachingBookmarksRepository {
     async fn get_all(&self) -> Result<Vec<Bookmark>> {

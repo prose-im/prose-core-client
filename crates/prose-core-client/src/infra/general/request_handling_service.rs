@@ -16,6 +16,7 @@ use crate::domain::general::models::{Capabilities, Feature, Identity, SoftwareVe
 use crate::domain::general::services::{RequestHandlingService, SubscriptionResponse};
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RequestHandlingService for XMPPClient {
     async fn respond_to_ping(&self, to: &Jid, id: &str) -> anyhow::Result<()> {

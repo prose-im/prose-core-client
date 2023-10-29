@@ -14,6 +14,7 @@ use crate::domain::shared::models::Availability;
 use crate::domain::user_info::models::{AvatarMetadata, UserActivity};
 use crate::domain::user_profiles::models::UserProfile;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {

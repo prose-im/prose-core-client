@@ -10,6 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::user_info::models::{AvatarMetadata, Presence, UserActivity, UserInfo};
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserInfoRepository: SendUnlessWasm + SyncUnlessWasm {

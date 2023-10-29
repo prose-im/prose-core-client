@@ -12,6 +12,7 @@ use crate::domain::settings::models::AccountSettings;
 
 type UpdateHandler = Box<dyn for<'a> FnOnce(&'a mut AccountSettings) + Send>;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait AccountSettingsRepository: SendUnlessWasm + SyncUnlessWasm {

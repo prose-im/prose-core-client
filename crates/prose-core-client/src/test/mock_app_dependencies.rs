@@ -134,7 +134,7 @@ impl From<MockAppDependencies> for AppDependencies {
             let topic_service = room_topic_service.clone();
             let message_repo = messages_repo.clone();
 
-            RoomFactory::new(move |data| {
+            RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
                     deps: deps.clone(),
@@ -146,7 +146,7 @@ impl From<MockAppDependencies> for AppDependencies {
                     drafts_repo: drafts_repo.clone(),
                 }
                 .into()
-            })
+            }))
         };
 
         let rooms_domain_service = RoomsDomainService {

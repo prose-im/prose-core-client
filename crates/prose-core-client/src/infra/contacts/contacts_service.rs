@@ -14,6 +14,7 @@ use crate::domain::contacts::models::{Contact, Group as DomainGroup};
 use crate::domain::contacts::services::ContactsService;
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ContactsService for XMPPClient {
     async fn load_contacts(&self, account_jid: &BareJid) -> Result<Vec<Contact>> {

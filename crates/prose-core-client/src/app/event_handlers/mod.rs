@@ -30,6 +30,7 @@ mod user_state_event_handler;
 /// and returns an `Option<XMPPEvent>`. If the handler returns `None`, it means the event has been
 /// consumed and no further processing should be done. If it returns `Some(event)`, the event is
 /// not consumed and should be passed to the next handler.
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 pub(crate) trait XMPPEventHandler: SendUnlessWasm + SyncUnlessWasm {
     fn name(&self) -> &'static str;

@@ -38,6 +38,7 @@ impl CachingUserInfoRepository {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserInfoRepository for CachingUserInfoRepository {
     fn resolve_bare_jid_to_full(&self, jid: &BareJid) -> Jid {

@@ -38,6 +38,7 @@ pub(crate) struct MessagesEventHandler {
     room_factory: DynRoomFactory,
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl XMPPEventHandler for MessagesEventHandler {
     fn name(&self) -> &'static str {

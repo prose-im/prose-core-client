@@ -13,6 +13,7 @@ use crate::domain::connection::models::ServerFeatures;
 use crate::domain::connection::services::ConnectionService;
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ConnectionService for XMPPClient {
     async fn connect(&self, jid: &FullJid, password: &str) -> Result<(), ConnectionError> {

@@ -19,6 +19,7 @@ use crate::domain::user_profiles::{
 };
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserProfileService for XMPPClient {
     async fn load_profile(&self, from: &BareJid) -> Result<Option<UserProfile>> {

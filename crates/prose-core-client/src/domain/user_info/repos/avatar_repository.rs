@@ -12,6 +12,7 @@ use prose_xmpp::mods::AvatarData;
 
 use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {

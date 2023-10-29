@@ -13,6 +13,7 @@ use prose_xmpp::stanza::muc::{mediated_invite, MediatedInvite};
 
 use crate::infra::xmpp::XMPPClient;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RoomParticipationService for XMPPClient {
     async fn invite_users_to_room(
