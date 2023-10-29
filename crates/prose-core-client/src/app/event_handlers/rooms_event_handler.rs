@@ -11,6 +11,7 @@ use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
+use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::mods::{bookmark, bookmark2, chat, muc, status};
 use prose_xmpp::stanza::message::ChatState;
@@ -19,22 +20,28 @@ use prose_xmpp::{ns, Event};
 
 use crate::app::deps::{
     DynAppServiceDependencies, DynConnectedRoomsRepository, DynMessagesRepository,
-    DynMessagingService, DynRoomFactory,
+    DynMessagingService, DynRoomFactory, DynRoomsDomainService,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
-use crate::app::services::RoomsService;
-use crate::app::services::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
 use crate::client_event::RoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload, TimestampedMessage};
+use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
 use crate::ClientEvent;
 
+#[derive(InjectDependencies)]
 pub(crate) struct RoomsEventHandler {
-    rooms_service: RoomsService,
-    connected_rooms_repo: DynConnectedRoomsRepository,
-    room_factory: DynRoomFactory,
-    messaging_service: DynMessagingService,
-    messages_repo: DynMessagesRepository,
+    #[inject]
     app_service: DynAppServiceDependencies,
+    #[inject]
+    connected_rooms_repo: DynConnectedRoomsRepository,
+    #[inject]
+    messages_repo: DynMessagesRepository,
+    #[inject]
+    messaging_service: DynMessagingService,
+    #[inject]
+    room_factory: DynRoomFactory,
+    #[inject]
+    rooms_domain_service: DynRoomsDomainService,
 }
 
 #[async_trait]
@@ -332,7 +339,7 @@ impl RoomsEventHandler {
     async fn handle_invite(&self, room_jid: BareJid, password: Option<String>) -> Result<()> {
         info!("Joining room {} after receiving invite…", room_jid);
 
-        self.rooms_service
+        self.rooms_domain_service
             .create_or_join_room(CreateOrEnterRoomRequest {
                 r#type: CreateOrEnterRoomRequestType::Join {
                     room_jid,

@@ -16,7 +16,7 @@ use crate::domain::messaging::services::{MessageArchiveService, MessagingService
 use crate::domain::rooms::repos::{BookmarksRepository, ConnectedRoomsRepository};
 use crate::domain::rooms::services::{
     BookmarksService, RoomFactory, RoomManagementService, RoomParticipationService,
-    RoomTopicService,
+    RoomTopicService, RoomsDomainService,
 };
 use crate::domain::settings::repos::AccountSettingsRepository;
 use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
@@ -45,6 +45,7 @@ pub(crate) type DynRoomFactory = RoomFactory;
 pub(crate) type DynRoomManagementService = Arc<dyn RoomManagementService>;
 pub(crate) type DynRoomParticipationService = Arc<dyn RoomParticipationService>;
 pub(crate) type DynRoomTopicService = Arc<dyn RoomTopicService>;
+pub(crate) type DynRoomsDomainService = Arc<RoomsDomainService>;
 pub(crate) type DynUserAccountService = Arc<dyn UserAccountService>;
 pub(crate) type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub(crate) type DynUserInfoService = Arc<dyn UserInfoService>;
@@ -70,6 +71,7 @@ pub struct AppDependencies {
     pub room_management_service: DynRoomManagementService,
     pub room_participation_service: DynRoomParticipationService,
     pub room_topic_service: DynRoomTopicService,
+    pub rooms_domain_service: DynRoomsDomainService,
     pub user_account_service: DynUserAccountService,
     pub user_info_repo: DynUserInfoRepository,
     pub user_info_service: DynUserInfoService,

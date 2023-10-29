@@ -8,12 +8,16 @@ pub use room_factory::RoomFactory;
 pub use room_management_service::RoomManagementService;
 pub use room_participation_service::RoomParticipationService;
 pub use room_topic_service::RoomTopicService;
+pub use rooms_domain_service::{
+    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType, RoomsDomainService,
+};
 
 mod bookmarks_service;
 mod room_factory;
 mod room_management_service;
 mod room_participation_service;
 mod room_topic_service;
+mod rooms_domain_service;
 
 #[cfg(feature = "test")]
 pub mod mocks {

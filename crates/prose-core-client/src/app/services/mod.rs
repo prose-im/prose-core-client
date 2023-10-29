@@ -10,7 +10,6 @@ pub(crate) use room::RoomInner;
 pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
 pub use room_envelope::RoomEnvelope;
 pub use rooms_service::RoomsService;
-pub(crate) use rooms_service::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
 pub use user_data_service::UserDataService;
 
 mod account_service;

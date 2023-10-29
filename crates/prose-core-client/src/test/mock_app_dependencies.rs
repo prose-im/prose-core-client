@@ -29,7 +29,7 @@ use crate::domain::rooms::repos::mocks::{MockBookmarksRepository, MockConnectedR
 use crate::domain::rooms::services::mocks::{
     MockRoomManagementService, MockRoomParticipationService, MockRoomTopicService,
 };
-use crate::domain::rooms::services::RoomFactory;
+use crate::domain::rooms::services::{RoomFactory, RoomsDomainService};
 use crate::domain::settings::repos::mocks::MockAccountSettingsRepository;
 use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoRepository};
 use crate::domain::user_info::services::mocks::MockUserInfoService;
@@ -112,13 +112,18 @@ impl MockAppDependencies {
 
 impl From<MockAppDependencies> for AppDependencies {
     fn from(mock: MockAppDependencies) -> Self {
-        let drafts_repo = Arc::new(mock.drafts_repo);
         let app_service = Arc::new(mock.app_service);
-        let messaging_service = Arc::new(mock.messaging_service);
+        let bookmarks_repo = Arc::new(mock.bookmarks_repo);
+        let connected_rooms_repo = Arc::new(mock.connected_rooms_repo);
+        let ctx = Arc::new(mock.ctx);
+        let drafts_repo = Arc::new(mock.drafts_repo);
         let message_archive_service = Arc::new(mock.message_archive_service);
+        let messages_repo = Arc::new(mock.messages_repo);
+        let messaging_service = Arc::new(mock.messaging_service);
+        let room_management_service = Arc::new(mock.room_management_service);
         let room_participation_service = Arc::new(mock.room_participation_service);
         let room_topic_service = Arc::new(mock.room_topic_service);
-        let messages_repo = Arc::new(mock.messages_repo);
+        let user_profile_repo = Arc::new(mock.user_profile_repo);
 
         let room_factory = {
             let drafts_repo = drafts_repo.clone();
@@ -144,29 +149,40 @@ impl From<MockAppDependencies> for AppDependencies {
             })
         };
 
+        let rooms_domain_service = RoomsDomainService {
+            app_service: app_service.clone(),
+            bookmarks_repo: bookmarks_repo.clone(),
+            connected_rooms_repo: connected_rooms_repo.clone(),
+            ctx: ctx.clone(),
+            room_management_service: room_management_service.clone(),
+            room_participation_service: room_participation_service.clone(),
+            user_profile_repo: user_profile_repo.clone(),
+        };
+
         AppDependencies {
             account_settings_repo: Arc::new(mock.account_settings_repo),
             app_service,
             avatar_repo: Arc::new(mock.avatar_repo),
-            bookmarks_repo: Arc::new(mock.bookmarks_repo),
-            connected_rooms_repo: Arc::new(mock.connected_rooms_repo),
+            bookmarks_repo,
+            connected_rooms_repo,
             connection_service: Arc::new(mock.connection_service),
             contacts_repo: Arc::new(mock.contacts_repo),
             contacts_service: Arc::new(mock.contacts_service),
-            ctx: Arc::new(mock.ctx),
+            ctx,
             drafts_repo,
             message_archive_service,
             messages_repo,
             messaging_service,
             request_handling_service: Arc::new(mock.request_handling_service),
             room_factory,
-            room_management_service: Arc::new(mock.room_management_service),
+            room_management_service,
             room_participation_service,
             room_topic_service,
+            rooms_domain_service: Arc::new(rooms_domain_service),
             user_account_service: Arc::new(mock.user_account_service),
             user_info_repo: Arc::new(mock.user_info_repo),
             user_info_service: Arc::new(mock.user_info_service),
-            user_profile_repo: Arc::new(mock.user_profile_repo),
+            user_profile_repo,
             user_profile_service: Arc::new(mock.user_profile_service),
         }
     }
