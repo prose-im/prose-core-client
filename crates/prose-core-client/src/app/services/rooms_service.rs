@@ -5,35 +5,135 @@
 
 use anyhow::{bail, Result};
 use jid::BareJid;
-use tracing::info;
+use std::sync::atomic::Ordering;
+use tracing::{error, info};
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods;
 
 use crate::app::deps::{
-    DynAppContext, DynConnectedRoomsRepository, DynRoomFactory, DynRoomManagementService,
-    DynRoomsDomainService,
+    DynAppContext, DynAppServiceDependencies, DynBookmarksRepository, DynConnectedRoomsRepository,
+    DynContactsRepository, DynRoomFactory, DynRoomManagementService, DynRoomsDomainService,
+    DynUserProfileRepository,
 };
 use crate::app::services::RoomEnvelope;
+use crate::domain::rooms::models::RoomInternals;
 use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
 };
+use crate::domain::shared::utils::build_contact_name;
+use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct RoomsService {
     #[inject]
+    app_service: DynAppServiceDependencies,
+    #[inject]
+    bookmarks_repo: DynBookmarksRepository,
+    #[inject]
     connected_rooms_repo: DynConnectedRoomsRepository,
+    #[inject]
+    contacts_repo: DynContactsRepository,
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     room_management_service: DynRoomManagementService,
     #[inject]
     room_factory: DynRoomFactory,
     #[inject]
-    ctx: DynAppContext,
-    #[inject]
     rooms_domain_service: DynRoomsDomainService,
+    #[inject]
+    user_profile_repo: DynUserProfileRepository,
 }
 
 impl RoomsService {
+    pub async fn start_observing_rooms(&self) -> Result<()> {
+        if self.ctx.is_observing_rooms.swap(true, Ordering::Acquire) {
+            return Ok(());
+        }
+
+        let user_jid = self.ctx.connected_jid()?;
+
+        // Insert contacts as "Direct Message" rooms…
+        let direct_message_rooms = {
+            let contacts = self.contacts_repo.get_all(&user_jid.to_bare()).await?;
+            let mut rooms = vec![];
+
+            for contact in contacts {
+                let user_profile = self
+                    .user_profile_repo
+                    .get(&contact.jid)
+                    .await
+                    .ok()
+                    .map(|maybe_profile| maybe_profile.unwrap_or_default())
+                    .unwrap_or_default();
+                let room = RoomInternals::for_direct_message(
+                    &user_jid,
+                    &contact,
+                    &build_contact_name(&contact, &user_profile),
+                );
+                rooms.push(room)
+            }
+
+            rooms
+        };
+        self.connected_rooms_repo.replace(direct_message_rooms);
+
+        let bookmarks = match self.bookmarks_repo.get_all().await {
+            Ok(bookmarks) => bookmarks,
+            Err(error) => {
+                error!("Failed to load bookmarks. Reason: {}", error.to_string());
+                Default::default()
+            }
+        };
+
+        let mut invalid_bookmarks = vec![];
+
+        for bookmark in bookmarks {
+            let result = self
+                .rooms_domain_service
+                .create_or_join_room(CreateOrEnterRoomRequest {
+                    r#type: CreateOrEnterRoomRequestType::Join {
+                        room_jid: bookmark.room_jid.clone(),
+                        nickname: None,
+                        password: None,
+                    },
+                    save_bookmark: false,
+                    notify_delegate: false,
+                })
+                .await;
+
+            match result {
+                Ok(_) => (),
+                Err(error) if error.is_gone_err() => {
+                    // The room does not exist anymore…
+                    invalid_bookmarks.push(bookmark.room_jid);
+                }
+                Err(error) => error!(
+                    "Failed to enter room {}. Reason: {}",
+                    bookmark.room_jid,
+                    error.to_string()
+                ),
+            }
+        }
+
+        if !invalid_bookmarks.is_empty() {
+            info!("Deleting {} invalid bookmarks…", invalid_bookmarks.len());
+            if let Err(error) = self.bookmarks_repo.delete(&invalid_bookmarks).await {
+                error!(
+                    "Failed to delete invalid bookmarks. Reason {}",
+                    error.to_string()
+                )
+            }
+        }
+
+        self.app_service
+            .event_dispatcher
+            .dispatch_event(ClientEvent::RoomsChanged);
+
+        Ok(())
+    }
+
     pub fn connected_rooms(&self) -> Vec<RoomEnvelope> {
         self.connected_rooms_repo
             .get_all()

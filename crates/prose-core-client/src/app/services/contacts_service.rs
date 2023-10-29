@@ -10,8 +10,7 @@ use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::*;
 use crate::app::dtos::Contact;
-use crate::util::concatenate_names;
-use crate::util::jid_ext::JidExt;
+use crate::domain::shared::utils::build_contact_name;
 
 #[derive(InjectDependencies)]
 pub struct ContactsService {
@@ -47,10 +46,7 @@ impl ContactsService {
                 .await?
                 .unwrap_or_default();
 
-            let name = concatenate_names(&profile.first_name, &profile.last_name)
-                .or(profile.nickname)
-                .or(domain_contact.name)
-                .unwrap_or(domain_contact.jid.to_display_name());
+            let name = build_contact_name(&domain_contact, &profile);
 
             let contact = Contact {
                 jid: domain_contact.jid,

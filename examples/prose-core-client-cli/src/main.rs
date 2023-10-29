@@ -50,7 +50,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
     println!("Connected.");
 
     println!("Starting room observation…");
-    client.start_observing_rooms().await?;
+    client.rooms.start_observing_rooms().await?;
     println!("Done.");
 
     Ok((jid.into_bare(), client))
@@ -317,7 +317,7 @@ async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
 }
 
 async fn select_room(client: &Client) -> Result<RoomEnvelope> {
-    let mut rooms = client.rooms.connected_rooms().await;
+    let mut rooms = client.rooms.connected_rooms();
     rooms.sort_by(compare_room_envelopes);
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
@@ -326,7 +326,6 @@ async fn select_muc_room(client: &Client) -> Result<RoomEnvelope> {
     let mut rooms = client
         .rooms
         .connected_rooms()
-        .await
         .into_iter()
         .filter(|room| {
             if let &RoomEnvelope::DirectMessage(_) = room {
@@ -645,7 +644,7 @@ impl ConnectedRoomExt for RoomEnvelope {
 }
 
 async fn list_connected_rooms(client: &Client) -> Result<()> {
-    let mut rooms = client.rooms.connected_rooms().await;
+    let mut rooms = client.rooms.connected_rooms();
     rooms.sort_by(compare_room_envelopes);
 
     let rooms = rooms

@@ -6,7 +6,7 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::util::concatenate_names;
+use crate::domain::shared::utils::concatenate_names;
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
 pub struct Address {

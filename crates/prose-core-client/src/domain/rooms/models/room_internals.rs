@@ -3,7 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::BareJid;
+use crate::domain::contacts::models::Contact;
+use jid::{BareJid, FullJid};
 use parking_lot::RwLock;
 
 use crate::domain::rooms::models::{RoomMetadata, RoomState};
@@ -78,5 +79,22 @@ impl RoomInternals {
         };
 
         room
+    }
+}
+
+impl RoomInternals {
+    pub fn for_direct_message(user_jid: &FullJid, contact: &Contact, contact_name: &str) -> Self {
+        Self {
+            info: RoomInfo {
+                jid: contact.jid.clone(),
+                name: Some(contact_name.to_string()),
+                description: None,
+                user_jid: user_jid.to_bare(),
+                user_nickname: user_jid.resource_str().to_string(),
+                members: vec![contact.jid.clone()],
+                room_type: RoomType::DirectMessage,
+            },
+            state: Default::default(),
+        }
     }
 }
