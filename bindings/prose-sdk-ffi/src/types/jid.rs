@@ -12,15 +12,14 @@ pub struct JID {
 }
 
 impl JID {
-    pub fn to_full_jid_with_resource(&self, resource: &str) -> Result<FullJid, JidParseError> {
-        Ok(FullJid::from_parts(
+    pub fn to_bare(&self) -> Result<BareJid, JidParseError> {
+        Ok(BareJid::from_parts(
             self.node
                 .as_ref()
                 .map(|node| NodePart::new(node))
                 .transpose()?
                 .as_ref(),
             &DomainPart::new(&self.domain)?,
-            &ResourcePart::new(resource)?,
         ))
     }
 }

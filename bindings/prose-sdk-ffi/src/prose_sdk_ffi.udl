@@ -49,12 +49,6 @@ callback interface Logger {
     void log(LogLevel level, string message);
 };
 
-enum CachePolicy {
-    "ReturnCacheDataElseLoad",
-    "ReturnCacheDataDontLoad",
-    "ReloadIgnoringCacheData"
-};
-
 [Enum]
 interface ClientEvent {
     ComposingUsersChanged(JID conversation);
@@ -173,8 +167,4 @@ dictionary UserProfile {
 dictionary AccountBookmark {
     JID jid;
     boolean is_selected;
-};
-
-dictionary AccountSettings {
-    Availability availability;
 };

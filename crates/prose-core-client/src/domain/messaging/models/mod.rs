@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub(self) use error::StanzaParseError;
-pub use message::{Message, MessageId, Reaction, StanzaId};
+pub use message::{Emoji, Message, MessageId, Reaction, StanzaId};
 pub use message_like::{
     MessageLike, MessageLikeId, Payload as MessageLikePayload, TimestampedMessage,
 };

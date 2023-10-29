@@ -16,6 +16,8 @@ pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient
 
 #[cfg(target_arch = "wasm32")]
 pub use crate::infra::avatars::StoreAvatarCache;
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::infra::avatars::{FsAvatarCache, FsAvatarCacheError};
 
 #[cfg(feature = "test")]
 pub mod test;

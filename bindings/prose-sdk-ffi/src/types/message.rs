@@ -5,7 +5,7 @@
 
 use crate::types::JID;
 use chrono::{DateTime as ChronoDateTime, Utc};
-use prose_core_client::types::{
+use prose_core_client::dtos::{
     Emoji, Message as ProseMessage, MessageId, Reaction as ProseReaction, StanzaId,
 };
 

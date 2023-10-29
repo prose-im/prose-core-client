@@ -10,7 +10,7 @@ pub use contact::Contact;
 pub use crate::domain::{
     contacts::models::Group,
     general::models::SoftwareVersion,
-    messaging::models::{Message, MessageId, Reaction},
+    messaging::models::{Emoji, Message, MessageId, Reaction, StanzaId},
     rooms::models::Occupant,
     shared::models::Availability,
     user_info::models::{LastActivity, UserActivity, UserInfo, UserMetadata},
