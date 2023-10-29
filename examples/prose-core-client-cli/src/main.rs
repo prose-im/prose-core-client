@@ -11,10 +11,14 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
-use common::{enable_debug_logging, load_credentials, Level};
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
+use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::convert::IntoAttributeValue;
+use strum::IntoEnumIterator;
+use strum_macros::{Display, EnumIter};
+use url::Url;
+
+use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::app::dtos::{Address, Contact, Message, Occupant};
 use prose_core_client::app::services::RoomEnvelope;
 use prose_core_client::infra::avatars::FsAvatarCache;
@@ -22,9 +26,6 @@ use prose_core_client::{Client, ClientDelegate, ClientEvent, RoomEventType, Sqli
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::ConferenceBookmark;
-use strum::IntoEnumIterator;
-use strum_macros::{Display, EnumIter};
-use url::Url;
 
 async fn configure_client() -> Result<(BareJid, Client)> {
     let cache_path = env::current_dir()?

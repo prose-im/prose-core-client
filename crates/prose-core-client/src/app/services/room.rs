@@ -248,16 +248,6 @@ impl<Kind> Room<Kind> {
     }
 }
 
-impl<Kind> Room<Kind> {
-    pub(crate) async fn load_message(&self, message_id: &MessageId) -> Result<Message> {
-        let ids = &[message_id];
-        self.load_messages_with_ids(ids)
-            .await?
-            .pop()
-            .ok_or(format_err!("No message with id {}", ids[0]))
-    }
-}
-
 impl Room<Group> {
     pub async fn resend_invites_to_members(&self) -> Result<()> {
         info!("Sending invites to group members…");

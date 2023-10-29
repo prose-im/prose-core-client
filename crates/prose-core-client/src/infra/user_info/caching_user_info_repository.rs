@@ -8,12 +8,11 @@ use async_trait::async_trait;
 use jid::{BareJid, Jid};
 use parking_lot::RwLock;
 
-use crate::app::deps::DynUserInfoService;
 use prose_store::prelude::*;
 
+use crate::app::deps::DynUserInfoService;
 use crate::domain::user_info::models::{AvatarMetadata, Presence, UserActivity, UserInfo};
 use crate::domain::user_info::repos::UserInfoRepository;
-use crate::domain::user_info::services::UserInfoService;
 
 use super::PresenceMap;
 

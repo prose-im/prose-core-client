@@ -37,7 +37,7 @@ pub struct Message {
 
 impl Message {
     pub fn toggle_reaction(&mut self, user_id: &BareJid, emoji: Emoji) {
-        let Some(mut reaction) = self
+        let Some(reaction) = self
             .reactions
             .iter_mut()
             .find(|reaction| reaction.emoji == emoji)

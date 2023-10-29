@@ -76,7 +76,10 @@ impl XMPPEventHandler for RoomsEventHandler {
                 }
             },
             Event::MUC(event) => match event {
-                muc::Event::DirectInvite { from, invite } => {
+                muc::Event::DirectInvite {
+                    from: _from,
+                    invite,
+                } => {
                     self.handle_invite(invite.jid, invite.password).await?;
                     Ok(None)
                 }

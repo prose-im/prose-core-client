@@ -11,7 +11,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 use prose_xmpp::stanza::avatar;
 
-use crate::domain::user_info::models::{AvatarInfo, AvatarMetadata, PlatformImage};
+use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 
 pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (400, 400);
 

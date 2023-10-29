@@ -152,13 +152,13 @@ mod tests {
             Some("r2".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r2"), Presence::unavailable());
+        map.update_presence(&jid!("a@prose.org/r2"), Presence::default());
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r1"), Presence::unavailable());
+        map.update_presence(&jid!("a@prose.org/r1"), Presence::default());
         assert_eq!(map.get_highest_presence(&user), None);
     }
 
@@ -195,7 +195,7 @@ mod tests {
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r1"), Presence::unavailable());
+        map.update_presence(&jid!("a@prose.org/r1"), Presence::default());
         assert_eq!(map.get_highest_presence(&user), None);
     }
 
@@ -239,10 +239,9 @@ mod tests {
 
     fn p(priority: i8) -> Presence {
         Presence {
-            kind: None,
-            show: None,
-            status: None,
             priority,
+            availability: Availability::Available,
+            status: None,
         }
     }
 }

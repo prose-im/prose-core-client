@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use xmpp_parsers::presence;
 
 use prose_xmpp::mods;
 use prose_xmpp::stanza::{avatar, VCard4};

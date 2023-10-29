@@ -10,7 +10,7 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::user_info::models::{AvatarInfo, AvatarMetadata, PlatformImage};
+use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]

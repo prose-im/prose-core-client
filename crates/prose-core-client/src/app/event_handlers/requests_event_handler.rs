@@ -35,7 +35,11 @@ impl XMPPEventHandler for RequestsEventHandler {
     async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>> {
         match event {
             Event::Caps(event) => match event {
-                caps::Event::DiscoInfoQuery { from, id, node } => {
+                caps::Event::DiscoInfoQuery {
+                    from,
+                    id,
+                    node: _node,
+                } => {
                     self.request_handling_service
                         .respond_to_disco_info_query(&from, &id, &self.ctx.capabilities)
                         .await?;

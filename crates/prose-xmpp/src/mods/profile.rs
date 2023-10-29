@@ -22,12 +22,12 @@ use xmpp_parsers::version::{VersionQuery, VersionResult};
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
+use crate::ns;
 use crate::stanza::avatar;
 use crate::stanza::avatar::ImageId;
 use crate::stanza::last_activity::LastActivityResponse;
 use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::RequestError;
-use crate::{ns, ParseError};
 
 #[derive(Default, Clone)]
 pub struct Profile {

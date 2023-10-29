@@ -7,12 +7,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
 
-use crate::app::deps::DynUserProfileService;
 use prose_store::prelude::*;
 
+use crate::app::deps::DynUserProfileService;
 use crate::domain::user_profiles::models::UserProfile;
 use crate::domain::user_profiles::repos::UserProfileRepository;
-use crate::domain::user_profiles::services::UserProfileService;
 
 #[entity]
 pub struct UserProfileRecord {

@@ -3,15 +3,10 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::str::FromStr;
-
-use chrono::{DateTime, Duration, FixedOffset, TimeZone, Utc};
-
 pub use constant_time_provider::ConstantTimeProvider;
 pub use message_builder::MessageBuilder;
 pub use mock_app_dependencies::MockAppDependencies;
 use prose_xmpp::test::BareJidTestAdditions;
-use prose_xmpp::{IDProvider, TimeProvider};
 
 // use crate::data_cache::indexed_db::PlatformCache;
 // use crate::types::{Availability, SoftwareVersion};
