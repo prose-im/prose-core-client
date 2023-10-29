@@ -16,6 +16,7 @@ mod account_settings_repository;
 mod contacts_repository;
 mod drafts_repository;
 mod messages_repository;
+mod user_info_repository;
 
 #[cfg(target_arch = "wasm32")]
 type PlatformDriver = IndexedDBDriver;

@@ -22,7 +22,7 @@ impl PresenceMap {
     }
 
     pub fn update_presence(&mut self, from: &Jid, presence: Presence) {
-        if presence.availability() == Availability::Unavailable {
+        if presence.availability == Availability::Unavailable {
             self.remove_presence(from)
         } else {
             self.insert_presence(from, presence)

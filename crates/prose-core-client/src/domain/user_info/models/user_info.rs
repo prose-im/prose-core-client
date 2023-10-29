@@ -12,6 +12,6 @@ use crate::domain::user_info::models::{AvatarInfo, UserActivity};
 pub struct UserInfo {
     pub avatar: Option<AvatarInfo>,
     pub activity: Option<UserActivity>,
-    #[serde(skip_serializing)]
+    #[serde(skip_serializing, default)]
     pub availability: Availability,
 }

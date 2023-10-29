@@ -73,9 +73,9 @@ impl UserInfoRepository for CachingUserInfoRepository {
             .read()
             .get_highest_presence(jid)
             .map(|entry| entry.presence.clone())
-            .unwrap_or(Presence::unavailable());
+            .unwrap_or_default();
 
-        record.payload.availability = presence.availability();
+        record.payload.availability = presence.availability;
 
         if record.payload.avatar.is_none() {
             record.payload.avatar = self
