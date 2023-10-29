@@ -25,7 +25,7 @@ impl ConnectionService for XMPPClient {
 
     async fn set_message_carbons_enabled(&self, is_enabled: bool) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
-        chat.set_message_carbons_enabled(true)?;
+        chat.set_message_carbons_enabled(is_enabled)?;
         Ok(())
     }
 
