@@ -39,7 +39,8 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         create_collection::<D, MessagesRecord>(&tx)?;
         create_collection::<D, UserInfoRecord>(&tx)?;
         create_collection::<D, UserProfileRecord>(&tx)?;
-
+        #[cfg(target_arch = "wasm32")]
+        create_collection::<D, crate::infra::avatars::AvatarRecord>(&tx)?;
         Ok(())
     })
     .await

@@ -7,11 +7,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
-use prose_xmpp::stanza::avatar;
 
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarMetadata, UserActivity};
+use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserActivity};
 use crate::domain::user_profiles::models::UserProfile;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -21,7 +20,7 @@ pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
     async fn set_avatar_metadata(&self, metadata: &AvatarMetadata) -> Result<()>;
     async fn set_avatar_image(
         &self,
-        checksum: &avatar::ImageId,
+        checksum: &AvatarImageId,
         base64_image_data: String,
     ) -> Result<()>;
 

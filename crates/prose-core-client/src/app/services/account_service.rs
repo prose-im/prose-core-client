@@ -87,7 +87,7 @@ impl AccountService {
         let metadata = AvatarMetadata {
             bytes: image_data_len,
             mime_type: mime_type.as_ref().to_string(),
-            checksum: image_data.generate_sha1_checksum()?,
+            checksum: image_data.generate_sha1_checksum()?.as_ref().into(),
             width,
             height,
             url: None,

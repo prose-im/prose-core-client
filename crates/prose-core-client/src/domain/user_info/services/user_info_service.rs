@@ -9,8 +9,8 @@ use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
-use prose_xmpp::stanza::avatar;
 
+use crate::domain::user_info::models::AvatarImageId;
 use crate::domain::user_info::models::AvatarMetadata;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -21,6 +21,6 @@ pub trait UserInfoService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_avatar_image(
         &self,
         from: &BareJid,
-        image_id: &avatar::ImageId,
+        image_id: &AvatarImageId,
     ) -> Result<Option<AvatarData>>;
 }

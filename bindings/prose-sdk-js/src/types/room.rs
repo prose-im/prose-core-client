@@ -3,23 +3,23 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use super::IntoJSArray;
-use crate::client::WasmError;
-use crate::types::{
-    try_jid_vec_from_string_array, BareJid, BareJidArray, MessagesArray, StringArray,
-};
-use alloc::rc::Rc;
 use js_sys::Array;
-use prose_core_client::data_cache::indexed_db::PlatformCache;
-use prose_core_client::room::{
-    DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
-};
-use prose_core_client::types::{ConnectedRoom, MessageId};
 use tracing::info;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-type Cache = Rc<PlatformCache>;
+use prose_core_client::dtos::MessageId;
+use prose_core_client::services::{
+    DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom, RoomEnvelope,
+};
+
+use crate::client::WasmError;
+use crate::types::{
+    try_jid_vec_from_string_array, BareJid, BareJidArray, MessagesArray, StringArray,
+};
+
+use super::IntoJSArray;
+
 type Result<T, E = JsError> = std::result::Result<T, E>;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -53,7 +53,7 @@ export interface RoomBase {
 export interface RoomMUC {
     readonly subject?: string;
     
-    setSubject(subject?: string): Promise<void>;
+    setTopic(topic?: string): Promise<void>;
 }
 
 export interface RoomChannel {
@@ -101,31 +101,31 @@ pub enum RoomType {
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomDirectMessage {
     kind: RoomType,
-    room: SdkRoom<DirectMessage, Cache, Cache>,
+    room: SdkRoom<DirectMessage>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomGroup {
     kind: RoomType,
-    room: SdkRoom<Group, Cache, Cache>,
+    room: SdkRoom<Group>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomPrivateChannel {
     kind: RoomType,
-    room: SdkRoom<PrivateChannel, Cache, Cache>,
+    room: SdkRoom<PrivateChannel>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomPublicChannel {
     kind: RoomType,
-    room: SdkRoom<PublicChannel, Cache, Cache>,
+    room: SdkRoom<PublicChannel>,
 }
 
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomGeneric {
     kind: RoomType,
-    room: SdkRoom<Generic, Cache, Cache>,
+    room: SdkRoom<Generic>,
 }
 
 macro_rules! base_room_impl {
@@ -207,16 +207,10 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(js_name = "loadLatestMessages")]
-            pub async fn load_latest_messages(
-                &self,
-                since: Option<String>,
-                load_from_server: bool,
-            ) -> Result<MessagesArray> {
-                let since: Option<MessageId> = since.map(|id| id.into());
-
+            pub async fn load_latest_messages(&self) -> Result<MessagesArray> {
                 let messages = self
                     .room
-                    .load_latest_messages(since.as_ref(), load_from_server)
+                    .load_latest_messages()
                     .await
                     .map_err(WasmError::from)?;
 
@@ -232,10 +226,11 @@ macro_rules! base_room_impl {
                     .into_iter()
                     .map(|id| MessageId::from(id))
                     .collect();
+                let message_id_refs = message_ids.iter().collect::<Vec<_>>();
 
                 let messages = self
                     .room
-                    .load_messages_with_ids(message_ids.as_slice())
+                    .load_messages_with_ids(&message_id_refs)
                     .await
                     .map_err(WasmError::from)?;
 
@@ -289,10 +284,10 @@ macro_rules! muc_room_impl {
                 self.room.subject()
             }
 
-            #[wasm_bindgen(js_name = "setSubject")]
-            pub async fn set_subject(&self, subject: Option<String>) -> Result<()> {
+            #[wasm_bindgen(js_name = "setTopic")]
+            pub async fn set_topic(&self, topic: Option<String>) -> Result<()> {
                 self.room
-                    .set_subject(subject.as_deref())
+                    .set_topic(topic.as_deref())
                     .await
                     .map_err(WasmError::from)?;
                 Ok(())
@@ -350,30 +345,30 @@ extern "C" {
     pub type RoomsArray;
 }
 
-pub trait ConnectedRoomExt {
+pub trait RoomEnvelopeExt {
     fn into_js_value(self) -> JsValue;
 }
 
-impl ConnectedRoomExt for ConnectedRoom<Cache, Cache> {
+impl RoomEnvelopeExt for RoomEnvelope {
     fn into_js_value(self) -> JsValue {
         match self {
-            ConnectedRoom::DirectMessage(room) => JsValue::from(RoomDirectMessage {
+            RoomEnvelope::DirectMessage(room) => JsValue::from(RoomDirectMessage {
                 kind: RoomType::DirectMessage,
                 room,
             }),
-            ConnectedRoom::Group(room) => JsValue::from(RoomGroup {
+            RoomEnvelope::Group(room) => JsValue::from(RoomGroup {
                 kind: RoomType::Group,
                 room,
             }),
-            ConnectedRoom::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
+            RoomEnvelope::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
                 kind: RoomType::PrivateChannel,
                 room,
             }),
-            ConnectedRoom::PublicChannel(room) => JsValue::from(RoomPublicChannel {
+            RoomEnvelope::PublicChannel(room) => JsValue::from(RoomPublicChannel {
                 kind: RoomType::PublicChannel,
                 room,
             }),
-            ConnectedRoom::Generic(room) => JsValue::from(RoomGeneric {
+            RoomEnvelope::Generic(room) => JsValue::from(RoomGeneric {
                 kind: RoomType::Generic,
                 room,
             }),
@@ -381,8 +376,8 @@ impl ConnectedRoomExt for ConnectedRoom<Cache, Cache> {
     }
 }
 
-impl From<Vec<ConnectedRoom<Cache, Cache>>> for RoomsArray {
-    fn from(value: Vec<ConnectedRoom<Cache, Cache>>) -> Self {
+impl From<Vec<RoomEnvelope>> for RoomsArray {
+    fn from(value: Vec<RoomEnvelope>) -> Self {
         value
             .into_iter()
             .map(|envelope| envelope.into_js_value())

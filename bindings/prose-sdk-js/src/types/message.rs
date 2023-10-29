@@ -4,12 +4,13 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::IntoJSArray;
+use prose_core_client::dtos;
 use wasm_bindgen::prelude::*;
 
 use super::{BareJid, BareJidArray, ReactionsArray};
 
 #[wasm_bindgen]
-pub struct Message(prose_core_client::types::Message);
+pub struct Message(dtos::Message);
 
 #[wasm_bindgen]
 pub struct Reaction {
@@ -99,14 +100,14 @@ impl Reaction {
     }
 }
 
-impl From<prose_core_client::types::Message> for Message {
-    fn from(value: prose_core_client::types::Message) -> Self {
+impl From<dtos::Message> for Message {
+    fn from(value: dtos::Message) -> Self {
         Message(value)
     }
 }
 
-impl From<prose_core_client::types::Reaction> for Reaction {
-    fn from(value: prose_core_client::types::Reaction) -> Self {
+impl From<dtos::Reaction> for Reaction {
+    fn from(value: dtos::Reaction) -> Self {
         Reaction {
             emoji: value.emoji.into_inner(),
             from: value.from.into_iter().map(Into::into).collect(),

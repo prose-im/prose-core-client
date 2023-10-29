@@ -7,12 +7,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use prose_xmpp::mods;
-use prose_xmpp::stanza::{avatar, VCard4};
+use prose_xmpp::stanza::VCard4;
 
 use crate::domain::account::services::UserAccountService;
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarMetadata, UserActivity};
+use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserActivity};
 use crate::domain::user_profiles::models::UserProfile;
 use crate::infra::xmpp::XMPPClient;
 
@@ -24,7 +24,7 @@ impl UserAccountService for XMPPClient {
         profile
             .set_avatar_metadata(
                 metadata.bytes,
-                &metadata.checksum,
+                &metadata.checksum.as_ref().into(),
                 &metadata.mime_type,
                 metadata.width,
                 metadata.height,
@@ -35,12 +35,12 @@ impl UserAccountService for XMPPClient {
 
     async fn set_avatar_image(
         &self,
-        checksum: &avatar::ImageId,
+        checksum: &AvatarImageId,
         base64_image_data: String,
     ) -> Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile
-            .set_avatar_image(checksum, base64_image_data)
+            .set_avatar_image(&checksum.as_ref().into(), base64_image_data)
             .await?;
         Ok(())
     }

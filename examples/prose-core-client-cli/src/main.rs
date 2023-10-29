@@ -19,10 +19,12 @@ use strum_macros::{Display, EnumIter};
 use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
-use prose_core_client::app::dtos::{Address, Contact, Message, Occupant};
-use prose_core_client::app::services::RoomEnvelope;
+use prose_core_client::dtos::{Address, Contact, Message, Occupant};
 use prose_core_client::infra::avatars::FsAvatarCache;
-use prose_core_client::{Client, ClientDelegate, ClientEvent, RoomEventType, SqliteDriver};
+use prose_core_client::services::RoomEnvelope;
+use prose_core_client::{
+    open_store, Client, ClientDelegate, ClientEvent, RoomEventType, SqliteDriver,
+};
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::ConferenceBookmark;
@@ -36,13 +38,14 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     println!("Cached data can be found at {:?}", cache_path);
 
+    let store = open_store(SqliteDriver::new(&cache_path.join("db.sqlite3"))).await?;
+
     let client = Client::builder()
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
-        .set_driver(SqliteDriver::new(&cache_path.join("db.sqlite3")))
+        .set_store(store)
         .set_avatar_cache(FsAvatarCache::new(&cache_path.join("Avatar"))?)
         .set_delegate(Some(Box::new(Delegate {})))
-        .build()
-        .await?;
+        .build();
 
     let (jid, password) = load_credentials();
 

@@ -15,7 +15,7 @@ use prose_xmpp::ConnectionError;
 use crate::app::services::{
     AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
 };
-use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedDriver};
+use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore};
 use crate::ClientEvent;
 
 #[derive(Clone)]
@@ -28,7 +28,7 @@ pub trait ClientDelegate: SendUnlessWasm + SyncUnlessWasm {
 }
 
 impl Client {
-    pub fn builder() -> ClientBuilder<UndefinedDriver, UndefinedAvatarCache> {
+    pub fn builder() -> ClientBuilder<UndefinedStore, UndefinedAvatarCache> {
         ClientBuilder::new()
     }
 }

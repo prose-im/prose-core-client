@@ -5,13 +5,15 @@
 
 use serde::{Deserialize, Serialize};
 
-use prose_xmpp::stanza::avatar;
+use prose_utils::id_string;
+
+id_string!(AvatarImageId);
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct AvatarMetadata {
     pub bytes: usize,
     pub mime_type: String,
-    pub checksum: avatar::ImageId,
+    pub checksum: AvatarImageId,
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub url: Option<String>,
@@ -19,7 +21,7 @@ pub struct AvatarMetadata {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct AvatarInfo {
-    pub checksum: avatar::ImageId,
+    pub checksum: AvatarImageId,
     pub mime_type: String,
 }
 

@@ -5,9 +5,7 @@
 
 use std::sync::Arc;
 
-use anyhow::Result;
-
-use prose_store::prelude::PlatformDriver;
+use prose_store::prelude::{PlatformDriver, Store};
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
@@ -23,16 +21,16 @@ use crate::client::ClientInner;
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
 use crate::infra::avatars::AvatarCache;
 use crate::infra::general::NanoIDProvider;
-use crate::infra::platform_dependencies::{open_store, PlatformDependencies};
+use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
 use crate::{Client, ClientDelegate};
 
-pub struct UndefinedDriver {}
+pub struct UndefinedStore {}
 pub struct UndefinedAvatarCache {}
 
-pub struct ClientBuilder<D, A> {
+pub struct ClientBuilder<S, A> {
     builder: XMPPClientBuilder,
-    driver: D,
+    store: S,
     avatar_cache: A,
     time_provider: Arc<dyn TimeProvider>,
     id_provider: Arc<dyn IDProvider>,
@@ -40,11 +38,11 @@ pub struct ClientBuilder<D, A> {
     delegate: Option<Box<dyn ClientDelegate>>,
 }
 
-impl ClientBuilder<UndefinedDriver, UndefinedAvatarCache> {
+impl ClientBuilder<UndefinedStore, UndefinedAvatarCache> {
     pub(crate) fn new() -> Self {
         ClientBuilder {
             builder: XMPPClient::builder(),
-            driver: UndefinedDriver {},
+            store: UndefinedStore {},
             avatar_cache: UndefinedAvatarCache {},
             time_provider: Arc::new(SystemTimeProvider::default()),
             id_provider: Arc::new(UUIDProvider::default()),
@@ -54,11 +52,14 @@ impl ClientBuilder<UndefinedDriver, UndefinedAvatarCache> {
     }
 }
 
-impl<A> ClientBuilder<UndefinedDriver, A> {
-    pub fn set_driver(self, driver: PlatformDriver) -> ClientBuilder<PlatformDriver, A> {
+impl<A> ClientBuilder<UndefinedStore, A> {
+    pub fn set_store(
+        self,
+        store: Store<PlatformDriver>,
+    ) -> ClientBuilder<Store<PlatformDriver>, A> {
         ClientBuilder {
             builder: self.builder,
-            driver,
+            store,
             avatar_cache: self.avatar_cache,
             time_provider: self.time_provider,
             id_provider: self.id_provider,
@@ -72,7 +73,7 @@ impl<D> ClientBuilder<D, UndefinedAvatarCache> {
     pub fn set_avatar_cache<A2: AvatarCache>(self, avatar_cache: A2) -> ClientBuilder<D, A2> {
         ClientBuilder {
             builder: self.builder,
-            driver: self.driver,
+            store: self.store,
             avatar_cache,
             time_provider: self.time_provider,
             id_provider: self.id_provider,
@@ -109,8 +110,8 @@ impl<D, A> ClientBuilder<D, A> {
     }
 }
 
-impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
-    pub async fn build(self) -> Result<Client> {
+impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
+    pub fn build(self) -> Client {
         let capabilities = Capabilities::new(
             self.software_version.name.clone(),
             "https://prose.org",
@@ -176,7 +177,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
         let dependencies: AppDependencies = PlatformDependencies {
             ctx: AppContext::new(capabilities, self.software_version),
             app_service_deps,
-            store: open_store(self.driver).await?,
+            store: self.store,
             xmpp: xmpp_client.clone(),
             avatar_cache: Box::new(self.avatar_cache),
         }
@@ -200,6 +201,6 @@ impl<A: AvatarCache + 'static> ClientBuilder<PlatformDriver, A> {
 
         event_dispatcher.set_client_inner(Arc::downgrade(&client_inner));
 
-        Ok(Client::from(client_inner))
+        Client::from(client_inner)
     }
 }

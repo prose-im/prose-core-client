@@ -6,6 +6,8 @@
 pub use avatar_cache::{AvatarCache, MAX_IMAGE_DIMENSIONS};
 #[cfg(not(target_arch = "wasm32"))]
 pub use fs_avatar_cache::*;
+#[cfg(target_arch = "wasm32")]
+pub use store_avatar_cache::*;
 
 mod avatar_cache;
 #[cfg(not(target_arch = "wasm32"))]

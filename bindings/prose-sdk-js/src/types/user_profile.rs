@@ -3,16 +3,16 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use prose_core_client::types::Url;
+use prose_core_client::dtos;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 #[derive(Clone, Debug)]
-pub struct UserProfile(prose_core_client::types::UserProfile);
+pub struct UserProfile(dtos::UserProfile);
 
 #[wasm_bindgen]
 #[derive(Debug)]
-pub struct Address(prose_core_client::types::Address);
+pub struct Address(dtos::Address);
 
 #[wasm_bindgen]
 #[derive(Clone, Default, Debug)]
@@ -22,13 +22,13 @@ pub struct Job {
     organization: Option<String>,
 }
 
-impl From<prose_core_client::types::UserProfile> for UserProfile {
-    fn from(value: prose_core_client::types::UserProfile) -> Self {
+impl From<dtos::UserProfile> for UserProfile {
+    fn from(value: dtos::UserProfile) -> Self {
         UserProfile(value)
     }
 }
 
-impl From<UserProfile> for prose_core_client::types::UserProfile {
+impl From<UserProfile> for dtos::UserProfile {
     fn from(value: UserProfile) -> Self {
         value.0
     }
@@ -78,7 +78,7 @@ impl UserProfile {
 
     #[wasm_bindgen(setter)]
     pub fn set_url(&mut self, url: Option<String>) {
-        self.0.url = url.and_then(|u| Url::parse(u.as_ref()).ok())
+        self.0.url = url.and_then(|u| dtos::Url::parse(u.as_ref()).ok())
     }
 
     #[wasm_bindgen(getter)]

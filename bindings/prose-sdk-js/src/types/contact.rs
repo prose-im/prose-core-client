@@ -3,8 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use prose_core_client::types::{
-    roster::Group as CoreGroup, Availability as CoreAvailability, Contact as CoreContact,
+use prose_core_client::dtos::{
+    Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
     UserActivity as CoreUserActivity,
 };
 use wasm_bindgen::prelude::*;
