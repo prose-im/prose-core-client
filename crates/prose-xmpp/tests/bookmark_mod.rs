@@ -14,7 +14,7 @@ use xmpp_parsers::pubsub;
 
 use prose_xmpp::stanza::ConferenceBookmark;
 use prose_xmpp::test::{ClientTestAdditions, ConnectedClient};
-use prose_xmpp::{jid_str, mods, Client, Event};
+use prose_xmpp::{jid, mods, Client, Event};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_loads_bookmarks() -> Result<()> {

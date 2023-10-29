@@ -115,7 +115,7 @@ impl TryFrom<Element> for Continue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jid_str;
+    use crate::jid;
     use anyhow::Result;
 
     #[test]

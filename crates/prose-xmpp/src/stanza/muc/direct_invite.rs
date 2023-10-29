@@ -52,7 +52,7 @@ impl MessagePayload for DirectInvite {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jid_str;
+    use crate::jid;
     use anyhow::Result;
 
     #[test]
