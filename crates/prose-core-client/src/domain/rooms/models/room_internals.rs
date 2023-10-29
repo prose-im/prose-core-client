@@ -9,6 +9,7 @@ use parking_lot::RwLock;
 use crate::domain::rooms::models::{RoomMetadata, RoomState};
 use crate::domain::shared::models::RoomType;
 
+/// Contains information about a connected room and its state.
 #[derive(Debug)]
 pub struct RoomInternals {
     pub info: RoomInfo,

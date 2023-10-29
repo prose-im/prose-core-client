@@ -21,8 +21,8 @@ use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
 
 use crate::app::deps::{
-    DynAppContext, DynAppServiceDependencies, DynBookmarksRepository, DynRoomFactory,
-    DynRoomManagementService, DynRoomParticipationService, DynUserProfileService,
+    DynAppContext, DynAppServiceDependencies, DynBookmarksRepository, DynConnectedRoomsRepository,
+    DynRoomFactory, DynRoomManagementService, DynRoomParticipationService, DynUserProfileService,
 };
 use crate::app::services::RoomEnvelope;
 use crate::domain::rooms::models::{Bookmark, RoomConfig, RoomError, RoomInternals, RoomMetadata};
@@ -31,7 +31,8 @@ use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct RoomsService {
-    rooms: RwLock<HashMap<BareJid, Arc<RoomInternals>>>,
+    #[inject]
+    connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]
     room_management_service: DynRoomManagementService,
     #[inject]
@@ -49,10 +50,10 @@ pub struct RoomsService {
 }
 
 impl RoomsService {
-    pub async fn connected_rooms(&self) -> Vec<RoomEnvelope> {
-        self.rooms
-            .read()
-            .values()
+    pub fn connected_rooms(&self) -> Vec<RoomEnvelope> {
+        self.connected_rooms_repo
+            .get_all()
+            .into_iter()
             .filter_map(|internals| {
                 if internals.is_pending() {
                     None
@@ -169,12 +170,6 @@ impl RoomsService {
     pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
         self.room_management_service.destroy_room(room_jid).await?;
         Ok(())
-    }
-}
-
-impl RoomsService {
-    pub(crate) fn get_room(&self, room_id: &BareJid) -> Option<Arc<RoomInternals>> {
-        self.rooms.read().get(room_id).cloned()
     }
 }
 
@@ -303,13 +298,8 @@ impl RoomsService {
         let metadata = match result {
             Ok(metadata) => metadata,
             Err(RoomError::RoomIsAlreadyConnected(room_jid)) => {
-                if let Some(room) = self
-                    .rooms
-                    .read()
-                    .get(&room_jid)
-                    .map(|room| self.room_factory.build(room.clone()))
-                {
-                    return Ok(room);
+                if let Some(room) = self.connected_rooms_repo.get(&room_jid) {
+                    return Ok(self.room_factory.build(room));
                 };
                 return Err(RoomError::RoomIsAlreadyConnected(room_jid));
             }
@@ -320,21 +310,17 @@ impl RoomsService {
         // taken already.
         let room_jid = metadata.room_jid.clone();
 
-        let room = {
-            let mut connected_rooms = self.rooms.write();
-            let room_jid = room_jid.to_bare();
-
-            let Some(room) = connected_rooms.remove(&room_jid) else {
-                return Err(RequestError::Generic {
-                    msg: "Room was modified during connection".to_string(),
-                }
-                .into());
-            };
-
-            // Convert the temporary room to its final form…
-            let room = Arc::new(room.to_permanent(metadata));
-            connected_rooms.insert(room_jid, room.clone());
-            room
+        let Some(room) = self.connected_rooms_repo.update(
+            &room_jid.to_bare(),
+            Box::new(move |room| {
+                // Convert the temporary room to its final form…
+                room.to_permanent(metadata)
+            }),
+        ) else {
+            return Err(RequestError::Generic {
+                msg: "Room was modified during connection".to_string(),
+            }
+            .into());
         };
 
         let room_name = room
@@ -520,7 +506,7 @@ impl RoomsService {
                 Ok(occupancy) => occupancy,
                 Err(error) => {
                     // Remove pending room again…
-                    self.rooms.write().remove(&room_jid);
+                    self.connected_rooms_repo.delete(&[&room_jid]);
 
                     // We've received a conflict which means that the room exists but that our
                     // nickname is taken.
@@ -549,7 +535,7 @@ impl RoomsService {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
-                    self.rooms.write().remove(&room_jid);
+                    self.connected_rooms_repo.delete(&[&room_jid]);
                     // If the validation failed and we've created the room we'll destroy it again.
                     if room_has_been_created {
                         _ = self.room_management_service.destroy_room(&room_jid).await;
@@ -562,7 +548,7 @@ impl RoomsService {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
-                    self.rooms.write().remove(&room_jid);
+                    self.connected_rooms_repo.delete(&[&room_jid]);
                     // Again, if the additional configuration fails and we've created the room
                     // we'll destroy it again.
                     if room_has_been_created {
@@ -613,7 +599,7 @@ impl RoomsService {
                 }
                 Err(RoomError::RequestError(error)) => {
                     // Remove pending room again…
-                    self.rooms.write().remove(&room_jid);
+                    self.connected_rooms_repo.delete(&[room_jid]);
 
                     if error.defined_condition() == Some(DefinedCondition::Conflict) {
                         info!("Nickname was already taken in room. Will try again with modified nickname…");
@@ -624,7 +610,7 @@ impl RoomsService {
                 }
                 Err(error) => {
                     // Remove pending room again…
-                    self.rooms.write().remove(&room_jid);
+                    self.connected_rooms_repo.delete(&[room_jid]);
                     Err(error)
                 }
             };
@@ -637,18 +623,9 @@ impl RoomsService {
         user_jid: &BareJid,
         nickname: &str,
     ) -> Result<(), RoomError> {
-        let mut rooms = self.rooms.write();
-
-        if rooms.contains_key(&room_jid) {
-            return Err(RoomError::RoomIsAlreadyConnected(room_jid.clone()));
-        }
-
-        rooms.insert(
-            room_jid.clone(),
-            Arc::new(RoomInternals::pending(room_jid, user_jid, nickname)),
-        );
-
-        Ok(())
+        self.connected_rooms_repo
+            .set(RoomInternals::pending(room_jid, user_jid, nickname))
+            .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
     }
 }
 

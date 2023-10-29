@@ -15,7 +15,7 @@ use crate::infra::contacts::CachingContactsRepository;
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessagesRecord,
 };
-use crate::infra::rooms::CachingBookmarksRepository;
+use crate::infra::rooms::{CachingBookmarksRepository, InMemoryConnectedRoomsRepository};
 use crate::infra::settings::{AccountSettingsRecord, AccountSettingsRepository};
 use crate::infra::user_info::caching_avatar_repository::CachingAvatarRepository;
 use crate::infra::user_info::{CachingUserInfoRepository, UserInfoRecord};
@@ -85,6 +85,7 @@ impl From<PlatformDependencies> for AppDependencies {
             app_service,
             avatar_repo: Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache)),
             bookmarks_repo: Arc::new(CachingBookmarksRepository::new(d.xmpp.clone())),
+            connected_rooms_repo: Arc::new(InMemoryConnectedRoomsRepository::new()),
             connection_service: d.xmpp.clone(),
             contacts_repo: Arc::new(CachingContactsRepository::new(d.xmpp.clone())),
             contacts_service: d.xmpp.clone(),

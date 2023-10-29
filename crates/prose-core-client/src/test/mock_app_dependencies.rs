@@ -25,7 +25,7 @@ use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
 use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
 use crate::domain::messaging::services::mocks::{MockMessageArchiveService, MockMessagingService};
-use crate::domain::rooms::repos::mocks::MockBookmarksRepository;
+use crate::domain::rooms::repos::mocks::{MockBookmarksRepository, MockConnectedRoomsRepository};
 use crate::domain::rooms::services::mocks::{
     MockRoomManagementService, MockRoomParticipationService, MockRoomTopicService,
 };
@@ -84,6 +84,7 @@ pub struct MockAppDependencies {
     pub app_service: AppServiceDependencies,
     pub avatar_repo: MockAvatarRepository,
     pub bookmarks_repo: MockBookmarksRepository,
+    pub connected_rooms_repo: MockConnectedRoomsRepository,
     pub connection_service: MockConnectionService,
     pub contacts_repo: MockContactsRepository,
     pub contacts_service: MockContactsService,
@@ -148,6 +149,7 @@ impl From<MockAppDependencies> for AppDependencies {
             app_service,
             avatar_repo: Arc::new(mock.avatar_repo),
             bookmarks_repo: Arc::new(mock.bookmarks_repo),
+            connected_rooms_repo: Arc::new(mock.connected_rooms_repo),
             connection_service: Arc::new(mock.connection_service),
             contacts_repo: Arc::new(mock.contacts_repo),
             contacts_service: Arc::new(mock.contacts_service),

@@ -18,7 +18,8 @@ use prose_xmpp::stanza::Message;
 use prose_xmpp::{ns, Event};
 
 use crate::app::deps::{
-    DynAppServiceDependencies, DynMessagesRepository, DynMessagingService, DynRoomFactory,
+    DynAppServiceDependencies, DynConnectedRoomsRepository, DynMessagesRepository,
+    DynMessagingService, DynRoomFactory,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::app::services::RoomsService;
@@ -29,6 +30,7 @@ use crate::ClientEvent;
 
 pub(crate) struct RoomsEventHandler {
     rooms_service: RoomsService,
+    connected_rooms_repo: DynConnectedRoomsRepository,
     room_factory: DynRoomFactory,
     messaging_service: DynMessagingService,
     messages_repo: DynMessagesRepository,
@@ -139,7 +141,7 @@ impl RoomsEventHandler {
             return Ok(());
         };
 
-        let Some(room) = self.rooms_service.get_room(&from) else {
+        let Some(room) = self.connected_rooms_repo.get(&from) else {
             error!("Received message from sender for which we do not have a room.");
             return Ok(());
         };
@@ -253,7 +255,7 @@ impl RoomsEventHandler {
 
         let to = to.to_bare();
 
-        let Some(room) = self.rooms_service.get_room(&to) else {
+        let Some(room) = self.connected_rooms_repo.get(&to) else {
             error!("Sent message to recipient for which we do not have a room.");
             return Ok(());
         };
@@ -284,7 +286,7 @@ impl RoomsEventHandler {
 
         let to = to.into_bare();
 
-        let Some(room) = self.rooms_service.get_room(&to) else {
+        let Some(room) = self.connected_rooms_repo.get(&to) else {
             error!("Received presence from user for which we do not have a room.");
             return Ok(());
         };

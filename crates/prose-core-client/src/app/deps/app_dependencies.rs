@@ -13,7 +13,7 @@ use crate::domain::contacts::services::ContactsService;
 use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
 use crate::domain::messaging::services::{MessageArchiveService, MessagingService};
-use crate::domain::rooms::repos::BookmarksRepository;
+use crate::domain::rooms::repos::{BookmarksRepository, ConnectedRoomsRepository};
 use crate::domain::rooms::services::{
     BookmarksService, RoomFactory, RoomManagementService, RoomParticipationService,
     RoomTopicService,
@@ -32,6 +32,7 @@ pub(crate) type DynAppServiceDependencies = Arc<AppServiceDependencies>;
 pub(crate) type DynAvatarRepository = Arc<dyn AvatarRepository>;
 pub(crate) type DynBookmarksRepository = Arc<dyn BookmarksRepository>;
 pub(crate) type DynBookmarksService = Arc<dyn BookmarksService>;
+pub(crate) type DynConnectedRoomsRepository = Arc<dyn ConnectedRoomsRepository>;
 pub(crate) type DynConnectionService = Arc<dyn ConnectionService>;
 pub(crate) type DynContactsRepository = Arc<dyn ContactsRepository>;
 pub(crate) type DynContactsService = Arc<dyn ContactsService>;
@@ -55,6 +56,7 @@ pub struct AppDependencies {
     pub app_service: DynAppServiceDependencies,
     pub avatar_repo: DynAvatarRepository,
     pub bookmarks_repo: DynBookmarksRepository,
+    pub connected_rooms_repo: DynConnectedRoomsRepository,
     pub connection_service: DynConnectionService,
     pub contacts_repo: DynContactsRepository,
     pub contacts_service: DynContactsService,
