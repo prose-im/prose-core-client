@@ -5,8 +5,6 @@
 
 use std::path::PathBuf;
 
-use jid::BareJid;
-
 use prose_core_client::dtos::{Availability, MessageId, UserProfile};
 use prose_core_client::{Client as ProseClient, ClientDelegate as ProseClientDelegate};
 use prose_xmpp::stanza::message::Emoji;
@@ -26,9 +24,9 @@ pub struct Client {
 
 impl Client {
     pub fn new(
-        jid: JID,
-        cache_dir: String,
-        delegate: Option<Box<dyn ClientDelegate>>,
+        _jid: JID,
+        _cache_dir: String,
+        _delegate: Option<Box<dyn ClientDelegate>>,
     ) -> Result<Self, ClientError> {
         todo!("FIXME")
 
@@ -115,9 +113,9 @@ impl Client {
 
     pub async fn load_latest_messages(
         &self,
-        from: JID,
-        since: Option<MessageId>,
-        load_from_server: bool,
+        _from: JID,
+        _since: Option<MessageId>,
+        _load_from_server: bool,
     ) -> Result<Vec<Message>, ClientError> {
         todo!("Use Room API");
         // let messages = self
@@ -129,8 +127,8 @@ impl Client {
 
     pub async fn load_messages_with_ids(
         &self,
-        conversation: JID,
-        ids: Vec<MessageId>,
+        _conversation: JID,
+        _ids: Vec<MessageId>,
     ) -> Result<Vec<Message>, ClientError> {
         todo!("Use Room API");
         // let messages = self
@@ -140,7 +138,7 @@ impl Client {
         // Ok(messages.into_iter().map(Into::into).collect())
     }
 
-    pub async fn send_message(&self, to: JID, body: String) -> Result<(), ClientError> {
+    pub async fn send_message(&self, _to: JID, _body: String) -> Result<(), ClientError> {
         todo!("Use Room API")
         //self.client.send_message(BareJid::from(to), body).await?;
         // Ok(())
@@ -148,22 +146,22 @@ impl Client {
 
     pub async fn update_message(
         &self,
-        conversation: JID,
-        id: MessageId,
-        body: String,
+        _conversation: JID,
+        _id: MessageId,
+        _body: String,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
         // self.client
         //     .update_message(BareJid::from(conversation), id, body)
         //     .await?;
-        Ok(())
+        // Ok(())
     }
 
     pub async fn toggle_reaction_to_message(
         &self,
-        conversation: JID,
-        id: MessageId,
-        emoji: Emoji,
+        _conversation: JID,
+        _id: MessageId,
+        _emoji: Emoji,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
         // self.client
@@ -174,8 +172,8 @@ impl Client {
 
     pub async fn retract_message(
         &self,
-        conversation: JID,
-        id: MessageId,
+        _conversation: JID,
+        _id: MessageId,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
         // self.client
@@ -186,8 +184,8 @@ impl Client {
 
     pub async fn set_user_is_composing(
         &self,
-        conversation: JID,
-        is_composing: bool,
+        _conversation: JID,
+        _is_composing: bool,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
         // self.client
@@ -196,7 +194,7 @@ impl Client {
         // Ok(())
     }
 
-    pub async fn load_composing_users(&self, conversation: JID) -> Result<Vec<JID>, ClientError> {
+    pub async fn load_composing_users(&self, _conversation: JID) -> Result<Vec<JID>, ClientError> {
         todo!("Use Room API");
         // let users = self
         //     .client
@@ -207,8 +205,8 @@ impl Client {
 
     pub async fn save_draft(
         &self,
-        conversation: JID,
-        text: Option<String>,
+        _conversation: JID,
+        _text: Option<String>,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
         // self.client
@@ -217,7 +215,7 @@ impl Client {
         // Ok(())
     }
 
-    pub async fn load_draft(&self, conversation: JID) -> Result<Option<String>, ClientError> {
+    pub async fn load_draft(&self, _conversation: JID) -> Result<Option<String>, ClientError> {
         todo!("Use Room API");
         // let text = self.client.load_draft(&conversation.into()).await?;
         // Ok(text)

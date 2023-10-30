@@ -14,11 +14,12 @@ use xmpp_parsers::{date, mam, Element};
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
+use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
     Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
 };
-use crate::test::{mock_data, BareJidTestAdditions};
+use crate::test::mock_data;
 
 impl<T> From<T> for MessageLikeId
 where

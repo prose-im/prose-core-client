@@ -12,16 +12,14 @@ use prose_xmpp::mods;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 
 use crate::domain::rooms::models::{RoomError, RoomMetadata};
-use crate::domain::rooms::services::RoomParticipationService;
 
 type ConfigureRoomHandler =
     Box<dyn FnOnce(DataForm) -> PinnedFuture<anyhow::Result<RoomConfigResponse>> + 'static + Send>;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-pub trait RoomManagementService:
-    RoomParticipationService + SendUnlessWasm + SyncUnlessWasm
-{
+#[cfg_attr(feature = "test", mockall::automock)]
+pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_public_rooms(
         &self,
         muc_service: &BareJid,
@@ -46,46 +44,4 @@ pub trait RoomManagementService:
     ) -> Result<(), RoomError>;
 
     async fn destroy_room(&self, room_jid: &BareJid) -> Result<(), RoomError>;
-}
-
-#[cfg(feature = "test")]
-mockall::mock! {
-    pub RoomManagementService {}
-
-    #[async_trait]
-    impl RoomManagementService for RoomManagementService {
-        async fn load_public_rooms(
-            &self,
-            muc_service: &BareJid,
-        ) -> Result<Vec<mods::muc::Room>, RoomError>;
-
-        async fn create_reserved_room(
-            &self,
-            room_jid: &FullJid,
-            handler: ConfigureRoomHandler,
-        ) -> Result<RoomMetadata, RoomError>;
-
-        async fn join_room<'a, 'b, 'c>(
-            &'a self,
-            room_jid: &'b FullJid,
-            password: Option<&'c str>,
-        ) -> Result<RoomMetadata, RoomError>;
-
-        async fn set_room_owners<'a, 'b, 'c, 'd>(
-            &'a self,
-            room_jid: &'b BareJid,
-            users: &'c [&'d BareJid],
-        ) -> Result<(), RoomError>;
-
-        async fn destroy_room(&self, room_jid: &BareJid) -> Result<(), RoomError>;
-    }
-
-    #[async_trait]
-    impl RoomParticipationService for RoomManagementService {
-        async fn invite_users_to_room<'a, 'b, 'c, 'd>(
-            &'a self,
-            room_jid: &'b BareJid,
-            participants: &'c [&'d BareJid],
-        ) -> Result<(), RoomError>;
-    }
 }

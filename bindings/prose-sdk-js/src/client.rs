@@ -338,7 +338,7 @@ impl Client {
         //     .delete_cached_data()
         //     .await
         //     .map_err(WasmError::from)?;
-        Ok(())
+        // Ok(())
     }
 
     #[wasm_bindgen(js_name = "loadUserMetadata")]

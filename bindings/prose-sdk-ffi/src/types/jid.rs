@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::{BareJid, DomainPart, Error as JidParseError, FullJid, NodePart, ResourcePart};
+use jid::{BareJid, DomainPart, Error as JidParseError, NodePart};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct JID {

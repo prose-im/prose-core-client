@@ -6,7 +6,7 @@
 pub use account_bookmark::AccountBookmark;
 pub use client_event::ClientEvent;
 pub use contact::{Contact, Group};
-pub use jid::{format_jid, parse_jid, JID};
+pub use jid::{parse_jid, JID};
 pub use message::{DateTime, Message, Reaction};
 
 mod account_bookmark;
