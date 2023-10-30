@@ -112,7 +112,7 @@ impl Client {
         delegate: JSDelegate,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
-        let store = open_store(IndexedDBDriver::new("prose_cache")).await?;
+        let store = open_store(IndexedDBDriver::new("ProseCache2")).await?;
         let config = config.unwrap_or_default();
 
         let software_version = SoftwareVersion {
