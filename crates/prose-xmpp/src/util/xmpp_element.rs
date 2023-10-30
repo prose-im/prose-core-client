@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use anyhow::Result;
 use minidom::Element;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::message::MessageType;
@@ -19,24 +20,33 @@ pub enum XMPPElement {
     PubSubMessage(PubSubMessage),
 }
 
-impl TryFrom<Element> for XMPPElement {
-    type Error = anyhow::Error;
+impl XMPPElement {
+    pub fn try_from_element(value: Element) -> Result<Option<Self>> {
+        match &value {
+            _ if value.is("iq", ns::JABBER_CLIENT) => Ok(Some(Self::IQ(Iq::try_from(value)?))),
+            _ if value.is("message", ns::JABBER_CLIENT) => {
+                let message = xmpp_parsers::message::Message::try_from(value)?;
 
-    fn try_from(value: Element) -> Result<Self, Self::Error> {
-        if value.is("iq", ns::JABBER_CLIENT) {
-            Ok(Self::IQ(Iq::try_from(value)?))
-        } else if value.is("message", ns::JABBER_CLIENT) {
-            let message = xmpp_parsers::message::Message::try_from(value)?;
+                if message.type_ != MessageType::Headline {
+                    return Ok(Some(Self::Message(message.try_into()?)));
+                }
 
-            if message.type_ != MessageType::Headline {
-                return Ok(Self::Message(message.try_into()?));
+                Ok(Some(Self::PubSubMessage(message.try_into()?)))
             }
-
-            Ok(Self::PubSubMessage(message.try_into()?))
-        } else if value.is("presence", ns::JABBER_CLIENT) {
-            Ok(Self::Presence(value.try_into()?))
-        } else {
-            Err(anyhow::format_err!("Encountered unknown element"))
+            _ if value.is("presence", ns::JABBER_CLIENT) => {
+                Ok(Some(Self::Presence(value.try_into()?)))
+            }
+            // Ignore certain protocol features which we might receive when running in the web app…
+            _ if value.has_ns(ns::WEBSOCKET)
+                | value.has_ns(ns::SASL)
+                | value.has_ns(ns::STREAM) =>
+            {
+                Ok(None)
+            }
+            _ => Err(anyhow::format_err!(
+                "Encountered unknown element: {}",
+                String::from(&value)
+            )),
         }
     }
 }
