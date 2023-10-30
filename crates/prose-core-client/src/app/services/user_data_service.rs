@@ -9,8 +9,8 @@ use jid::{BareJid, Jid};
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAppServiceDependencies, DynAvatarRepository, DynUserInfoRepository,
-    DynUserProfileRepository, DynUserProfileService,
+    DynAvatarRepository, DynTimeProvider, DynUserInfoRepository, DynUserProfileRepository,
+    DynUserProfileService,
 };
 use crate::domain::user_info::models::{PlatformImage, UserMetadata};
 use crate::domain::user_profiles::models::UserProfile;
@@ -18,7 +18,7 @@ use crate::domain::user_profiles::models::UserProfile;
 #[derive(InjectDependencies)]
 pub struct UserDataService {
     #[inject]
-    app_service: DynAppServiceDependencies,
+    time_provider: DynTimeProvider,
     #[inject]
     user_profile_service: DynUserProfileService,
     #[inject]
@@ -53,7 +53,7 @@ impl UserDataService {
         };
         let metadata = self
             .user_profile_service
-            .load_user_metadata(&full_jid, self.app_service.time_provider.now())
+            .load_user_metadata(&full_jid, self.time_provider.now())
             .await?;
         Ok(metadata)
     }

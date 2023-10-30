@@ -18,8 +18,8 @@ use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::RequestError;
 
 use crate::app::deps::{
-    DynAppContext, DynAppServiceDependencies, DynBookmarksRepository, DynConnectedRoomsRepository,
-    DynRoomManagementService, DynRoomParticipationService, DynUserProfileRepository,
+    DynAppContext, DynBookmarksRepository, DynClientEventDispatcher, DynConnectedRoomsRepository,
+    DynIDProvider, DynRoomManagementService, DynRoomParticipationService, DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{Bookmark, RoomConfig, RoomError, RoomInternals, RoomMetadata};
 use crate::util::StringExt;
@@ -61,10 +61,11 @@ const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
 const PUBLIC_CHANNEL_PREFIX: &str = "org.prose.public-channel";
 
 pub struct RoomsDomainService {
-    pub(crate) app_service: DynAppServiceDependencies,
     pub(crate) bookmarks_repo: DynBookmarksRepository,
+    pub(crate) client_event_dispatcher: DynClientEventDispatcher,
     pub(crate) connected_rooms_repo: DynConnectedRoomsRepository,
     pub(crate) ctx: DynAppContext,
+    pub(crate) id_provider: DynIDProvider,
     pub(crate) room_management_service: DynRoomManagementService,
     pub(crate) room_participation_service: DynRoomParticipationService,
     pub(crate) user_profile_repo: DynUserProfileRepository,
@@ -108,7 +109,7 @@ impl RoomsDomainService {
                     // different people can create private channels with the same name without
                     // creating a conflict. A conflict might also potentially be a security
                     // issue if jid would contain sensitive information.
-                    let channel_id = self.app_service.id_provider.new_id();
+                    let channel_id = self.id_provider.new_id();
 
                     self.create_or_join_room_with_config(
                         &service,
@@ -210,8 +211,7 @@ impl RoomsDomainService {
         }
 
         if notify_delegate {
-            self.app_service
-                .event_dispatcher
+            self.client_event_dispatcher
                 .dispatch_event(ClientEvent::RoomsChanged);
         }
 

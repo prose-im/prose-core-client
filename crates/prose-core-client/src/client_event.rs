@@ -10,7 +10,7 @@ use prose_xmpp::ConnectionError;
 use crate::app::services::RoomEnvelope;
 use crate::domain::messaging::models::MessageId;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ClientEvent {
     /// The status of the connection has changed.
     ConnectionStatusChanged { event: ConnectionEvent },
@@ -30,7 +30,7 @@ pub enum ClientEvent {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RoomEventType {
     /// One or many messages were either received or sent.
     MessagesAppended { message_ids: Vec<MessageId> },
@@ -45,7 +45,7 @@ pub enum RoomEventType {
     ComposingUsersChanged,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConnectionEvent {
     Connect,
     Disconnect { error: Option<ConnectionError> },

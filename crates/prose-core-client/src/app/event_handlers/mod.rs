@@ -36,3 +36,11 @@ pub(crate) trait XMPPEventHandler: SendUnlessWasm + SyncUnlessWasm {
     fn name(&self) -> &'static str;
     async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>>;
 }
+
+#[cfg_attr(feature = "test", mockall::automock)]
+pub trait EventDispatcher<E>: SendUnlessWasm + SyncUnlessWasm
+where
+    E: SendUnlessWasm + SyncUnlessWasm,
+{
+    fn dispatch_event(&self, event: E);
+}

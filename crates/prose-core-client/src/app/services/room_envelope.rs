@@ -5,7 +5,7 @@
 
 use super::room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RoomEnvelope {
     DirectMessage(Room<DirectMessage>),
     Group(Room<Group>),

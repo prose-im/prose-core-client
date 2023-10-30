@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{client, Event};
 
-use crate::app::deps::{DynAppContext, DynAppServiceDependencies};
+use crate::app::deps::{DynAppContext, DynClientEventDispatcher};
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::ConnectionEvent;
 use crate::ClientEvent;
@@ -21,7 +21,7 @@ pub(crate) struct ConnectionEventHandler {
     #[inject]
     ctx: DynAppContext,
     #[inject]
-    app_service: DynAppServiceDependencies,
+    client_event_dispatcher: DynClientEventDispatcher,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -42,7 +42,7 @@ impl XMPPEventHandler for ConnectionEventHandler {
                 }
                 client::Event::Disconnected { error } => {
                     self.ctx.is_observing_rooms.store(false, Ordering::Relaxed);
-                    self.app_service.event_dispatcher.dispatch_event(
+                    self.client_event_dispatcher.dispatch_event(
                         ClientEvent::ConnectionStatusChanged {
                             event: ConnectionEvent::Disconnect { error },
                         },

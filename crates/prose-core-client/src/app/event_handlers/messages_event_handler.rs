@@ -17,8 +17,8 @@ use prose_xmpp::stanza::Message;
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynAppServiceDependencies, DynConnectedRoomsRepository, DynMessagesRepository,
-    DynMessagingService, DynRoomFactory,
+    DynClientEventDispatcher, DynConnectedRoomsRepository, DynMessagesRepository,
+    DynMessagingService, DynRoomFactory, DynTimeProvider,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, TimestampedMessage};
@@ -27,8 +27,6 @@ use crate::{ClientEvent, RoomEventType};
 #[derive(InjectDependencies)]
 pub(crate) struct MessagesEventHandler {
     #[inject]
-    app_service: DynAppServiceDependencies,
-    #[inject]
     connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]
     messages_repo: DynMessagesRepository,
@@ -36,6 +34,10 @@ pub(crate) struct MessagesEventHandler {
     messaging_service: DynMessagingService,
     #[inject]
     room_factory: DynRoomFactory,
+    #[inject]
+    time_provider: DynTimeProvider,
+    #[inject]
+    client_event_dispatcher: DynClientEventDispatcher,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -142,7 +144,7 @@ impl MessagesEventHandler {
         }
 
         let message_is_carbon = message.is_carbon();
-        let now = self.app_service.time_provider.now();
+        let now = self.time_provider.now();
 
         let parsed_message: Result<MessageLike> = match message {
             ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
@@ -172,8 +174,7 @@ impl MessagesEventHandler {
             debug!("Caching received message…");
             self.messages_repo.append(&from, &[message]).await?;
 
-            self.app_service
-                .event_dispatcher
+            self.client_event_dispatcher
                 .dispatch_event(ClientEvent::RoomChanged {
                     room: self.room_factory.build(room.clone()),
                     r#type: RoomEventType::from(message),
@@ -185,8 +186,7 @@ impl MessagesEventHandler {
                 .write()
                 .set_occupant_chat_state(&chat_state.from, &now, chat_state.state);
 
-            self.app_service
-                .event_dispatcher
+            self.client_event_dispatcher
                 .dispatch_event(ClientEvent::RoomChanged {
                     room: self.room_factory.build(room.clone()),
                     r#type: RoomEventType::ComposingUsersChanged,
@@ -226,14 +226,13 @@ impl MessagesEventHandler {
 
         let message = MessageLike::try_from(TimestampedMessage {
             message,
-            timestamp: self.app_service.time_provider.now(),
+            timestamp: self.time_provider.now(),
         })?;
 
         debug!("Caching sent message…");
         self.messages_repo.append(&to, &[&message]).await?;
 
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::RoomChanged {
                 room: self.room_factory.build(room),
                 r#type: RoomEventType::from(&message),

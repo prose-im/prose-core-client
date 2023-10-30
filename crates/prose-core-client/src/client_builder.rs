@@ -9,7 +9,7 @@ use prose_store::prelude::{PlatformDriver, Store};
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
-use crate::app::deps::{AppContext, AppDependencies, AppServiceDependencies};
+use crate::app::deps::{AppContext, AppDependencies};
 use crate::app::event_handlers::{
     ClientEventDispatcher, ConnectionEventHandler, MessagesEventHandler, RequestsEventHandler,
     RoomsEventHandler, UserStateEventHandler, XMPPEventHandlerQueue,
@@ -167,19 +167,15 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
 
         let event_dispatcher = Arc::new(ClientEventDispatcher::new(self.delegate));
 
-        let app_service_deps = AppServiceDependencies {
-            time_provider: self.time_provider,
-            id_provider: self.id_provider,
-            short_id_provider: Arc::new(NanoIDProvider::default()),
-            event_dispatcher: event_dispatcher.clone(),
-        };
-
         let dependencies: AppDependencies = PlatformDependencies {
             ctx: AppContext::new(capabilities, self.software_version),
-            app_service_deps,
+            id_provider: self.id_provider,
+            short_id_provider: Arc::new(NanoIDProvider::default()),
             store: self.store,
+            time_provider: self.time_provider,
             xmpp: xmpp_client.clone(),
             avatar_cache: Box::new(self.avatar_cache),
+            client_event_dispatcher: event_dispatcher.clone(),
         }
         .into();
 

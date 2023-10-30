@@ -16,8 +16,8 @@ use tracing::{debug, info};
 use prose_xmpp::stanza::message::Emoji;
 
 use crate::app::deps::{
-    DynAppServiceDependencies, DynDraftsRepository, DynMessageArchiveService,
-    DynMessagesRepository, DynMessagingService, DynRoomParticipationService, DynRoomTopicService,
+    DynDraftsRepository, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
+    DynRoomParticipationService, DynRoomTopicService, DynTimeProvider,
 };
 use crate::domain::messaging::models::{Message, MessageId, MessageLike};
 use crate::domain::rooms::models::RoomInternals;
@@ -49,7 +49,7 @@ impl HasTopic for Generic {}
 pub struct RoomInner {
     pub(crate) data: Arc<RoomInternals>,
 
-    pub(crate) deps: DynAppServiceDependencies,
+    pub(crate) time_provider: DynTimeProvider,
     pub(crate) messaging_service: DynMessagingService,
     pub(crate) message_archive_service: DynMessageArchiveService,
     pub(crate) participation_service: DynRoomParticipationService,
@@ -203,7 +203,7 @@ impl<Kind> Room<Kind> {
     pub async fn load_composing_users(&self) -> Result<Vec<BareJid>> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
-        let thirty_secs_ago = self.deps.time_provider.now() - Duration::seconds(30);
+        let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
         Ok(self.data.state.read().composing_users(thirty_secs_ago))
     }
 

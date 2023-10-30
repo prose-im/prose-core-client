@@ -3,16 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::atomic::Ordering;
+
 use anyhow::{bail, Result};
 use jid::BareJid;
-use std::sync::atomic::Ordering;
 use tracing::{error, info};
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods;
 
 use crate::app::deps::{
-    DynAppContext, DynAppServiceDependencies, DynBookmarksRepository, DynConnectedRoomsRepository,
+    DynAppContext, DynBookmarksRepository, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynContactsRepository, DynRoomFactory, DynRoomManagementService, DynRoomsDomainService,
     DynUserProfileRepository,
 };
@@ -27,7 +28,7 @@ use crate::ClientEvent;
 #[derive(InjectDependencies)]
 pub struct RoomsService {
     #[inject]
-    app_service: DynAppServiceDependencies,
+    client_event_dispatcher: DynClientEventDispatcher,
     #[inject]
     bookmarks_repo: DynBookmarksRepository,
     #[inject]
@@ -127,8 +128,7 @@ impl RoomsService {
             }
         }
 
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::RoomsChanged);
 
         Ok(())

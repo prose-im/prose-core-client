@@ -11,7 +11,7 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::{caps, ping, profile, roster};
 use prose_xmpp::Event;
 
-use crate::app::deps::{DynAppContext, DynAppServiceDependencies, DynRequestHandlingService};
+use crate::app::deps::{DynAppContext, DynRequestHandlingService, DynTimeProvider};
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::general::services::SubscriptionResponse;
 
@@ -23,7 +23,7 @@ pub(crate) struct RequestsEventHandler {
     #[inject]
     ctx: DynAppContext,
     #[inject]
-    app_service: DynAppServiceDependencies,
+    time_provider: DynTimeProvider,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -59,11 +59,7 @@ impl XMPPEventHandler for RequestsEventHandler {
             Event::Profile(event) => match event {
                 profile::Event::EntityTimeQuery { from, id } => {
                     self.request_handling_service
-                        .respond_to_entity_time_request(
-                            &from,
-                            &id,
-                            &self.app_service.time_provider.now(),
-                        )
+                        .respond_to_entity_time_request(&from, &id, &self.time_provider.now())
                         .await?;
                     Ok(None)
                 }

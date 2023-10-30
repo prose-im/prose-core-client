@@ -15,7 +15,7 @@ use prose_xmpp::stanza::{avatar, UserActivity, VCard4};
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynAppServiceDependencies, DynAvatarRepository, DynUserInfoRepository, DynUserProfileRepository,
+    DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::user_info::models::{
@@ -26,7 +26,7 @@ use crate::ClientEvent;
 #[derive(InjectDependencies)]
 pub(crate) struct UserStateEventHandler {
     #[inject]
-    app_service: DynAppServiceDependencies,
+    client_event_dispatcher: DynClientEventDispatcher,
     #[inject]
     avatar_repo: DynAvatarRepository,
     #[inject]
@@ -85,8 +85,7 @@ impl UserStateEventHandler {
             .set_user_presence(from, &DomainPresence::from(presence.clone()))
             .await?;
 
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::ContactChanged {
                 jid: from.to_bare(),
             });
@@ -101,8 +100,7 @@ impl UserStateEventHandler {
         self.user_profile_repo
             .set(&from, &vcard.try_into()?)
             .await?;
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::ContactChanged { jid: from });
 
         Ok(())
@@ -132,8 +130,7 @@ impl UserStateEventHandler {
             .precache_avatar_image(&from, &metadata.to_info())
             .await?;
 
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::AvatarChanged { jid: from });
 
         Ok(())
@@ -145,8 +142,7 @@ impl UserStateEventHandler {
         self.user_info_repo
             .set_user_activity(&jid, Some(&user_activity))
             .await?;
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::ContactChanged { jid });
         Ok(())
     }

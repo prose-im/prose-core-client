@@ -5,6 +5,7 @@
 
 use std::sync::{OnceLock, Weak};
 
+use crate::app::event_handlers::EventDispatcher;
 use crate::client::ClientInner;
 use crate::{ClientDelegate, ClientEvent};
 
@@ -27,8 +28,10 @@ impl ClientEventDispatcher {
             .map_err(|_| ())
             .expect("Tried to set client_inner on ClientEventDispatcher more than once");
     }
+}
 
-    pub(crate) fn dispatch_event(&self, event: ClientEvent) {
+impl EventDispatcher<ClientEvent> for ClientEventDispatcher {
+    fn dispatch_event(&self, event: ClientEvent) {
         let Some(ref delegate) = self.delegate else {
             return;
         };

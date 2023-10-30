@@ -9,8 +9,8 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{ConnectionError, IDProvider};
 
 use crate::app::deps::{
-    DynAccountSettingsRepository, DynAppContext, DynAppServiceDependencies, DynConnectionService,
-    DynUserAccountService,
+    DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher, DynConnectionService,
+    DynIDProvider, DynUserAccountService,
 };
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
@@ -18,17 +18,19 @@ use crate::domain::shared::models::Availability;
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
-pub(crate) struct ConnectionService {
+pub struct ConnectionService {
     #[inject]
     ctx: DynAppContext,
-    #[inject]
-    app_service: DynAppServiceDependencies,
     #[inject]
     connection_service: DynConnectionService,
     #[inject]
     account_settings_repo: DynAccountSettingsRepository,
     #[inject]
     user_account_service: DynUserAccountService,
+    #[inject]
+    short_id_provider: DynIDProvider,
+    #[inject]
+    client_event_dispatcher: DynClientEventDispatcher,
 }
 
 impl ConnectionService {
@@ -46,7 +48,7 @@ impl ConnectionService {
                 })?;
         let resource = settings
             .resource
-            .unwrap_or_else(|| self.app_service.short_id_provider.new_id());
+            .unwrap_or_else(|| self.short_id_provider.new_id());
         let availability = settings.availability.unwrap_or(Availability::Available);
 
         let full_jid = jid
@@ -92,8 +94,7 @@ impl ConnectionService {
                 msg: err.to_string(),
             })?;
 
-        self.app_service
-            .event_dispatcher
+        self.client_event_dispatcher
             .dispatch_event(ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Connect,
             });
