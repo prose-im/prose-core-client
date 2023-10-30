@@ -12,10 +12,10 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
 
-use crate::app::services::{
-    AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
-};
 use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore};
+use crate::services::{
+    AccountService, CacheService, ConnectionService, ContactsService, RoomsService, UserDataService,
+};
 use crate::ClientEvent;
 
 #[derive(Clone)]
@@ -39,6 +39,7 @@ pub struct ClientInner {
     pub contacts: ContactsService,
     pub rooms: RoomsService,
     pub user_data: UserDataService,
+    pub cache: CacheService,
 }
 
 impl From<Arc<ClientInner>> for Client {

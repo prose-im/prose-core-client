@@ -27,4 +27,6 @@ pub trait UserInfoRepository: SendUnlessWasm + SyncUnlessWasm {
         user_activity: Option<&UserActivity>,
     ) -> Result<()>;
     async fn set_user_presence(&self, jid: &Jid, presence: &Presence) -> Result<()>;
+
+    async fn clear_cache(&self) -> Result<()>;
 }

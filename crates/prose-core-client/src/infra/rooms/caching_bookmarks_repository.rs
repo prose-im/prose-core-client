@@ -59,6 +59,11 @@ impl BookmarksRepository for CachingBookmarksRepository {
         .await?;
         Ok(())
     }
+
+    async fn clear_cache(&self) -> Result<()> {
+        self.bookmarks.write().take();
+        Ok(())
+    }
 }
 
 impl CachingBookmarksRepository {

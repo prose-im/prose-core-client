@@ -23,6 +23,7 @@ use crate::infra::avatars::AvatarCache;
 use crate::infra::general::NanoIDProvider;
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
+use crate::services::CacheService;
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedStore {}
@@ -193,6 +194,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             contacts: ContactsService::from(&dependencies),
             rooms: RoomsService::from(&dependencies),
             user_data: UserDataService::from(&dependencies),
+            cache: CacheService::from(&dependencies),
         });
 
         event_dispatcher.set_client_inner(Arc::downgrade(&client_inner));

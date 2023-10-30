@@ -18,4 +18,5 @@ pub trait BookmarksRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get_all(&self) -> Result<Vec<Bookmark>>;
     async fn put(&self, bookmark: Bookmark) -> Result<()>;
     async fn delete(&self, room_jids: &[BareJid]) -> Result<()>;
+    async fn clear_cache(&self) -> Result<()>;
 }

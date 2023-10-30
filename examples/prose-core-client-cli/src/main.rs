@@ -752,8 +752,7 @@ async fn main() -> Result<()> {
             }
             Selection::DeleteCachedData => {
                 println!("Cleaning cache…");
-                todo!()
-                //client.delete_cached_data().await?;
+                client.cache.clear_cache().await?;
             }
             Selection::CreateGroup => {
                 let contacts = select_multiple_contacts(&client).await?;

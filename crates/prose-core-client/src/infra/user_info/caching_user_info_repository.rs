@@ -135,4 +135,15 @@ impl UserInfoRepository for CachingUserInfoRepository {
         map.update_presence(jid, presence.clone().into());
         Ok(())
     }
+
+    async fn clear_cache(&self) -> Result<()> {
+        let tx = self
+            .store
+            .transaction_for_reading_and_writing(&[UserInfoRecord::collection()])
+            .await?;
+        tx.truncate_collections(&[UserInfoRecord::collection()])?;
+        tx.commit().await?;
+        self.presences.write().clear();
+        Ok(())
+    }
 }

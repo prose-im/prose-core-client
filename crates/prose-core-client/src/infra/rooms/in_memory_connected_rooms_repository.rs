@@ -7,6 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use jid::BareJid;
 use parking_lot::RwLock;
 
@@ -25,6 +26,8 @@ impl InMemoryConnectedRoomsRepository {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
     fn get(&self, room_jid: &BareJid) -> Option<Arc<RoomInternals>> {
         self.rooms.read().get(room_jid).cloned()
@@ -71,5 +74,10 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         self.rooms
             .write()
             .retain(|room_jid, _| !jids_to_delete.contains(room_jid));
+    }
+
+    async fn clear_cache(&self) -> Result<()> {
+        self.rooms.write().clear();
+        Ok(())
     }
 }

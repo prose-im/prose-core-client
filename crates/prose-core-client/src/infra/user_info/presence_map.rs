@@ -35,6 +35,10 @@ impl PresenceMap {
             .and_then(|entries| entries.first())
             .map(|entry| entry)
     }
+
+    pub fn clear(&mut self) {
+        self.map.clear()
+    }
 }
 
 impl PresenceMap {

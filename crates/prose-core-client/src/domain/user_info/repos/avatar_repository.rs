@@ -30,4 +30,6 @@ pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {
         metadata: &AvatarInfo,
         image: &AvatarData,
     ) -> Result<()>;
+
+    async fn clear_cache(&self) -> Result<()>;
 }

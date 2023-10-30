@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
 
@@ -55,6 +56,16 @@ impl DomainDraftsRepository for DraftsRepository {
         } else {
             collection.delete(room_id)?;
         }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    async fn clear_cache(&self) -> Result<()> {
+        let tx = self
+            .store
+            .transaction_for_reading_and_writing(&[DraftsRecord::collection()])
+            .await?;
+        tx.truncate_collections(&[DraftsRecord::collection()])?;
         tx.commit().await?;
         Ok(())
     }

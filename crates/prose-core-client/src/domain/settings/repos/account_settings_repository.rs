@@ -18,4 +18,5 @@ type UpdateHandler = Box<dyn for<'a> FnOnce(&'a mut AccountSettings) + Send>;
 pub trait AccountSettingsRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get(&self, jid: &BareJid) -> Result<AccountSettings>;
     async fn update(&self, jid: &BareJid, block: UpdateHandler) -> Result<()>;
+    async fn clear_cache(&self) -> Result<()>;
 }

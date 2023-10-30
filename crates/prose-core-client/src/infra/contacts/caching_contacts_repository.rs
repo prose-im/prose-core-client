@@ -41,4 +41,9 @@ impl ContactsRepository for CachingContactsRepository {
 
         Ok(contacts)
     }
+
+    async fn clear_cache(&self) -> Result<()> {
+        self.contacts.write().take();
+        Ok(())
+    }
 }

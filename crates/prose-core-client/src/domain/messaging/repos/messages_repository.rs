@@ -17,4 +17,5 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get(&self, room_id: &BareJid, id: &MessageId) -> Result<Option<Message>>;
     async fn get_all(&self, room_id: &BareJid, ids: &[&MessageId]) -> Result<Vec<Message>>;
     async fn append(&self, room_id: &BareJid, messages: &[&MessageLike]) -> Result<()>;
+    async fn clear_cache(&self) -> Result<()>;
 }

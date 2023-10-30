@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
 
@@ -79,6 +80,11 @@ impl DomainAvatarRepository for CachingAvatarRepository {
         self.avatar_cache
             .cache_avatar_image(user_jid, image, info)
             .await?;
+        Ok(())
+    }
+
+    async fn clear_cache(&self) -> Result<()> {
+        self.avatar_cache.delete_all_cached_images().await?;
         Ok(())
     }
 }

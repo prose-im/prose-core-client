@@ -333,12 +333,12 @@ impl Client {
 
     #[wasm_bindgen(js_name = "deleteCachedData")]
     pub async fn delete_cached_data(&self) -> Result<()> {
-        todo!("Implement me");
-        // self.client
-        //     .delete_cached_data()
-        //     .await
-        //     .map_err(WasmError::from)?;
-        // Ok(())
+        self.client
+            .cache
+            .clear_cache()
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = "loadUserMetadata")]

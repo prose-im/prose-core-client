@@ -17,4 +17,5 @@ pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get(&self, jid: &BareJid) -> Result<Option<UserProfile>>;
     async fn set(&self, jid: &BareJid, profile: &UserProfile) -> Result<()>;
     async fn delete(&self, jid: &BareJid) -> Result<()>;
+    async fn clear_cache(&self) -> Result<()>;
 }

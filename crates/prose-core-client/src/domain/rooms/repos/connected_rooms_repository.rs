@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
@@ -16,6 +17,8 @@ type UpdateHandler = Box<dyn FnOnce(Arc<RoomInternals>) -> RoomInternals + Send>
 
 pub struct RoomAlreadyExistsError;
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ConnectedRoomsRepository: SendUnlessWasm + SyncUnlessWasm {
     fn get(&self, room_jid: &BareJid) -> Option<Arc<RoomInternals>>;
@@ -31,4 +34,6 @@ pub trait ConnectedRoomsRepository: SendUnlessWasm + SyncUnlessWasm {
     fn update(&self, room_jid: &BareJid, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
 
     fn delete<'a>(&self, room_jids: &[&'a BareJid]);
+
+    async fn clear_cache(&self) -> Result<()>;
 }

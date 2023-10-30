@@ -15,4 +15,5 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 pub trait DraftsRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get(&self, room_id: &BareJid) -> Result<Option<String>>;
     async fn set(&self, room_id: &BareJid, draft: Option<&str>) -> Result<()>;
+    async fn clear_cache(&self) -> Result<()>;
 }

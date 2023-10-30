@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use account_service::AccountService;
+pub use cache_service::CacheService;
 pub use connection_service::ConnectionService;
 pub use contacts_service::ContactsService;
 pub(crate) use room::RoomInner;
@@ -13,6 +14,7 @@ pub use rooms_service::RoomsService;
 pub use user_data_service::UserDataService;
 
 mod account_service;
+mod cache_service;
 mod connection_service;
 mod contacts_service;
 mod room;

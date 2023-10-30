@@ -80,4 +80,14 @@ impl UserProfileRepository for CachingUserProfileRepository {
         tx.commit().await?;
         Ok(())
     }
+
+    async fn clear_cache(&self) -> Result<()> {
+        let tx = self
+            .store
+            .transaction_for_reading_and_writing(&[UserProfileRecord::collection()])
+            .await?;
+        tx.truncate_collections(&[UserProfileRecord::collection()])?;
+        tx.commit().await?;
+        Ok(())
+    }
 }

@@ -16,4 +16,5 @@ use crate::domain::contacts::models::Contact;
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ContactsRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get_all(&self, account_jid: &BareJid) -> Result<Vec<Contact>>;
+    async fn clear_cache(&self) -> Result<()>;
 }
