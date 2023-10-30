@@ -55,9 +55,22 @@ impl ConnectionService {
             .with_resource_str(&resource)
             .expect("Failed to build FullJid with generated ID as resource.");
 
-        self.connection_service
+        self.ctx.set_connection_properties(ConnectionProperties {
+            connected_jid: full_jid.clone(),
+            server_features: Default::default(),
+        });
+
+        let connection_result = self
+            .connection_service
             .connect(&full_jid, password.as_ref())
-            .await?;
+            .await;
+        match connection_result {
+            Ok(_) => (),
+            Err(err) => {
+                self.ctx.reset_connection_properties();
+                return Err(err);
+            }
+        }
 
         self.user_account_service
             .set_availability(&self.ctx.capabilities, &availability)
@@ -73,13 +86,10 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
-        self.ctx
-            .connection_properties
-            .write()
-            .replace(ConnectionProperties {
-                connected_jid: full_jid.clone(),
-                server_features,
-            });
+        self.ctx.set_connection_properties(ConnectionProperties {
+            connected_jid: full_jid.clone(),
+            server_features,
+        });
 
         self.account_settings_repo
             .update(

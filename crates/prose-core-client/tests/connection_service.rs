@@ -3,11 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
 use mockall::predicate;
 
+use prose_core_client::app::deps::DynAppContext;
 use prose_core_client::app::services::ConnectionService;
 use prose_core_client::domain::connection::models::ServerFeatures;
 use prose_core_client::domain::settings::models::AccountSettings;
@@ -15,7 +16,7 @@ use prose_core_client::dtos::Availability;
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::{ClientEvent, ConnectionEvent};
 use prose_xmpp::test::ConstantIDProvider;
-use prose_xmpp::{bare, full};
+use prose_xmpp::{bare, full, ConnectionError};
 
 #[tokio::test]
 async fn test_starts_available_and_generates_resource() -> Result<()> {
@@ -161,6 +162,59 @@ async fn test_restores_availability_and_resource() -> Result<()> {
     service
         .connect(&bare!("jane.doe@prose.org"), "my-password")
         .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+/// Test that the ConnectionService sets the connected_jid on AppContext before it
+/// starts connecting and clears it if the connection fails. It's important that the connected_jid
+/// is set immediately so that when events come in while the connection is in progress,
+/// event handlers already have access to the connected_jid.
+async fn test_connection_failure() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+    let ctx = Arc::new(OnceLock::<DynAppContext>::new());
+
+    deps.short_id_provider = Arc::new(ConstantIDProvider::new("resource-id"));
+
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(Default::default()) }));
+    {
+        let ctx = ctx.clone();
+        deps.connection_service
+            .expect_connect()
+            .once()
+            .return_once(move |_, _| {
+                assert_eq!(
+                    ctx.get().unwrap().connected_jid().ok(),
+                    Some(full!("jane.doe@prose.org/resource-id"))
+                );
+                Box::pin(async {
+                    Err(ConnectionError::Generic {
+                        msg: "Failure".to_string(),
+                    })
+                })
+            });
+    }
+
+    let deps = deps.into_deps();
+    ctx.set(deps.ctx.clone()).map_err(|_| ()).unwrap();
+
+    let service = ConnectionService::from(&deps);
+
+    *deps.ctx.connection_properties.write() = None;
+    assert!(deps.ctx.connected_jid().is_err());
+    assert!(deps.ctx.muc_service().is_err());
+
+    assert!(service
+        .connect(&bare!("jane.doe@prose.org"), "my-password")
+        .await
+        .is_err());
+
+    assert!(deps.ctx.connected_jid().is_err());
+    assert!(deps.ctx.muc_service().is_err());
 
     Ok(())
 }

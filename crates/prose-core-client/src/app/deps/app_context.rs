@@ -49,3 +49,13 @@ impl AppContext {
             .ok_or(anyhow::anyhow!("Server does not support MUC (XEP-0045)"))
     }
 }
+
+impl AppContext {
+    pub fn set_connection_properties(&self, properties: ConnectionProperties) {
+        self.connection_properties.write().replace(properties);
+    }
+
+    pub fn reset_connection_properties(&self) {
+        self.connection_properties.write().take();
+    }
+}

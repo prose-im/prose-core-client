@@ -15,7 +15,8 @@ use prose_xmpp::stanza::{avatar, UserActivity, VCard4};
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository, DynUserProfileRepository,
+    DynAppContext, DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository,
+    DynUserProfileRepository,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::user_info::models::{
@@ -25,6 +26,8 @@ use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct UserStateEventHandler {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
     #[inject]
@@ -46,10 +49,13 @@ impl XMPPEventHandler for UserStateEventHandler {
         match event {
             Event::Status(event) => match event {
                 status::Event::Presence(presence) => {
-                    self.presence_did_change(&presence).await?;
-                    // Since presence can contain more information than we handle, give others
-                    // a chance to handle this event has well…
-                    Ok(Some(Event::Status(status::Event::Presence(presence))))
+                    if let Some(presence) = self.presence_did_change(presence).await? {
+                        // Since presence can contain more information than we handle, give others
+                        // a chance to handle this event has well…
+                        Ok(Some(Event::Status(status::Event::Presence(presence))))
+                    } else {
+                        Ok(None)
+                    }
                 }
                 status::Event::UserActivity {
                     from,
@@ -76,21 +82,27 @@ impl XMPPEventHandler for UserStateEventHandler {
 }
 
 impl UserStateEventHandler {
-    async fn presence_did_change(&self, presence: &Presence) -> Result<()> {
+    async fn presence_did_change(&self, presence: Presence) -> Result<Option<Presence>> {
         let Some(from) = &presence.from else {
-            return Ok(());
+            return Ok(Some(presence));
         };
 
         self.user_info_repo
             .set_user_presence(from, &DomainPresence::from(presence.clone()))
             .await?;
 
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::ContactChanged {
-                jid: from.to_bare(),
-            });
+        let from = from.to_bare();
+        let user_jid = self.ctx.connected_jid()?.into_bare();
 
-        Ok(())
+        // We'll ignore our own presence and won't forward it.
+        if from == user_jid {
+            return Ok(None);
+        }
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::ContactChanged { jid: from.clone() });
+
+        Ok(Some(presence))
     }
 
     async fn vcard_did_change(&self, from: Jid, vcard: VCard4) -> Result<()> {

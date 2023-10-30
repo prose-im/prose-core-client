@@ -14,7 +14,7 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::{bookmark, bookmark2, muc, status};
 use prose_xmpp::{ns, Event};
 
-use crate::app::deps::{DynConnectedRoomsRepository, DynRoomsDomainService};
+use crate::app::deps::{DynAppContext, DynConnectedRoomsRepository, DynRoomsDomainService};
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::RoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
@@ -22,6 +22,8 @@ use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateOrEnterRoom
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]
@@ -94,6 +96,11 @@ impl RoomsEventHandler {
         };
 
         let to = to.into_bare();
+
+        // Ignore presences that we're directed at us. We don't have a room for the logged-in user.
+        if to == self.ctx.connected_jid()?.into_bare() {
+            return Ok(());
+        }
 
         let Some(room) = self.connected_rooms_repo.get(&to) else {
             warn!(
