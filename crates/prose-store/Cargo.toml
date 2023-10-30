@@ -13,7 +13,7 @@ authors = ["Marc Bauer <mb@nesium.com>"]
 [dependencies]
 async-trait = { workspace = true }
 chrono = { workspace = true, features = ["serde", "wasmbind"], optional = true }
-prose-store-entity-macro = { path = "../../crates/prose-store-entity-macro" }
+prose-proc-macros = { path = "../../crates/prose-proc-macros" }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

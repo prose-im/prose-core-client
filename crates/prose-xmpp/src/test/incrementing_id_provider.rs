@@ -8,12 +8,14 @@ use std::sync::Mutex;
 use crate::IDProvider;
 
 pub struct IncrementingIDProvider {
+    prefix: String,
     last_id: Mutex<i64>,
 }
 
 impl IncrementingIDProvider {
-    pub fn new() -> Self {
+    pub fn new(prefix: &str) -> Self {
         IncrementingIDProvider {
+            prefix: prefix.to_string(),
             last_id: Mutex::new(0),
         }
     }
@@ -28,6 +30,6 @@ impl IDProvider for IncrementingIDProvider {
     fn new_id(&self) -> String {
         let mut last_id = self.last_id.lock().unwrap();
         *last_id += 1;
-        format!("id-{}", *last_id)
+        format!("{}-{}", self.prefix, *last_id)
     }
 }

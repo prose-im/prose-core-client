@@ -4,8 +4,8 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::JID;
-use prose_core_client::types::{
-    roster::Group as CoreGroup, Availability, Contact as CoreContact, UserActivity,
+use prose_core_client::dtos::{
+    Availability, Contact as CoreContact, Group as CoreGroup, UserActivity,
 };
 
 #[derive(Debug, PartialEq, Clone)]

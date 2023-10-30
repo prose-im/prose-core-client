@@ -3,17 +3,21 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::borrow::Cow;
+
 use anyhow::{bail, Result};
 use base64::{engine::general_purpose, DecodeError, Engine as _};
 use chrono::{DateTime, FixedOffset};
 use jid::{BareJid, Jid};
 use minidom::Element;
-use std::borrow::Cow;
+use sha1::{Digest, Sha1};
 use xmpp_parsers::hashes::Sha1HexAttribute;
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub;
 use xmpp_parsers::pubsub::pubsub::Items;
 use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
+use xmpp_parsers::time::{TimeQuery, TimeResult};
+use xmpp_parsers::version::{VersionQuery, VersionResult};
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
@@ -24,9 +28,6 @@ use crate::stanza::avatar::ImageId;
 use crate::stanza::last_activity::LastActivityResponse;
 use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::RequestError;
-use sha1::{Digest, Sha1};
-use xmpp_parsers::time::{TimeQuery, TimeResult};
-use xmpp_parsers::version::{VersionQuery, VersionResult};
 
 #[derive(Default, Clone)]
 pub struct Profile {

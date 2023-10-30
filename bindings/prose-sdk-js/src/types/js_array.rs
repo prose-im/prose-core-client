@@ -29,8 +29,8 @@ extern "C" {
     pub type ContactsArray;
 }
 
-impl From<Vec<prose_core_client::types::Message>> for MessagesArray {
-    fn from(value: Vec<prose_core_client::types::Message>) -> Self {
+impl From<Vec<prose_core_client::dtos::Message>> for MessagesArray {
+    fn from(value: Vec<prose_core_client::dtos::Message>) -> Self {
         value
             .into_iter()
             .map(|message| Message::from(message))

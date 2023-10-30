@@ -107,13 +107,13 @@ pub(super) struct ModuleContextInner {
 }
 
 impl ModuleContextInner {
-    #[cfg(not(feature = "test"))]
+    #[cfg(any(not(feature = "test"), target_arch = "wasm32"))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
         prose_wasm_utils::spawn(fut);
     }
 
-    #[cfg(feature = "test")]
+    #[cfg(all(feature = "test", not(target_arch = "wasm32")))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         tokio::task::block_in_place(move || {
             let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);

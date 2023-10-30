@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::{BareJid, DomainPart, Error as JidParseError, FullJid, NodePart, ResourcePart};
+use jid::{BareJid, DomainPart, Error as JidParseError, NodePart};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct JID {
@@ -12,15 +12,14 @@ pub struct JID {
 }
 
 impl JID {
-    pub fn to_full_jid_with_resource(&self, resource: &str) -> Result<FullJid, JidParseError> {
-        Ok(FullJid::from_parts(
+    pub fn to_bare(&self) -> Result<BareJid, JidParseError> {
+        Ok(BareJid::from_parts(
             self.node
                 .as_ref()
                 .map(|node| NodePart::new(node))
                 .transpose()?
                 .as_ref(),
             &DomainPart::new(&self.domain)?,
-            &ResourcePart::new(resource)?,
         ))
     }
 }

@@ -11,7 +11,6 @@ pub(crate) use request_future::{ElementReducerPoll, RequestFuture};
 pub use xmpp_element::XMPPElement;
 
 pub mod element_ext;
-pub(crate) mod id_string_macro;
 mod module_future_state;
 mod publish_options_ext;
 mod request_error;

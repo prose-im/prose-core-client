@@ -3,22 +3,16 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use alloc::rc::Rc;
-use std::marker::PhantomData;
-
 use tracing::warn;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::avatar_cache::AvatarCache;
-use prose_core_client::data_cache::indexed_db::PlatformCache;
-use prose_core_client::data_cache::DataCache;
-use prose_core_client::types::MessageId;
-use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent};
+use prose_core_client::dtos::MessageId;
+use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent, RoomEventType};
 use prose_xmpp::ConnectionError;
 
 use crate::client::Client;
 use crate::types::BareJid;
-use crate::types::ConnectedRoomExt;
+use crate::types::RoomEnvelopeExt;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
@@ -145,19 +139,13 @@ impl From<ConnectionError> for JSConnectionError {
     }
 }
 
-pub struct Delegate<D: DataCache, A: AvatarCache> {
+pub struct Delegate {
     inner: JSDelegate,
-    data_cache: PhantomData<D>,
-    avatar_cache: PhantomData<A>,
 }
 
-impl<D: DataCache, A: AvatarCache> Delegate<D, A> {
+impl Delegate {
     pub fn new(js: JSDelegate) -> Self {
-        Delegate {
-            inner: js,
-            data_cache: PhantomData,
-            avatar_cache: PhantomData,
-        }
+        Delegate { inner: js }
     }
 }
 
@@ -173,14 +161,8 @@ impl JSValueConvertible for Vec<MessageId> {
     }
 }
 
-type WasmCache = Rc<PlatformCache>;
-
-impl ClientDelegate<WasmCache, WasmCache> for Delegate<WasmCache, WasmCache> {
-    fn handle_event(
-        &self,
-        client: prose_core_client::Client<WasmCache, WasmCache>,
-        event: ClientEvent<WasmCache, WasmCache>,
-    ) {
+impl ClientDelegate for Delegate {
+    fn handle_event(&self, client: prose_core_client::Client, event: ClientEvent) {
         match self.handle_event_throwing(client, event) {
             Ok(()) => (),
             Err(val) => warn!(
@@ -191,18 +173,15 @@ impl ClientDelegate<WasmCache, WasmCache> for Delegate<WasmCache, WasmCache> {
     }
 }
 
-impl Delegate<WasmCache, WasmCache> {
+impl Delegate {
     fn handle_event_throwing(
         &self,
-        client: prose_core_client::Client<WasmCache, WasmCache>,
-        event: ClientEvent<WasmCache, WasmCache>,
+        client: prose_core_client::Client,
+        event: ClientEvent,
     ) -> Result<(), JsValue> {
         let client = Client::from(client);
 
         match event {
-            ClientEvent::ComposingUsersChanged { room } => self
-                .inner
-                .composing_users_changed(client, room.into_js_value())?,
             ClientEvent::ConnectionStatusChanged {
                 event: ConnectionEvent::Connect,
             } => self.inner.client_connected(client)?,
@@ -216,21 +195,26 @@ impl Delegate<WasmCache, WasmCache> {
                 self.inner.contact_changed(client, jid.into())?
             }
             ClientEvent::AvatarChanged { jid } => self.inner.avatar_changed(client, jid.into())?,
-            ClientEvent::MessagesAppended { room, message_ids } => self.inner.messages_appended(
-                client,
-                room.into_js_value(),
-                message_ids.into_js_array(),
-            )?,
-            ClientEvent::MessagesUpdated { room, message_ids } => self.inner.messages_updated(
-                client,
-                room.into_js_value(),
-                message_ids.into_js_array(),
-            )?,
-            ClientEvent::MessagesDeleted { room, message_ids } => self.inner.messages_deleted(
-                client,
-                room.into_js_value(),
-                message_ids.into_js_array(),
-            )?,
+            ClientEvent::RoomChanged { room, r#type } => match r#type {
+                RoomEventType::MessagesAppended { message_ids } => self.inner.messages_appended(
+                    client,
+                    room.into_js_value(),
+                    message_ids.into_js_array(),
+                )?,
+                RoomEventType::MessagesUpdated { message_ids } => self.inner.messages_updated(
+                    client,
+                    room.into_js_value(),
+                    message_ids.into_js_array(),
+                )?,
+                RoomEventType::MessagesDeleted { message_ids } => self.inner.messages_deleted(
+                    client,
+                    room.into_js_value(),
+                    message_ids.into_js_array(),
+                )?,
+                RoomEventType::ComposingUsersChanged => self
+                    .inner
+                    .composing_users_changed(client, room.into_js_value())?,
+            },
         }
         Ok(())
     }

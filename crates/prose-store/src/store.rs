@@ -127,3 +127,22 @@ impl<D: Driver> Store<D> {
         collection.contains_key(key).await
     }
 }
+
+#[macro_export]
+macro_rules! upsert {
+    ($entity:ident, store: $store:expr, id: $id:expr, insert_if_needed: $insert_closure:expr, update: $update_closure:expr) => {{
+        let tx = $store
+            .transaction_for_reading_and_writing(&[$entity::collection()])
+            .await?;
+        {
+            let collection = tx.writeable_collection($entity::collection())?;
+            let mut value = collection
+                .get::<_, _>($id)
+                .await?
+                .unwrap_or_else($insert_closure);
+            $update_closure(&mut value);
+            collection.put_entity(&value)?;
+        }
+        tx.commit().await?;
+    }};
+}

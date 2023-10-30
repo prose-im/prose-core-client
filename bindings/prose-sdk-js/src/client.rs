@@ -3,20 +3,19 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use base64::{engine::general_purpose, Engine as _};
+use js_sys::Array;
+use wasm_bindgen::prelude::*;
+
+use prose_core_client::dtos::{SoftwareVersion, UserActivity};
+use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, StoreAvatarCache};
+
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, ConnectedRoomExt,
-    Contact, ContactsArray, IntoJSArray, RoomsArray, UserMetadata, UserProfile,
+    try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
+    ContactsArray, IntoJSArray, RoomEnvelopeExt, RoomsArray, UserMetadata, UserProfile,
 };
-use base64::{engine::general_purpose, Engine as _};
-use jid::ResourcePart;
-use js_sys::Array;
-use prose_core_client::data_cache::indexed_db::{IndexedDBDataCache, PlatformCache};
-use prose_core_client::types::{SoftwareVersion, UserActivity};
-use prose_core_client::{CachePolicy, Client as ProseClient, ClientBuilder};
-use std::rc::Rc;
-use wasm_bindgen::prelude::*;
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
 
@@ -103,7 +102,7 @@ impl Default for ClientConfig {
 
 #[wasm_bindgen(js_name = "ProseClient")]
 pub struct Client {
-    client: ProseClient<Rc<PlatformCache>, Rc<PlatformCache>>,
+    client: ProseClient,
 }
 
 #[wasm_bindgen(js_class = "ProseClient")]
@@ -113,7 +112,7 @@ impl Client {
         delegate: JSDelegate,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
-        let cache = Rc::new(IndexedDBDataCache::new().await?);
+        let store = open_store(IndexedDBDriver::new("ProseCache2")).await?;
         let config = config.unwrap_or_default();
 
         let software_version = SoftwareVersion {
@@ -123,10 +122,10 @@ impl Client {
         };
 
         let client = Client {
-            client: ClientBuilder::new()
+            client: ProseClient::builder()
                 .set_connector_provider(Connector::provider(connection_provider, config))
-                .set_data_cache(cache.clone())
-                .set_avatar_cache(cache)
+                .set_store(store.clone())
+                .set_avatar_cache(StoreAvatarCache::new(store))
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .set_software_version(software_version)
                 .build(),
@@ -135,19 +134,8 @@ impl Client {
         Ok(client)
     }
 
-    pub async fn connect(
-        &self,
-        jid: &BareJid,
-        password: &str,
-        availability: Availability,
-    ) -> Result<()> {
-        // TODO: Generate and store resource.
-        let jid = jid.to_full_jid_with_resource(&ResourcePart::new("web").unwrap());
-
-        self.client
-            .connect(&jid, password, availability.into())
-            .await?;
-
+    pub async fn connect(&self, jid: &BareJid, password: &str) -> Result<()> {
+        self.client.connect(&jid.into(), password).await?;
         Ok(())
     }
 
@@ -159,6 +147,7 @@ impl Client {
     #[wasm_bindgen(js_name = "startObservingRooms")]
     pub async fn start_observing_rooms(&self) -> Result<()> {
         self.client
+            .rooms
             .start_observing_rooms()
             .await
             .map_err(WasmError::from)?;
@@ -167,13 +156,14 @@ impl Client {
 
     #[wasm_bindgen(js_name = "connectedRooms")]
     pub fn connected_rooms(&self) -> Result<RoomsArray> {
-        Ok(self.client.connected_rooms().into())
+        Ok(self.client.rooms.connected_rooms().into())
     }
 
     #[wasm_bindgen(js_name = "loadPublicChannels")]
     pub async fn load_public_channels(&self) -> Result<ChannelsArray> {
         Ok(self
             .client
+            .rooms
             .load_public_rooms()
             .await
             .map_err(WasmError::from)?
@@ -191,7 +181,8 @@ impl Client {
 
         Ok(self
             .client
-            .create_direct_message(participants.as_slice())
+            .rooms
+            .create_room_for_direct_message(participants.as_slice())
             .await
             .map_err(WasmError::from)?
             .into_js_value())
@@ -203,7 +194,8 @@ impl Client {
     pub async fn create_public_channel(&self, channel_name: &str) -> Result<JsValue> {
         Ok(self
             .client
-            .create_public_channel(channel_name)
+            .rooms
+            .create_room_for_public_channel(channel_name)
             .await
             .map_err(WasmError::from)?
             .into_js_value())
@@ -214,7 +206,8 @@ impl Client {
     pub async fn create_private_channel(&self, channel_name: &str) -> Result<JsValue> {
         Ok(self
             .client
-            .create_private_channel(channel_name)
+            .rooms
+            .create_room_for_private_channel(channel_name)
             .await
             .map_err(WasmError::from)?
             .into_js_value())
@@ -225,7 +218,8 @@ impl Client {
     pub async fn join_room(&self, room_jid: &BareJid, password: Option<String>) -> Result<JsValue> {
         Ok(self
             .client
-            .join_room_with_jid(&room_jid.into(), password.as_deref())
+            .rooms
+            .join_room(&room_jid.into(), password.as_deref())
             .await
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?
             .into_js_value())
@@ -249,6 +243,7 @@ impl Client {
         };
 
         self.client
+            .account
             .set_user_activity(user_activity)
             .await
             .map_err(WasmError::from)?;
@@ -260,6 +255,7 @@ impl Client {
     pub async fn add_contact(&self, jid: &BareJid) -> Result<()> {
         Ok(self
             .client
+            .contacts
             .add_contact(&jid.into())
             .await
             .map_err(WasmError::from)?)
@@ -269,7 +265,8 @@ impl Client {
     pub async fn load_contacts(&self) -> Result<ContactsArray> {
         Ok(self
             .client
-            .load_contacts(Default::default())
+            .contacts
+            .load_contacts()
             .await
             .map_err(WasmError::from)?
             .into_iter()
@@ -283,7 +280,8 @@ impl Client {
     pub async fn load_avatar_data_url(&self, jid: &BareJid) -> Result<Option<String>> {
         let avatar = self
             .client
-            .load_avatar(jid, CachePolicy::ReturnCacheDataDontLoad)
+            .user_data
+            .load_avatar(&jid.into())
             .await
             .map_err(WasmError::from)?;
         Ok(avatar)
@@ -300,7 +298,8 @@ impl Client {
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?;
 
         self.client
-            .save_avatar(&image_data, None, None, mime_type)
+            .account
+            .set_avatar(&image_data, None, None, mime_type)
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -312,7 +311,8 @@ impl Client {
     pub async fn load_user_profile(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
         let profile = self
             .client
-            .load_user_profile(jid, CachePolicy::ReturnCacheDataElseLoad)
+            .user_data
+            .load_user_profile(&jid.into())
             .await
             .map_err(WasmError::from)?;
 
@@ -324,7 +324,8 @@ impl Client {
     #[wasm_bindgen(js_name = "saveUserProfile")]
     pub async fn save_user_profile(&self, profile: &UserProfile) -> Result<()> {
         self.client
-            .save_profile((profile.clone()).into())
+            .account
+            .set_profile(&(profile.clone()).into())
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -333,7 +334,8 @@ impl Client {
     #[wasm_bindgen(js_name = "deleteCachedData")]
     pub async fn delete_cached_data(&self) -> Result<()> {
         self.client
-            .delete_cached_data()
+            .cache
+            .clear_cache()
             .await
             .map_err(WasmError::from)?;
         Ok(())
@@ -343,9 +345,11 @@ impl Client {
     pub async fn load_user_metadata(&self, jid: &BareJid) -> Result<UserMetadata> {
         let metadata = self
             .client
-            .load_user_metadata(jid.as_ref())
+            .user_data
+            .load_user_metadata(&jid.into())
             .await
-            .map_err(WasmError::from)?;
+            .map_err(WasmError::from)?
+            .unwrap_or_default();
         Ok(metadata.into())
     }
 
@@ -354,6 +358,7 @@ impl Client {
     #[wasm_bindgen(js_name = "setAvailability")]
     pub async fn set_availability(&self, availability: Availability) -> Result<()> {
         self.client
+            .account
             .set_availability(availability.into())
             .await
             .map_err(WasmError::from)?;
@@ -361,8 +366,8 @@ impl Client {
     }
 }
 
-impl From<ProseClient<Rc<PlatformCache>, Rc<PlatformCache>>> for Client {
-    fn from(client: ProseClient<Rc<PlatformCache>, Rc<PlatformCache>>) -> Self {
+impl From<ProseClient> for Client {
+    fn from(client: ProseClient) -> Self {
         Client { client }
     }
 }

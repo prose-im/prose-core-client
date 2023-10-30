@@ -1,7 +1,13 @@
-use jid::Jid;
-use minidom::IntoAttributeValue;
+// prose-core-client/prose-core-client
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::{Display, Formatter};
+
+use jid::Jid;
+use minidom::IntoAttributeValue;
 use xmpp_parsers::data_forms::{Field, FieldType};
 
 #[allow(dead_code)]
@@ -235,9 +241,11 @@ impl FieldExt for Field {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use prose_xmpp::jid_str;
     use xmpp_parsers::data_forms::Option_;
+
+    use prose_xmpp::jid;
+
+    use super::*;
 
     #[test]
     fn test_bool_field() {
@@ -254,7 +262,7 @@ mod tests {
         assert_eq!(
             FormConfig::new([FormValue::optional(
                 "field-name",
-                Value::JidMulti(vec![jid_str!("a@prose.org"), jid_str!("b@prose.org")])
+                Value::JidMulti(vec![jid!("a@prose.org"), jid!("b@prose.org")])
             )])
             .populate_form_fields(&[Field::new("field-name", FieldType::JidMulti)])
             .unwrap(),
@@ -269,7 +277,7 @@ mod tests {
         assert_eq!(
             FormConfig::new([FormValue::optional(
                 "field-name",
-                Value::JidSingle(jid_str!("a@prose.org"))
+                Value::JidSingle(jid!("a@prose.org"))
             )])
             .populate_form_fields(&[Field::new("field-name", FieldType::JidSingle)])
             .unwrap(),

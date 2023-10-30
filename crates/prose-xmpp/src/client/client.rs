@@ -139,8 +139,9 @@ impl ClientInner {
     }
 
     fn handle_stanza(ctx: &ModuleContextInner, mods: &ModuleLookup, stanza: Element) {
-        let elem = match XMPPElement::try_from(stanza) {
-            Ok(elem) => elem,
+        let elem = match XMPPElement::try_from_element(stanza) {
+            Ok(None) => return,
+            Ok(Some(elem)) => elem,
             Err(err) => {
                 error!("Failed to parse stanza. {}", err);
                 return;

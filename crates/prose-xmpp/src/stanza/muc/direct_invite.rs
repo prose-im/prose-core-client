@@ -52,7 +52,7 @@ impl MessagePayload for DirectInvite {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jid_str;
+    use crate::jid;
     use anyhow::Result;
 
     #[test]
@@ -71,7 +71,7 @@ mod tests {
         assert_eq!(
             invite,
             DirectInvite {
-                jid: jid_str!("darkcave@macbeth.shakespeare.lit").into_bare(),
+                jid: jid!("darkcave@macbeth.shakespeare.lit").into_bare(),
                 password: Some("cauldronburn".to_string()),
                 reason: Some("Hey Hecate, this is the place for all good witches!".to_string()),
                 r#continue: Some(true),
@@ -92,7 +92,7 @@ mod tests {
         assert_eq!(
             invite,
             DirectInvite {
-                jid: jid_str!("darkcave@macbeth.shakespeare.lit").into_bare(),
+                jid: jid!("darkcave@macbeth.shakespeare.lit").into_bare(),
                 password: None,
                 reason: None,
                 r#continue: None,
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn test_serialize_full_direct_invite() -> Result<()> {
         let invite = DirectInvite {
-            jid: jid_str!("darkcave@macbeth.shakespeare.lit").into_bare(),
+            jid: jid!("darkcave@macbeth.shakespeare.lit").into_bare(),
             password: Some("cauldronburn".to_string()),
             reason: Some("Hey Hecate, this is the place for all good witches!".to_string()),
             r#continue: Some(true),
@@ -124,7 +124,7 @@ mod tests {
     #[test]
     fn test_serialize_minimal_direct_invite() -> Result<()> {
         let invite = DirectInvite {
-            jid: jid_str!("darkcave@macbeth.shakespeare.lit").into_bare(),
+            jid: jid!("darkcave@macbeth.shakespeare.lit").into_bare(),
             password: None,
             reason: None,
             r#continue: None,

@@ -9,11 +9,10 @@ pub use std::path::PathBuf;
 
 pub use jid::{BareJid, Error as JidParseError, FullJid};
 
-pub use prose_core_client::types::{
-    AccountSettings, Address, Availability, Emoji, MessageId, StanzaId, Url, UserActivity,
-    UserProfile,
+pub use prose_core_client::dtos::{
+    Address, Availability, Emoji, MessageId, StanzaId, Url, UserActivity, UserProfile,
 };
-pub use prose_core_client::{CachePolicy, ConnectionEvent};
+pub use prose_core_client::ConnectionEvent;
 pub use prose_xmpp::ConnectionError;
 
 pub use crate::types::{AccountBookmark, ClientEvent, Contact, DateTime, Group, JID};
@@ -101,9 +100,9 @@ impl UniffiCustomTypeConverter for DateTime {
 pub mod uniffi_types {
     pub use crate::{
         client::Client,
-        types::{parse_jid, AccountBookmark, DateTime, Message, MessagesPage, Reaction, JID},
-        AccountSettings, Availability, CachePolicy, ClientError, ConnectionError, Contact, Emoji,
-        FullJid, JidParseError, MessageId, PathBuf, StanzaId, Url, UserProfile,
+        types::{parse_jid, AccountBookmark, DateTime, Message, Reaction, JID},
+        Availability, ClientError, ConnectionError, Contact, Emoji, FullJid, JidParseError,
+        MessageId, PathBuf, StanzaId, Url, UserProfile,
     };
 }
 

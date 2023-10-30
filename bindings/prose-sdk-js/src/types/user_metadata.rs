@@ -4,14 +4,15 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use chrono::{FixedOffset, Utc};
-use prose_core_client::types::user_metadata;
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-pub struct UserMetadata(prose_core_client::types::UserMetadata);
+use prose_core_client::dtos;
 
 #[wasm_bindgen]
-pub struct LastActivity(user_metadata::LastActivity);
+pub struct UserMetadata(dtos::UserMetadata);
+
+#[wasm_bindgen]
+pub struct LastActivity(dtos::LastActivity);
 
 #[wasm_bindgen]
 pub struct DateTime(chrono::DateTime<FixedOffset>);
@@ -33,8 +34,8 @@ pub struct UserEncryption {
     end_to_end_method: Option<String>,
 }
 
-impl From<prose_core_client::types::UserMetadata> for UserMetadata {
-    fn from(value: prose_core_client::types::UserMetadata) -> Self {
+impl From<dtos::UserMetadata> for UserMetadata {
+    fn from(value: dtos::UserMetadata) -> Self {
         UserMetadata(value)
     }
 }

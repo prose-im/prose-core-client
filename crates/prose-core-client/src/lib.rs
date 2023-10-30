@@ -3,22 +3,35 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+pub use app::{dtos, services};
+pub use client::{Client, ClientDelegate};
+pub use client_event::{ClientEvent, ConnectionEvent, RoomEventType};
+pub use infra::platform_dependencies::open_store;
+#[cfg(target_arch = "wasm32")]
+pub use prose_store::prelude::IndexedDBDriver;
 #[cfg(not(target_arch = "wasm32"))]
-pub use avatar_cache::fs_avatar_cache::FsAvatarCache;
+pub use prose_store::prelude::SqliteDriver;
 #[cfg(not(target_arch = "wasm32"))]
-pub use bookmarks::{AccountBookmark, AccountBookmarksClient};
-pub use client::{
-    room, CachePolicy, Client, ClientBuilder, ClientDelegate, ClientEvent, ConnectionEvent,
-};
+pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient};
 
-pub mod avatar_cache;
-mod client;
-pub mod data_cache;
-pub mod types;
+#[cfg(target_arch = "wasm32")]
+pub use crate::infra::avatars::StoreAvatarCache;
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::infra::avatars::{FsAvatarCache, FsAvatarCacheError};
 
 #[cfg(feature = "test")]
 pub mod test;
 
-#[cfg(not(target_arch = "wasm32"))]
-mod bookmarks;
-mod util;
+pub mod app;
+mod client;
+mod client_builder;
+mod client_event;
+
+#[cfg(feature = "test")]
+pub mod domain;
+#[cfg(not(feature = "test"))]
+pub(crate) mod domain;
+
+pub mod infra;
+
+pub(crate) mod util;

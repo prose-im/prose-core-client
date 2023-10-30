@@ -11,22 +11,23 @@ use std::str::FromStr;
 use std::{env, fs};
 
 use anyhow::Result;
-use common::{enable_debug_logging, load_credentials, Level};
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, MultiSelect, Select};
+use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::convert::IntoAttributeValue;
-use prose_core_client::data_cache::indexed_db::PlatformCache;
-use prose_core_client::room::Occupant;
-use prose_core_client::types::{Address, Availability, ConnectedRoom, Contact, Message};
-use prose_core_client::{CachePolicy, ClientBuilder, ClientDelegate, ClientEvent, FsAvatarCache};
-use prose_xmpp::connector;
-use prose_xmpp::mods::muc;
-use prose_xmpp::stanza::ConferenceBookmark;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use url::Url;
 
-type Client = prose_core_client::Client<PlatformCache, FsAvatarCache>;
+use common::{enable_debug_logging, load_credentials, Level};
+use prose_core_client::dtos::{Address, Contact, Message, Occupant};
+use prose_core_client::infra::avatars::FsAvatarCache;
+use prose_core_client::services::RoomEnvelope;
+use prose_core_client::{
+    open_store, Client, ClientDelegate, ClientEvent, RoomEventType, SqliteDriver,
+};
+use prose_xmpp::connector;
+use prose_xmpp::mods::muc;
+use prose_xmpp::stanza::ConferenceBookmark;
 
 async fn configure_client() -> Result<(BareJid, Client)> {
     let cache_path = env::current_dir()?
@@ -37,24 +38,23 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     println!("Cached data can be found at {:?}", cache_path);
 
-    let data_cache = PlatformCache::open(&cache_path.join("db.sqlite3")).await?;
-    let image_cache = FsAvatarCache::new(&cache_path.join("Avatar"))?;
+    let store = open_store(SqliteDriver::new(&cache_path.join("db.sqlite3"))).await?;
 
-    let client = ClientBuilder::new()
+    let client = Client::builder()
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
-        .set_data_cache(data_cache)
-        .set_avatar_cache(image_cache)
+        .set_store(store)
+        .set_avatar_cache(FsAvatarCache::new(&cache_path.join("Avatar"))?)
         .set_delegate(Some(Box::new(Delegate {})))
         .build();
 
     let (jid, password) = load_credentials();
 
     println!("Connecting to server as {}…", jid);
-    client.connect(&jid, password, Availability::Away).await?;
+    client.connect(&jid.to_bare(), password).await?;
     println!("Connected.");
 
     println!("Starting room observation…");
-    client.start_observing_rooms().await?;
+    client.rooms.start_observing_rooms().await?;
     println!("Done.");
 
     Ok((jid.into_bare(), client))
@@ -197,8 +197,8 @@ impl Display for JidWithName {
     }
 }
 
-impl From<ConnectedRoom<PlatformCache, FsAvatarCache>> for JidWithName {
-    fn from(value: ConnectedRoom<PlatformCache, FsAvatarCache>) -> Self {
+impl From<RoomEnvelope> for JidWithName {
+    fn from(value: RoomEnvelope) -> Self {
         Self {
             jid: value.to_generic_room().jid().clone(),
             name: format!(
@@ -232,7 +232,7 @@ impl From<Contact> for JidWithName {
     }
 }
 
-struct ConnectedRoomEnvelope(ConnectedRoom<PlatformCache, FsAvatarCache>);
+struct ConnectedRoomEnvelope(RoomEnvelope);
 
 impl Display for ConnectedRoomEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -302,10 +302,7 @@ impl Display for BookmarkEnvelope {
 
 #[allow(dead_code)]
 async fn select_contact(client: &Client) -> Result<BareJid> {
-    let contacts = client
-        .load_contacts(CachePolicy::default())
-        .await?
-        .into_iter();
+    let contacts = client.contacts.load_contacts().await?.into_iter();
     Ok(
         select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
             .jid
@@ -315,25 +312,27 @@ async fn select_contact(client: &Client) -> Result<BareJid> {
 
 async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
     let contacts = client
-        .load_contacts(CachePolicy::default())
+        .contacts
+        .load_contacts()
         .await?
         .into_iter()
         .map(JidWithName::from);
     Ok(select_multiple_jids_from_list(contacts))
 }
 
-async fn select_room(client: &Client) -> Result<ConnectedRoom<PlatformCache, FsAvatarCache>> {
-    let mut rooms = client.connected_rooms();
+async fn select_room(client: &Client) -> Result<RoomEnvelope> {
+    let mut rooms = client.rooms.connected_rooms();
     rooms.sort_by(compare_room_envelopes);
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
 
-async fn select_muc_room(client: &Client) -> Result<ConnectedRoom<PlatformCache, FsAvatarCache>> {
+async fn select_muc_room(client: &Client) -> Result<RoomEnvelope> {
     let mut rooms = client
+        .rooms
         .connected_rooms()
         .into_iter()
         .filter(|room| {
-            if let &ConnectedRoom::DirectMessage(_) = room {
+            if let &RoomEnvelope::DirectMessage(_) = room {
                 return false;
             }
             true
@@ -375,10 +374,7 @@ fn select_multiple_jids_from_list(jids: impl IntoIterator<Item = JidWithName>) -
 
 async fn load_avatar(client: &Client, jid: &BareJid) -> Result<()> {
     println!("Loading avatar for {}…", jid);
-    match client
-        .load_avatar(jid.clone(), CachePolicy::default())
-        .await?
-    {
+    match client.user_data.load_avatar(jid).await? {
         Some(path) => println!("Saved avatar image to {:?}.", path),
         None => println!("{} has not set an avatar.", jid),
     }
@@ -400,16 +396,17 @@ async fn save_avatar(client: &Client) -> Result<()> {
         .interact_text()
         .unwrap();
 
-    client.save_avatar_from_url(Path::new(path.trim())).await?;
+    client
+        .account
+        .set_avatar_from_url(Path::new(path.trim()))
+        .await?;
 
     Ok(())
 }
 
 async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
     println!("Loading profile for {}…", jid);
-    let profile = client
-        .load_user_profile(jid.clone(), CachePolicy::default())
-        .await?;
+    let profile = client.user_data.load_user_profile(jid).await?;
 
     let Some(profile) = profile else {
         println!("No profile set for {}", jid);
@@ -448,7 +445,8 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
 async fn update_user_profile(client: &Client, jid: BareJid) -> Result<()> {
     println!("Loading current profile…");
     let mut profile = client
-        .load_user_profile(jid, CachePolicy::default())
+        .user_data
+        .load_user_profile(&jid)
         .await?
         .unwrap_or_default();
 
@@ -476,19 +474,19 @@ async fn update_user_profile(client: &Client, jid: BareJid) -> Result<()> {
         profile.address = Some(Address { locality, country })
     }
 
-    client.save_profile(profile).await
+    client.account.set_profile(&profile).await
 }
 
 async fn load_contacts(client: &Client) -> Result<()> {
-    let contacts = client.load_contacts(CachePolicy::default()).await?;
+    let contacts = client.contacts.load_contacts().await?;
 
     for contact in contacts {
         println!(
             r#"
     Jid: {}
     Name: {}
-    Availability: {}
-    Group: {}
+    Availability: {:?}
+    Group: {:?}
     "#,
             contact.jid, contact.name, contact.availability, contact.group,
         );
@@ -501,11 +499,11 @@ async fn load_messages(client: &Client) -> Result<()> {
     let room = select_room(client).await?;
 
     let messages = match room {
-        ConnectedRoom::DirectMessage(room) => room.load_latest_messages(None, true).await?,
-        ConnectedRoom::Group(room) => room.load_latest_messages(None, true).await?,
-        ConnectedRoom::PrivateChannel(room) => room.load_latest_messages(None, true).await?,
-        ConnectedRoom::PublicChannel(room) => room.load_latest_messages(None, true).await?,
-        ConnectedRoom::Generic(room) => room.load_latest_messages(None, true).await?,
+        RoomEnvelope::DirectMessage(room) => room.load_latest_messages().await?,
+        RoomEnvelope::Group(room) => room.load_latest_messages().await?,
+        RoomEnvelope::PrivateChannel(room) => room.load_latest_messages().await?,
+        RoomEnvelope::PublicChannel(room) => room.load_latest_messages().await?,
+        RoomEnvelope::Generic(room) => room.load_latest_messages().await?,
     };
 
     for message in messages {
@@ -554,17 +552,14 @@ fn format_opt<T: Display>(value: Option<T>) -> String {
     }
 }
 
-fn compare_room_envelopes(
-    lhs: &ConnectedRoom<PlatformCache, FsAvatarCache>,
-    rhs: &ConnectedRoom<PlatformCache, FsAvatarCache>,
-) -> Ordering {
-    fn sort_order(envelope: &ConnectedRoom<PlatformCache, FsAvatarCache>) -> i32 {
+fn compare_room_envelopes(lhs: &RoomEnvelope, rhs: &RoomEnvelope) -> Ordering {
+    fn sort_order(envelope: &RoomEnvelope) -> i32 {
         match envelope {
-            ConnectedRoom::DirectMessage(_) => 0,
-            ConnectedRoom::Group(_) => 1,
-            ConnectedRoom::PrivateChannel(_) => 2,
-            ConnectedRoom::PublicChannel(_) => 3,
-            ConnectedRoom::Generic(_) => 4,
+            RoomEnvelope::DirectMessage(_) => 0,
+            RoomEnvelope::Group(_) => 1,
+            RoomEnvelope::PrivateChannel(_) => 2,
+            RoomEnvelope::PublicChannel(_) => 3,
+            RoomEnvelope::Generic(_) => 4,
         }
     }
 
@@ -585,12 +580,8 @@ fn compare_room_envelopes(
 
 struct Delegate {}
 
-impl ClientDelegate<PlatformCache, FsAvatarCache> for Delegate {
-    fn handle_event(
-        &self,
-        client: prose_core_client::Client<PlatformCache, FsAvatarCache>,
-        event: ClientEvent<PlatformCache, FsAvatarCache>,
-    ) {
+impl ClientDelegate for Delegate {
+    fn handle_event(&self, client: Client, event: ClientEvent) {
         tokio::spawn(async move {
             match Self::_handle_event(client, event).await {
                 Ok(_) => (),
@@ -601,15 +592,17 @@ impl ClientDelegate<PlatformCache, FsAvatarCache> for Delegate {
 }
 
 impl Delegate {
-    async fn _handle_event(
-        _client: prose_core_client::Client<PlatformCache, FsAvatarCache>,
-        event: ClientEvent<PlatformCache, FsAvatarCache>,
-    ) -> Result<()> {
-        match event {
-            ClientEvent::MessagesAppended { room, message_ids } => {
+    async fn _handle_event(_client: Client, event: ClientEvent) -> Result<()> {
+        let ClientEvent::RoomChanged { room, r#type } = event else {
+            return Ok(());
+        };
+
+        match r#type {
+            RoomEventType::MessagesAppended { message_ids } => {
+                let message_id_refs = message_ids.iter().collect::<Vec<_>>();
                 let messages = room
                     .to_generic_room()
-                    .load_messages_with_ids(message_ids.as_slice())
+                    .load_messages_with_ids(message_id_refs.as_slice())
                     .await?;
                 for message in messages {
                     println!("Received message:\n{}", MessageEnvelope(message));
@@ -641,21 +634,21 @@ impl StringExt for String {
     }
 }
 
-impl ConnectedRoomExt for ConnectedRoom<PlatformCache, FsAvatarCache> {
+impl ConnectedRoomExt for RoomEnvelope {
     fn kind(&self) -> String {
         match self {
-            ConnectedRoom::DirectMessage(_) => "💬",
-            ConnectedRoom::Group(_) => "👥",
-            ConnectedRoom::PrivateChannel(_) => "🔒",
-            ConnectedRoom::PublicChannel(_) => "🔊",
-            ConnectedRoom::Generic(_) => "🌐",
+            RoomEnvelope::DirectMessage(_) => "💬",
+            RoomEnvelope::Group(_) => "👥",
+            RoomEnvelope::PrivateChannel(_) => "🔒",
+            RoomEnvelope::PublicChannel(_) => "🔊",
+            RoomEnvelope::Generic(_) => "🌐",
         }
         .to_string()
     }
 }
 
 async fn list_connected_rooms(client: &Client) -> Result<()> {
-    let mut rooms = client.connected_rooms();
+    let mut rooms = client.rooms.connected_rooms();
     rooms.sort_by(compare_room_envelopes);
 
     let rooms = rooms
@@ -735,7 +728,7 @@ async fn main() -> Result<()> {
                 update_user_profile(&client, jid.clone()).await?;
             }
             Selection::DeleteUserProfile => {
-                client.delete_profile().await?;
+                client.account.delete_profile().await?;
             }
             Selection::LoadUserAvatar => {
                 let jid = prompt_bare_jid(&jid);
@@ -749,7 +742,7 @@ async fn main() -> Result<()> {
             }
             Selection::AddContact => {
                 let jid = prompt_bare_jid(None);
-                client.add_contact(&jid).await?;
+                client.contacts.add_contact(&jid).await?;
             }
             Selection::SendMessage => {
                 send_message(&client).await?;
@@ -759,22 +752,32 @@ async fn main() -> Result<()> {
             }
             Selection::DeleteCachedData => {
                 println!("Cleaning cache…");
-                client.delete_cached_data().await?;
+                client.cache.clear_cache().await?;
             }
             Selection::CreateGroup => {
                 let contacts = select_multiple_contacts(&client).await?;
-                client.create_direct_message(contacts.as_slice()).await?;
+                client
+                    .rooms
+                    .create_room_for_direct_message(contacts.as_slice())
+                    .await?;
             }
             Selection::CreatePublicChannel => {
                 let room_name = prompt_string("Enter a name for the channel:");
-                client.create_public_channel(room_name).await?;
+                client
+                    .rooms
+                    .create_room_for_public_channel(room_name)
+                    .await?;
             }
             Selection::CreatePrivateChannel => {
                 let room_name = prompt_string("Enter a name for the channel:");
-                client.create_private_channel(room_name).await?;
+                client
+                    .rooms
+                    .create_room_for_private_channel(room_name)
+                    .await?;
             }
             Selection::LoadPublicRooms => {
                 let rooms = client
+                    .rooms
                     .load_public_rooms()
                     .await?
                     .into_iter()
@@ -785,6 +788,7 @@ async fn main() -> Result<()> {
             }
             Selection::DestroyPublicRoom => {
                 let rooms = client
+                    .rooms
                     .load_public_rooms()
                     .await?
                     .into_iter()
@@ -803,55 +807,57 @@ async fn main() -> Result<()> {
                     .interact()
                     .unwrap();
                 println!();
-                client.destroy_room(&rooms[selection].jid).await?;
+                client.rooms.destroy_room(&rooms[selection].jid).await?;
             }
             Selection::LoadBookmarks => {
-                let bookmarks = client
-                    .load_bookmarks_dbg()
-                    .await?
-                    .into_iter()
-                    .map(BookmarkEnvelope)
-                    .map(|b| b.to_string())
-                    .collect::<Vec<_>>();
-
-                println!("Bookmarks:\n{}", bookmarks.join("\n"));
+                todo!()
+                // let bookmarks = client
+                //     .load_bookmarks_dbg()
+                //     .await?
+                //     .into_iter()
+                //     .map(BookmarkEnvelope)
+                //     .map(|b| b.to_string())
+                //     .collect::<Vec<_>>();
+                //
+                // println!("Bookmarks:\n{}", bookmarks.join("\n"));
             }
             Selection::DeleteBookmark => {
-                let bookmarks = client
-                    .load_bookmarks_dbg()
-                    .await?
-                    .into_iter()
-                    .map(BookmarkEnvelope)
-                    .collect::<Vec<_>>();
-
-                if bookmarks.is_empty() {
-                    println!("No bookmarks to delete");
-                    continue;
-                }
-
-                let selection = Select::with_theme(&ColorfulTheme::default())
-                    .with_prompt("Select a bookmark to delete")
-                    .default(0)
-                    .items(bookmarks.as_slice())
-                    .interact()
-                    .unwrap();
-                println!();
-
-                let selected_bookmark = &bookmarks[selection].0;
-                client.delete_bookmark(&selected_bookmark.jid).await?;
-
-                if Confirm::new()
-                    .with_prompt(format!(
-                        "Do you want to delete room {} as well?",
-                        selected_bookmark.jid
-                    ))
-                    .interact()?
-                {
-                    println!("Deleting room…");
-                    client
-                        .destroy_room(&selected_bookmark.jid.to_bare())
-                        .await?;
-                }
+                todo!()
+                // let bookmarks = client
+                //     .load_bookmarks_dbg()
+                //     .await?
+                //     .into_iter()
+                //     .map(BookmarkEnvelope)
+                //     .collect::<Vec<_>>();
+                //
+                // if bookmarks.is_empty() {
+                //     println!("No bookmarks to delete");
+                //     continue;
+                // }
+                //
+                // let selection = Select::with_theme(&ColorfulTheme::default())
+                //     .with_prompt("Select a bookmark to delete")
+                //     .default(0)
+                //     .items(bookmarks.as_slice())
+                //     .interact()
+                //     .unwrap();
+                // println!();
+                //
+                // let selected_bookmark = &bookmarks[selection].0;
+                // client.delete_bookmark(&selected_bookmark.jid).await?;
+                //
+                // if Confirm::new()
+                //     .with_prompt(format!(
+                //         "Do you want to delete room {} as well?",
+                //         selected_bookmark.jid
+                //     ))
+                //     .interact()?
+                // {
+                //     println!("Deleting room…");
+                //     client
+                //         .destroy_room(&selected_bookmark.jid.to_bare())
+                //         .await?;
+                // }
             }
             Selection::ListConnectedRooms => {
                 list_connected_rooms(&client).await?;
@@ -861,11 +867,11 @@ async fn main() -> Result<()> {
                 let subject = prompt_string("Enter a subject:");
 
                 match room {
-                    ConnectedRoom::DirectMessage(_) => unreachable!(),
-                    ConnectedRoom::Group(room) => room.set_subject(Some(&subject)).await,
-                    ConnectedRoom::PrivateChannel(room) => room.set_subject(Some(&subject)).await,
-                    ConnectedRoom::PublicChannel(room) => room.set_subject(Some(&subject)).await,
-                    ConnectedRoom::Generic(room) => room.set_subject(Some(&subject)).await,
+                    RoomEnvelope::DirectMessage(_) => unreachable!(),
+                    RoomEnvelope::Group(room) => room.set_topic(Some(&subject)).await,
+                    RoomEnvelope::PrivateChannel(room) => room.set_topic(Some(&subject)).await,
+                    RoomEnvelope::PublicChannel(room) => room.set_topic(Some(&subject)).await,
+                    RoomEnvelope::Generic(room) => room.set_topic(Some(&subject)).await,
                 }?;
             }
             Selection::ListRoomOccupants => {

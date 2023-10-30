@@ -1,3 +1,4 @@
+use crate::repository::Entity;
 use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use serde::de::DeserializeOwned;
@@ -179,6 +180,14 @@ pub trait WritableCollection<'tx>: Collection<'tx> {
 
     /// Deletes all entries in the collection.
     fn truncate(&self) -> Result<(), Self::Error>;
+
+    async fn set_entity<E: Entity + Send + Sync>(&self, entity: &E) -> Result<(), Self::Error> {
+        self.set(entity.id(), entity).await
+    }
+
+    fn put_entity<E: Entity>(&self, entity: &E) -> Result<(), Self::Error> {
+        self.put(entity.id(), entity)
+    }
 }
 
 pub trait ReadWriteTransaction<'tx>: ReadTransaction<'tx> + WriteTransaction<'tx> {}

@@ -9,14 +9,15 @@ publish = false
 anyhow = { workspace = true }
 chrono = { workspace = true }
 jid = { workspace = true }
+parking_lot = { workspace = true }
+prose-core-client = { path = "../../crates/prose-core-client", features = ["test"] }
+prose-store = { path = "../../crates/prose-store" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 tempfile = { workspace = true }
 xmpp-parsers = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-prose-core-client = { path = "../../crates/prose-core-client", features = ["test"] }
 tokio = { workspace = true, features = ["macros", "rt"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-prose-core-client = { path = "../../crates/prose-core-client" }
 wasm-bindgen-test = "0.3.33"

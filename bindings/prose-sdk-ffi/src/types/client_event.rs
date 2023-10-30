@@ -4,9 +4,8 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::uniffi_types::JID;
-use prose_core_client::data_cache::indexed_db::PlatformCache;
-use prose_core_client::types::MessageId;
-use prose_core_client::{ConnectionEvent, FsAvatarCache};
+use prose_core_client::dtos::MessageId;
+use prose_core_client::ConnectionEvent;
 
 pub enum ClientEvent {
     /// A user in `conversation` started or stopped typing.
@@ -40,8 +39,8 @@ pub enum ClientEvent {
     },
 }
 
-impl From<prose_core_client::ClientEvent<PlatformCache, FsAvatarCache>> for ClientEvent {
-    fn from(_value: prose_core_client::ClientEvent<PlatformCache, FsAvatarCache>) -> Self {
+impl From<prose_core_client::ClientEvent> for ClientEvent {
+    fn from(_value: prose_core_client::ClientEvent) -> Self {
         todo!("FIXME")
         // match value {
         //     ProseClientEvent::ComposingUsersChanged { room } => {

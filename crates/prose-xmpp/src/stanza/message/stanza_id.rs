@@ -8,8 +8,9 @@ use std::str::FromStr;
 use jid::Jid;
 use minidom::Element;
 
+use prose_utils::id_string;
+
 use crate::ns;
-use crate::util::id_string_macro::id_string;
 use crate::util::ElementExt;
 
 // XEP-0359: Unique and Stable Stanza ID

@@ -18,8 +18,12 @@ base64 = { workspace = true }
 indexmap = "2.0.0"
 jid = { workspace = true, features = ["serde"] }
 minidom = { workspace = true }
+nanoid = "0.4"
 parking_lot = { workspace = true }
+paste = "1.0"
+prose-proc-macros = { path = "../prose-proc-macros" }
 prose-store = { path = "../prose-store", features = ["chrono", "jid"] }
+prose-utils = { path = "../prose-utils" }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 prose-xmpp = { path = "../prose-xmpp" }
 serde = { workspace = true, features = ["derive"] }
@@ -31,6 +35,8 @@ tracing = { workspace = true }
 url = { workspace = true, features = ["serde"] }
 uuid = { workspace = true }
 xmpp-parsers = { workspace = true }
+mockall = { version = "0.11", optional = true }
+derivative = { version = "2.2", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { workspace = true, features = ["serde"] }
@@ -39,12 +45,9 @@ image = {version = "0.24.5" }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 # Test
-auto_impl = { version = "1.1.0", optional = true }
-insta = { workspace = true, features = ["json"], optional = true }
 tokio = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-auto_impl = { version = "1.1.0" }
 chrono = { workspace = true, features = ["serde"] }
 
 [build-dependencies]
@@ -52,5 +55,5 @@ uniffi = { workspace = true, features = ["build"] }
 
 [features]
 default = []
-test = ["prose-xmpp/test", "dep:auto_impl", "dep:tokio", "tokio/macros", "dep:auto_impl", "dep:insta"]
+test = ["prose-xmpp/test", "dep:tokio", "tokio/macros", "dep:mockall", "dep:derivative"]
 debug = []
