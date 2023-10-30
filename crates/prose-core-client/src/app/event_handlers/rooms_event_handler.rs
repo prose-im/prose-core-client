@@ -6,7 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
@@ -86,14 +86,20 @@ impl XMPPEventHandler for RoomsEventHandler {
 impl RoomsEventHandler {
     async fn presence_did_change(&self, presence: Presence) -> Result<()> {
         let Some(to) = presence.to else {
-            error!("Received presence from unknown user.");
+            error!(
+                "Received presence from unknown user. {}",
+                String::from(&minidom::Element::from(presence))
+            );
             return Ok(());
         };
 
         let to = to.into_bare();
 
         let Some(room) = self.connected_rooms_repo.get(&to) else {
-            error!("Received presence from user for which we do not have a room.");
+            warn!(
+                "Received presence from user ({}) for which we do not have a room.",
+                to
+            );
             return Ok(());
         };
 
