@@ -6,4 +6,5 @@
 pub(crate) mod availability;
 pub(crate) mod caps;
 pub(crate) mod presence;
+pub(crate) mod stanza_error;
 pub(crate) mod user_activity;

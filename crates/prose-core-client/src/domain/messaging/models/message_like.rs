@@ -13,6 +13,8 @@ use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{mam, stanza_id, Forwarded, Message};
 
+use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
+
 use super::{MessageId, StanzaId, StanzaParseError};
 
 /// A type that describes permanent messages, i.e. messages that need to be replayed to restore
@@ -214,7 +216,12 @@ impl TryFrom<&Message> for TargetedPayload {
 
     fn try_from(message: &Message) -> Result<Self> {
         if let Some(error) = &message.error {
-            return Err(anyhow::format_err!("{:?}", error));
+            return Ok(TargetedPayload {
+                target: None,
+                payload: Payload::Message {
+                    body: format!("Error: {}", error.to_string()),
+                },
+            });
         }
 
         if let Some(reactions) = &message.reactions {

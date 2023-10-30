@@ -5,5 +5,5 @@
 
 pub use xmpp_client::{XMPPClient, XMPPClientBuilder};
 
-mod type_conversions;
+pub(crate) mod type_conversions;
 mod xmpp_client;
