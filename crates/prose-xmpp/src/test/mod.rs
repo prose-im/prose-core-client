@@ -8,6 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 #[cfg(feature = "test")]
 pub use connector::{Connection, Connector};
+pub use constant_id_provider::ConstantIDProvider;
 pub use incrementing_id_provider::IncrementingIDProvider;
 use jid::{BareJid, DomainPart, FullJid, NodePart};
 use parking_lot::RwLock;
@@ -15,6 +16,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 mod connector;
+mod constant_id_provider;
 mod incrementing_id_provider;
 
 pub trait StrExt {
