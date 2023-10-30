@@ -24,7 +24,7 @@ use crate::domain::user_info::models::{
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
-pub(crate) struct UserStateEventHandler {
+pub struct UserStateEventHandler {
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
     #[inject]

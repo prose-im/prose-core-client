@@ -17,7 +17,7 @@ use crate::domain::general::services::SubscriptionResponse;
 
 /// Handles various server requests.
 #[derive(InjectDependencies)]
-pub(crate) struct RequestsEventHandler {
+pub struct RequestsEventHandler {
     #[inject]
     request_handling_service: DynRequestHandlingService,
     #[inject]

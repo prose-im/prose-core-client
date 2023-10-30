@@ -21,7 +21,7 @@ use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
 
 #[derive(InjectDependencies)]
-pub(crate) struct RoomsEventHandler {
+pub struct RoomsEventHandler {
     #[inject]
     connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]

@@ -12,6 +12,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 
+#[derive(Debug, PartialEq)]
 pub enum SubscriptionResponse {
     Approve,
     Deny,

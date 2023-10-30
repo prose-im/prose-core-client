@@ -25,7 +25,7 @@ use crate::domain::messaging::models::{MessageLike, TimestampedMessage};
 use crate::{ClientEvent, RoomEventType};
 
 #[derive(InjectDependencies)]
-pub(crate) struct MessagesEventHandler {
+pub struct MessagesEventHandler {
     #[inject]
     connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]

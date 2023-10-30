@@ -7,4 +7,8 @@ pub mod dtos;
 pub mod services;
 
 pub(crate) mod deps;
+
+#[cfg(feature = "test")]
+pub mod event_handlers;
+#[cfg(not(feature = "test"))]
 pub(crate) mod event_handlers;

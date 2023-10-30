@@ -5,7 +5,7 @@
 
 pub type Namespace = &'static str;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Capabilities {
     pub node: String,
     pub identity: Identity,
@@ -13,7 +13,7 @@ pub struct Capabilities {
     pub ver_string: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Identity {
     pub category: String,
     pub kind: String,
@@ -21,7 +21,7 @@ pub struct Identity {
     pub lang: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Feature {
     Name(Namespace),
     Notify(Namespace),

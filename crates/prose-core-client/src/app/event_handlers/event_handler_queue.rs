@@ -9,7 +9,7 @@ use tracing::error;
 
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 
-pub(crate) struct XMPPEventHandlerQueue {
+pub struct XMPPEventHandlerQueue {
     handlers: OnceLock<Vec<Box<dyn XMPPEventHandler>>>,
 }
 

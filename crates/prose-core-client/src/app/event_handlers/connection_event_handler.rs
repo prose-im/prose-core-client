@@ -17,7 +17,7 @@ use crate::client_event::ConnectionEvent;
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
-pub(crate) struct ConnectionEventHandler {
+pub struct ConnectionEventHandler {
     #[inject]
     ctx: DynAppContext,
     #[inject]
