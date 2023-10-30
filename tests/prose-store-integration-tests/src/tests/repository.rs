@@ -199,6 +199,7 @@ async fn test_update_entry_in_async_trait_compiles() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 trait RepoWrapperTrait {
     async fn update_company(&self, company: Company) -> Result<()>;
@@ -231,6 +232,7 @@ impl RepoWrapper2 {
 // This code doesn't compile due to a 'higher-ranked lifetime error'.
 // See: https://github.com/rust-lang/rust/issues/102211
 
+// #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 // #[async_trait]
 // impl RepoWrapperTrait for RepoWrapper1 {
 //     async fn update_company(&self, company: Company) -> Result<()> {
@@ -243,6 +245,7 @@ impl RepoWrapper2 {
 //     }
 // }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RepoWrapperTrait for RepoWrapper1 {
     async fn update_company(&self, company: Company) -> Result<()> {
@@ -264,6 +267,7 @@ impl RepoWrapperTrait for RepoWrapper1 {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RepoWrapperTrait for RepoWrapper2 {
     // This is a slightly more elegant workaround for the code above which doesn't compile.
