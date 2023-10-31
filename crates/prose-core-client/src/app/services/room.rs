@@ -13,13 +13,11 @@ use chrono::Duration;
 use jid::BareJid;
 use tracing::{debug, info};
 
-use prose_xmpp::stanza::message::Emoji;
-
 use crate::app::deps::{
     DynDraftsRepository, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
     DynRoomParticipationService, DynRoomTopicService, DynTimeProvider,
 };
-use crate::domain::messaging::models::{Message, MessageId, MessageLike};
+use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::RoomInternals;
 
 pub struct Room<Kind> {

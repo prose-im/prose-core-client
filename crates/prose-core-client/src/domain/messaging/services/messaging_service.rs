@@ -8,9 +8,8 @@ use async_trait::async_trait;
 use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
-use prose_xmpp::stanza::message::Emoji;
 
-use crate::domain::messaging::models::MessageId;
+use crate::domain::messaging::models::{Emoji, MessageId};
 use crate::domain::shared::models::RoomType;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

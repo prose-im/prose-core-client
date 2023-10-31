@@ -5,9 +5,8 @@
 
 use std::path::PathBuf;
 
-use prose_core_client::dtos::{Availability, MessageId, UserProfile};
+use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
 use prose_core_client::{Client as ProseClient, ClientDelegate as ProseClientDelegate};
-use prose_xmpp::stanza::message::Emoji;
 use prose_xmpp::ConnectionError;
 
 use crate::types::{ClientEvent, Message, JID};

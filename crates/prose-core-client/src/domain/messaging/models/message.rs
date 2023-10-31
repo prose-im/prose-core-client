@@ -9,12 +9,12 @@ use jid::BareJid;
 use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
-pub use prose_xmpp::stanza::message::Emoji;
 
 use super::{MessageLike, MessageLikePayload};
 
 id_string!(MessageId);
 id_string!(StanzaId);
+id_string!(Emoji);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Reaction {

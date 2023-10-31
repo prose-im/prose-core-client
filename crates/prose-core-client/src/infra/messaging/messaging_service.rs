@@ -10,9 +10,8 @@ use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods;
-use prose_xmpp::stanza::message::Emoji;
 
-use crate::domain::messaging::models::MessageId;
+use crate::domain::messaging::models::{Emoji, MessageId};
 use crate::domain::messaging::services::MessagingService;
 use crate::domain::shared::models::RoomType;
 use crate::infra::xmpp::XMPPClient;
@@ -77,7 +76,7 @@ impl MessagingService for XMPPClient {
         chat.react_to_message(
             message_id.as_ref().into(),
             room_jid.clone(),
-            emoji.iter().cloned(),
+            emoji.iter().map(|e| e.as_ref().into()),
             &room_type.message_type(),
         )?;
         Ok(())
