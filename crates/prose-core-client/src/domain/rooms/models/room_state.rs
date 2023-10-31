@@ -7,9 +7,8 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
+use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::muc::user::Affiliation;
-
-use prose_xmpp::stanza::message::ChatState;
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct RoomState {
@@ -20,7 +19,7 @@ pub struct RoomState {
     pub occupants: HashMap<Jid, Occupant>,
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Occupant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.
     pub jid: Option<BareJid>,
@@ -28,6 +27,18 @@ pub struct Occupant {
     pub occupant_id: Option<String>,
     pub chat_state: ChatState,
     pub chat_state_updated: DateTime<Utc>,
+}
+
+impl Default for Occupant {
+    fn default() -> Self {
+        Self {
+            jid: None,
+            affiliation: Default::default(),
+            occupant_id: None,
+            chat_state: ChatState::Gone,
+            chat_state_updated: Default::default(),
+        }
+    }
 }
 
 impl RoomState {

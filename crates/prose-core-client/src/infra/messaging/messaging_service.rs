@@ -6,10 +6,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
+use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods;
-use prose_xmpp::stanza::message::{ChatState, Emoji};
+use prose_xmpp::stanza::message::Emoji;
 
 use crate::domain::messaging::models::MessageId;
 use crate::domain::messaging::services::MessagingService;

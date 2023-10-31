@@ -7,6 +7,7 @@ use std::str::FromStr;
 
 use jid::Jid;
 use minidom::Element;
+use xmpp_parsers::message::MessagePayload;
 
 use prose_utils::id_string;
 
@@ -97,3 +98,5 @@ impl From<ReferencedStanza> for Element {
             .build()
     }
 }
+
+impl MessagePayload for StanzaId {}

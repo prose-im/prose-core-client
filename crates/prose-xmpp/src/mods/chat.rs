@@ -6,6 +6,7 @@
 use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::carbons;
+use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::iq::Iq;
 
 use crate::client::ModuleContext;
@@ -15,9 +16,7 @@ use crate::stanza::message;
 use crate::stanza::message::chat_marker::Received;
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::retract::Retract;
-use crate::stanza::message::{
-    ChatState, Emoji, Fallback, Forwarded, Message, MessageType, Reactions,
-};
+use crate::stanza::message::{Emoji, Fallback, Forwarded, Message, MessageType, Reactions};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Carbon {
@@ -44,31 +43,31 @@ impl Module for Chat {
 
     fn handle_message_stanza(&self, stanza: &Message) -> Result<()> {
         // Ignore MAM messages.
-        if stanza.archived_message.is_some() {
+        if stanza.is_mam_message() {
             return Ok(());
         }
 
-        if let Some(received_carbon) = &stanza.received_carbon {
+        if let Some(received_carbon) = stanza.received_carbon() {
             // Ignore messages from invalid senders.
             // CVE-2017-5589
             // https://rt-solutions.de/en/cve-2017-5589_xmpp_carbons/
             if stanza.from == Some(Jid::Bare(self.ctx.bare_jid())) {
                 self.ctx
                     .schedule_event(ClientEvent::Chat(Event::Carbon(Carbon::Received(
-                        received_carbon.forwarded.clone(),
+                        received_carbon.forwarded,
                     ))));
             }
             return Ok(());
         }
 
-        if let Some(sent_carbon) = &stanza.sent_carbon {
+        if let Some(sent_carbon) = stanza.sent_carbon() {
             // Ignore messages from invalid senders.
             // CVE-2017-5589
             // https://rt-solutions.de/en/cve-2017-5589_xmpp_carbons/
             if stanza.from == Some(self.ctx.bare_jid().into()) {
                 self.ctx
                     .schedule_event(ClientEvent::Chat(Event::Carbon(Carbon::Sent(
-                        sent_carbon.forwarded.clone(),
+                        sent_carbon.forwarded,
                     ))));
             }
             return Ok(());
@@ -89,15 +88,14 @@ impl Chat {
         message_type: &MessageType,
         chat_state: Option<ChatState>,
     ) -> Result<()> {
-        let mut stanza = Message::new()
+        let stanza = Message::new()
             .set_type(message_type.clone())
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
             .set_body(body)
+            .set_chat_state(chat_state)
             .set_markable();
-
-        stanza.chat_state = chat_state;
 
         self.send_message_stanza(stanza)
     }
@@ -129,7 +127,7 @@ impl Chat {
             .set_type(message_type.clone())
             .set_from(self.ctx.full_jid())
             .set_to(to)
-            .set_chat_state(chat_state);
+            .set_chat_state(Some(chat_state));
         self.ctx.send_stanza(stanza)
     }
 
@@ -146,11 +144,11 @@ impl Chat {
             .set_id(self.ctx.generate_id().into())
             .set_from(self.ctx.full_jid())
             .set_to(to)
-            .set_store(true)
             .set_message_reactions(Reactions {
                 id,
                 reactions: reactions.into_iter().collect(),
-            });
+            })
+            .set_store(true);
         self.send_message_stanza(stanza)
     }
 

@@ -56,11 +56,11 @@ async fn handle_event(client: Client, event: Event) -> Result<()> {
         return Ok(());
     };
 
-    let Some(from) = message.from else {
+    let Some(from) = message.from.clone() else {
         return Ok(());
     };
 
-    let Some(body) = message.body else {
+    let Some(body) = message.body() else {
         return Ok(());
     };
 

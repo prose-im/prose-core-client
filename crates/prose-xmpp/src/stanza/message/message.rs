@@ -3,11 +3,14 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::Jid;
+use std::ops::{Deref, DerefMut};
+
+use anyhow::Result;
 use minidom::Element;
-use strum_macros::{Display, EnumString};
+use tracing::error;
+use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::delay::Delay;
-use xmpp_parsers::message::{Body, MessageType, Subject};
+use xmpp_parsers::message::{Message as RawMessage, MessagePayload};
 use xmpp_parsers::message_correct::Replace;
 use xmpp_parsers::stanza_error::StanzaError;
 
@@ -15,147 +18,153 @@ use prose_utils::id_string;
 
 use crate::ns;
 use crate::stanza::message::fasten::ApplyTo;
-use crate::stanza::message::stanza_id::{OriginId, StanzaId};
-use crate::stanza::message::{carbons, Fallback, Reactions};
+use crate::stanza::message::stanza_id::StanzaId;
+use crate::stanza::message::{carbons, Reactions};
 use crate::stanza::message::{chat_marker, mam};
 use crate::stanza::muc;
 
 id_string!(Id);
 
-// We're redeclaring ChatState here since this makes it easier to work with when saving it to the
-// SQL db.
-#[derive(
-    Debug, PartialEq, Display, EnumString, Clone, serde::Serialize, serde::Deserialize, Default,
-)]
-#[strum(serialize_all = "lowercase")]
-pub enum ChatState {
-    /// User is actively participating in the chat session.
-    Active,
-    /// User has not been actively participating in the chat session.
-    Composing,
-    /// User has effectively ended their participation in the chat session.
-    #[default]
-    Gone,
-    /// User is composing a message.
-    Inactive,
-    /// User had been composing but now has stopped.
-    Paused,
-}
+#[derive(Debug, PartialEq, Clone)]
+pub struct Message(RawMessage);
 
-#[derive(Debug, PartialEq, Clone, Default)]
-pub struct Message {
-    pub from: Option<Jid>,
-    pub to: Option<Jid>,
-    pub id: Option<Id>,
-    pub stanza_id: Option<StanzaId>,
-    pub origin_id: Option<OriginId>,
-    pub r#type: MessageType,
-    pub body: Option<String>,
-    pub subject: Option<String>,
-    pub chat_state: Option<ChatState>,
-    pub replace: Option<Id>,
-    pub reactions: Option<Reactions>,
-    pub fastening: Option<ApplyTo>,
-    pub fallback: Option<Fallback>,
-    pub delay: Option<Delay>,
-    pub markable: bool,
-    pub displayed_marker: Option<chat_marker::Displayed>,
-    pub received_marker: Option<chat_marker::Received>,
-    pub acknowledged_marker: Option<chat_marker::Acknowledged>,
-    pub archived_message: Option<mam::ArchivedMessage>,
-    pub sent_carbon: Option<carbons::Sent>,
-    pub received_carbon: Option<carbons::Received>,
-    pub store: Option<bool>,
-    pub direct_invite: Option<muc::DirectInvite>,
-    pub mediated_invite: Option<muc::MediatedInvite>,
-    pub error: Option<StanzaError>,
+impl Default for Message {
+    fn default() -> Self {
+        Self(RawMessage {
+            from: None,
+            to: None,
+            id: None,
+            type_: Default::default(),
+            bodies: Default::default(),
+            subjects: Default::default(),
+            thread: None,
+            payloads: vec![],
+        })
+    }
 }
 
 impl Message {
     pub fn new() -> Self {
-        Message::default()
+        Self::default()
     }
 }
 
-impl TryFrom<xmpp_parsers::message::Message> for Message {
-    type Error = anyhow::Error;
+impl Deref for Message {
+    type Target = RawMessage;
 
-    fn try_from(root: xmpp_parsers::message::Message) -> Result<Self, Self::Error> {
-        let mut message = Message::new();
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
-        message.body = root
-            .get_best_body(vec![])
-            .map(|(_, body)| body.0.to_string());
+impl DerefMut for Message {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
-        message.subject = root
-            .get_best_subject(vec![])
-            .map(|(_, subject)| subject.0.to_string());
+impl Message {
+    pub fn body(&self) -> Option<&str> {
+        self.get_best_body(vec![])
+            .as_ref()
+            .map(|(_, body)| body.0.as_str())
+    }
 
-        for payload in root.payloads.into_iter() {
-            match payload {
-                _ if payload.is("stanza-id", ns::SID) => {
-                    message.stanza_id = Some(StanzaId::try_from(payload)?)
-                }
-                _ if payload.is("origin-id", ns::SID) => {
-                    message.origin_id = Some(OriginId::try_from(payload)?)
-                }
-                _ if payload.has_ns(ns::CHATSTATES) => {
-                    message.chat_state = Some(payload.name().parse()?)
-                }
-                _ if payload.is("replace", ns::MESSAGE_CORRECT) => {
-                    message.replace = Some(Replace::try_from(payload)?.id.into())
-                }
-                _ if payload.is("reactions", ns::REACTIONS) => {
-                    message.reactions = Some(Reactions::try_from(payload)?);
-                }
-                _ if payload.is("apply-to", ns::FASTEN) => {
-                    message.fastening = Some(ApplyTo::try_from(payload)?)
-                }
-                _ if payload.is("fallback", ns::FALLBACK) => {
-                    message.fallback = Some(Fallback::try_from(payload)?)
-                }
-                _ if payload.is("delay", ns::DELAY) => {
-                    message.delay = Some(Delay::try_from(payload)?)
-                }
-                _ if payload.is("markable", ns::CHAT_MARKERS) => message.markable = true,
-                _ if payload.is("received", ns::CHAT_MARKERS) => {
-                    message.received_marker = Some(chat_marker::Received::try_from(payload)?)
-                }
-                _ if payload.is("displayed", ns::CHAT_MARKERS) => {
-                    message.displayed_marker = Some(chat_marker::Displayed::try_from(payload)?)
-                }
-                _ if payload.is("acknowledged", ns::CHAT_MARKERS) => {
-                    message.acknowledged_marker =
-                        Some(chat_marker::Acknowledged::try_from(payload)?)
-                }
-                _ if payload.is("result", ns::MAM) => {
-                    message.archived_message = Some(mam::ArchivedMessage::try_from(payload)?)
-                }
-                _ if payload.is("sent", ns::CARBONS) => {
-                    message.sent_carbon = Some(carbons::Sent::try_from(payload)?)
-                }
-                _ if payload.is("received", ns::CARBONS) => {
-                    message.received_carbon = Some(carbons::Received::try_from(payload)?)
-                }
-                _ if payload.is("x", ns::DIRECT_MUC_INVITATIONS) => {
-                    message.direct_invite = Some(muc::DirectInvite::try_from(payload)?)
-                }
-                _ if payload.is("x", ns::MUC_USER) => {
-                    message.mediated_invite = Some(muc::MediatedInvite::try_from(payload)?)
-                }
-                _ if payload.is("error", ns::DEFAULT_NS) => {
-                    message.error = Some(StanzaError::try_from(payload)?)
-                }
-                _ => (),
-            }
-        }
+    pub fn subject(&self) -> Option<&str> {
+        self.get_best_subject(vec![])
+            .as_ref()
+            .map(|(_, subject)| subject.0.as_str())
+    }
 
-        message.from = root.from;
-        message.to = root.to;
-        message.id = root.id.map(Into::into);
-        message.r#type = root.type_;
+    pub fn direct_invite(&self) -> Option<muc::DirectInvite> {
+        self.typed_payload("x", ns::DIRECT_MUC_INVITATIONS)
+    }
 
-        Ok(message)
+    pub fn mediated_invite(&self) -> Option<muc::MediatedInvite> {
+        self.typed_payload("x", ns::MUC_USER)
+    }
+
+    pub fn archived_message(&self) -> Option<mam::ArchivedMessage> {
+        self.typed_payload("result", ns::MAM)
+    }
+
+    pub fn received_carbon(&self) -> Option<carbons::Received> {
+        self.typed_payload("received", ns::CARBONS)
+    }
+
+    pub fn sent_carbon(&self) -> Option<carbons::Sent> {
+        self.typed_payload("sent", ns::CARBONS)
+    }
+
+    pub fn is_mam_message(&self) -> bool {
+        self.payloads
+            .iter()
+            .find(|p| p.is("result", ns::MAM))
+            .is_some()
+    }
+
+    pub fn chat_state(&self) -> Option<ChatState> {
+        self.typed_payload_with_predicate(|p| p.has_ns(ns::CHATSTATES))
+    }
+
+    pub fn stanza_id(&self) -> Option<StanzaId> {
+        self.typed_payload("stanza-id", ns::SID)
+    }
+
+    pub fn delay(&self) -> Option<Delay> {
+        self.typed_payload("delay", ns::DELAY)
+    }
+
+    pub fn error(&self) -> Option<StanzaError> {
+        self.typed_payload("error", ns::DEFAULT_NS)
+    }
+
+    pub fn reactions(&self) -> Option<Reactions> {
+        self.typed_payload("reactions", ns::REACTIONS)
+    }
+
+    pub fn fastening(&self) -> Option<ApplyTo> {
+        self.typed_payload("apply-to", ns::FASTEN)
+    }
+
+    pub fn replace(&self) -> Option<Id> {
+        self.typed_payload::<Replace>("replace", ns::MESSAGE_CORRECT)
+            .map(|r| r.id.into())
+    }
+
+    pub fn received_marker(&self) -> Option<chat_marker::Received> {
+        self.typed_payload("received", ns::CHAT_MARKERS)
+    }
+
+    pub fn displayed_marker(&self) -> Option<chat_marker::Displayed> {
+        self.typed_payload("displayed", ns::CHAT_MARKERS)
+    }
+}
+
+impl Message {
+    fn typed_payload<P: MessagePayload>(&self, name: &str, ns: &str) -> Option<P> {
+        self.typed_payload_with_predicate(|p| p.is(name, ns))
+    }
+
+    fn typed_payload_with_predicate<P: MessagePayload, F>(&self, predicate: F) -> Option<P>
+    where
+        F: FnMut(&Element) -> bool,
+    {
+        let mut predicate = predicate;
+        let Some(payload) = self.payloads.iter().find(|p| predicate(*p)) else {
+            return None;
+        };
+        let Ok(payload) = P::try_from(payload.clone()) else {
+            error!("Failed to parse message payload {}.", String::from(payload));
+            return None;
+        };
+        Some(payload)
+    }
+}
+
+impl From<Message> for Element {
+    fn from(value: Message) -> Self {
+        value.0.into()
     }
 }
 
@@ -163,114 +172,41 @@ impl TryFrom<Element> for Message {
     type Error = anyhow::Error;
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
-        Message::try_from(xmpp_parsers::message::Message::try_from(value)?)
+        Ok(Message(xmpp_parsers::message::Message::try_from(value)?))
     }
 }
 
-impl From<Message> for Element {
+impl From<Message> for RawMessage {
     fn from(value: Message) -> Self {
-        xmpp_parsers::message::Message::from(value).into()
+        value.0
     }
 }
 
-impl From<Message> for xmpp_parsers::message::Message {
-    fn from(value: Message) -> Self {
-        let mut message = xmpp_parsers::message::Message::new(None);
-        message.to = value.to;
-        message.from = value.from;
-        message.id = value.id.map(|id| id.into_inner());
-        message.type_ = value.r#type;
-
-        if let Some(body) = value.body {
-            message.bodies.insert("".into(), Body(body));
-        }
-        if let Some(subject) = value.subject {
-            message.subjects.insert("".into(), Subject(subject));
-        }
-        if let Some(stanza_id) = value.stanza_id {
-            message.payloads.push(stanza_id.into())
-        }
-        if let Some(origin_id) = value.origin_id {
-            message.payloads.push(origin_id.into())
-        }
-        if let Some(chat_state) = value.chat_state {
-            message
-                .payloads
-                .push(Element::builder(chat_state.to_string(), ns::CHATSTATES).build());
-        }
-        if let Some(replace) = value.replace {
-            message.payloads.push(
-                Replace {
-                    id: replace.into_inner(),
-                }
-                .into(),
-            );
-        }
-        if let Some(reactions) = value.reactions {
-            message.payloads.push(reactions.into());
-        }
-        if let Some(fastening) = value.fastening {
-            message.payloads.push(fastening.into());
-        }
-        if let Some(fallback) = value.fallback {
-            message.payloads.push(fallback.into());
-        }
-        if let Some(delay) = value.delay {
-            message.payloads.push(delay.into());
-        }
-        if value.markable {
-            message.payloads.push(chat_marker::Markable {}.into());
-        }
-        if let Some(received) = value.received_marker {
-            message.payloads.push(received.into());
-        }
-        if let Some(displayed) = value.displayed_marker {
-            message.payloads.push(displayed.into());
-        }
-        if let Some(acknowledged) = value.acknowledged_marker {
-            message.payloads.push(acknowledged.into());
-        }
-        if let Some(archived_message) = value.archived_message {
-            message.payloads.push(archived_message.into());
-        }
-        if let Some(received_carbon) = value.received_carbon {
-            message.payloads.push(received_carbon.into());
-        }
-        if let Some(sent_carbon) = value.sent_carbon {
-            message.payloads.push(sent_carbon.into());
-        }
-        if let Some(store) = value.store {
-            message.payloads.push(
-                Element::builder(if store { "store" } else { "no-store" }, ns::HINTS).build(),
-            );
-        }
-        if let Some(direct_invite) = value.direct_invite {
-            message.payloads.push(direct_invite.into())
-        }
-        if let Some(mediated_invite) = value.mediated_invite {
-            message.payloads.push(mediated_invite.into())
-        }
-        message
+impl From<RawMessage> for Message {
+    fn from(value: RawMessage) -> Self {
+        Self(value)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use anyhow::Result;
+    use xmpp_parsers::mam::QueryId;
+    use xmpp_parsers::message::{Message as RawMessage, Subject};
+
     use crate::stanza::message::mam::ArchivedMessage;
     use crate::stanza::message::Forwarded;
     use crate::stanza::muc::{DirectInvite, Invite, MediatedInvite};
     use crate::{bare, jid};
-    use anyhow::Result;
-    use xmpp_parsers::mam::QueryId;
-    use xmpp_parsers::message::Message as RawMessage;
+
+    use super::*;
 
     #[test]
     fn test_body() -> Result<()> {
-        let message = Message::try_from(
+        let message = Message::from(
             RawMessage::chat(jid!("recv@prose.org")).with_body("en".into(), "Hello World".into()),
-        )?;
-        assert_eq!(message.body, Some("Hello World".to_string()));
+        );
+        assert_eq!(message.body(), Some("Hello World"));
         Ok(())
     }
 
@@ -280,8 +216,8 @@ mod tests {
         raw.subjects
             .insert("en".into(), Subject("Important Subject".to_string()));
 
-        let message = Message::try_from(raw)?;
-        assert_eq!(message.subject, Some("Important Subject".to_string()));
+        let message = Message::from(raw);
+        assert_eq!(message.subject(), Some("Important Subject"));
         Ok(())
     }
 
@@ -295,10 +231,9 @@ mod tests {
             thread: None,
         };
 
-        let message = Message::try_from(
-            RawMessage::chat(jid!("recv@prose.org")).with_payload(invite.clone()),
-        )?;
-        assert_eq!(message.direct_invite, Some(invite));
+        let message =
+            Message::from(RawMessage::chat(jid!("recv@prose.org")).with_payload(invite.clone()));
+        assert_eq!(message.direct_invite(), Some(invite));
         Ok(())
     }
 
@@ -313,10 +248,9 @@ mod tests {
             password: None,
         };
 
-        let message = Message::try_from(
-            RawMessage::chat(jid!("recv@prose.org")).with_payload(invite.clone()),
-        )?;
-        assert_eq!(message.mediated_invite, Some(invite));
+        let message =
+            Message::from(RawMessage::chat(jid!("recv@prose.org")).with_payload(invite.clone()));
+        assert_eq!(message.mediated_invite(), Some(invite));
         Ok(())
     }
 
@@ -331,10 +265,10 @@ mod tests {
             },
         };
 
-        let message = Message::try_from(
+        let message = Message::from(
             RawMessage::chat(jid!("recv@prose.org")).with_payload(archived_message.clone()),
-        )?;
-        assert_eq!(message.archived_message, Some(archived_message));
+        );
+        assert_eq!(message.archived_message(), Some(archived_message));
         Ok(())
     }
 
@@ -347,10 +281,10 @@ mod tests {
             },
         };
 
-        let message = Message::try_from(
+        let message = Message::from(
             RawMessage::chat(jid!("recv@prose.org")).with_payload(received_carbon.clone()),
-        )?;
-        assert_eq!(message.received_carbon, Some(received_carbon));
+        );
+        assert_eq!(message.received_carbon(), Some(received_carbon));
         Ok(())
     }
 
@@ -363,10 +297,10 @@ mod tests {
             },
         };
 
-        let message = Message::try_from(
+        let message = Message::from(
             RawMessage::chat(jid!("recv@prose.org")).with_payload(sent_carbon.clone()),
-        )?;
-        assert_eq!(message.sent_carbon, Some(sent_carbon));
+        );
+        assert_eq!(message.sent_carbon(), Some(sent_carbon));
         Ok(())
     }
 }

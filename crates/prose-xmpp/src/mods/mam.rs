@@ -149,7 +149,7 @@ impl RequestFuture<MAMFutureState, (Vec<mam::ArchivedMessage>, mam::Fin)> {
                     return Ok(ElementReducerPoll::Pending);
                 };
 
-                let Some(archived_message) = &message.archived_message else {
+                let Some(archived_message) = message.archived_message() else {
                     return Ok(ElementReducerPoll::Pending);
                 };
 
@@ -161,7 +161,7 @@ impl RequestFuture<MAMFutureState, (Vec<mam::ArchivedMessage>, mam::Fin)> {
                     return Ok(ElementReducerPoll::Pending);
                 }
 
-                state.messages.push(archived_message.clone());
+                state.messages.push(archived_message);
                 Ok(ElementReducerPoll::Pending)
             },
             |state| {

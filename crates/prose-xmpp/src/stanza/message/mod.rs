@@ -7,7 +7,7 @@ pub use xmpp_parsers::message::MessageType;
 
 pub use fallback::Fallback;
 pub use forwarding::Forwarded;
-pub use message::{ChatState, Id, Message};
+pub use message::{Id, Message};
 pub use reactions::{Emoji, Reactions};
 
 mod builder;

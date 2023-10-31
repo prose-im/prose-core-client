@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use minidom::Element;
+use xmpp_parsers::message::MessagePayload;
 
 use prose_utils::id_string;
 
@@ -48,3 +49,5 @@ impl From<Reactions> for Element {
         .into()
     }
 }
+
+impl MessagePayload for Reactions {}

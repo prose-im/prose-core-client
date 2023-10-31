@@ -7,12 +7,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::{BareJid, Jid};
 use tracing::{debug, error};
+use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::chat;
 use prose_xmpp::mods::chat::Carbon;
-use prose_xmpp::stanza::message::ChatState;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::Event;
 
@@ -113,7 +113,7 @@ impl MessagesEventHandler {
         };
 
         if let ReceivedMessage::Message(message) = &message {
-            if let Some(subject) = &message.subject {
+            if let Some(subject) = &message.subject() {
                 room.state.write().subject = if subject.is_empty() {
                     None
                 } else {
@@ -131,10 +131,10 @@ impl MessagesEventHandler {
         let mut chat_state: Option<ChatStateEvent> = None;
 
         if let ReceivedMessage::Message(message) = &message {
-            if let (Some(state), Some(from)) = (&message.chat_state, &message.from) {
+            if let (Some(state), Some(from)) = (message.chat_state(), &message.from) {
                 chat_state = Some(ChatStateEvent {
-                    state: state.clone(),
-                    from: if message.r#type == MessageType::Groupchat {
+                    state,
+                    from: if message.type_ == MessageType::Groupchat {
                         from.clone()
                     } else {
                         Jid::Bare(from.to_bare())

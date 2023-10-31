@@ -73,21 +73,21 @@ impl Module for MUC {
             return Ok(());
         };
 
-        if let Some(direct_invite) = &stanza.direct_invite {
+        if let Some(direct_invite) = stanza.direct_invite() {
             self.ctx
                 .schedule_event(ClientEvent::MUC(Event::DirectInvite {
                     from: from.clone(),
-                    invite: direct_invite.clone(),
+                    invite: direct_invite,
                 }));
         };
 
-        if let Some(mediated_invite) = &stanza.mediated_invite {
+        if let Some(mediated_invite) = stanza.mediated_invite() {
             // Ignore empty invites.
             if !mediated_invite.invites.is_empty() {
                 self.ctx
                     .schedule_event(ClientEvent::MUC(Event::MediatedInvite {
                         from: from.clone(),
-                        invite: mediated_invite.clone(),
+                        invite: mediated_invite,
                     }));
             }
         };
@@ -330,11 +330,7 @@ impl MUC {
         to: impl Into<Jid>,
         direct_invite: DirectInvite,
     ) -> Result<()> {
-        let message = Message {
-            to: Some(to.into()),
-            direct_invite: Some(direct_invite),
-            ..Default::default()
-        };
+        let message = Message::new().set_to(to).add_payload(direct_invite);
         self.ctx.send_stanza(message)?;
         Ok(())
     }
@@ -346,11 +342,9 @@ impl MUC {
         room_jid: &BareJid,
         mediated_invite: MediatedInvite,
     ) -> Result<()> {
-        let message = Message {
-            to: Some(room_jid.clone().into()),
-            mediated_invite: Some(mediated_invite),
-            ..Default::default()
-        };
+        let message = Message::new()
+            .set_to(room_jid.clone())
+            .add_payload(mediated_invite);
         self.ctx.send_stanza(message)?;
         Ok(())
     }

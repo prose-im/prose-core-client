@@ -112,8 +112,8 @@ impl TryFrom<TimestampedMessage<Carbon>> for MessageLike {
         let stanza_id = carbon
             .stanza
             .as_ref()
-            .and_then(|s| s.stanza_id.as_ref())
-            .map(|sid| sid.id.clone());
+            .and_then(|s| s.stanza_id())
+            .map(|sid| sid.id);
         MessageLike::try_from((stanza_id, &carbon))
     }
 }
@@ -124,16 +124,15 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
     fn try_from(envelope: TimestampedMessage<Message>) -> Result<Self> {
         let msg = envelope.message;
 
-        let id = MessageLikeId::new(msg.id.as_ref().map(|id| id.as_ref().into()));
-        let stanza_id = &msg.stanza_id;
+        let id = MessageLikeId::new(msg.id.as_ref().map(|id| id.into()));
+        let stanza_id = msg.stanza_id();
         let from = msg
             .from
             .as_ref()
             .ok_or(StanzaParseError::missing_attribute("from"))?;
         let to = msg.to.as_ref();
         let timestamp = msg
-            .delay
-            .as_ref()
+            .delay()
             .map(|delay| delay.stamp.0.into())
             .unwrap_or(envelope.timestamp);
         let TargetedPayload {
@@ -143,7 +142,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
 
         Ok(MessageLike {
             id,
-            stanza_id: stanza_id.as_ref().map(|s| s.id.as_ref().into()),
+            stanza_id: stanza_id.map(|s| s.id.as_ref().into()),
             target: refs.map(|id| id.as_ref().into()),
             to: to.map(|jid| jid.to_bare()),
             from: from.to_bare(),
@@ -182,10 +181,11 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             payload,
         } = TargetedPayload::try_from(&message)?;
 
-        let id = MessageLikeId::new(message.id.map(|id| id.as_ref().into()));
-        let to = message.to;
+        let id = MessageLikeId::new(message.id.as_ref().map(|id| id.into()));
+        let to = message.to.as_ref();
         let from = message
             .from
+            .as_ref()
             .ok_or(StanzaParseError::missing_attribute("from"))?;
         let timestamp = &carbon
             .delay
@@ -215,7 +215,7 @@ impl TryFrom<&Message> for TargetedPayload {
     type Error = anyhow::Error;
 
     fn try_from(message: &Message) -> Result<Self> {
-        if let Some(error) = &message.error {
+        if let Some(error) = &message.error() {
             return Ok(TargetedPayload {
                 target: None,
                 payload: Payload::Message {
@@ -224,49 +224,53 @@ impl TryFrom<&Message> for TargetedPayload {
             });
         }
 
-        if let Some(reactions) = &message.reactions {
+        if let Some(reactions) = message.reactions() {
             return Ok(TargetedPayload {
-                target: Some(reactions.id.clone()),
+                target: Some(reactions.id),
                 payload: Payload::Reaction {
-                    emojis: reactions.reactions.clone(),
+                    emojis: reactions.reactions,
                 },
             });
         };
 
-        if let Some(fastening) = &message.fastening {
+        if let Some(fastening) = message.fastening() {
             if fastening.retract() {
                 return Ok(TargetedPayload {
-                    target: Some(fastening.id.clone()),
+                    target: Some(fastening.id),
                     payload: Payload::Retraction,
                 });
             }
         }
 
-        if let (Some(replace_id), Some(body)) = (&message.replace, &message.body) {
+        if let (Some(replace_id), Some(body)) = (message.replace(), message.body()) {
             return Ok(TargetedPayload {
-                target: Some(replace_id.clone()),
-                payload: Payload::Correction { body: body.clone() },
+                target: Some(replace_id),
+                payload: Payload::Correction {
+                    body: body.to_string(),
+                },
             });
         }
 
-        if let Some(marker) = &message.received_marker {
+        if let Some(marker) = message.received_marker() {
             return Ok(TargetedPayload {
-                target: Some(marker.id.clone()),
+                target: Some(marker.id),
                 payload: Payload::DeliveryReceipt,
             });
         }
 
-        if let Some(marker) = &message.displayed_marker {
+        if let Some(marker) = message.displayed_marker() {
             return Ok(TargetedPayload {
-                target: Some(marker.id.clone()),
+                target: Some(marker.id),
                 payload: Payload::ReadReceipt,
             });
         }
 
-        if let Some(body) = &message.body {
+        if let Some(body) = message.body() {
             return Ok(TargetedPayload {
                 target: None,
-                payload: Payload::Message { body: body.clone() },
+                payload: Payload::Message {
+                    body: body.to_string(),
+                },
             });
         }
 

@@ -6,10 +6,11 @@
 use anyhow::Result;
 use insta::assert_snapshot;
 use jid::BareJid;
+use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
-use prose_xmpp::stanza::message::{carbons, ChatState, Forwarded};
+use prose_xmpp::stanza::message::{carbons, Forwarded};
 use prose_xmpp::stanza::Message;
 use prose_xmpp::test::{BareJidTestAdditions, ClientTestAdditions, ConnectedClient};
 use prose_xmpp::{bare, jid, mods, Client, Event};
@@ -76,10 +77,10 @@ async fn test_sends_received_carbon_event() -> Result<()> {
         },
     };
 
-    let mut message = Message::new()
+    let message = Message::new()
         .set_from(BareJid::ours())
-        .set_body("Hello World");
-    message.received_carbon = Some(carbon.clone());
+        .set_body("Hello World")
+        .set_received_carbon(carbon.clone());
 
     connection.receive_stanza(message.clone()).await;
     assert_eq!(
@@ -107,10 +108,10 @@ async fn test_does_not_send_received_carbon_event_for_different_user() -> Result
         },
     };
 
-    let mut message = Message::new()
+    let message = Message::new()
         .set_from(bare!("spoof@prose.org"))
-        .set_body("Hello World");
-    message.received_carbon = Some(carbon.clone());
+        .set_body("Hello World")
+        .set_received_carbon(carbon.clone());
 
     connection.receive_stanza(message.clone()).await;
     assert_eq!(*sent_events.read(), vec![]);
@@ -133,10 +134,10 @@ async fn test_sends_sent_carbon_event() -> Result<()> {
         },
     };
 
-    let mut message = Message::new()
+    let message = Message::new()
         .set_from(BareJid::ours())
-        .set_body("Hello World");
-    message.sent_carbon = Some(carbon.clone());
+        .set_body("Hello World")
+        .set_sent_carbon(carbon.clone());
 
     connection.receive_stanza(message.clone()).await;
     assert_eq!(
@@ -164,10 +165,10 @@ async fn test_does_not_send_sent_carbon_event_for_different_user() -> Result<()>
         },
     };
 
-    let mut message = Message::new()
+    let message = Message::new()
         .set_from(bare!("spoof@prose.org"))
-        .set_body("Hello World");
-    message.sent_carbon = Some(carbon.clone());
+        .set_body("Hello World")
+        .set_sent_carbon(carbon.clone());
 
     connection.receive_stanza(message.clone()).await;
     assert_eq!(*sent_events.read(), vec![]);
