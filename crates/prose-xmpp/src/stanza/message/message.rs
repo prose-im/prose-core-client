@@ -254,52 +254,119 @@ impl From<Message> for xmpp_parsers::message::Message {
     }
 }
 
-// TODO: Fix tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stanza::message::mam::ArchivedMessage;
+    use crate::stanza::message::Forwarded;
+    use crate::stanza::muc::{DirectInvite, Invite, MediatedInvite};
+    use crate::{bare, jid};
+    use anyhow::Result;
+    use xmpp_parsers::mam::QueryId;
+    use xmpp_parsers::message::Message as RawMessage;
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn test_read_chat_state() -> Result<()> {
-//         let message = r#"
-//       <message from="valerian@prose.org/mobile" to="marc@prose.org/home" id="purplecf8f33c0" type="chat">
-//         <body>How is it going?</body>
-//         <active xmlns="http://jabber.org/protocol/chatstates"/>
-//       </message>
-//       "#;
-//
-//         let stanza = Message::from_str(message).unwrap();
-//
-//         // assert_eq!(stanza.chat_state(), Some(ChatState::Active));
-//         assert_eq!(stanza.body().as_deref(), Some("How is it going?"));
-//
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_get_message_reactions() {
-//         let message = r#"
-//       <message from="a@prose.org" to="b@prose.org" id="id1" type="chat">
-//         <reactions id="id2" xmlns='urn:xmpp:reactions:0'>
-//             <reaction>👋</reaction>
-//             <reaction>🐢</reaction>
-//         </reactions>
-//       </message>
-//       "#;
-//
-//         let stanza = Message::from_str(message).unwrap();
-//         assert_eq!(
-//             stanza.message_reactions(),
-//             Some(("id2".into(), vec!["👋".into(), "🐢".into()]))
-//         );
-//     }
-//
-//     #[test]
-//     fn test_set_message_reactions() {
-//         let stanza =
-//             Message::new().set_message_reactions("id2".into(), vec!["👋".into(), "🐢".into()]);
-//         let message = r#"<message><reactions id="id2" xmlns="urn:xmpp:reactions:0"><reaction>👋</reaction><reaction>🐢</reaction></reactions></message>"#;
-//         assert_eq!(stanza.to_string(), message);
-//     }
-// }
+    #[test]
+    fn test_body() -> Result<()> {
+        let message = Message::try_from(
+            RawMessage::chat(jid!("recv@prose.org")).with_body("en".into(), "Hello World".into()),
+        )?;
+        assert_eq!(message.body, Some("Hello World".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_subject() -> Result<()> {
+        let mut raw = RawMessage::chat(jid!("recv@prose.org"));
+        raw.subjects
+            .insert("en".into(), Subject("Important Subject".to_string()));
+
+        let message = Message::try_from(raw)?;
+        assert_eq!(message.subject, Some("Important Subject".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn test_direct_invite() -> Result<()> {
+        let invite = DirectInvite {
+            jid: bare!("user@prose.org"),
+            password: Some("topsecret".to_string()),
+            reason: Some("Who knows".to_string()),
+            r#continue: None,
+            thread: None,
+        };
+
+        let message = Message::try_from(
+            RawMessage::chat(jid!("recv@prose.org")).with_payload(invite.clone()),
+        )?;
+        assert_eq!(message.direct_invite, Some(invite));
+        Ok(())
+    }
+
+    #[test]
+    fn test_mediated_invite() -> Result<()> {
+        let invite = MediatedInvite {
+            invites: vec![Invite {
+                from: Some(jid!("sender@prose.org")),
+                to: Some(jid!("recv@prose.org")),
+                reason: Some("Some reason".to_string()),
+            }],
+            password: None,
+        };
+
+        let message = Message::try_from(
+            RawMessage::chat(jid!("recv@prose.org")).with_payload(invite.clone()),
+        )?;
+        assert_eq!(message.mediated_invite, Some(invite));
+        Ok(())
+    }
+
+    #[test]
+    fn test_archived_message() -> Result<()> {
+        let archived_message = ArchivedMessage {
+            id: "message-id".into(),
+            query_id: Some(QueryId("query-id".to_string())),
+            forwarded: Forwarded {
+                delay: None,
+                stanza: None,
+            },
+        };
+
+        let message = Message::try_from(
+            RawMessage::chat(jid!("recv@prose.org")).with_payload(archived_message.clone()),
+        )?;
+        assert_eq!(message.archived_message, Some(archived_message));
+        Ok(())
+    }
+
+    #[test]
+    fn test_received_carbon() -> Result<()> {
+        let received_carbon = carbons::Received {
+            forwarded: Forwarded {
+                delay: None,
+                stanza: Some(Box::new(Message::new().set_id("id-100".into()))),
+            },
+        };
+
+        let message = Message::try_from(
+            RawMessage::chat(jid!("recv@prose.org")).with_payload(received_carbon.clone()),
+        )?;
+        assert_eq!(message.received_carbon, Some(received_carbon));
+        Ok(())
+    }
+
+    #[test]
+    fn test_sent_carbon() -> Result<()> {
+        let sent_carbon = carbons::Sent {
+            forwarded: Forwarded {
+                delay: None,
+                stanza: Some(Box::new(Message::new().set_id("id-100".into()))),
+            },
+        };
+
+        let message = Message::try_from(
+            RawMessage::chat(jid!("recv@prose.org")).with_payload(sent_carbon.clone()),
+        )?;
+        assert_eq!(message.sent_carbon, Some(sent_carbon));
+        Ok(())
+    }
+}

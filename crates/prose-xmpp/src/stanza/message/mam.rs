@@ -5,6 +5,7 @@
 
 use minidom::Element;
 pub use xmpp_parsers::mam::{Complete, Fin, Query, QueryId};
+use xmpp_parsers::message::MessagePayload;
 
 use crate::stanza::message::{stanza_id, Forwarded};
 
@@ -39,3 +40,5 @@ impl From<ArchivedMessage> for Element {
         .into()
     }
 }
+
+impl MessagePayload for ArchivedMessage {}

@@ -5,6 +5,7 @@
 
 use crate::stanza::message::Forwarded;
 use minidom::Element;
+use xmpp_parsers::message::MessagePayload;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Received {
@@ -55,3 +56,6 @@ impl From<Sent> for Element {
         .into()
     }
 }
+
+impl MessagePayload for Received {}
+impl MessagePayload for Sent {}

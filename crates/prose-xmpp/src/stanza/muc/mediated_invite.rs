@@ -8,6 +8,7 @@ use crate::util::ElementExt;
 use jid::Jid;
 use minidom::Element;
 use std::str::FromStr;
+use xmpp_parsers::message::MessagePayload;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct MediatedInvite {
@@ -62,6 +63,8 @@ impl TryFrom<Element> for MediatedInvite {
         Ok(MediatedInvite { invites, password })
     }
 }
+
+impl MessagePayload for MediatedInvite {}
 
 impl From<Invite> for Element {
     fn from(value: Invite) -> Self {
