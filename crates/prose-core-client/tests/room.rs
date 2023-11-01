@@ -6,13 +6,16 @@
 use std::sync::Arc;
 
 use anyhow::Result;
+use mockall::predicate;
 use xmpp_parsers::mam::Fin;
 use xmpp_parsers::rsm::SetResult;
 
+use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
+use prose_core_client::domain::shared::models::RoomType;
 use prose_core_client::dtos::Occupant;
-use prose_core_client::test::{MessageBuilder, MockRoomFactoryDependencies};
+use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_xmpp::{bare, jid};
 
 #[tokio::test]
@@ -144,6 +147,57 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                 .build_message(),
         ]
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_toggle_reaction() -> Result<()> {
+    let mut deps = MockRoomFactoryDependencies::default();
+
+    deps.message_repo.expect_get().once().return_once(|_, _| {
+        Box::pin(async {
+            Ok(vec![
+                MessageBuilder::new_with_index(1).build_message_like(),
+                MessageBuilder::new_with_index(2)
+                    .set_from(&mock_data::account_jid().into())
+                    .build_message_like_with_payload(
+                        1,
+                        MessageLikePayload::Reaction {
+                            emojis: vec!["🍻".into()],
+                        },
+                    ),
+                MessageBuilder::new_with_index(3)
+                    .set_from(&mock_data::account_jid().into())
+                    .build_message_like_with_payload(
+                        1,
+                        MessageLikePayload::Reaction {
+                            emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
+                        },
+                    ),
+            ])
+        })
+    });
+
+    deps.messaging_service
+        .expect_react_to_message()
+        .once()
+        .with(
+            predicate::eq(bare!("room@conference.prose.org")),
+            predicate::eq(RoomType::Group),
+            predicate::eq(MessageBuilder::id_for_index(1)),
+            predicate::eq(vec!["🍻".into(), "✅".into()]),
+        )
+        .return_once(|_, _, _, _| Box::pin(async { Ok(()) }));
+
+    let internals = RoomInternals::group(&bare!("room@conference.prose.org"));
+
+    let room = RoomFactory::from(deps)
+        .build(Arc::new(internals))
+        .to_generic_room();
+
+    room.toggle_reaction_to_message(MessageBuilder::id_for_index(1), "🍕".into())
+        .await?;
 
     Ok(())
 }
