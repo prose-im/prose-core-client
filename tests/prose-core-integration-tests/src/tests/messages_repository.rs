@@ -9,7 +9,7 @@ use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::MessageBuilder;
-use prose_xmpp::bare;
+use prose_xmpp::{bare, jid};
 
 use crate::tests::{async_test, store};
 
@@ -23,9 +23,8 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
     repo.append(&room_id, &[&message]).await?;
     repo.append(&room_id, &[&message]).await?;
 
-    let message = MessageBuilder::new_with_index(123).build_message();
     assert_eq!(
-        repo.get_all(&room_id, &[message.id.as_ref().unwrap()])
+        repo.get_all(&room_id, &[&message.id.clone().into_original_id().unwrap()])
             .await?,
         vec![message]
     );
@@ -39,16 +38,12 @@ async fn test_loads_message_with_reactions() -> Result<()> {
 
     let room_id = bare!("a@prose.org");
 
-    repo.append(
-        &room_id,
-        &[
-            &MessageBuilder::new_with_index(1).build_message_like(),
-            &MessageBuilder::new_with_index(3)
-                .set_from(&bare!("b@prose.org"))
-                .build_reaction_to(1, &["🍿".into(), "📼".into()]),
-        ],
-    )
-    .await?;
+    let message1 = MessageBuilder::new_with_index(1).build_message_like();
+    let message2 = MessageBuilder::new_with_index(3)
+        .set_from(&jid!("b@prose.org"))
+        .build_reaction_to(1, &["🍿".into(), "📼".into()]);
+
+    repo.append(&room_id, &[&message1, &message2]).await?;
 
     let mut message = MessageBuilder::new_with_index(1).build_message();
     message.toggle_reaction(&bare!("b@prose.org"), "🍿".into());
@@ -57,7 +52,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     assert_eq!(
         repo.get_all(&room_id, &[&MessageBuilder::id_for_index(1)])
             .await?,
-        vec![message]
+        vec![message1, message2]
     );
 
     Ok(())
@@ -69,33 +64,27 @@ async fn test_load_messages_targeting() -> Result<()> {
 
     let room_id = bare!("a@prose.org");
 
+    let message1 = MessageBuilder::new_with_index(1).build_message_like();
+    let message2 = MessageBuilder::new_with_index(2).build_message_like();
+    let message3 = MessageBuilder::new_with_index(3)
+        .build_message_like_with_payload(1, MessageLikePayload::Retraction {});
+    let message4 = MessageBuilder::new_with_index(4)
+        .set_from(&jid!("b@prose.org"))
+        .build_reaction_to(2, &["🍿".into(), "📼".into()]);
+    let message5 = MessageBuilder::new_with_index(5).build_message_like();
+    let message6 = MessageBuilder::new_with_index(6)
+        .set_from(&jid!("c@prose.org"))
+        .build_reaction_to(2, &["🍕".into()]);
+    let message7 = MessageBuilder::new_with_index(7)
+        .build_message_like_with_payload(5, MessageLikePayload::ReadReceipt);
+
     repo.append(
         &room_id,
         &[
-            &MessageBuilder::new_with_index(1).build_message_like(),
-            &MessageBuilder::new_with_index(2).build_message_like(),
-            &MessageBuilder::new_with_index(3)
-                .build_message_like_with_payload(1, MessageLikePayload::Retraction {}),
-            &MessageBuilder::new_with_index(4)
-                .set_from(&bare!("b@prose.org"))
-                .build_reaction_to(2, &["🍿".into(), "📼".into()]),
-            &MessageBuilder::new_with_index(5).build_message_like(),
-            &MessageBuilder::new_with_index(6)
-                .set_from(&bare!("c@prose.org"))
-                .build_reaction_to(2, &["🍕".into()]),
-            &MessageBuilder::new_with_index(7)
-                .build_message_like_with_payload(5, MessageLikePayload::ReadReceipt),
+            &message1, &message2, &message3, &message4, &message5, &message6, &message7,
         ],
     )
     .await?;
-
-    let mut message2 = MessageBuilder::new_with_index(2).build_message();
-    message2.toggle_reaction(&bare!("b@prose.org"), "🍿".into());
-    message2.toggle_reaction(&bare!("b@prose.org"), "📼".into());
-    message2.toggle_reaction(&bare!("c@prose.org"), "🍕".into());
-
-    let mut message5 = MessageBuilder::new_with_index(5).build_message();
-    message5.is_read = true;
 
     assert_eq!(
         repo.get_all(
@@ -107,7 +96,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             ]
         )
         .await?,
-        vec![message2, message5]
+        vec![message1, message2, message3, message4, message5, message6, message7]
     );
 
     Ok(())

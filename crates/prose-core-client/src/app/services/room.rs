@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use anyhow::{format_err, Result};
 use chrono::Duration;
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use tracing::{debug, info};
 
 use crate::app::deps::{
@@ -161,11 +161,12 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
-        let mut message = self
-            .message_repo
-            .get(&self.data.info.jid, &id)
-            .await?
+        let messages = self.message_repo.get(&self.data.info.jid, &id).await?;
+
+        let mut message = Message::reducing_messages(messages)
+            .pop()
             .ok_or(format_err!("No message with id {}", id))?;
+
         message.toggle_reaction(&self.data.info.user_jid, emoji);
         let all_emojis = message
             .reactions_from(&self.data.info.user_jid)
@@ -189,7 +190,8 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn load_messages_with_ids(&self, ids: &[&MessageId]) -> Result<Vec<Message>> {
-        self.message_repo.get_all(&self.data.info.jid, ids).await
+        let messages = self.message_repo.get_all(&self.data.info.jid, ids).await?;
+        Ok(self.reduce_messages_and_lookup_real_jids(messages))
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
@@ -235,7 +237,24 @@ impl<Kind> Room<Kind> {
             )
             .await?;
 
-        Ok(Message::reducing_messages(messages))
+        Ok(self.reduce_messages_and_lookup_real_jids(messages))
+    }
+}
+
+impl<Kind> Room<Kind> {
+    fn reduce_messages_and_lookup_real_jids(&self, mut messages: Vec<MessageLike>) -> Vec<Message> {
+        let state = &*self.data.state.read();
+        for message in messages.iter_mut() {
+            if let Some(real_jid) = state
+                .occupants
+                .get(&message.from)
+                .and_then(|o| o.jid.clone())
+                .map(Jid::Bare)
+            {
+                message.from = real_jid;
+            }
+        }
+        Message::reducing_messages(messages)
     }
 }
 

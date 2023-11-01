@@ -6,7 +6,7 @@
 use std::str::FromStr;
 
 use chrono::{DateTime, Duration, Utc};
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::{date, mam, Element};
@@ -33,7 +33,7 @@ where
 pub struct MessageBuilder {
     id: MessageId,
     stanza_id: Option<StanzaId>,
-    from: BareJid,
+    from: Jid,
     to: BareJid,
     body: String,
     timestamp: DateTime<Utc>,
@@ -55,7 +55,7 @@ impl MessageBuilder {
         MessageBuilder {
             id: Self::id_for_index(idx),
             stanza_id: Some(format!("res-{}", idx).into()),
-            from: BareJid::ours(),
+            from: Jid::Bare(BareJid::ours()),
             to: BareJid::theirs(),
             body: format!("Message {}", idx).to_string(),
             timestamp: mock_data::reference_date() + Duration::minutes(idx.into()),
@@ -72,7 +72,7 @@ impl MessageBuilder {
         self
     }
 
-    pub fn set_from(mut self, from: &BareJid) -> Self {
+    pub fn set_from(mut self, from: &Jid) -> Self {
         self.from = from.clone();
         self
     }
@@ -83,7 +83,7 @@ impl MessageBuilder {
         Message {
             id: Some(self.id),
             stanza_id: self.stanza_id,
-            from: self.from,
+            from: self.from.into_bare(),
             body: self.body,
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
@@ -134,25 +134,29 @@ impl MessageBuilder {
 
     pub fn build_mam_message(self, query_id: impl Into<String>) -> Element {
         prose_xmpp::stanza::Message::new()
-            .set_archived_message(ArchivedMessage {
-                id: self.stanza_id.expect("Missing stanzaId").to_string().into(),
-                query_id: Some(mam::QueryId(query_id.into())),
-                forwarded: Forwarded {
-                    delay: Some(Delay {
-                        from: None,
-                        stamp: date::DateTime(self.timestamp.into()),
-                        data: None,
-                    }),
-                    stanza: Some(Box::new(
-                        prose_xmpp::stanza::Message::new()
-                            .set_id(self.id.as_ref().into())
-                            .set_type(MessageType::Chat)
-                            .set_to(self.to)
-                            .set_from(self.from)
-                            .set_body(self.body),
-                    )),
-                },
-            })
+            .set_archived_message(self.build_archived_message(query_id))
             .into()
+    }
+
+    pub fn build_archived_message(self, query_id: impl Into<String>) -> ArchivedMessage {
+        ArchivedMessage {
+            id: self.stanza_id.expect("Missing stanzaId").to_string().into(),
+            query_id: Some(mam::QueryId(query_id.into())),
+            forwarded: Forwarded {
+                delay: Some(Delay {
+                    from: None,
+                    stamp: date::DateTime(self.timestamp.into()),
+                    data: None,
+                }),
+                stanza: Some(Box::new(
+                    prose_xmpp::stanza::Message::new()
+                        .set_id(self.id.as_ref().into())
+                        .set_type(MessageType::Chat)
+                        .set_to(self.to)
+                        .set_from(self.from)
+                        .set_body(self.body),
+                )),
+            },
+        }
     }
 }

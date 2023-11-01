@@ -10,6 +10,7 @@ pub use mock_app_dependencies::{MockAppDependencies, MockRoomFactoryDependencies
 mod constant_time_provider;
 mod message_builder;
 mod mock_app_dependencies;
+mod room_internals;
 
 pub mod mock_data {
     pub use super::mock_app_dependencies::{

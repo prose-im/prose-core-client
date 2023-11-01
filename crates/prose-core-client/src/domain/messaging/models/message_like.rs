@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -32,7 +32,7 @@ pub struct MessageLike {
     pub stanza_id: Option<StanzaId>,
     pub target: Option<MessageId>,
     pub to: Option<BareJid>,
-    pub from: BareJid,
+    pub from: Jid,
     pub timestamp: DateTime<Utc>,
     pub payload: Payload,
     pub is_first_message: bool,
@@ -151,7 +151,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             stanza_id: stanza_id.map(|s| s.id.as_ref().into()),
             target: refs.map(|id| id.as_ref().into()),
             to: to.map(|jid| jid.to_bare()),
-            from: from.to_bare(),
+            from: from.clone(),
             timestamp: timestamp.into(),
             payload,
             is_first_message: false,
@@ -204,7 +204,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             stanza_id: Some(stanza_id.as_ref().into()),
             target: refs.map(|id| id.as_ref().into()),
             to: to.map(|jid| jid.to_bare()),
-            from: from.to_bare(),
+            from: from.clone(),
             timestamp: timestamp.0.into(),
             payload,
             is_first_message: false,

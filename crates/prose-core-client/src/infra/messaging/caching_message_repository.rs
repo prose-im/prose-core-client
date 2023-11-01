@@ -10,7 +10,7 @@ use jid::BareJid;
 use prose_store::prelude::*;
 use prose_store::RawKey;
 
-use crate::domain::messaging::models::{Message, MessageId, MessageLike, MessageLikeId};
+use crate::domain::messaging::models::{MessageId, MessageLike, MessageLikeId};
 use crate::domain::messaging::repos::MessagesRepository;
 
 // TODO: Incorporate MessageArchiveService, cache complete pages loaded from the server
@@ -58,11 +58,11 @@ impl KeyType for MessageId {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl MessagesRepository for CachingMessageRepository {
-    async fn get(&self, room_id: &BareJid, id: &MessageId) -> Result<Option<Message>> {
-        Ok(self.get_all(room_id, &[id]).await?.pop())
+    async fn get(&self, room_id: &BareJid, id: &MessageId) -> Result<Vec<MessageLike>> {
+        Ok(self.get_all(room_id, &[id]).await?)
     }
 
-    async fn get_all(&self, _room_id: &BareJid, ids: &[&MessageId]) -> Result<Vec<Message>> {
+    async fn get_all(&self, _room_id: &BareJid, ids: &[&MessageId]) -> Result<Vec<MessageLike>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessagesRecord::collection()])
@@ -83,8 +83,7 @@ impl MessagesRepository for CachingMessageRepository {
         }
 
         messages.sort_by_key(|msg| msg.timestamp);
-
-        Ok(Message::reducing_messages(messages))
+        Ok(messages)
     }
 
     async fn append(&self, _room_id: &BareJid, messages: &[&MessageLike]) -> Result<()> {

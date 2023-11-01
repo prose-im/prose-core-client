@@ -82,7 +82,7 @@ impl Message {
                     let message = Message {
                         id: message_id.into_original_id(),
                         stanza_id: msg.stanza_id,
-                        from: msg.from,
+                        from: msg.from.into_bare(),
                         body,
                         timestamp: msg.timestamp.into(),
                         is_read: false,
@@ -114,6 +114,8 @@ impl Message {
                 MessageLikePayload::ReadReceipt => message.is_read = true,
                 MessageLikePayload::Message { .. } => unreachable!(),
                 MessageLikePayload::Reaction { mut emojis } => {
+                    let modifier_from = modifier.from.to_bare();
+
                     // Iterate over all existing reactions
                     'outer: for reaction in &mut message.reactions {
                         let mut idx: i32 = (emojis.len() as i32) - 1;
@@ -123,8 +125,8 @@ impl Message {
                             // If the emoji is the same as the reaction…
                             if emoji.as_ref() == reaction.emoji.as_ref() {
                                 // …add the author if needed
-                                if !reaction.from.contains(&modifier.from) {
-                                    reaction.from.push(modifier.from.clone())
+                                if !reaction.from.contains(&modifier_from) {
+                                    reaction.from.push(modifier_from.clone())
                                 }
                                 // Remove the applied emoji from the list of emojis
                                 emojis.remove(idx as usize);
@@ -136,7 +138,7 @@ impl Message {
 
                         // We couldn't find an emoji for this reaction, so remove our author
                         // from it (if needed)…
-                        reaction.from.retain(|from| from != &modifier.from);
+                        reaction.from.retain(|from| from != &modifier_from);
                     }
 
                     // Remove all empty reactions
@@ -149,7 +151,7 @@ impl Message {
                         // …add a new reaction
                         message.reactions.push(Reaction {
                             emoji: emoji.into_inner().into(),
-                            from: vec![modifier.from.clone()],
+                            from: vec![modifier_from.clone()],
                         })
                     }
                 }
@@ -170,7 +172,7 @@ mod tests {
     use chrono::{TimeZone, Utc};
     use jid::BareJid;
 
-    use prose_xmpp::bare;
+    use prose_xmpp::{bare, jid};
 
     use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
     use crate::test::MessageBuilder;
@@ -283,8 +285,8 @@ mod tests {
                 id: "1".into(),
                 stanza_id: None,
                 target: None,
-                to: Some(BareJid::from_str("a@prose.org").unwrap()),
-                from: BareJid::from_str("b@prose.org").unwrap(),
+                to: Some(bare!("a@prose.org")),
+                from: jid!("b@prose.org"),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
                     .unwrap()
@@ -298,8 +300,8 @@ mod tests {
                 id: "2".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: Some(BareJid::from_str("a@prose.org").unwrap()),
-                from: BareJid::from_str("b@prose.org").unwrap(),
+                to: Some(bare!("a@prose.org")),
+                from: jid!("b@prose.org"),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 01)
                     .unwrap()
@@ -313,8 +315,8 @@ mod tests {
                 id: "3".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: Some(BareJid::from_str("a@prose.org").unwrap()),
-                from: BareJid::from_str("c@prose.org").unwrap(),
+                to: Some(bare!("a@prose.org")),
+                from: jid!("c@prose.org"),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 02)
                     .unwrap()
@@ -328,8 +330,8 @@ mod tests {
                 id: "4".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: Some(BareJid::from_str("a@prose.org").unwrap()),
-                from: BareJid::from_str("b@prose.org").unwrap(),
+                to: Some(bare!("a@prose.org")),
+                from: jid!("b@prose.org"),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 03)
                     .unwrap()
@@ -343,8 +345,8 @@ mod tests {
                 id: "5".into(),
                 stanza_id: None,
                 target: Some("1".into()),
-                to: Some(BareJid::from_str("a@prose.org").unwrap()),
-                from: BareJid::from_str("b@prose.org").unwrap(),
+                to: Some(bare!("a@prose.org")),
+                from: jid!("b@prose.org"),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 04)
                     .unwrap()
