@@ -5,20 +5,26 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use tracing::{error, info, warn};
+use xmpp_parsers::chatstates::ChatState;
+use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::mods::{bookmark, bookmark2, muc, status};
+use prose_xmpp::mods::{bookmark, bookmark2, chat, muc, status};
 use prose_xmpp::{ns, Event};
 
-use crate::app::deps::{DynAppContext, DynConnectedRoomsRepository, DynRoomsDomainService};
+use crate::app::deps::{
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynRoomFactory,
+    DynRoomsDomainService, DynTimeProvider,
+};
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::RoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
+use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
@@ -28,6 +34,12 @@ pub struct RoomsEventHandler {
     connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]
     rooms_domain_service: DynRoomsDomainService,
+    #[inject]
+    client_event_dispatcher: DynClientEventDispatcher,
+    #[inject]
+    room_factory: DynRoomFactory,
+    #[inject]
+    time_provider: DynTimeProvider,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -45,6 +57,18 @@ impl XMPPEventHandler for RoomsEventHandler {
                     Ok(None)
                 }
                 _ => Ok(Some(Event::Status(event))),
+            },
+            Event::Chat(event) => match event {
+                chat::Event::ChatStateChanged {
+                    from,
+                    chat_state,
+                    message_type,
+                } => {
+                    self.handle_changed_chat_state(from, chat_state, message_type)
+                        .await?;
+                    Ok(None)
+                }
+                _ => Ok(Some(Event::Chat(event))),
             },
             Event::MUC(event) => match event {
                 muc::Event::DirectInvite {
@@ -67,7 +91,6 @@ impl XMPPEventHandler for RoomsEventHandler {
                     Ok(None)
                 }
             },
-
             Event::Bookmark2(event) => match event {
                 bookmark2::Event::BookmarksPublished {
                     bookmarks: _bookmarks,
@@ -87,7 +110,7 @@ impl XMPPEventHandler for RoomsEventHandler {
 
 impl RoomsEventHandler {
     async fn presence_did_change(&self, presence: Presence) -> Result<()> {
-        let Some(to) = presence.to else {
+        let Some(from) = presence.from else {
             error!(
                 "Received presence from unknown user. {}",
                 String::from(&minidom::Element::from(presence))
@@ -95,22 +118,19 @@ impl RoomsEventHandler {
             return Ok(());
         };
 
-        let to = to.into_bare();
+        let from = from;
+        let bare_from = from.to_bare();
 
-        // Ignore presences that we're directed at us. We don't have a room for the logged-in user.
-        if to == self.ctx.connected_jid()?.into_bare() {
+        // Ignore presences that were sent by us. We don't have a room for the logged-in user.
+        if bare_from == self.ctx.connected_jid()?.into_bare() {
             return Ok(());
         }
 
-        let Some(room) = self.connected_rooms_repo.get(&to) else {
+        let Some(room) = self.connected_rooms_repo.get(&bare_from) else {
             warn!(
                 "Received presence from user ({}) for which we do not have a room.",
-                to
+                from
             );
-            return Ok(());
-        };
-
-        let Some(from) = &presence.from else {
             return Ok(());
         };
 
@@ -143,7 +163,7 @@ impl RoomsEventHandler {
         info!("Received real jid for {}: {}", from, jid);
         room.state
             .write()
-            .insert_occupant(from, Some(&jid.into_bare()), &affiliation);
+            .insert_occupant(&from, Some(&jid.into_bare()), &affiliation);
 
         Ok(())
     }
@@ -162,6 +182,39 @@ impl RoomsEventHandler {
                 notify_delegate: true,
             })
             .await?;
+
+        Ok(())
+    }
+
+    pub async fn handle_changed_chat_state(
+        &self,
+        from: Jid,
+        chat_state: ChatState,
+        message_type: MessageType,
+    ) -> Result<()> {
+        let bare_from = from.to_bare();
+
+        let Some(room) = self.connected_rooms_repo.get(&bare_from) else {
+            error!("Received chat state from sender for which we do not have a room.");
+            return Ok(());
+        };
+
+        let jid = if message_type == MessageType::Groupchat {
+            from
+        } else {
+            Jid::Bare(bare_from)
+        };
+        let now = self.time_provider.now();
+
+        room.state
+            .write()
+            .set_occupant_chat_state(&jid, &now, chat_state);
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::RoomChanged {
+                room: self.room_factory.build(room.clone()),
+                r#type: RoomEventType::ComposingUsersChanged,
+            });
 
         Ok(())
     }

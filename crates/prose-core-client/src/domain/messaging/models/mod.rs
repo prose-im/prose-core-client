@@ -6,7 +6,7 @@
 pub(self) use error::StanzaParseError;
 pub use message::{Emoji, Message, MessageId, Reaction, StanzaId};
 pub use message_like::{
-    MessageLike, MessageLikeId, Payload as MessageLikePayload, TimestampedMessage,
+    MessageLike, MessageLikeError, MessageLikeId, Payload as MessageLikePayload, TimestampedMessage,
 };
 
 mod error;

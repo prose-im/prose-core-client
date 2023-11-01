@@ -5,7 +5,7 @@
 
 pub use constant_time_provider::ConstantTimeProvider;
 pub use message_builder::MessageBuilder;
-pub use mock_app_dependencies::MockAppDependencies;
+pub use mock_app_dependencies::{MockAppDependencies, MockRoomFactoryDependencies};
 
 mod constant_time_provider;
 mod message_builder;

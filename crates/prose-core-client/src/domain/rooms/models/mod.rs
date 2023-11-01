@@ -6,6 +6,8 @@
 pub use bookmark::Bookmark;
 pub use room_config::RoomConfig;
 pub use room_error::RoomError;
+#[cfg(feature = "test")]
+pub use room_internals::RoomInfo;
 pub use room_internals::RoomInternals;
 pub use room_metadata::RoomMetadata;
 pub use room_settings::{RoomSettings, RoomValidationError};

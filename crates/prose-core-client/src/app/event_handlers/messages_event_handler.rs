@@ -5,10 +5,8 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::{BareJid, Jid};
+use jid::BareJid;
 use tracing::{debug, error};
-use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::chat;
@@ -21,7 +19,7 @@ use crate::app::deps::{
     DynMessagingService, DynRoomFactory, DynTimeProvider,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
-use crate::domain::messaging::models::{MessageLike, TimestampedMessage};
+use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::{ClientEvent, RoomEventType};
 
 #[derive(InjectDependencies)]
@@ -64,6 +62,7 @@ impl XMPPEventHandler for MessagesEventHandler {
                     self.handle_sent_message(message).await?;
                     Ok(None)
                 }
+                _ => Ok(Some(Event::Chat(event))),
             },
             _ => Ok(Some(event)),
         }
@@ -123,26 +122,6 @@ impl MessagesEventHandler {
             }
         }
 
-        struct ChatStateEvent {
-            state: ChatState,
-            from: Jid,
-        }
-
-        let mut chat_state: Option<ChatStateEvent> = None;
-
-        if let ReceivedMessage::Message(message) = &message {
-            if let (Some(state), Some(from)) = (message.chat_state(), &message.from) {
-                chat_state = Some(ChatStateEvent {
-                    state,
-                    from: if message.type_ == MessageType::Groupchat {
-                        from.clone()
-                    } else {
-                        Jid::Bare(from.to_bare())
-                    },
-                });
-            }
-        }
-
         let message_is_carbon = message.is_carbon();
         let now = self.time_provider.now();
 
@@ -157,45 +136,27 @@ impl MessagesEventHandler {
             }),
         };
 
-        let parsed_message = match parsed_message {
-            Ok(message) => Some(message),
+        let message = match parsed_message {
+            Ok(message) => message,
             Err(err) => {
-                error!("Failed to parse received message: {}", err);
-                None
+                return match err.downcast_ref::<MessageLikeError>() {
+                    Some(MessageLikeError::NoPayload) => Ok(()),
+                    None => {
+                        error!("Failed to parse received message: {}", err);
+                        Ok(())
+                    }
+                }
             }
         };
 
-        if parsed_message.is_none() && chat_state.is_none() {
-            // Nothing to do…
-            return Ok(());
-        }
+        debug!("Caching received message…");
+        self.messages_repo.append(&from, &[&message]).await?;
 
-        if let Some(message) = &parsed_message {
-            debug!("Caching received message…");
-            self.messages_repo.append(&from, &[message]).await?;
-
-            self.client_event_dispatcher
-                .dispatch_event(ClientEvent::RoomChanged {
-                    room: self.room_factory.build(room.clone()),
-                    r#type: RoomEventType::from(message),
-                });
-        }
-
-        if let Some(chat_state) = chat_state {
-            room.state
-                .write()
-                .set_occupant_chat_state(&chat_state.from, &now, chat_state.state);
-
-            self.client_event_dispatcher
-                .dispatch_event(ClientEvent::RoomChanged {
-                    room: self.room_factory.build(room.clone()),
-                    r#type: RoomEventType::ComposingUsersChanged,
-                });
-        }
-
-        let Some(message) = parsed_message else {
-            return Ok(());
-        };
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::RoomChanged {
+                room: self.room_factory.build(room.clone()),
+                r#type: RoomEventType::from(&message),
+            });
 
         // Don't send delivery receipts for carbons or anything other than a regular message.
         if message_is_carbon || !message.payload.is_message() {

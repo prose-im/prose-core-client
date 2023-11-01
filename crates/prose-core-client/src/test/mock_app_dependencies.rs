@@ -14,7 +14,11 @@ use parking_lot::RwLock;
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full};
 
-use crate::app::deps::{AppContext, AppDependencies, DynIDProvider, DynTimeProvider};
+use crate::app::deps::{
+    AppContext, AppDependencies, DynDraftsRepository, DynIDProvider, DynMessageArchiveService,
+    DynMessagesRepository, DynMessagingService, DynRoomParticipationService, DynRoomTopicService,
+    DynTimeProvider,
+};
 use crate::app::event_handlers::MockEventDispatcher;
 use crate::app::services::RoomInner;
 use crate::domain::account::services::mocks::MockUserAccountService;
@@ -29,8 +33,9 @@ use crate::domain::messaging::services::mocks::{MockMessageArchiveService, MockM
 use crate::domain::rooms::repos::mocks::{MockBookmarksRepository, MockConnectedRoomsRepository};
 use crate::domain::rooms::services::mocks::{
     MockRoomManagementService, MockRoomParticipationService, MockRoomTopicService,
+    MockRoomsDomainService,
 };
-use crate::domain::rooms::services::{RoomFactory, RoomsDomainService};
+use crate::domain::rooms::services::RoomFactory;
 use crate::domain::settings::repos::mocks::MockAccountSettingsRepository;
 use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoRepository};
 use crate::domain::user_info::services::mocks::MockUserInfoService;
@@ -86,14 +91,13 @@ pub struct MockAppDependencies {
     pub messages_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
     pub request_handling_service: MockRequestHandlingService,
+    pub rooms_domain_service: MockRoomsDomainService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
     pub room_topic_service: MockRoomTopicService,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub short_id_provider: DynIDProvider,
-    #[derivative(Default(
-        value = "Arc::new(ConstantTimeProvider { time: mock_reference_date() })"
-    ))]
+    #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
     pub user_account_service: MockUserAccountService,
     pub user_info_repo: MockUserInfoRepository,
@@ -147,17 +151,6 @@ impl From<MockAppDependencies> for AppDependencies {
             }))
         };
 
-        let rooms_domain_service = RoomsDomainService {
-            bookmarks_repo: bookmarks_repo.clone(),
-            client_event_dispatcher: client_event_dispatcher.clone(),
-            connected_rooms_repo: connected_rooms_repo.clone(),
-            ctx: ctx.clone(),
-            id_provider: mock.id_provider.clone(),
-            room_management_service: room_management_service.clone(),
-            room_participation_service: room_participation_service.clone(),
-            user_profile_repo: user_profile_repo.clone(),
-        };
-
         AppDependencies {
             account_settings_repo: Arc::new(mock.account_settings_repo),
             avatar_repo: Arc::new(mock.avatar_repo),
@@ -178,7 +171,7 @@ impl From<MockAppDependencies> for AppDependencies {
             room_management_service,
             room_participation_service,
             room_topic_service,
-            rooms_domain_service: Arc::new(rooms_domain_service),
+            rooms_domain_service: Arc::new(mock.rooms_domain_service),
             short_id_provider: mock.short_id_provider,
             time_provider: mock.time_provider,
             user_account_service: Arc::new(mock.user_account_service),
@@ -187,5 +180,74 @@ impl From<MockAppDependencies> for AppDependencies {
             user_profile_repo,
             user_profile_service: Arc::new(mock.user_profile_service),
         }
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Default)]
+pub struct MockRoomFactoryDependencies {
+    pub drafts_repo: MockDraftsRepository,
+    pub message_archive_service: MockMessageArchiveService,
+    pub message_repo: MockMessagesRepository,
+    pub messaging_service: MockMessagingService,
+    pub participation_service: MockRoomParticipationService,
+    #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
+    pub time_provider: DynTimeProvider,
+    pub topic_service: MockRoomTopicService,
+}
+
+pub struct MockSealedRoomFactoryDependencies {
+    pub drafts_repo: DynDraftsRepository,
+    pub message_archive_service: DynMessageArchiveService,
+    pub message_repo: DynMessagesRepository,
+    pub messaging_service: DynMessagingService,
+    pub participation_service: DynRoomParticipationService,
+    pub time_provider: DynTimeProvider,
+    pub topic_service: DynRoomTopicService,
+}
+
+impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
+    fn from(value: MockRoomFactoryDependencies) -> Self {
+        Self {
+            drafts_repo: Arc::new(value.drafts_repo),
+            message_archive_service: Arc::new(value.message_archive_service),
+            message_repo: Arc::new(value.message_repo),
+            messaging_service: Arc::new(value.messaging_service),
+            participation_service: Arc::new(value.participation_service),
+            time_provider: Arc::new(value.time_provider),
+            topic_service: Arc::new(value.topic_service),
+        }
+    }
+}
+
+impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
+    fn from(value: MockSealedRoomFactoryDependencies) -> Self {
+        RoomFactory::new(Arc::new(move |data| {
+            RoomInner {
+                data: data.clone(),
+                time_provider: value.time_provider.clone(),
+                messaging_service: value.messaging_service.clone(),
+                message_archive_service: value.message_archive_service.clone(),
+                participation_service: value.participation_service.clone(),
+                topic_service: value.topic_service.clone(),
+                message_repo: value.message_repo.clone(),
+                drafts_repo: value.drafts_repo.clone(),
+            }
+            .into()
+        }))
+    }
+}
+
+impl From<MockRoomFactoryDependencies> for RoomFactory {
+    fn from(value: MockRoomFactoryDependencies) -> Self {
+        MockSealedRoomFactoryDependencies::from(value).into()
+    }
+}
+
+impl RoomFactory {
+    pub fn mock() -> Self {
+        RoomFactory::from(MockSealedRoomFactoryDependencies::from(
+            MockRoomFactoryDependencies::default(),
+        ))
     }
 }

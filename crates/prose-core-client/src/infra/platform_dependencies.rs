@@ -11,7 +11,8 @@ use crate::app::deps::{
     AppContext, AppDependencies, DynClientEventDispatcher, DynIDProvider, DynTimeProvider,
 };
 use crate::app::services::RoomInner;
-use crate::domain::rooms::services::{RoomFactory, RoomsDomainService};
+use crate::domain::rooms::services::impls::RoomsDomainService;
+use crate::domain::rooms::services::RoomFactory;
 use crate::infra::avatars::AvatarCache;
 use crate::infra::contacts::CachingContactsRepository;
 use crate::infra::messaging::{

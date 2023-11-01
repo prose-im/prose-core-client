@@ -53,11 +53,11 @@ impl RoomsService {
             return Ok(());
         }
 
-        let user_jid = self.ctx.connected_jid()?;
+        let user_jid = self.ctx.connected_jid()?.into_bare();
 
         // Insert contacts as "Direct Message" rooms…
         let direct_message_rooms = {
-            let contacts = self.contacts_repo.get_all(&user_jid.to_bare()).await?;
+            let contacts = self.contacts_repo.get_all(&user_jid).await?;
             let mut rooms = vec![];
 
             for contact in contacts {

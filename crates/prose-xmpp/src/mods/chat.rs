@@ -34,6 +34,11 @@ pub enum Event {
     Message(Message),
     Carbon(Carbon),
     Sent(Message),
+    ChatStateChanged {
+        from: Jid,
+        chat_state: ChatState,
+        message_type: MessageType,
+    },
 }
 
 impl Module for Chat {
@@ -44,6 +49,21 @@ impl Module for Chat {
     fn handle_message_stanza(&self, stanza: &Message) -> Result<()> {
         // Ignore MAM messages.
         if stanza.is_mam_message() {
+            return Ok(());
+        }
+
+        if let (Some(from), Some(chat_state)) = (stanza.from.clone(), stanza.chat_state()) {
+            self.ctx
+                .schedule_event(ClientEvent::Chat(Event::ChatStateChanged {
+                    from,
+                    chat_state,
+                    message_type: stanza.type_.clone(),
+                }));
+        }
+
+        // If the chat state was the only payload no need to send an event for the remaining
+        // empty message.
+        if stanza.payloads.is_empty() && stanza.bodies.is_empty() && stanza.subjects.is_empty() {
             return Ok(());
         }
 

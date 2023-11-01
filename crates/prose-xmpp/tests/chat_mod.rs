@@ -177,6 +177,44 @@ async fn test_does_not_send_sent_carbon_event_for_different_user() -> Result<()>
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn test_sends_chat_state_changed_event() -> Result<()> {
+    let ConnectedClient {
+        connection,
+        sent_events,
+        ..
+    } = Client::connected_client().await?;
+
+    connection
+        .receive_stanza(
+            Message::new()
+                .set_from(jid!("sender@prose.org"))
+                .set_chat_state(Some(ChatState::Composing))
+                .set_body("Hello World"),
+        )
+        .await;
+
+    assert_eq!(
+        *sent_events.read(),
+        vec![
+            Event::Chat(mods::chat::Event::ChatStateChanged {
+                from: jid!("sender@prose.org"),
+                chat_state: ChatState::Composing,
+                message_type: Default::default()
+            }),
+            Event::Chat(mods::chat::Event::Message(
+                // Chat state should be removed…
+                Message::new()
+                    .set_from(jid!("sender@prose.org"))
+                    .set_chat_state(Some(ChatState::Composing))
+                    .set_body("Hello World")
+            ))
+        ]
+    );
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_send_message() -> Result<()> {
     let ConnectedClient {
         connection, client, ..

@@ -13,6 +13,7 @@ pub use rooms_domain_service::{
 };
 
 mod bookmarks_service;
+pub mod impls;
 mod room_factory;
 mod room_management_service;
 mod room_participation_service;
@@ -25,4 +26,5 @@ pub mod mocks {
     pub use super::room_management_service::MockRoomManagementService;
     pub use super::room_participation_service::MockRoomParticipationService;
     pub use super::room_topic_service::MockRoomTopicService;
+    pub use super::rooms_domain_service::MockRoomsDomainService;
 }

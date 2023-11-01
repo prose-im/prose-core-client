@@ -17,6 +17,12 @@ use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 
 use super::{MessageId, StanzaId, StanzaParseError};
 
+#[derive(thiserror::Error, Debug)]
+pub enum MessageLikeError {
+    #[error("No payload in message")]
+    NoPayload,
+}
+
 /// A type that describes permanent messages, i.e. messages that need to be replayed to restore
 /// the complete history of a conversation. Note that ephemeral messages like chat states are
 /// handled differently.
@@ -274,9 +280,6 @@ impl TryFrom<&Message> for TargetedPayload {
             });
         }
 
-        Err(anyhow::format_err!(
-            "Failed to interpret message {:?}",
-            message
-        ))
+        Err(MessageLikeError::NoPayload.into())
     }
 }

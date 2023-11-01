@@ -69,16 +69,148 @@ impl RoomState {
 
     /// Returns all composing users that started composing after `started_after`.
     pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<BareJid> {
-        self.occupants
+        let mut composing_occupants = self
+            .occupants
             .values()
             .filter_map(|occupant| {
                 if occupant.chat_state != ChatState::Composing
-                    || occupant.chat_state_updated < started_after
+                    || occupant.chat_state_updated <= started_after
+                    || occupant.jid.is_none()
                 {
                     return None;
                 }
-                occupant.jid.clone()
+                Some(occupant.clone())
             })
+            .collect::<Vec<_>>();
+        composing_occupants.sort_by_key(|o| o.chat_state_updated);
+        composing_occupants
+            .into_iter()
+            .filter_map(|occupant| occupant.jid)
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use chrono::TimeZone;
+
+    use prose_xmpp::{bare, jid};
+
+    use super::*;
+
+    #[test]
+    fn test_insert_occupant() {
+        let mut state = RoomState::default();
+        assert!(state.occupants.is_empty());
+
+        state.insert_occupant(
+            &jid!("room@prose.org/a"),
+            Some(&bare!("a@prose.org")),
+            &Affiliation::Owner,
+        );
+        state.insert_occupant(&jid!("b@prose.org"), None, &Affiliation::Member);
+
+        assert_eq!(state.occupants.len(), 2);
+        assert_eq!(
+            state.occupants.get(&jid!("room@prose.org/a")).unwrap(),
+            &Occupant {
+                jid: Some(bare!("a@prose.org")),
+                affiliation: Affiliation::Owner,
+                occupant_id: None,
+                chat_state: ChatState::Gone,
+                chat_state_updated: Default::default(),
+            }
+        );
+        assert_eq!(
+            state.occupants.get(&jid!("b@prose.org")).unwrap(),
+            &Occupant {
+                jid: None,
+                affiliation: Affiliation::Member,
+                occupant_id: None,
+                chat_state: ChatState::Gone,
+                chat_state_updated: Default::default(),
+            }
+        );
+    }
+
+    #[test]
+    fn test_set_occupant_chat_state() {
+        let mut state = RoomState::default();
+
+        state.insert_occupant(
+            &jid!("room@prose.org/a"),
+            Some(&bare!("a@prose.org")),
+            &Affiliation::Owner,
+        );
+
+        state.set_occupant_chat_state(
+            &jid!("room@prose.org/a"),
+            &Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 0).unwrap(),
+            ChatState::Composing,
+        );
+
+        assert_eq!(
+            state
+                .occupants
+                .get(&jid!("room@prose.org/a"))
+                .unwrap()
+                .chat_state,
+            ChatState::Composing
+        );
+        assert_eq!(
+            state
+                .occupants
+                .get(&jid!("room@prose.org/a"))
+                .unwrap()
+                .chat_state_updated,
+            Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 0).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_composing_users() {
+        let mut state = RoomState::default();
+
+        state.occupants.insert(
+            jid!("room@prose.org/a"),
+            Occupant {
+                jid: Some(bare!("a@prose.org")),
+                chat_state: ChatState::Composing,
+                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
+                ..Default::default()
+            },
+        );
+        state.occupants.insert(
+            jid!("room@prose.org/b"),
+            Occupant {
+                jid: Some(bare!("b@prose.org")),
+                chat_state: ChatState::Active,
+                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
+                ..Default::default()
+            },
+        );
+        state.occupants.insert(
+            jid!("room@prose.org/c"),
+            Occupant {
+                jid: Some(bare!("c@prose.org")),
+                chat_state: ChatState::Composing,
+                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 20).unwrap(),
+                ..Default::default()
+            },
+        );
+        state.occupants.insert(
+            jid!("room@prose.org/d"),
+            Occupant {
+                jid: Some(bare!("d@prose.org")),
+                chat_state: ChatState::Composing,
+                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap(),
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(
+            state.composing_users(Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap()),
+            vec![bare!("c@prose.org"), bare!("a@prose.org")]
+        );
     }
 }
