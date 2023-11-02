@@ -59,6 +59,10 @@ impl Client {
     pub fn get_mod<M: AnyModule + Clone>(&self) -> M {
         self.inner.get_mod()
     }
+
+    pub fn send_raw_stanza(&self, stanza: impl Into<Element>) -> Result<()> {
+        self.inner.context.send_stanza(stanza)
+    }
 }
 
 pub(super) struct ClientInner {

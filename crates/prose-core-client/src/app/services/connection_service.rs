@@ -117,3 +117,10 @@ impl ConnectionService {
         self.ctx.connection_properties.write().take();
     }
 }
+
+#[cfg(feature = "debug")]
+impl ConnectionService {
+    pub async fn send_raw_stanza(&self, stanza: minidom::Element) -> anyhow::Result<()> {
+        self.connection_service.send_raw_stanza(stanza).await
+    }
+}

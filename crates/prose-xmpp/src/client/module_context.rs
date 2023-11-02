@@ -56,10 +56,7 @@ impl ModuleContext {
     }
 
     pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<()> {
-        let Some(conn) = &*self.inner.connection.read() else {
-            return Ok(());
-        };
-        conn.send_stanza(stanza.into())
+        self.inner.send_stanza(stanza)
     }
 
     pub(crate) fn full_jid(&self) -> FullJid {
@@ -107,6 +104,13 @@ pub(super) struct ModuleContextInner {
 }
 
 impl ModuleContextInner {
+    pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<()> {
+        let Some(conn) = &*self.connection.read() else {
+            return Ok(());
+        };
+        conn.send_stanza(stanza.into())
+    }
+
     #[cfg(any(not(feature = "test"), target_arch = "wasm32"))]
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);

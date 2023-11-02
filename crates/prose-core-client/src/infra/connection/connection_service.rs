@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
+use minidom::Element;
 
 use prose_xmpp::{mods, ConnectionError};
 
@@ -52,5 +53,9 @@ impl ConnectionService for XMPPClient {
         }
 
         Ok(server_features)
+    }
+
+    async fn send_raw_stanza(&self, stanza: Element) -> Result<()> {
+        self.client.send_raw_stanza(stanza)
     }
 }

@@ -14,6 +14,7 @@ use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::convert::IntoAttributeValue;
+use minidom::Element;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
 use url::Url;
@@ -704,6 +705,8 @@ enum Selection {
     ListRoomOccupants,
     #[strum(serialize = "List members in room")]
     ListRoomMembers,
+    #[strum(serialize = "Send raw XML")]
+    SendRawXML,
     Disconnect,
     Noop,
     Exit,
@@ -891,6 +894,13 @@ async fn main() -> Result<()> {
                     .map(|jid| jid.to_string())
                     .collect::<Vec<_>>();
                 println!("{}", members.join("\n"))
+            }
+            Selection::SendRawXML => {
+                let input = Input::<String>::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Enter XML")
+                    .interact_text()?;
+                let element = Element::from_str(&input)?;
+                client.send_raw_stanza(element).await?;
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

@@ -69,3 +69,10 @@ impl Client {
         self.connection.disconnect().await
     }
 }
+
+#[cfg(feature = "debug")]
+impl Client {
+    pub async fn send_raw_stanza(&self, stanza: impl Into<minidom::Element>) -> Result<()> {
+        self.inner.connection.send_raw_stanza(stanza.into()).await
+    }
+}
