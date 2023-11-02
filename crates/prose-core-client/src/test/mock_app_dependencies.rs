@@ -17,7 +17,7 @@ use prose_xmpp::{bare, full};
 use crate::app::deps::{
     AppContext, AppDependencies, DynDraftsRepository, DynIDProvider, DynMessageArchiveService,
     DynMessagesRepository, DynMessagingService, DynRoomParticipationService, DynRoomTopicService,
-    DynTimeProvider,
+    DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::MockEventDispatcher;
 use crate::app::services::RoomInner;
@@ -135,6 +135,7 @@ impl From<MockAppDependencies> for AppDependencies {
             let participation_service = room_participation_service.clone();
             let time_provider = mock.time_provider.clone();
             let topic_service = room_topic_service.clone();
+            let user_profile_repo = user_profile_repo.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
@@ -146,6 +147,7 @@ impl From<MockAppDependencies> for AppDependencies {
                     topic_service: topic_service.clone(),
                     message_repo: message_repo.clone(),
                     drafts_repo: drafts_repo.clone(),
+                    user_profile_repo: user_profile_repo.clone(),
                 }
                 .into()
             }))
@@ -194,6 +196,7 @@ pub struct MockRoomFactoryDependencies {
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
     pub topic_service: MockRoomTopicService,
+    pub user_profile_repo: MockUserProfileRepository,
 }
 
 pub struct MockSealedRoomFactoryDependencies {
@@ -204,6 +207,7 @@ pub struct MockSealedRoomFactoryDependencies {
     pub participation_service: DynRoomParticipationService,
     pub time_provider: DynTimeProvider,
     pub topic_service: DynRoomTopicService,
+    pub user_profile_repo: DynUserProfileRepository,
 }
 
 impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
@@ -216,6 +220,7 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
             participation_service: Arc::new(value.participation_service),
             time_provider: Arc::new(value.time_provider),
             topic_service: Arc::new(value.topic_service),
+            user_profile_repo: Arc::new(value.user_profile_repo),
         }
     }
 }
@@ -225,13 +230,14 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
         RoomFactory::new(Arc::new(move |data| {
             RoomInner {
                 data: data.clone(),
-                time_provider: value.time_provider.clone(),
-                messaging_service: value.messaging_service.clone(),
-                message_archive_service: value.message_archive_service.clone(),
-                participation_service: value.participation_service.clone(),
-                topic_service: value.topic_service.clone(),
-                message_repo: value.message_repo.clone(),
                 drafts_repo: value.drafts_repo.clone(),
+                message_archive_service: value.message_archive_service.clone(),
+                message_repo: value.message_repo.clone(),
+                messaging_service: value.messaging_service.clone(),
+                participation_service: value.participation_service.clone(),
+                time_provider: value.time_provider.clone(),
+                topic_service: value.topic_service.clone(),
+                user_profile_repo: value.user_profile_repo.clone(),
             }
             .into()
         }))

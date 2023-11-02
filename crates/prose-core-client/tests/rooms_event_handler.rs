@@ -19,7 +19,7 @@ use prose_core_client::domain::contacts::models::Contact;
 use prose_core_client::domain::rooms::models::{RoomInfo, RoomInternals};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::{Group, Occupant};
+use prose_core_client::dtos::{ComposingUser, Group, Occupant};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
@@ -95,22 +95,11 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
 async fn test_handles_chat_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals {
-        info: RoomInfo {
-            jid: bare!("room@conference.prose.org"),
-            name: None,
-            description: None,
-            user_jid: bare!("user@prose.org"),
-            user_nickname: "".to_string(),
-            members: vec![],
-            room_type: RoomType::Group,
-        },
-        state: Default::default(),
-    });
-    room.state.write().insert_occupant(
-        &jid!("room@conference.prose.org/nickname"),
-        Some(&bare!("nickname@prose.org")),
-        &Affiliation::Owner,
+    let room = Arc::new(
+        RoomInternals::group(&bare!("room@conference.prose.org")).with_occupants([(
+            jid!("room@conference.prose.org/nickname"),
+            Occupant::owner().set_real_jid(&bare!("nickname@prose.org")),
+        )]),
     );
 
     {
@@ -159,12 +148,21 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
 
     let mut factory_deps = MockRoomFactoryDependencies::default();
     factory_deps.time_provider = time_provider.clone();
+    factory_deps
+        .user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(bare!("nickname@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Janice Doe".to_string())) }));
 
     let room_factory = RoomFactory::from(factory_deps);
     let room = room_factory.build(room.clone()).to_generic_room();
     assert_eq!(
         room.load_composing_users().await?,
-        vec![bare!("nickname@prose.org")]
+        vec![ComposingUser {
+            name: "Janice Doe".to_string(),
+            jid: bare!("nickname@prose.org")
+        }]
     );
 
     time_provider.set_ymd_hms(2023, 01, 04, 00, 00, 31);
@@ -233,12 +231,21 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
 
     let mut factory_deps = MockRoomFactoryDependencies::default();
     factory_deps.time_provider = time_provider.clone();
+    factory_deps
+        .user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(bare!("contact@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Janice Doe".to_string())) }));
 
     let room_factory = RoomFactory::from(factory_deps);
     let room = room_factory.build(room.clone()).to_generic_room();
     assert_eq!(
         room.load_composing_users().await?,
-        vec![bare!("contact@prose.org")]
+        vec![ComposingUser {
+            name: "Janice Doe".to_string(),
+            jid: bare!("contact@prose.org")
+        }]
     );
 
     time_provider.set_ymd_hms(2023, 01, 04, 00, 00, 31);

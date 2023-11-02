@@ -81,6 +81,15 @@ impl UserProfileRepository for CachingUserProfileRepository {
         Ok(())
     }
 
+    async fn get_display_name(&self, jid: &BareJid) -> Result<Option<String>> {
+        // This is a bit heavy-handed right now to load the full contact. prose-store should
+        // support multi-column indexes instead so that we can just pull out the required fields.
+        Ok(self
+            .get(jid)
+            .await?
+            .and_then(|p| p.full_name().or(p.nickname)))
+    }
+
     async fn clear_cache(&self) -> Result<()> {
         let tx = self
             .store

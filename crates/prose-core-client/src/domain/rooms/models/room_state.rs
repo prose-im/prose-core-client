@@ -67,7 +67,8 @@ impl RoomState {
             });
     }
 
-    /// Returns all composing users that started composing after `started_after`.
+    /// Returns the real JIDs of all composing users that started composing after `started_after`.
+    /// If we don't have a real JID for a composing user they are excluded from the list.
     pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<BareJid> {
         let mut composing_occupants = self
             .occupants
@@ -87,6 +88,10 @@ impl RoomState {
             .into_iter()
             .filter_map(|occupant| occupant.jid)
             .collect()
+    }
+
+    pub fn real_jid_for_occupant(&self, occupant_jid: &Jid) -> Option<BareJid> {
+        self.occupants.get(occupant_jid).and_then(|o| o.jid.clone())
     }
 }
 

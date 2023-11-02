@@ -80,6 +80,7 @@ impl From<PlatformDependencies> for AppDependencies {
             let time_provider = time_provider.clone();
             let message_repo = messages_repo.clone();
             let drafts_repo = drafts_repo.clone();
+            let user_profile_repo = user_profile_repo.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
@@ -91,6 +92,7 @@ impl From<PlatformDependencies> for AppDependencies {
                     topic_service: xmpp.clone(),
                     message_repo: message_repo.clone(),
                     drafts_repo: drafts_repo.clone(),
+                    user_profile_repo: user_profile_repo.clone(),
                 }
                 .into()
             }))

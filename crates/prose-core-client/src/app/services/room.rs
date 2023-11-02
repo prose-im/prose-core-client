@@ -15,10 +15,11 @@ use tracing::{debug, info};
 
 use crate::app::deps::{
     DynDraftsRepository, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
-    DynRoomParticipationService, DynRoomTopicService, DynTimeProvider,
+    DynRoomParticipationService, DynRoomTopicService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
-use crate::domain::rooms::models::RoomInternals;
+use crate::domain::rooms::models::{ComposingUser, RoomInternals};
+use crate::util::jid_ext::JidExt;
 
 pub struct Room<Kind> {
     inner: Arc<RoomInner>,
@@ -55,6 +56,7 @@ pub struct RoomInner {
 
     pub(crate) message_repo: DynMessagesRepository,
     pub(crate) drafts_repo: DynDraftsRepository,
+    pub(crate) user_profile_repo: DynUserProfileRepository,
 }
 
 impl<Kind> From<Arc<RoomInner>> for Room<Kind> {
@@ -200,11 +202,25 @@ impl<Kind> Room<Kind> {
             .await
     }
 
-    pub async fn load_composing_users(&self) -> Result<Vec<BareJid>> {
+    pub async fn load_composing_users(&self) -> Result<Vec<ComposingUser>> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
         let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
-        Ok(self.data.state.read().composing_users(thirty_secs_ago))
+        let state = &*self.data.state.read();
+
+        let mut composing_users = vec![];
+        for real_jid in state.composing_users(thirty_secs_ago) {
+            composing_users.push(ComposingUser {
+                name: self
+                    .user_profile_repo
+                    .get_display_name(&real_jid)
+                    .await?
+                    .unwrap_or_else(|| real_jid.to_display_name()),
+                jid: real_jid,
+            })
+        }
+
+        Ok(composing_users)
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
@@ -245,13 +261,8 @@ impl<Kind> Room<Kind> {
     fn reduce_messages_and_lookup_real_jids(&self, mut messages: Vec<MessageLike>) -> Vec<Message> {
         let state = &*self.data.state.read();
         for message in messages.iter_mut() {
-            if let Some(real_jid) = state
-                .occupants
-                .get(&message.from)
-                .and_then(|o| o.jid.clone())
-                .map(Jid::Bare)
-            {
-                message.from = real_jid;
+            if let Some(real_jid) = state.real_jid_for_occupant(&message.from) {
+                message.from = Jid::Bare(real_jid)
             }
         }
         Message::reducing_messages(messages)

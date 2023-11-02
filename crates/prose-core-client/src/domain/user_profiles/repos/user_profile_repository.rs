@@ -17,5 +17,10 @@ pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get(&self, jid: &BareJid) -> Result<Option<UserProfile>>;
     async fn set(&self, jid: &BareJid, profile: &UserProfile) -> Result<()>;
     async fn delete(&self, jid: &BareJid) -> Result<()>;
+
+    /// Returns the display name for `jid`. Display name is a cascade of first_name, last_name
+    /// and nickname;
+    async fn get_display_name(&self, jid: &BareJid) -> Result<Option<String>>;
+
     async fn clear_cache(&self) -> Result<()>;
 }
