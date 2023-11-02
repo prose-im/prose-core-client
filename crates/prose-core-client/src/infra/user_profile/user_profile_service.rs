@@ -7,6 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use jid::{BareJid, FullJid};
+use tracing::warn;
 use url::Url;
 
 use crate::domain::user_info::models::{LastActivity, UserMetadata};
@@ -24,8 +25,15 @@ use crate::infra::xmpp::XMPPClient;
 impl UserProfileService for XMPPClient {
     async fn load_profile(&self, from: &BareJid) -> Result<Option<UserProfile>> {
         let profile = self.client.get_mod::<mods::Profile>();
-        let vcard = profile.load_vcard(from.clone()).await?;
-        Ok(vcard.map(TryInto::try_into).transpose()?)
+
+        match profile.load_vcard(from.clone()).await {
+            Ok(vcard) => Ok(vcard.map(TryInto::try_into).transpose()?),
+            Err(err) if err.is_forbidden_err() => {
+                warn!("You don't have the rights to access the vCard of {}", from);
+                Ok(None)
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 
     async fn load_user_metadata(

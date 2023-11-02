@@ -46,6 +46,10 @@ impl RequestError {
         self.defined_condition() == Some(DefinedCondition::ItemNotFound)
     }
 
+    pub fn is_forbidden_err(&self) -> bool {
+        self.defined_condition() == Some(DefinedCondition::Forbidden)
+    }
+
     pub fn defined_condition(&self) -> Option<DefinedCondition> {
         let RequestError::XMPP {
             err: StanzaError {

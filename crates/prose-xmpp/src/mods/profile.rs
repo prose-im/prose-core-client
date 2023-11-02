@@ -22,12 +22,12 @@ use xmpp_parsers::version::{VersionQuery, VersionResult};
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
-use crate::ns;
 use crate::stanza::avatar;
 use crate::stanza::avatar::ImageId;
 use crate::stanza::last_activity::LastActivityResponse;
 use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::RequestError;
+use crate::{ns, ParseError};
 
 #[derive(Default, Clone)]
 pub struct Profile {
@@ -171,7 +171,10 @@ impl Module for Profile {
 }
 
 impl Profile {
-    pub async fn load_vcard(&self, from: impl Into<BareJid>) -> Result<Option<VCard4>> {
+    pub async fn load_vcard(
+        &self,
+        from: impl Into<BareJid>,
+    ) -> Result<Option<VCard4>, RequestError> {
         let iq = Iq {
             from: None,
             to: Some(Jid::from(from.into())),
@@ -180,7 +183,9 @@ impl Profile {
         };
 
         let vcard = match self.ctx.send_iq(iq).await {
-            Ok(Some(payload)) => VCard4::try_from(payload)?,
+            Ok(Some(payload)) => {
+                VCard4::try_from(payload).map_err(|e| ParseError::Generic { msg: e.to_string() })?
+            }
             Ok(None) => return Err(RequestError::UnexpectedResponse.into()),
             Err(e) if e.is_item_not_found_err() => return Ok(None),
             Err(e) => return Err(e.into()),
@@ -242,7 +247,7 @@ impl Profile {
     pub async fn load_latest_avatar_metadata(
         &self,
         from: impl Into<Jid>,
-    ) -> Result<Option<avatar::Info>> {
+    ) -> Result<Option<avatar::Info>, RequestError> {
         let iq = Iq {
             from: None,
             to: Some(from.into()),
@@ -277,7 +282,15 @@ impl Profile {
             return Ok(None);
         };
 
-        let mut metadata = avatar::Metadata::try_from(payload)?;
+        let mut metadata = match avatar::Metadata::try_from(payload) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                return Err(ParseError::Generic {
+                    msg: err.to_string(),
+                }
+                .into())
+            }
+        };
 
         if metadata.infos.is_empty() {
             return Ok(None);
@@ -328,7 +341,7 @@ impl Profile {
         &self,
         from: impl Into<Jid>,
         image_id: &Sha1HexAttribute,
-    ) -> Result<Option<AvatarData>> {
+    ) -> Result<Option<AvatarData>, RequestError> {
         let iq = Iq {
             from: None,
             to: Some(from.into()),

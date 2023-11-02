@@ -8,6 +8,7 @@ use std::str::FromStr;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
+use tracing::warn;
 use xmpp_parsers::hashes::Sha1HexAttribute;
 
 use prose_xmpp::mods;
@@ -23,11 +24,18 @@ use crate::infra::xmpp::XMPPClient;
 impl UserInfoService for XMPPClient {
     async fn load_latest_avatar_metadata(&self, from: &BareJid) -> Result<Option<AvatarMetadata>> {
         let profile = self.client.get_mod::<mods::Profile>();
-        let metadata = profile
-            .load_latest_avatar_metadata(from.clone())
-            .await?
-            .map(Into::into);
-        Ok(metadata)
+
+        match profile.load_latest_avatar_metadata(from.clone()).await {
+            Ok(metadata) => Ok(metadata.map(Into::into)),
+            Err(err) if err.is_forbidden_err() => {
+                warn!(
+                    "You don't have the rights to access the avatar metadata of {}",
+                    from
+                );
+                Ok(None)
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 
     async fn load_avatar_image(
@@ -36,13 +44,21 @@ impl UserInfoService for XMPPClient {
         image_id: &AvatarImageId,
     ) -> Result<Option<AvatarData>> {
         let profile = self.client.get_mod::<mods::Profile>();
-        let image = profile
+
+        match profile
             .load_avatar_image(
                 from.clone(),
                 &Sha1HexAttribute::from_str(&image_id.as_ref())?,
             )
-            .await?;
-        Ok(image)
+            .await
+        {
+            Ok(image) => Ok(image),
+            Err(err) if err.is_forbidden_err() => {
+                warn!("You don't have the rights to access the avatar of {}", from);
+                Ok(None)
+            }
+            Err(err) => Err(err.into()),
+        }
     }
 }
 
