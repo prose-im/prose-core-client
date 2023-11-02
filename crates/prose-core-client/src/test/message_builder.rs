@@ -41,7 +41,6 @@ pub struct MessageBuilder {
     is_edited: bool,
     is_delivered: bool,
     reactions: Vec<Reaction>,
-    is_first_message: bool,
 }
 
 impl MessageBuilder {
@@ -63,7 +62,6 @@ impl MessageBuilder {
             is_edited: false,
             is_delivered: false,
             reactions: vec![],
-            is_first_message: false,
         }
     }
 
@@ -102,7 +100,6 @@ impl MessageBuilder {
             from: self.from,
             timestamp: self.timestamp,
             payload: MessageLikePayload::Message { body: self.body },
-            is_first_message: self.is_first_message,
         }
     }
 
@@ -119,7 +116,6 @@ impl MessageBuilder {
             from: self.from,
             timestamp: self.timestamp,
             payload,
-            is_first_message: self.is_first_message,
         }
     }
 

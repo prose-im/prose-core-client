@@ -294,7 +294,6 @@ mod tests {
                 payload: MessageLikePayload::Message {
                     body: String::from("Hello World"),
                 },
-                is_first_message: false,
             },
             MessageLike {
                 id: "2".into(),
@@ -309,7 +308,6 @@ mod tests {
                 payload: MessageLikePayload::Reaction {
                     emojis: vec!["👍".into()],
                 },
-                is_first_message: false,
             },
             MessageLike {
                 id: "3".into(),
@@ -324,7 +322,6 @@ mod tests {
                 payload: MessageLikePayload::Reaction {
                     emojis: vec!["👍".into()],
                 },
-                is_first_message: false,
             },
             MessageLike {
                 id: "4".into(),
@@ -339,7 +336,6 @@ mod tests {
                 payload: MessageLikePayload::Reaction {
                     emojis: vec!["👍".into(), "📼".into(), "🍿".into(), "☕️".into()],
                 },
-                is_first_message: false,
             },
             MessageLike {
                 id: "5".into(),
@@ -354,7 +350,6 @@ mod tests {
                 payload: MessageLikePayload::Reaction {
                     emojis: vec!["📼".into(), "🍿".into()],
                 },
-                is_first_message: false,
             },
         ];
 

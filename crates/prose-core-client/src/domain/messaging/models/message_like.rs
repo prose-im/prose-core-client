@@ -35,7 +35,6 @@ pub struct MessageLike {
     pub from: Jid,
     pub timestamp: DateTime<Utc>,
     pub payload: Payload,
-    pub is_first_message: bool,
 }
 
 /// A ID that can act as a placeholder in the rare cases when a message doesn't have an ID. Since
@@ -154,7 +153,6 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             from: from.clone(),
             timestamp: timestamp.into(),
             payload,
-            is_first_message: false,
         })
     }
 }
@@ -207,7 +205,6 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             from: from.clone(),
             timestamp: timestamp.0.into(),
             payload,
-            is_first_message: false,
         })
     }
 }
