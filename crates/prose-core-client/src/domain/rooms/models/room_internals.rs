@@ -105,7 +105,6 @@ impl RoomInternals {
                     Occupant {
                         jid: Some(contact.jid.clone()),
                         affiliation: Affiliation::Owner,
-                        occupant_id: None,
                         chat_state: ChatState::Gone,
                         chat_state_updated: Default::default(),
                     },
@@ -165,7 +164,6 @@ mod tests {
                         Occupant {
                             jid: Some(bare!("contact@prose.org")),
                             affiliation: Affiliation::Owner,
-                            occupant_id: None,
                             chat_state: ChatState::Gone,
                             chat_state_updated: Default::default(),
                         }

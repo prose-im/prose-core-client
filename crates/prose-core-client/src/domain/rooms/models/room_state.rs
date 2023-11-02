@@ -24,7 +24,6 @@ pub struct Occupant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.
     pub jid: Option<BareJid>,
     pub affiliation: Affiliation,
-    pub occupant_id: Option<String>,
     pub chat_state: ChatState,
     pub chat_state_updated: DateTime<Utc>,
 }
@@ -34,7 +33,6 @@ impl Default for Occupant {
         Self {
             jid: None,
             affiliation: Default::default(),
-            occupant_id: None,
             chat_state: ChatState::Gone,
             chat_state_updated: Default::default(),
         }
@@ -121,7 +119,6 @@ mod tests {
             &Occupant {
                 jid: Some(bare!("a@prose.org")),
                 affiliation: Affiliation::Owner,
-                occupant_id: None,
                 chat_state: ChatState::Gone,
                 chat_state_updated: Default::default(),
             }
@@ -131,7 +128,6 @@ mod tests {
             &Occupant {
                 jid: None,
                 affiliation: Affiliation::Member,
-                occupant_id: None,
                 chat_state: ChatState::Gone,
                 chat_state_updated: Default::default(),
             }

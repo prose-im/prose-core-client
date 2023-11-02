@@ -39,7 +39,6 @@ impl Occupant {
         Occupant {
             jid: None,
             affiliation: Affiliation::Owner,
-            occupant_id: None,
             chat_state: ChatState::Gone,
             chat_state_updated: Default::default(),
         }

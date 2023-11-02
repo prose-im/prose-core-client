@@ -82,7 +82,6 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
         Occupant {
             jid: Some(bare!("real-jid@prose.org")),
             affiliation: Affiliation::Member,
-            occupant_id: None,
             chat_state: ChatState::Gone,
             chat_state_updated: Default::default(),
         }
