@@ -3,14 +3,15 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
+
 use jid::{BareJid, Jid};
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::muc::user::Affiliation;
 
 use crate::domain::contacts::models::Contact;
-use crate::domain::rooms::models::{RoomMetadata, RoomState};
+use crate::domain::rooms::models::RoomState;
 use crate::domain::shared::models::RoomType;
 use crate::dtos::Occupant;
 
@@ -34,9 +35,14 @@ pub struct RoomInfo {
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
     /// The list of members. Only available for DirectMessage and Group (member-only rooms).
-    pub members: Vec<BareJid>,
+    pub members: HashMap<BareJid, Member>,
     /// The type of the room.
     pub room_type: RoomType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Member {
+    pub name: String,
 }
 
 impl RoomInternals {
@@ -48,7 +54,7 @@ impl RoomInternals {
                 description: None,
                 user_jid: user_jid.clone(),
                 user_nickname: nickname.to_string(),
-                members: vec![],
+                members: HashMap::new(),
                 room_type: RoomType::Pending,
             },
             state: Default::default(),
@@ -57,32 +63,6 @@ impl RoomInternals {
 
     pub fn is_pending(&self) -> bool {
         self.info.room_type == RoomType::Pending
-    }
-
-    pub fn to_permanent(&self, metadata: RoomMetadata) -> Self {
-        assert!(self.is_pending(), "Cannot promote a non-pending room");
-
-        let mut room = Self {
-            info: self.info.clone(),
-            state: RwLock::new(self.state.read().clone()),
-        };
-
-        room.info.jid = metadata.room_jid.to_bare();
-        room.info.user_nickname = metadata.room_jid.resource_str().to_string();
-        room.info.name = metadata.settings.name;
-        room.info.description = metadata.settings.description;
-        room.info.members = metadata.members;
-
-        let features = &metadata.settings.features;
-
-        room.info.room_type = match features {
-            _ if features.can_act_as_group() => RoomType::Group,
-            _ if features.can_act_as_private_channel() => RoomType::PrivateChannel,
-            _ if features.can_act_as_public_channel() => RoomType::PublicChannel,
-            _ => RoomType::Generic,
-        };
-
-        room
     }
 }
 
@@ -95,7 +75,12 @@ impl RoomInternals {
                 description: None,
                 user_jid: user_jid.clone(),
                 user_nickname: "no_nickname".to_string(),
-                members: vec![contact.jid.clone()],
+                members: HashMap::from([(
+                    contact.jid.clone(),
+                    Member {
+                        name: contact_name.to_string(),
+                    },
+                )]),
                 room_type: RoomType::DirectMessage,
             },
             state: RwLock::new(RoomState {
@@ -104,6 +89,7 @@ impl RoomInternals {
                     Jid::Bare(contact.jid.clone()),
                     Occupant {
                         jid: Some(contact.jid.clone()),
+                        name: Some(contact_name.to_string()),
                         affiliation: Affiliation::Owner,
                         chat_state: ChatState::Gone,
                         chat_state_updated: Default::default(),
@@ -123,10 +109,12 @@ impl PartialEq for RoomInternals {
 
 #[cfg(test)]
 mod tests {
-    use prose_xmpp::{bare, jid};
     use std::collections::HashMap;
+
     use xmpp_parsers::chatstates::ChatState;
     use xmpp_parsers::muc::user::Affiliation;
+
+    use prose_xmpp::{bare, jid};
 
     use crate::domain::contacts::models::Group;
     use crate::dtos::Occupant;
@@ -154,7 +142,12 @@ mod tests {
                     description: None,
                     user_jid: bare!("logged-in-user@prose.org"),
                     user_nickname: "no_nickname".to_string(),
-                    members: vec![bare!("contact@prose.org")],
+                    members: HashMap::from([(
+                        bare!("contact@prose.org"),
+                        Member {
+                            name: "Jane Doe".to_string()
+                        }
+                    )]),
                     room_type: RoomType::DirectMessage,
                 },
                 state: RwLock::new(RoomState {
@@ -163,6 +156,7 @@ mod tests {
                         jid!("contact@prose.org"),
                         Occupant {
                             jid: Some(bare!("contact@prose.org")),
+                            name: Some("Jane Doe".to_string()),
                             affiliation: Affiliation::Owner,
                             chat_state: ChatState::Gone,
                             chat_state_updated: Default::default(),

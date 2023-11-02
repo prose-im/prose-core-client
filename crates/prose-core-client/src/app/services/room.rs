@@ -18,8 +18,12 @@ use crate::app::deps::{
     DynRoomParticipationService, DynRoomTopicService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
-use crate::domain::rooms::models::{ComposingUser, RoomInternals};
-use crate::util::jid_ext::JidExt;
+use crate::domain::rooms::models::RoomInternals;
+use crate::domain::shared::models::RoomType;
+use crate::dtos::{
+    Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
+};
+use crate::util::jid_ext::{BareJidExt, JidExt};
 
 pub struct Room<Kind> {
     inner: Arc<RoomInner>,
@@ -129,17 +133,35 @@ impl<Kind> Room<Kind> {
         self.data.state.read().subject.clone()
     }
 
-    pub fn members(&self) -> &[BareJid] {
-        self.data.info.members.as_slice()
+    pub fn members(&self) -> Vec<UserPresenceInfo> {
+        self.data
+            .info
+            .members
+            .iter()
+            .map(|(jid, member)| UserPresenceInfo {
+                jid: jid.clone(),
+                name: member.name.clone(),
+                availability: Availability::Available,
+            })
+            .collect()
     }
 
-    pub fn occupants(&self) -> Vec<BareJid> {
+    pub fn occupants(&self) -> Vec<UserBasicInfo> {
         self.data
             .state
             .read()
             .occupants
             .values()
-            .filter_map(|occupant| occupant.jid.clone())
+            .filter_map(|occupant| {
+                let Some(jid) = occupant.jid.clone() else {
+                    return None;
+                };
+                let name = occupant
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| jid.to_display_name());
+                Some(UserBasicInfo { jid, name })
+            })
             .collect()
     }
 }
@@ -191,9 +213,9 @@ impl<Kind> Room<Kind> {
             .await
     }
 
-    pub async fn load_messages_with_ids(&self, ids: &[&MessageId]) -> Result<Vec<Message>> {
+    pub async fn load_messages_with_ids(&self, ids: &[&MessageId]) -> Result<Vec<MessageDTO>> {
         let messages = self.message_repo.get_all(&self.data.info.jid, ids).await?;
-        Ok(self.reduce_messages_and_lookup_real_jids(messages))
+        Ok(self.reduce_messages_and_add_sender(messages).await)
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
@@ -202,25 +224,11 @@ impl<Kind> Room<Kind> {
             .await
     }
 
-    pub async fn load_composing_users(&self) -> Result<Vec<ComposingUser>> {
+    pub async fn load_composing_users(&self) -> Result<Vec<UserBasicInfo>> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
         let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
-        let state = &*self.data.state.read();
-
-        let mut composing_users = vec![];
-        for real_jid in state.composing_users(thirty_secs_ago) {
-            composing_users.push(ComposingUser {
-                name: self
-                    .user_profile_repo
-                    .get_display_name(&real_jid)
-                    .await?
-                    .unwrap_or_else(|| real_jid.to_display_name()),
-                jid: real_jid,
-            })
-        }
-
-        Ok(composing_users)
+        Ok(self.data.state.read().composing_users(thirty_secs_ago))
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
@@ -231,7 +239,7 @@ impl<Kind> Room<Kind> {
         self.drafts_repo.get(&self.data.info.jid).await
     }
 
-    pub async fn load_latest_messages(&self) -> Result<Vec<Message>> {
+    pub async fn load_latest_messages(&self) -> Result<Vec<MessageDTO>> {
         debug!("Loading messages from server…");
 
         let result = self
@@ -253,19 +261,75 @@ impl<Kind> Room<Kind> {
             )
             .await?;
 
-        Ok(self.reduce_messages_and_lookup_real_jids(messages))
+        Ok(self.reduce_messages_and_add_sender(messages).await)
     }
 }
 
 impl<Kind> Room<Kind> {
-    fn reduce_messages_and_lookup_real_jids(&self, mut messages: Vec<MessageLike>) -> Vec<Message> {
-        let state = &*self.data.state.read();
-        for message in messages.iter_mut() {
-            if let Some(real_jid) = state.real_jid_for_occupant(&message.from) {
-                message.from = Jid::Bare(real_jid)
-            }
+    async fn reduce_messages_and_add_sender(&self, messages: Vec<MessageLike>) -> Vec<MessageDTO> {
+        let messages = Message::reducing_messages(messages);
+        let mut message_dtos = Vec::with_capacity(messages.len());
+
+        for message in messages {
+            let name = self.resolve_user_name(&message.from).await;
+
+            let from = MessageSender {
+                jid: message.from,
+                name,
+            };
+
+            message_dtos.push(MessageDTO {
+                id: message.id,
+                stanza_id: message.stanza_id,
+                from,
+                body: message.body,
+                timestamp: message.timestamp,
+                is_read: message.is_read,
+                is_edited: message.is_edited,
+                is_delivered: message.is_delivered,
+                reactions: message.reactions,
+            });
         }
-        Message::reducing_messages(messages)
+
+        message_dtos
+    }
+
+    async fn resolve_user_name(&self, jid: &Jid) -> String {
+        let name = {
+            let state = &*self.data.state.read();
+
+            match jid {
+                Jid::Bare(bare) => self
+                    .data
+                    .info
+                    .members
+                    .get(bare)
+                    .map(|member| member.name.clone())
+                    .or_else(|| state.occupants.get(jid).and_then(|o| o.name.clone())),
+                Jid::Full(_) => state.occupants.get(jid).and_then(|o| o.name.clone()),
+            }
+        };
+
+        if let Some(name) = name {
+            return name;
+        };
+
+        if let Jid::Bare(bare) = &jid {
+            if let Some(name) = self
+                .user_profile_repo
+                .get_display_name(bare)
+                .await
+                .unwrap_or_default()
+            {
+                return name;
+            };
+        }
+
+        if self.data.info.room_type == RoomType::DirectMessage {
+            jid.node_to_display_name()
+        } else {
+            jid.resource_to_display_name()
+        }
     }
 }
 
@@ -280,7 +344,13 @@ impl Room<Group> {
     pub async fn resend_invites_to_members(&self) -> Result<()> {
         info!("Sending invites to group members…");
 
-        let member_jids = self.data.info.members.iter().collect::<Vec<_>>();
+        let member_jids = self
+            .data
+            .info
+            .members
+            .keys()
+            .map(|jid| jid)
+            .collect::<Vec<_>>();
         self.participation_service
             .invite_users_to_room(&self.data.info.jid, member_jids.as_slice())
             .await?;

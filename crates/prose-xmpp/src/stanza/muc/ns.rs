@@ -1,3 +1,8 @@
+// prose-core-client/prose-xmpp
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 /// https://xmpp.org/extensions/xep-0045.html#registrar-formtype-owner
 pub mod roomconfig {
     /// Whether to Allow Occupants to Invite Others

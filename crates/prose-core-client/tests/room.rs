@@ -14,24 +14,32 @@ use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::Occupant;
+use prose_core_client::dtos::{Member, Occupant};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
+use prose_xmpp::stanza::message::MucUser;
 use prose_xmpp::{bare, jid};
 
 #[tokio::test]
 async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(&bare!("room@conference.prose.org")).with_occupants([
-        (
-            jid!("room@conference.prose.org/a"),
-            Occupant::owner().set_real_jid(&bare!("a@prose.org")),
-        ),
-        (
-            jid!("room@conference.prose.org/c"),
-            Occupant::owner().set_real_jid(&bare!("c@prose.org")),
-        ),
-    ]);
+    let internals = RoomInternals::group(&bare!("room@conference.prose.org"))
+        .with_members([(
+            bare!("a@prose.org"),
+            Member {
+                name: "Aron Doe".to_string(),
+            },
+        )])
+        .with_occupants([(
+            jid!("room@conference.prose.org/b"),
+            Occupant::owner().set_name("Bernhard Doe"),
+        )]);
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(bare!("c@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_repo
         .expect_get_all()
@@ -40,13 +48,16 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
             Box::pin(async {
                 Ok(vec![
                     MessageBuilder::new_with_index(1)
-                        .set_from(&jid!("room@conference.prose.org/a"))
+                        .set_from(&jid!("a@prose.org"))
                         .build_message_like(),
                     MessageBuilder::new_with_index(2)
                         .set_from(&jid!("room@conference.prose.org/b"))
                         .build_message_like(),
                     MessageBuilder::new_with_index(3)
-                        .set_from(&jid!("room@conference.prose.org/c"))
+                        .set_from(&jid!("c@prose.org"))
+                        .build_message_like(),
+                    MessageBuilder::new_with_index(4)
+                        .set_from(&jid!("room@conference.prose.org/denise_doe"))
                         .build_message_like(),
                 ])
             })
@@ -66,13 +77,20 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
         vec![
             MessageBuilder::new_with_index(1)
                 .set_from(&jid!("a@prose.org"))
-                .build_message(),
+                .set_from_name("Aron Doe")
+                .build_message_dto(),
             MessageBuilder::new_with_index(2)
                 .set_from(&jid!("room@conference.prose.org/b"))
-                .build_message(),
+                .set_from_name("Bernhard Doe")
+                .build_message_dto(),
             MessageBuilder::new_with_index(3)
                 .set_from(&jid!("c@prose.org"))
-                .build_message(),
+                .set_from_name("Carl Doe")
+                .build_message_dto(),
+            MessageBuilder::new_with_index(4)
+                .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                .set_from_name("Denise Doe")
+                .build_message_dto(),
         ]
     );
 
@@ -83,16 +101,23 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(&bare!("room@conference.prose.org")).with_occupants([
-        (
-            jid!("room@conference.prose.org/a"),
-            Occupant::owner().set_real_jid(&bare!("a@prose.org")),
-        ),
-        (
-            jid!("room@conference.prose.org/c"),
-            Occupant::owner().set_real_jid(&bare!("c@prose.org")),
-        ),
-    ]);
+    let internals = RoomInternals::group(&bare!("room@conference.prose.org"))
+        .with_members([(
+            bare!("a@prose.org"),
+            Member {
+                name: "Aron Doe".to_string(),
+            },
+        )])
+        .with_occupants([(
+            jid!("room@conference.prose.org/b"),
+            Occupant::owner().set_name("Bernhard Doe"),
+        )]);
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(bare!("c@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_archive_service
         .expect_load_messages()
@@ -103,13 +128,30 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                     vec![
                         MessageBuilder::new_with_index(1)
                             .set_from(&jid!("room@conference.prose.org/a"))
-                            .build_archived_message("q1"),
+                            .build_archived_message(
+                                "q1",
+                                Some(MucUser {
+                                    jid: Some(jid!("a@prose.org")),
+                                    affiliation: Default::default(),
+                                    role: Default::default(),
+                                }),
+                            ),
                         MessageBuilder::new_with_index(2)
                             .set_from(&jid!("room@conference.prose.org/b"))
-                            .build_archived_message("q1"),
+                            .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(3)
                             .set_from(&jid!("room@conference.prose.org/c"))
-                            .build_archived_message("q1"),
+                            .build_archived_message(
+                                "q1",
+                                Some(MucUser {
+                                    jid: Some(jid!("c@prose.org")),
+                                    affiliation: Default::default(),
+                                    role: Default::default(),
+                                }),
+                            ),
+                        MessageBuilder::new_with_index(4)
+                            .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                            .build_archived_message("q1", None),
                     ],
                     Fin {
                         complete: Default::default(),
@@ -138,13 +180,20 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         vec![
             MessageBuilder::new_with_index(1)
                 .set_from(&jid!("a@prose.org"))
-                .build_message(),
+                .set_from_name("Aron Doe")
+                .build_message_dto(),
             MessageBuilder::new_with_index(2)
                 .set_from(&jid!("room@conference.prose.org/b"))
-                .build_message(),
+                .set_from_name("Bernhard Doe")
+                .build_message_dto(),
             MessageBuilder::new_with_index(3)
                 .set_from(&jid!("c@prose.org"))
-                .build_message(),
+                .set_from_name("Carl Doe")
+                .build_message_dto(),
+            MessageBuilder::new_with_index(4)
+                .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                .set_from_name("Denise Doe")
+                .build_message_dto(),
         ]
     );
 

@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
@@ -26,7 +26,7 @@ pub struct Reaction {
 pub struct Message {
     pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
-    pub from: BareJid,
+    pub from: Jid,
     pub body: String,
     pub timestamp: DateTime<Utc>,
     pub is_read: bool,
@@ -82,7 +82,7 @@ impl Message {
                     let message = Message {
                         id: message_id.into_original_id(),
                         stanza_id: msg.stanza_id,
-                        from: msg.from.into_bare(),
+                        from: msg.from,
                         body,
                         timestamp: msg.timestamp.into(),
                         is_read: false,
@@ -359,7 +359,7 @@ mod tests {
             Message {
                 id: Some("1".into()),
                 stanza_id: None,
-                from: BareJid::from_str("b@prose.org").unwrap(),
+                from: jid!("b@prose.org"),
                 body: "Hello World".to_string(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)

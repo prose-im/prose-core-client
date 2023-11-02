@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
 use std::future::Future;
 use std::iter;
 use std::sync::Arc;
@@ -10,6 +11,7 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use jid::{BareJid, NodePart};
+use parking_lot::RwLock;
 use sha1::{Digest, Sha1};
 use tracing::{error, info};
 use xmpp_parsers::stanza_error::DefinedCondition;
@@ -18,17 +20,22 @@ use prose_wasm_utils::PinnedFuture;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::RequestError;
 
-use super::super::{
-    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
-    RoomsDomainService as RoomsDomainServiceTrait,
-};
 use crate::app::deps::{
     DynAppContext, DynBookmarksRepository, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynIDProvider, DynRoomManagementService, DynRoomParticipationService, DynUserProfileRepository,
 };
-use crate::domain::rooms::models::{Bookmark, RoomConfig, RoomError, RoomInternals, RoomMetadata};
+use crate::domain::rooms::models::{
+    Bookmark, Member, RoomConfig, RoomError, RoomInfo, RoomInternals, RoomMetadata,
+};
+use crate::domain::shared::models::RoomType;
+use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
 use crate::ClientEvent;
+
+use super::super::{
+    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
+    RoomsDomainService as RoomsDomainServiceTrait,
+};
 
 const GROUP_PREFIX: &str = "org.prose.group";
 const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
@@ -148,12 +155,18 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
         let room_jid = metadata.room_jid.clone();
+        let room_info = self.collect_room_info(&user_jid, metadata).await?;
 
         let Some(room) = self.connected_rooms_repo.update(
             &room_jid.to_bare(),
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
-                room.to_permanent(metadata)
+                assert!(room.is_pending(), "Cannot promote a non-pending room");
+
+                RoomInternals {
+                    info: room_info,
+                    state: RwLock::new(room.state.read().clone()),
+                }
             }),
         ) else {
             return Err(RequestError::Generic {
@@ -454,6 +467,45 @@ impl RoomsDomainService {
                 }
             };
         }
+    }
+
+    async fn collect_room_info(
+        &self,
+        user_jid: &BareJid,
+        metadata: RoomMetadata,
+    ) -> Result<RoomInfo> {
+        let mut members = HashMap::with_capacity(metadata.members.len());
+
+        for jid in metadata.members {
+            let name = self
+                .user_profile_repo
+                .get_display_name(&jid)
+                .await
+                .unwrap_or_default()
+                .unwrap_or_else(|| jid.to_display_name());
+            members.insert(jid, Member { name });
+        }
+
+        let features = &metadata.settings.features;
+
+        let room_type = match features {
+            _ if features.can_act_as_group() => RoomType::Group,
+            _ if features.can_act_as_private_channel() => RoomType::PrivateChannel,
+            _ if features.can_act_as_public_channel() => RoomType::PublicChannel,
+            _ => RoomType::Generic,
+        };
+
+        let room_info = RoomInfo {
+            jid: metadata.room_jid.to_bare(),
+            name: metadata.settings.name,
+            description: metadata.settings.description,
+            user_jid: user_jid.clone(),
+            user_nickname: metadata.room_jid.resource_str().to_string(),
+            members,
+            room_type,
+        };
+
+        Ok(room_info)
     }
 }
 

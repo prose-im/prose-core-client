@@ -3,9 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::types::IntoJSArray;
-use prose_core_client::dtos;
 use wasm_bindgen::prelude::*;
+
+use prose_core_client::dtos;
+
+use crate::types::IntoJSArray;
 
 use super::{BareJid, BareJidArray, ReactionsArray};
 
@@ -19,6 +21,9 @@ pub struct Reaction {
     #[wasm_bindgen(skip)]
     pub from: Vec<BareJid>,
 }
+
+#[wasm_bindgen]
+pub struct MessageSender(dtos::MessageSender);
 
 #[wasm_bindgen]
 impl Message {
@@ -39,7 +44,12 @@ impl Message {
 
     #[wasm_bindgen(getter, js_name = "from")]
     pub fn from_(&self) -> String {
-        self.0.from.to_string()
+        self.0.from.jid.to_string()
+    }
+
+    #[wasm_bindgen(getter, js_name = "user")]
+    pub fn user(&self) -> MessageSender {
+        MessageSender(self.0.from.clone())
     }
 
     #[wasm_bindgen(getter, js_name = "content")]
@@ -97,6 +107,19 @@ impl Reaction {
             .iter()
             .cloned()
             .collect_into_js_array::<BareJidArray>()
+    }
+}
+
+#[wasm_bindgen]
+impl MessageSender {
+    #[wasm_bindgen(getter, js_name = "jid")]
+    pub fn jid(&self) -> String {
+        self.0.jid.to_string()
+    }
+
+    #[wasm_bindgen(getter, js_name = "name")]
+    pub fn name(&self) -> String {
+        self.0.name.clone()
     }
 }
 

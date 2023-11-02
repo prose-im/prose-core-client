@@ -15,6 +15,7 @@ use crate::stanza::message::chat_marker::{Acknowledged, Displayed, Received};
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::mam::ArchivedMessage;
 use crate::stanza::message::message::Message;
+use crate::stanza::message::muc_user::MucUser;
 use crate::stanza::message::{carbons, chat_marker, Fallback, Id, Reactions};
 
 impl Message {
@@ -124,6 +125,11 @@ impl Message {
         self.payloads.push(
             Element::builder(store.then_some("store").unwrap_or("no-store"), ns::HINTS).build(),
         );
+        self
+    }
+
+    pub fn set_muc_user(mut self, user: MucUser) -> Self {
+        self.payloads.push(user.into());
         self
     }
 }

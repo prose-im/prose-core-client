@@ -18,7 +18,7 @@ use prose_xmpp::{ns, Event};
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynRoomFactory,
-    DynRoomsDomainService, DynTimeProvider,
+    DynRoomsDomainService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::RoomEventType;
@@ -40,6 +40,8 @@ pub struct RoomsEventHandler {
     room_factory: DynRoomFactory,
     #[inject]
     time_provider: DynTimeProvider,
+    #[inject]
+    user_profile_repo: DynUserProfileRepository,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -161,9 +163,13 @@ impl RoomsEventHandler {
         };
 
         info!("Received real jid for {}: {}", from, jid);
+
+        let bare_jid = jid.into_bare();
+        let name = self.user_profile_repo.get_display_name(&bare_jid).await?;
+
         room.state
             .write()
-            .insert_occupant(&from, Some(&jid.into_bare()), &affiliation);
+            .insert_occupant(&from, Some(&bare_jid), name.as_deref(), &affiliation);
 
         Ok(())
     }

@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -81,7 +82,7 @@ async fn test_creates_rooms_for_contacts_and_bookmarks() -> Result<()> {
                         description: None,
                         user_jid: mock_data::account_jid().into_bare(),
                         user_nickname: "".to_string(),
-                        members: vec![],
+                        members: HashMap::new(),
                         room_type: RoomType::Group,
                     },
                     state: Default::default(),

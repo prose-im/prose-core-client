@@ -5,9 +5,17 @@
 
 use jid::BareJid;
 
-/// A user who is currently typing in a Room.
+use crate::dtos::Availability;
+
 #[derive(Debug, Clone, PartialEq)]
-pub struct ComposingUser {
-    pub name: String,
+pub struct UserBasicInfo {
     pub jid: BareJid,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UserPresenceInfo {
+    pub jid: BareJid,
+    pub name: String,
+    pub availability: Availability,
 }

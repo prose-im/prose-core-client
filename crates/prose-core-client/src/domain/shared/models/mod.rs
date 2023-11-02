@@ -5,6 +5,8 @@
 
 pub use availability::Availability;
 pub use room_type::RoomType;
+pub use user_info::{UserBasicInfo, UserPresenceInfo};
 
 mod availability;
 mod room_type;
+mod user_info;

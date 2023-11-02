@@ -8,14 +8,15 @@ use tracing::info;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use prose_core_client::dtos::{ComposingUser as CoreComposingUser, MessageId};
+use prose_core_client::dtos::MessageId;
 use prose_core_client::services::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom, RoomEnvelope,
 };
 
 use crate::client::WasmError;
 use crate::types::{
-    try_jid_vec_from_string_array, BareJid, BareJidArray, MessagesArray, StringArray,
+    try_jid_vec_from_string_array, MessagesArray, StringArray, UserBasicInfo, UserBasicInfoArray,
+    UserPresenceInfo, UserPresenceInfoArray,
 };
 
 use super::IntoJSArray;
@@ -31,9 +32,9 @@ export interface RoomBase {
     readonly id: RoomID;
     readonly name: string;
     /// The members of a room. Only available for DirectMessage and Group (member-only rooms)
-    readonly members: JID[];
+    readonly members: UserPresenceInfo[];
     /// The occupants of a room.
-    readonly occupants: JID[];
+    readonly occupants: UserBasicInfo[];
 
     sendMessage(body: string): Promise<void>;
     updateMessage(messageID: string, body: string): Promise<void>;
@@ -44,7 +45,7 @@ export interface RoomBase {
     loadMessagesWithIDs(messageIDs: string[]): Promise<Message[]>;
     
     setUserIsComposing(isComposing: boolean): Promise<void>;
-    loadComposingUsers(): Promise<ComposingUser[]>;
+    loadComposingUsers(): Promise<UserBasicInfo[]>;
     
     saveDraft(message?: string): Promise<void>;
     loadDraft(): Promise<string>;
@@ -152,21 +153,21 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(getter)]
-            pub fn members(&self) -> BareJidArray {
+            pub fn members(&self) -> UserPresenceInfoArray {
                 self.room
                     .members()
-                    .iter()
-                    .map(BareJid::from)
-                    .collect_into_js_array::<BareJidArray>()
+                    .into_iter()
+                    .map(UserPresenceInfo::from)
+                    .collect_into_js_array::<UserPresenceInfoArray>()
             }
 
             #[wasm_bindgen(getter)]
-            pub fn occupants(&self) -> BareJidArray {
+            pub fn occupants(&self) -> UserBasicInfoArray {
                 self.room
                     .occupants()
-                    .iter()
-                    .map(BareJid::from)
-                    .collect_into_js_array::<BareJidArray>()
+                    .into_iter()
+                    .map(UserBasicInfo::from)
+                    .collect_into_js_array::<UserBasicInfoArray>()
             }
 
             #[wasm_bindgen(js_name = "sendMessage")]
@@ -247,15 +248,15 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(js_name = "loadComposingUsers")]
-            pub async fn load_composing_users(&self) -> Result<ComposingUsersArray> {
+            pub async fn load_composing_users(&self) -> Result<UserBasicInfoArray> {
                 Ok(self
                     .room
                     .load_composing_users()
                     .await
                     .map_err(WasmError::from)?
                     .into_iter()
-                    .map(ComposingUser::from)
-                    .collect_into_js_array::<ComposingUsersArray>())
+                    .map(UserBasicInfo::from)
+                    .collect_into_js_array::<UserBasicInfoArray>())
             }
 
             #[wasm_bindgen(js_name = "saveDraft")]
@@ -343,9 +344,6 @@ channel_room_impl!(RoomPublicChannel);
 extern "C" {
     #[wasm_bindgen(typescript_type = "Room[]")]
     pub type RoomsArray;
-
-    #[wasm_bindgen(typescript_type = "ComposingUser[]")]
-    pub type ComposingUsersArray;
 }
 
 pub trait RoomEnvelopeExt {
@@ -385,27 +383,5 @@ impl From<Vec<RoomEnvelope>> for RoomsArray {
             .into_iter()
             .map(|envelope| envelope.into_js_value())
             .collect_into_js_array::<RoomsArray>()
-    }
-}
-
-#[wasm_bindgen]
-pub struct ComposingUser(CoreComposingUser);
-
-#[wasm_bindgen]
-impl ComposingUser {
-    #[wasm_bindgen(getter)]
-    pub fn name(&self) -> String {
-        self.0.name.clone()
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn jid(&self) -> BareJid {
-        self.0.jid.clone().into()
-    }
-}
-
-impl From<CoreComposingUser> for ComposingUser {
-    fn from(value: CoreComposingUser) -> Self {
-        Self(value)
     }
 }

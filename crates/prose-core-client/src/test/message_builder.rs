@@ -13,12 +13,13 @@ use xmpp_parsers::{date, mam, Element};
 
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
-use prose_xmpp::stanza::message::Forwarded;
+use prose_xmpp::stanza::message::{Forwarded, MucUser};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
     Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
 };
+use crate::dtos::{Message as MessageDTO, MessageSender};
 use crate::test::mock_data;
 
 impl<T> From<T> for MessageLikeId
@@ -34,6 +35,7 @@ pub struct MessageBuilder {
     id: MessageId,
     stanza_id: Option<StanzaId>,
     from: Jid,
+    from_name: Option<String>,
     to: BareJid,
     body: String,
     timestamp: DateTime<Utc>,
@@ -55,6 +57,7 @@ impl MessageBuilder {
             id: Self::id_for_index(idx),
             stanza_id: Some(format!("res-{}", idx).into()),
             from: Jid::Bare(BareJid::ours()),
+            from_name: None,
             to: BareJid::theirs(),
             body: format!("Message {}", idx).to_string(),
             timestamp: mock_data::reference_date() + Duration::minutes(idx.into()),
@@ -74,6 +77,11 @@ impl MessageBuilder {
         self.from = from.clone();
         self
     }
+
+    pub fn set_from_name(mut self, name: impl Into<String>) -> Self {
+        self.from_name = Some(name.into());
+        self
+    }
 }
 
 impl MessageBuilder {
@@ -81,7 +89,26 @@ impl MessageBuilder {
         Message {
             id: Some(self.id),
             stanza_id: self.stanza_id,
-            from: self.from.into_bare(),
+            from: self.from,
+            body: self.body,
+            timestamp: self.timestamp.into(),
+            is_read: self.is_read,
+            is_edited: self.is_edited,
+            is_delivered: self.is_delivered,
+            reactions: self.reactions,
+        }
+    }
+
+    pub fn build_message_dto(self) -> MessageDTO {
+        MessageDTO {
+            id: Some(self.id),
+            stanza_id: self.stanza_id,
+            from: MessageSender {
+                jid: self.from,
+                name: self
+                    .from_name
+                    .expect("You must set a name when building a MessageDTO"),
+            },
             body: self.body,
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
@@ -128,13 +155,32 @@ impl MessageBuilder {
         )
     }
 
-    pub fn build_mam_message(self, query_id: impl Into<String>) -> Element {
+    pub fn build_mam_message(
+        self,
+        query_id: impl Into<String>,
+        muc_user: Option<MucUser>,
+    ) -> Element {
         prose_xmpp::stanza::Message::new()
-            .set_archived_message(self.build_archived_message(query_id))
+            .set_archived_message(self.build_archived_message(query_id, muc_user))
             .into()
     }
 
-    pub fn build_archived_message(self, query_id: impl Into<String>) -> ArchivedMessage {
+    pub fn build_archived_message(
+        self,
+        query_id: impl Into<String>,
+        muc_user: Option<MucUser>,
+    ) -> ArchivedMessage {
+        let mut message = prose_xmpp::stanza::Message::new()
+            .set_id(self.id.as_ref().into())
+            .set_type(MessageType::Chat)
+            .set_to(self.to)
+            .set_from(self.from)
+            .set_body(self.body);
+
+        if let Some(muc_user) = muc_user {
+            message = message.set_muc_user(muc_user);
+        }
+
         ArchivedMessage {
             id: self.stanza_id.expect("Missing stanzaId").to_string().into(),
             query_id: Some(mam::QueryId(query_id.into())),
@@ -144,14 +190,7 @@ impl MessageBuilder {
                     stamp: date::DateTime(self.timestamp.into()),
                     data: None,
                 }),
-                stanza: Some(Box::new(
-                    prose_xmpp::stanza::Message::new()
-                        .set_id(self.id.as_ref().into())
-                        .set_type(MessageType::Chat)
-                        .set_to(self.to)
-                        .set_from(self.from)
-                        .set_body(self.body),
-                )),
+                stanza: Some(Box::new(message)),
             },
         }
     }

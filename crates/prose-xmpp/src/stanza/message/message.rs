@@ -18,6 +18,7 @@ use prose_utils::id_string;
 
 use crate::ns;
 use crate::stanza::message::fasten::ApplyTo;
+use crate::stanza::message::muc_user::MucUser;
 use crate::stanza::message::stanza_id::StanzaId;
 use crate::stanza::message::{carbons, Reactions};
 use crate::stanza::message::{chat_marker, mam};
@@ -138,6 +139,10 @@ impl Message {
 
     pub fn displayed_marker(&self) -> Option<chat_marker::Displayed> {
         self.typed_payload("displayed", ns::CHAT_MARKERS)
+    }
+
+    pub fn muc_user(&self) -> Option<MucUser> {
+        self.typed_payload("x", ns::MUC_USER)
     }
 }
 

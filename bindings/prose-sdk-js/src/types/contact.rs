@@ -21,6 +21,7 @@ impl From<CoreContact> for Contact {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub enum Availability {
     Available = 0,
     Unavailable = 1,

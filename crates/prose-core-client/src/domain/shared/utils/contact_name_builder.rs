@@ -5,7 +5,7 @@
 
 use crate::app::dtos::UserProfile;
 use crate::domain::contacts::models::Contact;
-use crate::util::jid_ext::JidExt;
+use crate::util::jid_ext::BareJidExt;
 use std::ops::Deref;
 
 pub(crate) fn build_contact_name(contact: &Contact, profile: &UserProfile) -> String {

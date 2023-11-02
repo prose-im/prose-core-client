@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use prose_store::prelude::*;
@@ -37,19 +38,41 @@ pub(crate) struct PlatformDependencies {
 }
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
-    Store::open(driver, 10, |event| {
+    let versions_changed = Arc::new(AtomicBool::new(false));
+
+    let inner_versions_changed = versions_changed.clone();
+    let store = Store::open(driver, 12, move |event| {
         let tx = &event.tx;
 
-        create_collection::<D, AccountSettingsRecord>(&tx)?;
-        create_collection::<D, DraftsRecord>(&tx)?;
-        create_collection::<D, MessagesRecord>(&tx)?;
-        create_collection::<D, UserInfoRecord>(&tx)?;
-        create_collection::<D, UserProfileRecord>(&tx)?;
-        #[cfg(target_arch = "wasm32")]
-        create_collection::<D, crate::infra::avatars::AvatarRecord>(&tx)?;
+        inner_versions_changed.store(true, Ordering::Relaxed);
+
+        if event.old_version < 10 {
+            create_collection::<D, AccountSettingsRecord>(&tx)?;
+            create_collection::<D, DraftsRecord>(&tx)?;
+            create_collection::<D, MessagesRecord>(&tx)?;
+            create_collection::<D, UserInfoRecord>(&tx)?;
+            create_collection::<D, UserProfileRecord>(&tx)?;
+            #[cfg(target_arch = "wasm32")]
+            create_collection::<D, crate::infra::avatars::AvatarRecord>(&tx)?;
+        }
+
         Ok(())
     })
-    .await
+    .await?;
+
+    if versions_changed.load(Ordering::Acquire) {
+        store
+            .truncate_collections(&[
+                MessagesRecord::collection(),
+                UserInfoRecord::collection(),
+                UserProfileRecord::collection(),
+                #[cfg(target_arch = "wasm32")]
+                crate::infra::avatars::AvatarRecord::collection(),
+            ])
+            .await?;
+    }
+
+    Ok(store)
 }
 
 fn create_collection<D: Driver, E: Entity>(tx: &D::UpgradeTransaction<'_>) -> Result<(), D::Error> {

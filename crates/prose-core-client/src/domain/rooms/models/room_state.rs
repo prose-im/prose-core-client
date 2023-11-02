@@ -5,6 +5,8 @@
 
 use std::collections::HashMap;
 
+use crate::domain::shared::models::UserBasicInfo;
+use crate::util::jid_ext::BareJidExt;
 use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
 use xmpp_parsers::chatstates::ChatState;
@@ -23,6 +25,7 @@ pub struct RoomState {
 pub struct Occupant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.
     pub jid: Option<BareJid>,
+    pub name: Option<String>,
     pub affiliation: Affiliation,
     pub chat_state: ChatState,
     pub chat_state_updated: DateTime<Utc>,
@@ -32,6 +35,7 @@ impl Default for Occupant {
     fn default() -> Self {
         Self {
             jid: None,
+            name: None,
             affiliation: Default::default(),
             chat_state: ChatState::Gone,
             chat_state_updated: Default::default(),
@@ -44,10 +48,12 @@ impl RoomState {
         &mut self,
         jid: &Jid,
         real_jid: Option<&BareJid>,
+        name: Option<&str>,
         affiliation: &Affiliation,
     ) {
         let occupant = self.occupants.entry(jid.clone()).or_default();
         occupant.jid = real_jid.cloned();
+        occupant.name = name.map(ToString::to_string);
         occupant.affiliation = affiliation.clone();
     }
 
@@ -67,7 +73,7 @@ impl RoomState {
 
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
     /// If we don't have a real JID for a composing user they are excluded from the list.
-    pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<BareJid> {
+    pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<UserBasicInfo> {
         let mut composing_occupants = self
             .occupants
             .values()
@@ -81,15 +87,25 @@ impl RoomState {
                 Some(occupant.clone())
             })
             .collect::<Vec<_>>();
+
         composing_occupants.sort_by_key(|o| o.chat_state_updated);
+
         composing_occupants
             .into_iter()
-            .filter_map(|occupant| occupant.jid)
-            .collect()
-    }
+            .filter_map(|occupant| {
+                let Some(jid) = &occupant.jid else {
+                    return None;
+                };
 
-    pub fn real_jid_for_occupant(&self, occupant_jid: &Jid) -> Option<BareJid> {
-        self.occupants.get(occupant_jid).and_then(|o| o.jid.clone())
+                Some(UserBasicInfo {
+                    name: occupant
+                        .name
+                        .clone()
+                        .unwrap_or_else(|| jid.to_display_name()),
+                    jid: jid.clone(),
+                })
+            })
+            .collect()
     }
 }
 
@@ -109,9 +125,10 @@ mod tests {
         state.insert_occupant(
             &jid!("room@prose.org/a"),
             Some(&bare!("a@prose.org")),
+            None,
             &Affiliation::Owner,
         );
-        state.insert_occupant(&jid!("b@prose.org"), None, &Affiliation::Member);
+        state.insert_occupant(&jid!("b@prose.org"), None, None, &Affiliation::Member);
 
         assert_eq!(state.occupants.len(), 2);
         assert_eq!(
@@ -119,17 +136,14 @@ mod tests {
             &Occupant {
                 jid: Some(bare!("a@prose.org")),
                 affiliation: Affiliation::Owner,
-                chat_state: ChatState::Gone,
-                chat_state_updated: Default::default(),
+                ..Default::default()
             }
         );
         assert_eq!(
             state.occupants.get(&jid!("b@prose.org")).unwrap(),
             &Occupant {
-                jid: None,
                 affiliation: Affiliation::Member,
-                chat_state: ChatState::Gone,
-                chat_state_updated: Default::default(),
+                ..Default::default()
             }
         );
     }
@@ -141,6 +155,7 @@ mod tests {
         state.insert_occupant(
             &jid!("room@prose.org/a"),
             Some(&bare!("a@prose.org")),
+            None,
             &Affiliation::Owner,
         );
 
@@ -194,6 +209,7 @@ mod tests {
             jid!("room@prose.org/c"),
             Occupant {
                 jid: Some(bare!("c@prose.org")),
+                name: Some("Jonathan Doe".to_string()),
                 chat_state: ChatState::Composing,
                 chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 20).unwrap(),
                 ..Default::default()
@@ -211,7 +227,16 @@ mod tests {
 
         assert_eq!(
             state.composing_users(Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap()),
-            vec![bare!("c@prose.org"), bare!("a@prose.org")]
+            vec![
+                UserBasicInfo {
+                    name: "Jonathan Doe".to_string(),
+                    jid: bare!("c@prose.org")
+                },
+                UserBasicInfo {
+                    name: "A".to_string(),
+                    jid: bare!("a@prose.org")
+                },
+            ]
         );
     }
 }

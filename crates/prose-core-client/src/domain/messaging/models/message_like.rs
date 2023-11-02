@@ -131,10 +131,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
 
         let id = MessageLikeId::new(msg.id.as_ref().map(|id| id.into()));
         let stanza_id = msg.stanza_id();
-        let from = msg
-            .from
-            .as_ref()
-            .ok_or(StanzaParseError::missing_attribute("from"))?;
+        let from = msg.resolved_from()?;
         let to = msg.to.as_ref();
         let timestamp = msg
             .delay()
@@ -150,7 +147,7 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             stanza_id: stanza_id.map(|s| s.id.as_ref().into()),
             target: refs.map(|id| id.as_ref().into()),
             to: to.map(|jid| jid.to_bare()),
-            from: from.clone(),
+            from,
             timestamp: timestamp.into(),
             payload,
         })
@@ -187,10 +184,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
 
         let id = MessageLikeId::new(message.id.as_ref().map(|id| id.into()));
         let to = message.to.as_ref();
-        let from = message
-            .from
-            .as_ref()
-            .ok_or(StanzaParseError::missing_attribute("from"))?;
+        let from = message.resolved_from()?;
         let timestamp = &carbon
             .delay
             .as_ref()
@@ -202,7 +196,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             stanza_id: Some(stanza_id.as_ref().into()),
             target: refs.map(|id| id.as_ref().into()),
             to: to.map(|jid| jid.to_bare()),
-            from: from.clone(),
+            from,
             timestamp: timestamp.0.into(),
             payload,
         })
@@ -278,5 +272,23 @@ impl TryFrom<&Message> for TargetedPayload {
         }
 
         Err(MessageLikeError::NoPayload.into())
+    }
+}
+
+trait MessageExt {
+    /// Returns either the real jid from a muc user or the original `from` value.
+    fn resolved_from(&self) -> Result<Jid, StanzaParseError>;
+}
+
+impl MessageExt for Message {
+    fn resolved_from(&self) -> Result<Jid, StanzaParseError> {
+        if let Some(muc_user) = &self.muc_user() {
+            if let Some(jid) = &muc_user.jid {
+                return Ok(jid.clone());
+            }
+        }
+        self.from
+            .clone()
+            .ok_or(StanzaParseError::missing_attribute("from"))
     }
 }

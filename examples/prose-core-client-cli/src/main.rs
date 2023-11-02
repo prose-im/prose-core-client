@@ -527,7 +527,7 @@ impl Display for MessageEnvelope {
                 .as_ref()
                 .map(|id| id.clone().into_inner())
                 .unwrap_or("<no-id>".to_string()),
-            self.0.from.to_string().truncate_to(20),
+            self.0.from.jid.to_string().truncate_to(20),
             self.0.body
         )
     }
@@ -891,7 +891,7 @@ async fn main() -> Result<()> {
                 let members = room
                     .members()
                     .iter()
-                    .map(|jid| jid.to_string())
+                    .map(|info| info.jid.to_string())
                     .collect::<Vec<_>>();
                 println!("{}", members.join("\n"))
             }

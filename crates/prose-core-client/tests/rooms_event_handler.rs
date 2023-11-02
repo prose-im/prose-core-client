@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -19,7 +20,7 @@ use prose_core_client::domain::contacts::models::Contact;
 use prose_core_client::domain::rooms::models::{RoomInfo, RoomInternals};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::{ComposingUser, Group, Occupant};
+use prose_core_client::dtos::{Group, Occupant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
@@ -37,7 +38,7 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
             description: None,
             user_jid: mock_data::account_jid().into_bare(),
             user_nickname: "".to_string(),
-            members: vec![],
+            members: HashMap::new(),
             room_type: RoomType::Group,
         },
         state: Default::default(),
@@ -51,6 +52,12 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
             .with(predicate::eq(bare!("room@conference.prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(bare!("real-jid@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("George Washington".to_string())) }));
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
@@ -81,6 +88,7 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
         occupant,
         Occupant {
             jid: Some(bare!("real-jid@prose.org")),
+            name: Some("George Washington".to_string()),
             affiliation: Affiliation::Member,
             chat_state: ChatState::Gone,
             chat_state_updated: Default::default(),
@@ -97,7 +105,9 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
     let room = Arc::new(
         RoomInternals::group(&bare!("room@conference.prose.org")).with_occupants([(
             jid!("room@conference.prose.org/nickname"),
-            Occupant::owner().set_real_jid(&bare!("nickname@prose.org")),
+            Occupant::owner()
+                .set_real_jid(&bare!("nickname@prose.org"))
+                .set_name("Janice Doe"),
         )]),
     );
 
@@ -147,18 +157,12 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
 
     let mut factory_deps = MockRoomFactoryDependencies::default();
     factory_deps.time_provider = time_provider.clone();
-    factory_deps
-        .user_profile_repo
-        .expect_get_display_name()
-        .once()
-        .with(predicate::eq(bare!("nickname@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Janice Doe".to_string())) }));
 
     let room_factory = RoomFactory::from(factory_deps);
     let room = room_factory.build(room.clone()).to_generic_room();
     assert_eq!(
         room.load_composing_users().await?,
-        vec![ComposingUser {
+        vec![UserBasicInfo {
             name: "Janice Doe".to_string(),
             jid: bare!("nickname@prose.org")
         }]
@@ -181,7 +185,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
             name: None,
             group: Group::Team,
         },
-        "",
+        "Janice Doe",
     ));
 
     {
@@ -230,18 +234,12 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
 
     let mut factory_deps = MockRoomFactoryDependencies::default();
     factory_deps.time_provider = time_provider.clone();
-    factory_deps
-        .user_profile_repo
-        .expect_get_display_name()
-        .once()
-        .with(predicate::eq(bare!("contact@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Janice Doe".to_string())) }));
 
     let room_factory = RoomFactory::from(factory_deps);
     let room = room_factory.build(room.clone()).to_generic_room();
     assert_eq!(
         room.load_composing_users().await?,
-        vec![ComposingUser {
+        vec![UserBasicInfo {
             name: "Janice Doe".to_string(),
             jid: bare!("contact@prose.org")
         }]
