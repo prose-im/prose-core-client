@@ -274,7 +274,7 @@ impl<Kind> Room<Kind> {
             let name = self.resolve_user_name(&message.from).await;
 
             let from = MessageSender {
-                jid: message.from,
+                jid: message.from.into_bare(),
                 name,
             };
 

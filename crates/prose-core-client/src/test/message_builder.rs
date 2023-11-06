@@ -104,7 +104,7 @@ impl MessageBuilder {
             id: Some(self.id),
             stanza_id: self.stanza_id,
             from: MessageSender {
-                jid: self.from,
+                jid: self.from.into_bare(),
                 name: self
                     .from_name
                     .expect("You must set a name when building a MessageDTO"),
