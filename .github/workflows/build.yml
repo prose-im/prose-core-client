@@ -5,6 +5,7 @@ on:
 
 permissions:
   id-token: write
+  contents: write
 
 name: Build and Release
 
