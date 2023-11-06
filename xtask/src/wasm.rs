@@ -204,7 +204,11 @@ fn run_release_npm(sh: &Shell, npm_token: &str, file_path: &PathBuf) -> Result<(
         .expect("write failed");
 
     // Publish release to NPM
-    let npm_command = cmd!(sh, "npm publish --provenance --userconfig={npmrc_path} {file_path}").run();
+    let npm_command = cmd!(
+        sh,
+        "npm publish --provenance --userconfig={npmrc_path} {file_path}"
+    )
+    .run();
 
     // Cleanup '.npmrc' configuration
     std::fs::remove_file(&npmrc_path).expect("could not remove file");
