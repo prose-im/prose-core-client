@@ -46,7 +46,7 @@ impl ContactsService {
                 .await?
                 .unwrap_or_default();
 
-            let name = build_contact_name(&domain_contact, &profile);
+            let name = build_contact_name(&domain_contact.jid, &profile);
 
             let contact = Contact {
                 jid: domain_contact.jid,

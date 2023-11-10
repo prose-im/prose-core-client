@@ -3,6 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
@@ -15,15 +17,21 @@ use prose_xmpp::stanza::Message;
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynClientEventDispatcher, DynConnectedRoomsRepository, DynMessagesRepository,
-    DynMessagingService, DynRoomFactory, DynTimeProvider,
+    DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
+    DynMessagesRepository, DynMessagingService, DynRoomFactory, DynSidebarRepository,
+    DynTimeProvider,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
+use crate::domain::rooms::models::RoomInternals;
+use crate::domain::shared::models::RoomType;
+use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::{ClientEvent, RoomEventType};
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
+    #[inject]
+    bookmarks_service: DynBookmarksService,
     #[inject]
     connected_rooms_repo: DynConnectedRoomsRepository,
     #[inject]
@@ -32,6 +40,8 @@ pub struct MessagesEventHandler {
     messaging_service: DynMessagingService,
     #[inject]
     room_factory: DynRoomFactory,
+    #[inject]
+    sidebar_repo: DynSidebarRepository,
     #[inject]
     time_provider: DynTimeProvider,
     #[inject]
@@ -152,6 +162,13 @@ impl MessagesEventHandler {
         debug!("Caching received message…");
         self.messages_repo.append(&from, &[&message]).await?;
 
+        if message.payload.is_message() {
+            match self.add_group_to_sidebar_if_needed(&room).await {
+                Ok(_) => (),
+                Err(err) => error!("Could not add group to sidebar. {}", err.to_string()),
+            }
+        }
+
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::RoomChanged {
                 room: self.room_factory.build(room.clone()),
@@ -198,6 +215,47 @@ impl MessagesEventHandler {
                 room: self.room_factory.build(room),
                 r#type: RoomEventType::from(&message),
             });
+
+        Ok(())
+    }
+}
+
+impl MessagesEventHandler {
+    async fn add_group_to_sidebar_if_needed(&self, room: &Arc<RoomInternals>) -> Result<()> {
+        if room.info.room_type != RoomType::Group {
+            return Ok(());
+        }
+
+        if self.sidebar_repo.get(&room.info.jid).is_some() {
+            return Ok(());
+        }
+
+        let group_name = room
+            .info
+            .name
+            .clone()
+            .unwrap_or("Untitled Group".to_string());
+
+        self.bookmarks_service
+            .save_bookmark(&Bookmark {
+                name: group_name.clone(),
+                jid: room.info.jid.clone(),
+                r#type: BookmarkType::Group,
+                is_favorite: false,
+                in_sidebar: true,
+            })
+            .await?;
+
+        self.sidebar_repo.put(&SidebarItem {
+            name: group_name,
+            jid: room.info.jid.clone(),
+            r#type: BookmarkType::Group,
+            is_favorite: false,
+            error: None,
+        });
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
 
         Ok(())
     }

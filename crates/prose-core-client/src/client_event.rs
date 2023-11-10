@@ -15,8 +15,8 @@ pub enum ClientEvent {
     /// The status of the connection has changed.
     ConnectionStatusChanged { event: ConnectionEvent },
 
-    /// The number of rooms changed.
-    RoomsChanged,
+    /// The contents of the sidebar have changed.
+    SidebarChanged,
 
     /// Infos about a contact have changed.
     ContactChanged { jid: BareJid },

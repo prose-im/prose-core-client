@@ -109,7 +109,8 @@ impl Caps {
     pub fn publish_capabilities(&self, caps: xmpp_parsers::caps::Caps) -> Result<()> {
         let mut presence = Presence::new(presence::Type::None);
         presence.add_payload(caps);
-        self.ctx.send_stanza(presence)
+        self.ctx.send_stanza(presence)?;
+        Ok(())
     }
 
     pub async fn send_disco_info_query_response(
@@ -119,7 +120,8 @@ impl Caps {
         disco: disco::DiscoInfoResult,
     ) -> Result<()> {
         self.ctx
-            .send_stanza(Iq::from_result(id, Some(disco)).with_to(to.into()))
+            .send_stanza(Iq::from_result(id, Some(disco)).with_to(to.into()))?;
+        Ok(())
     }
 
     pub async fn query_server_disco_info(

@@ -55,8 +55,12 @@ impl ModuleContext {
         future
     }
 
-    pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<()> {
-        self.inner.send_stanza(stanza)
+    pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<(), RequestError> {
+        self.inner
+            .send_stanza(stanza)
+            .map_err(|err| RequestError::Generic {
+                msg: err.to_string(),
+            })
     }
 
     pub(crate) fn full_jid(&self) -> FullJid {

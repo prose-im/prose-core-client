@@ -148,7 +148,8 @@ impl Chat {
             .set_from(self.ctx.full_jid())
             .set_to(to)
             .set_chat_state(Some(chat_state));
-        self.ctx.send_stanza(stanza)
+        self.ctx.send_stanza(stanza)?;
+        Ok(())
     }
 
     // https://xmpp.org/extensions/xep-0444.html
@@ -197,11 +198,12 @@ impl Chat {
     pub fn set_message_carbons_enabled(&self, enabled: bool) -> Result<()> {
         if enabled {
             self.ctx
-                .send_stanza(Iq::from_set(self.ctx.generate_id(), carbons::Enable))
+                .send_stanza(Iq::from_set(self.ctx.generate_id(), carbons::Enable))?;
         } else {
             self.ctx
-                .send_stanza(Iq::from_set(self.ctx.generate_id(), carbons::Disable))
+                .send_stanza(Iq::from_set(self.ctx.generate_id(), carbons::Disable))?;
         }
+        Ok(())
     }
 
     pub fn mark_message_received(
@@ -224,6 +226,7 @@ impl Chat {
     fn send_message_stanza(&self, message: Message) -> Result<()> {
         self.ctx
             .schedule_event(ClientEvent::Chat(Event::Sent(message.clone())));
-        self.ctx.send_stanza(message)
+        self.ctx.send_stanza(message)?;
+        Ok(())
     }
 }

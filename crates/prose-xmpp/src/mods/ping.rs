@@ -80,6 +80,7 @@ impl Ping {
             id: id.as_ref().to_string(),
             payload: IqType::Result(None),
         };
-        self.ctx.send_stanza(iq)
+        self.ctx.send_stanza(iq)?;
+        Ok(())
     }
 }

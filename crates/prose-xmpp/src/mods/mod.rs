@@ -20,6 +20,7 @@ pub use muc::MUC;
 pub use ping::Ping;
 pub use profile::{AvatarData, Profile};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+pub use pubsub::PubSub;
 pub use roster::Roster;
 pub use status::Status;
 
@@ -35,6 +36,7 @@ pub mod mam;
 pub mod muc;
 pub mod ping;
 pub mod profile;
+pub mod pubsub;
 pub mod roster;
 pub mod status;
 

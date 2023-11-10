@@ -16,15 +16,18 @@ use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
 use prose_core_client::app::event_handlers::{RoomsEventHandler, XMPPEvent, XMPPEventHandler};
-use prose_core_client::domain::contacts::models::Contact;
 use prose_core_client::domain::rooms::models::{RoomInfo, RoomInternals};
-use prose_core_client::domain::rooms::services::RoomFactory;
+use prose_core_client::domain::rooms::services::{
+    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, RoomFactory,
+};
 use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::{Group, Occupant, UserBasicInfo};
+use prose_core_client::dtos::{Occupant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
 use prose_core_client::{ClientEvent, RoomEventType};
+use prose_xmpp::mods::muc;
+use prose_xmpp::stanza::muc::MediatedInvite;
 use prose_xmpp::{bare, full, jid, mods};
 
 #[tokio::test]
@@ -180,11 +183,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
 
     let room = Arc::new(RoomInternals::for_direct_message(
         &mock_data::account_jid().into_bare(),
-        &Contact {
-            jid: bare!("contact@prose.org"),
-            name: None,
-            group: Group::Team,
-        },
+        &bare!("contact@prose.org"),
         "Janice Doe",
     ));
 
@@ -247,6 +246,46 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
 
     time_provider.set_ymd_hms(2023, 01, 04, 00, 00, 31);
     assert!(room.load_composing_users().await?.is_empty());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_handles_invite() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .with(predicate::eq(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Join {
+                room_jid: bare!("group@conference.prose.org"),
+                nickname: None,
+                password: None,
+            },
+            save_bookmark: true,
+            insert_sidebar_item: true,
+            notify_delegate: true,
+        }))
+        .returning(move |req| {
+            let CreateOrEnterRoomRequestType::Join { room_jid, .. } = req.r#type else {
+                panic!("Expected CreateOrEnterRoomRequestType::Join")
+            };
+            let response = Arc::new(RoomInternals::group(&bare!("group@conference.prose.org")));
+            assert_eq!(room_jid, response.info.jid);
+            Box::pin(async move { Ok(response) })
+        });
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+    event_handler
+        .handle_event(XMPPEvent::MUC(muc::Event::MediatedInvite {
+            from: jid!("group@conference.prose.org"),
+            invite: MediatedInvite {
+                invites: vec![],
+                password: None,
+            },
+        }))
+        .await?;
 
     Ok(())
 }

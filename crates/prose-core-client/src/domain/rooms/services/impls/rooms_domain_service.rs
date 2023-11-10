@@ -21,13 +21,15 @@ use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::RequestError;
 
 use crate::app::deps::{
-    DynAppContext, DynBookmarksRepository, DynClientEventDispatcher, DynConnectedRoomsRepository,
-    DynIDProvider, DynRoomManagementService, DynRoomParticipationService, DynUserProfileRepository,
+    DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
+    DynIDProvider, DynRoomManagementService, DynRoomParticipationService, DynSidebarRepository,
+    DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
-    Bookmark, Member, RoomConfig, RoomError, RoomInfo, RoomInternals, RoomMetadata,
+    Member, RoomConfig, RoomError, RoomInfo, RoomInternals, RoomMetadata,
 };
 use crate::domain::shared::models::RoomType;
+use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
 use crate::ClientEvent;
@@ -42,13 +44,14 @@ const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
 const PUBLIC_CHANNEL_PREFIX: &str = "org.prose.public-channel";
 
 pub struct RoomsDomainService {
-    pub(crate) bookmarks_repo: DynBookmarksRepository,
+    pub(crate) bookmarks_service: DynBookmarksService,
     pub(crate) client_event_dispatcher: DynClientEventDispatcher,
     pub(crate) connected_rooms_repo: DynConnectedRoomsRepository,
     pub(crate) ctx: DynAppContext,
     pub(crate) id_provider: DynIDProvider,
     pub(crate) room_management_service: DynRoomManagementService,
     pub(crate) room_participation_service: DynRoomParticipationService,
+    pub(crate) sidebar_repo: DynSidebarRepository,
     pub(crate) user_profile_repo: DynUserProfileRepository,
 }
 
@@ -60,6 +63,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         CreateOrEnterRoomRequest {
             r#type,
             save_bookmark,
+            insert_sidebar_item,
             notify_delegate,
         }: CreateOrEnterRoomRequest,
     ) -> Result<Arc<RoomInternals>, RoomError> {
@@ -182,26 +186,50 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             .map(|name| name.to_string())
             .unwrap_or(room.info.jid.to_string());
 
-        if save_bookmark {
-            let result = self
-                .bookmarks_repo
-                .put(Bookmark {
-                    name: room_name,
-                    room_jid: room_jid.to_bare(),
-                })
-                .await;
+        let bookmark_type = match room.info.room_type {
+            RoomType::Pending => None,
+            RoomType::DirectMessage => Some(BookmarkType::DirectMessage),
+            RoomType::Group => Some(BookmarkType::Group),
+            RoomType::PrivateChannel => Some(BookmarkType::PrivateChannel),
+            RoomType::PublicChannel => Some(BookmarkType::PublicChannel),
+            RoomType::Generic => None,
+        };
 
-            match result {
-                Ok(_) => (),
-                Err(error) => {
-                    error!("Failed to save bookmark for room {}. {}", room_jid, error)
+        if let Some(bookmark_type) = bookmark_type {
+            if save_bookmark {
+                let result = self
+                    .bookmarks_service
+                    .save_bookmark(&Bookmark {
+                        name: room_name.clone(),
+                        jid: room_jid.to_bare(),
+                        r#type: bookmark_type.clone(),
+                        is_favorite: false,
+                        in_sidebar: insert_sidebar_item,
+                    })
+                    .await;
+
+                match result {
+                    Ok(_) => (),
+                    Err(error) => {
+                        error!("Failed to save bookmark for room {}. {}", room_jid, error)
+                    }
                 }
+            }
+
+            if insert_sidebar_item {
+                self.sidebar_repo.put(&SidebarItem {
+                    name: room_name,
+                    jid: room_jid.to_bare(),
+                    r#type: bookmark_type.clone(),
+                    is_favorite: false,
+                    error: None,
+                });
             }
         }
 
         if notify_delegate {
             self.client_event_dispatcher
-                .dispatch_event(ClientEvent::RoomsChanged);
+                .dispatch_event(ClientEvent::SidebarChanged);
         }
 
         Ok(room)
@@ -517,7 +545,9 @@ impl RoomsDomainService {
         nickname: &str,
     ) -> Result<(), RoomError> {
         self.connected_rooms_repo
-            .set(RoomInternals::pending(room_jid, user_jid, nickname))
+            .set(Arc::new(RoomInternals::pending(
+                room_jid, user_jid, nickname,
+            )))
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
     }
 }

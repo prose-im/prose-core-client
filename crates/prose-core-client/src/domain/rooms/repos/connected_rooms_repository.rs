@@ -24,7 +24,7 @@ pub trait ConnectedRoomsRepository: SendUnlessWasm + SyncUnlessWasm {
     fn get(&self, room_jid: &BareJid) -> Option<Arc<RoomInternals>>;
     fn get_all(&self) -> Vec<Arc<RoomInternals>>;
 
-    fn set(&self, room: RoomInternals) -> Result<(), RoomAlreadyExistsError>;
+    fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError>;
 
     /// Replaces all rooms with `rooms`.
     fn replace(&self, rooms: Vec<RoomInternals>);

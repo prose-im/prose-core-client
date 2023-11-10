@@ -12,6 +12,7 @@ pub mod messaging;
 pub mod platform_dependencies;
 pub mod rooms;
 pub mod settings;
+pub mod sidebar;
 pub mod user_info;
 pub mod user_profile;
 pub mod xmpp;

@@ -11,6 +11,7 @@ pub(crate) use room::RoomInner;
 pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
 pub use room_envelope::RoomEnvelope;
 pub use rooms_service::RoomsService;
+pub use sidebar_service::SidebarService;
 pub use user_data_service::UserDataService;
 
 mod account_service;
@@ -20,4 +21,5 @@ mod contacts_service;
 mod room;
 mod room_envelope;
 mod rooms_service;
+mod sidebar_service;
 mod user_data_service;

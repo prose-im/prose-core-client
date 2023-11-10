@@ -1,6 +1,8 @@
-use crate::types::BareJid;
-use prose_xmpp::mods;
 use wasm_bindgen::prelude::wasm_bindgen;
+
+use prose_core_client::dtos::PublicRoomInfo;
+
+use crate::types::BareJid;
 
 #[wasm_bindgen]
 pub struct Channel {
@@ -21,10 +23,10 @@ impl Channel {
     }
 }
 
-impl From<mods::muc::Room> for Channel {
-    fn from(value: mods::muc::Room) -> Self {
+impl From<PublicRoomInfo> for Channel {
+    fn from(value: PublicRoomInfo) -> Self {
         Channel {
-            jid: value.jid.to_bare().into(),
+            jid: value.jid.clone().into(),
             name: value
                 .name
                 .or(value.jid.node_str().map(|n| n.to_string()))

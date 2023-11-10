@@ -10,19 +10,31 @@ use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
 use prose_wasm_utils::PinnedFuture;
-use prose_xmpp::mods::muc::{Room, RoomConfigResponse, RoomOccupancy};
+use prose_xmpp::mods::muc::{RoomConfigResponse, RoomOccupancy};
 use prose_xmpp::{mods, RequestError};
 
 use crate::domain::rooms::models::{RoomError, RoomMetadata, RoomSettings};
 use crate::domain::rooms::services::RoomManagementService;
+use crate::dtos::PublicRoomInfo;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RoomManagementService for XMPPClient {
-    async fn load_public_rooms(&self, muc_service: &BareJid) -> Result<Vec<Room>, RoomError> {
+    async fn load_public_rooms(
+        &self,
+        muc_service: &BareJid,
+    ) -> Result<Vec<PublicRoomInfo>, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        let rooms = muc_mod.load_public_rooms(muc_service).await?;
+        let rooms = muc_mod
+            .load_public_rooms(muc_service)
+            .await?
+            .into_iter()
+            .map(|room| PublicRoomInfo {
+                jid: room.jid.into_bare(),
+                name: room.name,
+            })
+            .collect();
         Ok(rooms)
     }
 
@@ -64,6 +76,12 @@ impl RoomManagementService for XMPPClient {
         }
 
         self.load_room_metadata(room_jid, occupancy).await
+    }
+
+    async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError> {
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+        muc_mod.exit_room(room_jid).await?;
+        Ok(())
     }
 
     async fn set_room_owners<'a, 'b, 'c>(

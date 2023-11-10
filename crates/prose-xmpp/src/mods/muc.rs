@@ -133,6 +133,14 @@ impl MUC {
         self.send_presence_to_room(&room_jid, password).await
     }
 
+    /// Exits a room.
+    /// https://xmpp.org/extensions/xep-0045.html#example-80
+    pub async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RequestError> {
+        self.ctx
+            .send_stanza(Presence::new(presence::Type::Unavailable).with_to(room_jid.clone()))?;
+        Ok(())
+    }
+
     /// Creates an instant room or joins an existing room with the same JID.
     /// https://xmpp.org/extensions/xep-0045.html#createroom-instant
     pub async fn create_instant_room(
@@ -355,7 +363,8 @@ impl MUC {
             .set_type(MessageType::Groupchat)
             .set_to(room_jid.clone())
             .set_subject(subject.unwrap_or_default()); // Send empty string for empty subject
-        self.ctx.send_stanza(message)
+        self.ctx.send_stanza(message)?;
+        Ok(())
     }
 }
 

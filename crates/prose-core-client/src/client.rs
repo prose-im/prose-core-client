@@ -14,7 +14,8 @@ use prose_xmpp::ConnectionError;
 
 use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore};
 use crate::services::{
-    AccountService, CacheService, ConnectionService, ContactsService, RoomsService, UserDataService,
+    AccountService, CacheService, ConnectionService, ContactsService, RoomsService, SidebarService,
+    UserDataService,
 };
 use crate::ClientEvent;
 
@@ -38,6 +39,7 @@ pub struct ClientInner {
     pub account: AccountService,
     pub contacts: ContactsService,
     pub rooms: RoomsService,
+    pub sidebar: SidebarService,
     pub user_data: UserDataService,
     pub cache: CacheService,
 }

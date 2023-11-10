@@ -453,7 +453,8 @@ impl Profile {
             Some(TimeResult(xmpp_parsers::date::DateTime(time))),
         )
         .with_to(to);
-        return self.ctx.send_stanza(response);
+        self.ctx.send_stanza(response)?;
+        Ok(())
     }
 
     /// XEP-0092: Software Version
@@ -480,7 +481,8 @@ impl Profile {
         id: impl AsRef<str>,
     ) -> Result<()> {
         self.ctx
-            .send_stanza(Iq::from_result(id.as_ref(), Some(software_version)).with_to(to))
+            .send_stanza(Iq::from_result(id.as_ref(), Some(software_version)).with_to(to))?;
+        Ok(())
     }
 
     /// XEP-0012: Last Activity
@@ -495,6 +497,7 @@ impl Profile {
         self.ctx.send_stanza(
             Iq::from_result(id.as_ref(), Some(LastActivityResponse { seconds, status }))
                 .with_to(to),
-        )
+        )?;
+        Ok(())
     }
 }

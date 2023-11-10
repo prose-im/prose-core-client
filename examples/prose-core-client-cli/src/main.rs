@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::Path;
@@ -20,7 +21,7 @@ use strum_macros::{Display, EnumIter};
 use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
-use prose_core_client::dtos::{Address, Contact, Message, Occupant};
+use prose_core_client::dtos::{Address, Contact, Message, Occupant, PublicRoomInfo, SidebarItem};
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
 use prose_core_client::{
@@ -224,10 +225,28 @@ impl From<muc::Room> for JidWithName {
     }
 }
 
+impl From<PublicRoomInfo> for JidWithName {
+    fn from(value: PublicRoomInfo) -> Self {
+        Self {
+            jid: value.jid,
+            name: value.name.as_deref().unwrap_or("<untitled>").to_string(),
+        }
+    }
+}
+
 impl From<Contact> for JidWithName {
     fn from(value: Contact) -> Self {
         Self {
             jid: value.jid,
+            name: value.name,
+        }
+    }
+}
+
+impl From<SidebarItem> for JidWithName {
+    fn from(value: SidebarItem) -> Self {
+        Self {
+            jid: value.room.to_generic_room().jid().clone(),
             name: value.name,
         }
     }
@@ -341,6 +360,21 @@ async fn select_muc_room(client: &Client) -> Result<RoomEnvelope> {
         .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+}
+
+async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
+    let rooms = client.rooms.load_public_rooms().await?;
+    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+}
+
+async fn select_sidebar_item(client: &Client) -> Result<Option<SidebarItem>> {
+    let items = client.sidebar.sidebar_items();
+    if items.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(
+        select_item_from_list(items, |item| JidWithName::from(item.clone())).clone(),
+    ))
 }
 
 fn select_item_from_list<T, O: ToString>(
@@ -683,24 +717,28 @@ enum Selection {
     LoadMessages,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
-    #[strum(serialize = "Create group")]
-    CreateGroup,
+    #[strum(serialize = "Start conversation")]
+    StartConversation,
     #[strum(serialize = "Create public channel")]
     CreatePublicChannel,
     #[strum(serialize = "Create private channel")]
     CreatePrivateChannel,
     #[strum(serialize = "Load public rooms")]
     LoadPublicRooms,
+    #[strum(serialize = "Join public room")]
+    JoinPublicRoom,
     #[strum(serialize = "Destroy public room")]
     DestroyPublicRoom,
-    #[strum(serialize = "Load bookmarks")]
-    LoadBookmarks,
-    #[strum(serialize = "Delete bookmark")]
-    DeleteBookmark,
     #[strum(serialize = "List connected rooms")]
     ListConnectedRooms,
+    #[strum(serialize = "List sidebar items")]
+    ListSidebarItems,
+    #[strum(serialize = "Toggle Favorite for sidebar item")]
+    ToggleSidebarItemFavorite,
+    #[strum(serialize = "Remove sidebar item")]
+    RemoveSidebarItem,
     #[strum(serialize = "Set room subject")]
-    SetRoomSubject,
+    SetRoomTopic,
     #[strum(serialize = "List occupants in room")]
     ListRoomOccupants,
     #[strum(serialize = "List members in room")]
@@ -757,12 +795,9 @@ async fn main() -> Result<()> {
                 println!("Cleaning cache…");
                 client.cache.clear_cache().await?;
             }
-            Selection::CreateGroup => {
+            Selection::StartConversation => {
                 let contacts = select_multiple_contacts(&client).await?;
-                client
-                    .rooms
-                    .create_room_for_direct_message(contacts.as_slice())
-                    .await?;
+                client.rooms.start_conversation(contacts.as_slice()).await?;
             }
             Selection::CreatePublicChannel => {
                 let room_name = prompt_string("Enter a name for the channel:");
@@ -789,6 +824,10 @@ async fn main() -> Result<()> {
                     .collect::<Vec<_>>();
                 println!("{}", rooms.join("\n"));
             }
+            Selection::JoinPublicRoom => {
+                let room = select_public_channel(&client).await?;
+                client.rooms.join_room(&room.jid, None).await?;
+            }
             Selection::DestroyPublicRoom => {
                 let rooms = client
                     .rooms
@@ -812,60 +851,67 @@ async fn main() -> Result<()> {
                 println!();
                 client.rooms.destroy_room(&rooms[selection].jid).await?;
             }
-            Selection::LoadBookmarks => {
-                todo!()
-                // let bookmarks = client
-                //     .load_bookmarks_dbg()
-                //     .await?
-                //     .into_iter()
-                //     .map(BookmarkEnvelope)
-                //     .map(|b| b.to_string())
-                //     .collect::<Vec<_>>();
-                //
-                // println!("Bookmarks:\n{}", bookmarks.join("\n"));
-            }
-            Selection::DeleteBookmark => {
-                todo!()
-                // let bookmarks = client
-                //     .load_bookmarks_dbg()
-                //     .await?
-                //     .into_iter()
-                //     .map(BookmarkEnvelope)
-                //     .collect::<Vec<_>>();
-                //
-                // if bookmarks.is_empty() {
-                //     println!("No bookmarks to delete");
-                //     continue;
-                // }
-                //
-                // let selection = Select::with_theme(&ColorfulTheme::default())
-                //     .with_prompt("Select a bookmark to delete")
-                //     .default(0)
-                //     .items(bookmarks.as_slice())
-                //     .interact()
-                //     .unwrap();
-                // println!();
-                //
-                // let selected_bookmark = &bookmarks[selection].0;
-                // client.delete_bookmark(&selected_bookmark.jid).await?;
-                //
-                // if Confirm::new()
-                //     .with_prompt(format!(
-                //         "Do you want to delete room {} as well?",
-                //         selected_bookmark.jid
-                //     ))
-                //     .interact()?
-                // {
-                //     println!("Deleting room…");
-                //     client
-                //         .destroy_room(&selected_bookmark.jid.to_bare())
-                //         .await?;
-                // }
-            }
             Selection::ListConnectedRooms => {
                 list_connected_rooms(&client).await?;
             }
-            Selection::SetRoomSubject => {
+            Selection::ListSidebarItems => {
+                let items = client.sidebar.sidebar_items().into_iter().fold(
+                    HashMap::new(),
+                    |mut map, item| {
+                        let category = match item.room {
+                            _ if item.is_favorite => "Favorites",
+                            RoomEnvelope::DirectMessage(_) => "Direct Messages",
+                            RoomEnvelope::Group(_) => "Group",
+                            RoomEnvelope::PrivateChannel(_) => "Private Channels",
+                            RoomEnvelope::PublicChannel(_) => "Public Channels",
+                            RoomEnvelope::Generic(_) => "Generic",
+                        };
+                        map.entry(category).or_insert_with(Vec::new).push(item);
+                        map
+                    },
+                );
+
+                let mut keys = items.keys().collect::<Vec<_>>();
+                keys.sort();
+
+                for key in keys {
+                    println!("# {}:", key);
+                    let values = items.get(key).unwrap();
+                    for value in values {
+                        println!(
+                            "  - {:<36} | has draft: {} | unread count: {}",
+                            value
+                                .room
+                                .to_generic_room()
+                                .name()
+                                .unwrap_or("<untitled>")
+                                .to_string()
+                                .truncate_to(36),
+                            value.has_draft,
+                            value.unread_count
+                        );
+                    }
+                }
+            }
+            Selection::ToggleSidebarItemFavorite => {
+                let Some(item) = select_sidebar_item(&client).await? else {
+                    continue;
+                };
+                client
+                    .sidebar
+                    .toggle_favorite(item.room.to_generic_room().jid())
+                    .await?;
+            }
+            Selection::RemoveSidebarItem => {
+                let Some(item) = select_sidebar_item(&client).await? else {
+                    continue;
+                };
+                client
+                    .sidebar
+                    .remove_from_sidebar(item.room.to_generic_room().jid())
+                    .await?;
+            }
+            Selection::SetRoomTopic => {
                 let room = select_muc_room(&client).await?;
                 let subject = prompt_string("Enter a subject:");
 

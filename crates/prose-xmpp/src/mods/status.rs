@@ -82,7 +82,8 @@ impl Status {
         if let Some(caps) = caps {
             presence.add_payload(caps)
         }
-        self.ctx.send_stanza(presence)
+        self.ctx.send_stanza(presence)?;
+        Ok(())
     }
 
     /// XEP-0108: User Activity

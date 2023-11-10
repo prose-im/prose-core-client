@@ -30,13 +30,15 @@ use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
 use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
 use crate::domain::messaging::services::mocks::{MockMessageArchiveService, MockMessagingService};
-use crate::domain::rooms::repos::mocks::{MockBookmarksRepository, MockConnectedRoomsRepository};
+use crate::domain::rooms::repos::mocks::MockConnectedRoomsRepository;
 use crate::domain::rooms::services::mocks::{
     MockRoomManagementService, MockRoomParticipationService, MockRoomTopicService,
     MockRoomsDomainService,
 };
 use crate::domain::rooms::services::RoomFactory;
 use crate::domain::settings::repos::mocks::MockAccountSettingsRepository;
+use crate::domain::sidebar::repos::mocks::MockSidebarRepository;
+use crate::domain::sidebar::services::mocks::MockBookmarksService;
 use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoRepository};
 use crate::domain::user_info::services::mocks::MockUserInfoService;
 use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
@@ -77,7 +79,7 @@ impl Default for AppContext {
 pub struct MockAppDependencies {
     pub account_settings_repo: MockAccountSettingsRepository,
     pub avatar_repo: MockAvatarRepository,
-    pub bookmarks_repo: MockBookmarksRepository,
+    pub bookmarks_service: MockBookmarksService,
     pub client_event_dispatcher: MockEventDispatcher<ClientEvent>,
     pub connected_rooms_repo: MockConnectedRoomsRepository,
     pub connection_service: MockConnectionService,
@@ -97,6 +99,7 @@ pub struct MockAppDependencies {
     pub room_topic_service: MockRoomTopicService,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub short_id_provider: DynIDProvider,
+    pub sidebar_repo: MockSidebarRepository,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
     pub user_account_service: MockUserAccountService,
@@ -114,7 +117,7 @@ impl MockAppDependencies {
 
 impl From<MockAppDependencies> for AppDependencies {
     fn from(mock: MockAppDependencies) -> Self {
-        let bookmarks_repo = Arc::new(mock.bookmarks_repo);
+        let bookmarks_service = Arc::new(mock.bookmarks_service);
         let client_event_dispatcher = Arc::new(mock.client_event_dispatcher);
         let connected_rooms_repo = Arc::new(mock.connected_rooms_repo);
         let ctx = Arc::new(mock.ctx);
@@ -156,7 +159,7 @@ impl From<MockAppDependencies> for AppDependencies {
         AppDependencies {
             account_settings_repo: Arc::new(mock.account_settings_repo),
             avatar_repo: Arc::new(mock.avatar_repo),
-            bookmarks_repo,
+            bookmarks_service,
             client_event_dispatcher,
             connected_rooms_repo,
             connection_service: Arc::new(mock.connection_service),
@@ -175,6 +178,7 @@ impl From<MockAppDependencies> for AppDependencies {
             room_topic_service,
             rooms_domain_service: Arc::new(mock.rooms_domain_service),
             short_id_provider: mock.short_id_provider,
+            sidebar_repo: Arc::new(mock.sidebar_repo),
             time_provider: mock.time_provider,
             user_account_service: Arc::new(mock.user_account_service),
             user_info_repo: Arc::new(mock.user_info_repo),

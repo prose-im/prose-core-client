@@ -5,8 +5,8 @@
 
 use jid::BareJid;
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Bookmark {
-    pub name: String,
-    pub room_jid: BareJid,
+#[derive(Debug, Clone, PartialEq)]
+pub struct PublicRoomInfo {
+    pub jid: BareJid,
+    pub name: Option<String>,
 }

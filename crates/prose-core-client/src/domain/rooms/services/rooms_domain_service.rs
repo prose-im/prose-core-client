@@ -43,6 +43,7 @@ pub enum CreateOrEnterRoomRequestType {
 pub struct CreateOrEnterRoomRequest {
     pub r#type: CreateOrEnterRoomRequestType,
     pub save_bookmark: bool,
+    pub insert_sidebar_item: bool,
     pub notify_delegate: bool,
 }
 

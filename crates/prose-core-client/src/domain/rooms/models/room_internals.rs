@@ -10,7 +10,6 @@ use parking_lot::RwLock;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::muc::user::Affiliation;
 
-use crate::domain::contacts::models::Contact;
 use crate::domain::rooms::models::RoomState;
 use crate::domain::shared::models::RoomType;
 use crate::dtos::Occupant;
@@ -67,16 +66,20 @@ impl RoomInternals {
 }
 
 impl RoomInternals {
-    pub fn for_direct_message(user_jid: &BareJid, contact: &Contact, contact_name: &str) -> Self {
+    pub fn for_direct_message(
+        user_jid: &BareJid,
+        contact_jid: &BareJid,
+        contact_name: &str,
+    ) -> Self {
         Self {
             info: RoomInfo {
-                jid: contact.jid.clone(),
+                jid: contact_jid.clone(),
                 name: Some(contact_name.to_string()),
                 description: None,
                 user_jid: user_jid.clone(),
                 user_nickname: "no_nickname".to_string(),
                 members: HashMap::from([(
-                    contact.jid.clone(),
+                    contact_jid.clone(),
                     Member {
                         name: contact_name.to_string(),
                     },
@@ -86,9 +89,9 @@ impl RoomInternals {
             state: RwLock::new(RoomState {
                 subject: None,
                 occupants: HashMap::from([(
-                    Jid::Bare(contact.jid.clone()),
+                    Jid::Bare(contact_jid.clone()),
                     Occupant {
-                        jid: Some(contact.jid.clone()),
+                        jid: Some(contact_jid.clone()),
                         name: Some(contact_name.to_string()),
                         affiliation: Affiliation::Owner,
                         chat_state: ChatState::Gone,
@@ -116,7 +119,6 @@ mod tests {
 
     use prose_xmpp::{bare, jid};
 
-    use crate::domain::contacts::models::Group;
     use crate::dtos::Occupant;
 
     use super::*;
@@ -125,11 +127,7 @@ mod tests {
     fn test_room_internals_for_direct_message() {
         let internals = RoomInternals::for_direct_message(
             &bare!("logged-in-user@prose.org"),
-            &Contact {
-                jid: bare!("contact@prose.org"),
-                name: None,
-                group: Group::Favorite,
-            },
+            &bare!("contact@prose.org"),
             "Jane Doe",
         );
 

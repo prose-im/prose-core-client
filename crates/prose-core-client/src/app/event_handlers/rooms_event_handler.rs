@@ -185,6 +185,7 @@ impl RoomsEventHandler {
                     password,
                 },
                 save_bookmark: true,
+                insert_sidebar_item: true,
                 notify_delegate: true,
             })
             .await?;

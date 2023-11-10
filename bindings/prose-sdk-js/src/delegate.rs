@@ -35,8 +35,8 @@ export interface ProseClientDelegate {
     clientConnected(): void
     clientDisconnected(client: ProseClient, error?: ConnectionError): void
     
-    /// The number of available rooms has changed.
-    roomsChanged(client: ProseClient): void
+    /// The contents of the sidebar have changed.
+    sidebarChanged(client: ProseClient): void
 
     /// A user in `conversation` started or stopped typing.
     composingUsersChanged(client: ProseClient, room: Room): void
@@ -80,8 +80,8 @@ extern "C" {
         room: JsValue,
     ) -> Result<(), JsValue>;
 
-    #[wasm_bindgen(method, catch, js_name = "roomsChanged")]
-    fn rooms_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
+    #[wasm_bindgen(method, catch, js_name = "sidebarChanged")]
+    fn sidebar_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "contactChanged")]
     fn contact_changed(this: &JSDelegate, client: Client, jid: BareJid) -> Result<(), JsValue>;
@@ -190,7 +190,7 @@ impl Delegate {
             } => self
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
-            ClientEvent::RoomsChanged => self.inner.rooms_changed(client)?,
+            ClientEvent::SidebarChanged => self.inner.sidebar_changed(client)?,
             ClientEvent::ContactChanged { jid } => {
                 self.inner.contact_changed(client, jid.into())?
             }

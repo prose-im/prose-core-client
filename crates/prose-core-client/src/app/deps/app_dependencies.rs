@@ -16,12 +16,14 @@ use crate::domain::contacts::services::ContactsService;
 use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
 use crate::domain::messaging::services::{MessageArchiveService, MessagingService};
-use crate::domain::rooms::repos::{BookmarksRepository, ConnectedRoomsRepository};
+use crate::domain::rooms::repos::ConnectedRoomsRepository;
 use crate::domain::rooms::services::{
-    BookmarksService, RoomFactory, RoomManagementService, RoomParticipationService,
-    RoomTopicService, RoomsDomainService,
+    RoomFactory, RoomManagementService, RoomParticipationService, RoomTopicService,
+    RoomsDomainService,
 };
 use crate::domain::settings::repos::AccountSettingsRepository;
+use crate::domain::sidebar::repos::SidebarRepository;
+use crate::domain::sidebar::services::BookmarksService;
 use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
 use crate::domain::user_info::services::UserInfoService;
 use crate::domain::user_profiles::repos::UserProfileRepository;
@@ -31,7 +33,6 @@ use crate::ClientEvent;
 pub type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
 pub type DynAppContext = Arc<AppContext>;
 pub type DynAvatarRepository = Arc<dyn AvatarRepository>;
-pub type DynBookmarksRepository = Arc<dyn BookmarksRepository>;
 pub type DynBookmarksService = Arc<dyn BookmarksService>;
 pub type DynClientEventDispatcher = Arc<dyn EventDispatcher<ClientEvent>>;
 pub type DynConnectedRoomsRepository = Arc<dyn ConnectedRoomsRepository>;
@@ -49,6 +50,7 @@ pub type DynRoomManagementService = Arc<dyn RoomManagementService>;
 pub type DynRoomParticipationService = Arc<dyn RoomParticipationService>;
 pub type DynRoomTopicService = Arc<dyn RoomTopicService>;
 pub type DynRoomsDomainService = Arc<dyn RoomsDomainService>;
+pub type DynSidebarRepository = Arc<dyn SidebarRepository>;
 pub type DynTimeProvider = Arc<dyn TimeProvider>;
 pub type DynUserAccountService = Arc<dyn UserAccountService>;
 pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
@@ -59,7 +61,7 @@ pub type DynUserProfileService = Arc<dyn UserProfileService>;
 pub struct AppDependencies {
     pub account_settings_repo: DynAccountSettingsRepository,
     pub avatar_repo: DynAvatarRepository,
-    pub bookmarks_repo: DynBookmarksRepository,
+    pub bookmarks_service: DynBookmarksService,
     pub client_event_dispatcher: DynClientEventDispatcher,
     pub connected_rooms_repo: DynConnectedRoomsRepository,
     pub connection_service: DynConnectionService,
@@ -78,6 +80,7 @@ pub struct AppDependencies {
     pub room_topic_service: DynRoomTopicService,
     pub rooms_domain_service: DynRoomsDomainService,
     pub short_id_provider: DynIDProvider,
+    pub sidebar_repo: DynSidebarRepository,
     pub time_provider: DynTimeProvider,
     pub user_account_service: DynUserAccountService,
     pub user_info_repo: DynUserInfoRepository,

@@ -3,16 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::app::dtos::UserProfile;
-use crate::domain::contacts::models::Contact;
-use crate::util::jid_ext::BareJidExt;
 use std::ops::Deref;
 
-pub(crate) fn build_contact_name(contact: &Contact, profile: &UserProfile) -> String {
+use jid::BareJid;
+
+use crate::app::dtos::UserProfile;
+use crate::util::jid_ext::BareJidExt;
+
+pub(crate) fn build_contact_name(contact_jid: &BareJid, profile: &UserProfile) -> String {
     concatenate_names(&profile.first_name, &profile.last_name)
         .or_else(|| profile.nickname.clone())
-        .or_else(|| contact.name.clone())
-        .unwrap_or_else(|| contact.jid.to_display_name())
+        .unwrap_or_else(|| contact_jid.to_display_name())
 }
 
 pub(crate) fn concatenate_names(

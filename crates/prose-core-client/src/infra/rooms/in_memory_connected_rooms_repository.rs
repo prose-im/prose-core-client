@@ -37,14 +37,14 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         self.rooms.read().values().cloned().collect()
     }
 
-    fn set(&self, room: RoomInternals) -> Result<(), RoomAlreadyExistsError> {
+    fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError> {
         let mut rooms = self.rooms.write();
 
         if rooms.contains_key(&room.info.jid) {
             return Err(RoomAlreadyExistsError);
         }
 
-        rooms.insert(room.info.jid.clone(), Arc::new(room));
+        rooms.insert(room.info.jid.clone(), room);
         Ok(())
     }
 

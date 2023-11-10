@@ -14,7 +14,8 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
-    ContactsArray, IntoJSArray, RoomEnvelopeExt, RoomsArray, UserMetadata, UserProfile,
+    ContactsArray, IntoJSArray, RoomEnvelopeExt, RoomsArray, SidebarItem, SidebarItemsArray,
+    UserMetadata, UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -159,6 +160,21 @@ impl Client {
         Ok(self.client.rooms.connected_rooms().into())
     }
 
+    #[wasm_bindgen(js_name = "sidebarItems")]
+    pub fn sidebar_items(&self) -> SidebarItemsArray {
+        self.client
+            .sidebar
+            .sidebar_items()
+            .into_iter()
+            .map(|item| {
+                JsValue::from(SidebarItem {
+                    dto: item,
+                    client: self.client.clone(),
+                })
+            })
+            .collect_into_js_array::<SidebarItemsArray>()
+    }
+
     #[wasm_bindgen(js_name = "loadPublicChannels")]
     pub async fn load_public_channels(&self) -> Result<ChannelsArray> {
         Ok(self
@@ -172,6 +188,22 @@ impl Client {
             .collect_into_js_array::<ChannelsArray>())
     }
 
+    /// Creates the direct message or joins it if it already exists and returns the `Room`.
+    /// Sends invites to all participants if the group was created.
+    /// Pass a String[] as participants where each string is a valid BareJid.
+    #[wasm_bindgen(js_name = "startConversation")]
+    pub async fn start_conversation(&self, participants: Array) -> Result<JsValue> {
+        let participants = try_jid_vec_from_string_array(participants)?;
+
+        Ok(self
+            .client
+            .rooms
+            .start_conversation(participants.as_slice())
+            .await
+            .map_err(WasmError::from)?
+            .into_js_value())
+    }
+
     /// Creates the group or joins it if it already exists and returns the `Room`.
     /// Sends invites to all participants if the group was created.
     /// Pass a String[] as participants where each string is a valid BareJid.
@@ -182,7 +214,7 @@ impl Client {
         Ok(self
             .client
             .rooms
-            .create_room_for_direct_message(participants.as_slice())
+            .create_room_for_group(participants.as_slice())
             .await
             .map_err(WasmError::from)?
             .into_js_value())

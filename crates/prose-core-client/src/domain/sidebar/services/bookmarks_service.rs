@@ -5,15 +5,17 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::rooms::models::Bookmark;
+use crate::domain::sidebar::models::Bookmark;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait BookmarksService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_bookmarks(&self) -> Result<Vec<Bookmark>>;
-    async fn publish_bookmarks(&self, bookmarks: &[Bookmark]) -> Result<()>;
+    async fn save_bookmark(&self, bookmark: &Bookmark) -> Result<()>;
+    async fn delete_bookmark(&self, jid: &BareJid) -> Result<()>;
 }

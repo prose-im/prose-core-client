@@ -64,6 +64,7 @@ impl XMPPClientBuilder {
             .add_mod(mods::MAM::default())
             .add_mod(mods::MUC::default())
             .add_mod(mods::Profile::default())
+            .add_mod(mods::PubSub::default())
             .add_mod(mods::Roster::default())
             .add_mod(mods::Status::default())
             .build();

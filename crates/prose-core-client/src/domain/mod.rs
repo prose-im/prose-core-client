@@ -11,6 +11,7 @@ pub mod messaging;
 pub mod rooms;
 pub mod settings;
 pub mod shared;
+pub mod sidebar;
 pub mod user_info;
 pub mod user_profiles;
 

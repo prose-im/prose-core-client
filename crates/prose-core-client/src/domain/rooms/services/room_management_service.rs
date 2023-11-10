@@ -8,10 +8,9 @@ use jid::{BareJid, FullJid};
 use xmpp_parsers::data_forms::DataForm;
 
 use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
-use prose_xmpp::mods;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 
-use crate::domain::rooms::models::{RoomError, RoomMetadata};
+use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomMetadata};
 
 type ConfigureRoomHandler =
     Box<dyn FnOnce(DataForm) -> PinnedFuture<anyhow::Result<RoomConfigResponse>> + 'static + Send>;
@@ -23,7 +22,7 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_public_rooms(
         &self,
         muc_service: &BareJid,
-    ) -> Result<Vec<mods::muc::Room>, RoomError>;
+    ) -> Result<Vec<PublicRoomInfo>, RoomError>;
 
     async fn create_reserved_room(
         &self,
@@ -36,6 +35,8 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         room_jid: &FullJid,
         password: Option<&str>,
     ) -> Result<RoomMetadata, RoomError>;
+
+    async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError>;
 
     async fn set_room_owners(
         &self,

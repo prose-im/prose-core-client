@@ -30,6 +30,46 @@ impl RoomInternals {
         }
     }
 
+    pub fn public_channel(jid: &BareJid) -> Self {
+        Self {
+            info: RoomInfo {
+                jid: jid.clone(),
+                name: None,
+                description: None,
+                user_jid: mock_data::account_jid().into_bare(),
+                user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+                members: HashMap::new(),
+                room_type: RoomType::PublicChannel,
+            },
+            state: Default::default(),
+        }
+    }
+
+    pub fn private_channel(jid: &BareJid) -> Self {
+        Self {
+            info: RoomInfo {
+                jid: jid.clone(),
+                name: None,
+                description: None,
+                user_jid: mock_data::account_jid().into_bare(),
+                user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+                members: HashMap::new(),
+                room_type: RoomType::PrivateChannel,
+            },
+            state: Default::default(),
+        }
+    }
+
+    pub fn with_user_nickname(mut self, nickname: impl Into<String>) -> Self {
+        self.info.user_nickname = nickname.into();
+        self
+    }
+
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.info.name = Some(name.into());
+        self
+    }
+
     pub fn with_members(mut self, members: impl IntoIterator<Item = (BareJid, Member)>) -> Self {
         self.info.members = members.into_iter().collect();
         self

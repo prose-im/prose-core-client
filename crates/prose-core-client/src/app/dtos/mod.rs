@@ -7,12 +7,13 @@ pub use url::Url;
 
 pub use contact::Contact;
 pub use message::{Message, MessageSender};
+pub use sidebar_item::SidebarItem;
 
 pub use crate::domain::{
     contacts::models::Group,
     general::models::SoftwareVersion,
     messaging::models::{Emoji, MessageId, Reaction, StanzaId},
-    rooms::models::{Member, Occupant},
+    rooms::models::{Member, Occupant, PublicRoomInfo},
     shared::models::{Availability, UserBasicInfo, UserPresenceInfo},
     user_info::models::{LastActivity, UserActivity, UserInfo, UserMetadata},
     user_profiles::models::{Address, UserProfile},
@@ -20,3 +21,4 @@ pub use crate::domain::{
 
 mod contact;
 mod message;
+mod sidebar_item;

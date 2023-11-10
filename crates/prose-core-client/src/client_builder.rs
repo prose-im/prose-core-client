@@ -23,7 +23,7 @@ use crate::infra::avatars::AvatarCache;
 use crate::infra::general::NanoIDProvider;
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
-use crate::services::CacheService;
+use crate::services::{CacheService, SidebarService};
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedStore {}
@@ -150,6 +150,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
                 Feature::Notify(ns::PUBSUB),
                 Feature::Notify(ns::USER_ACTIVITY),
                 Feature::Notify(ns::VCARD4),
+                Feature::Notify(crate::infra::xmpp::type_conversions::bookmark::ns::PROSE_BOOKMARK),
             ],
         );
 
@@ -193,6 +194,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             account: AccountService::from(&dependencies),
             contacts: ContactsService::from(&dependencies),
             rooms: RoomsService::from(&dependencies),
+            sidebar: SidebarService::from(&dependencies),
             user_data: UserDataService::from(&dependencies),
             cache: CacheService::from(&dependencies),
         });
