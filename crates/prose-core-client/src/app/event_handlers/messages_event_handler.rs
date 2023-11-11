@@ -163,7 +163,7 @@ impl MessagesEventHandler {
         self.messages_repo.append(&from, &[&message]).await?;
 
         if message.payload.is_message() {
-            match self.add_group_to_sidebar_if_needed(&room).await {
+            match self.add_sidebar_item_if_needed(&room).await {
                 Ok(_) => (),
                 Err(err) => error!("Could not add group to sidebar. {}", err.to_string()),
             }
@@ -221,35 +221,37 @@ impl MessagesEventHandler {
 }
 
 impl MessagesEventHandler {
-    async fn add_group_to_sidebar_if_needed(&self, room: &Arc<RoomInternals>) -> Result<()> {
-        if room.info.room_type != RoomType::Group {
-            return Ok(());
-        }
+    async fn add_sidebar_item_if_needed(&self, room: &Arc<RoomInternals>) -> Result<()> {
+        let bookmark_type = match room.info.room_type {
+            RoomType::DirectMessage => BookmarkType::DirectMessage,
+            RoomType::Group => BookmarkType::Group,
+            _ => return Ok(()),
+        };
 
         if self.sidebar_repo.get(&room.info.jid).is_some() {
             return Ok(());
         }
 
-        let group_name = room
+        let bookmark_name = room
             .info
             .name
             .clone()
-            .unwrap_or("Untitled Group".to_string());
+            .unwrap_or("Untitled Conversation".to_string());
 
         self.bookmarks_service
             .save_bookmark(&Bookmark {
-                name: group_name.clone(),
+                name: bookmark_name.clone(),
                 jid: room.info.jid.clone(),
-                r#type: BookmarkType::Group,
+                r#type: bookmark_type.clone(),
                 is_favorite: false,
                 in_sidebar: true,
             })
             .await?;
 
         self.sidebar_repo.put(&SidebarItem {
-            name: group_name,
+            name: bookmark_name,
             jid: room.info.jid.clone(),
-            r#type: BookmarkType::Group,
+            r#type: bookmark_type,
             is_favorite: false,
             error: None,
         });
