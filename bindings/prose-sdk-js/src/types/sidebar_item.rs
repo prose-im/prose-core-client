@@ -30,6 +30,7 @@ export interface SidebarItem {
     readonly isFavorite: boolean;
     readonly hasDraft: boolean;
     readonly unreadCount: number;
+    readonly mentionsCount: number;
     readonly error?: string;
     
     toggleFavorite(): Promise<void>;
@@ -88,6 +89,11 @@ impl SidebarItem {
     #[wasm_bindgen(getter, js_name = "unreadCount")]
     pub fn unread_count(&self) -> u32 {
         self.dto.unread_count
+    }
+
+    #[wasm_bindgen(getter, js_name = "mentionsCount")]
+    pub fn mentions_count(&self) -> u32 {
+        self.dto.mentions_count
     }
 
     #[wasm_bindgen(getter)]

@@ -12,5 +12,6 @@ pub struct SidebarItem {
     pub is_favorite: bool,
     pub has_draft: bool,
     pub unread_count: u32,
+    pub mentions_count: u32,
     pub error: Option<String>,
 }

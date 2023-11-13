@@ -51,8 +51,9 @@ impl SidebarService {
                 name: item.name,
                 room: self.room_factory.build(room),
                 is_favorite: item.is_favorite,
-                has_draft: false, // TODO
-                unread_count: 0,  // TODO
+                has_draft: false,  // TODO
+                unread_count: 0,   // TODO
+                mentions_count: 0, // TODO
                 error: item.error,
             };
             item_dtos.push(item_dto)
