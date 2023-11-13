@@ -14,8 +14,8 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
-    ContactsArray, IntoJSArray, RoomEnvelopeExt, RoomsArray, SidebarItem, SidebarItemsArray,
-    UserMetadata, UserProfile,
+    ContactsArray, IntoJSArray, RoomsArray, SidebarItem, SidebarItemsArray, UserMetadata,
+    UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -188,11 +188,11 @@ impl Client {
             .collect_into_js_array::<ChannelsArray>())
     }
 
-    /// Creates the direct message or joins it if it already exists and returns the `Room`.
+    /// Creates the direct message or joins it if it already exists and returns the `BareJid`.
     /// Sends invites to all participants if the group was created.
     /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "startConversation")]
-    pub async fn start_conversation(&self, participants: Array) -> Result<JsValue> {
+    pub async fn start_conversation(&self, participants: Array) -> Result<BareJid> {
         let participants = try_jid_vec_from_string_array(participants)?;
 
         Ok(self
@@ -201,14 +201,15 @@ impl Client {
             .start_conversation(participants.as_slice())
             .await
             .map_err(WasmError::from)?
-            .into_js_value())
+            .into_inner()
+            .into())
     }
 
-    /// Creates the group or joins it if it already exists and returns the `Room`.
+    /// Creates the group or joins it if it already exists and returns the `BareJid`.
     /// Sends invites to all participants if the group was created.
     /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "createGroup")]
-    pub async fn create_group(&self, participants: Array) -> Result<JsValue> {
+    pub async fn create_group(&self, participants: Array) -> Result<BareJid> {
         let participants = try_jid_vec_from_string_array(participants)?;
 
         Ok(self
@@ -217,44 +218,48 @@ impl Client {
             .create_room_for_group(participants.as_slice())
             .await
             .map_err(WasmError::from)?
-            .into_js_value())
+            .into_inner()
+            .into())
     }
 
     /// Creates the public channel or joins it if one with the same name already exists and
-    /// returns the `Room`.
+    /// returns the `BareJid`.
     #[wasm_bindgen(js_name = "createPublicChannel")]
-    pub async fn create_public_channel(&self, channel_name: &str) -> Result<JsValue> {
+    pub async fn create_public_channel(&self, channel_name: &str) -> Result<BareJid> {
         Ok(self
             .client
             .rooms
             .create_room_for_public_channel(channel_name)
             .await
             .map_err(WasmError::from)?
-            .into_js_value())
+            .into_inner()
+            .into())
     }
 
-    /// Creates the private channel and returns the created `Room`.
+    /// Creates the private channel and returns the `BareJid` of the created room.
     #[wasm_bindgen(js_name = "createPrivateChannel")]
-    pub async fn create_private_channel(&self, channel_name: &str) -> Result<JsValue> {
+    pub async fn create_private_channel(&self, channel_name: &str) -> Result<BareJid> {
         Ok(self
             .client
             .rooms
             .create_room_for_private_channel(channel_name)
             .await
             .map_err(WasmError::from)?
-            .into_js_value())
+            .into_inner()
+            .into())
     }
 
-    /// Joins and returns the room identified by `Room`.
+    /// Joins the room identified by `room_jid` and returns its `BareJid`.
     #[wasm_bindgen(js_name = "joinRoom")]
-    pub async fn join_room(&self, room_jid: &BareJid, password: Option<String>) -> Result<JsValue> {
+    pub async fn join_room(&self, room_jid: &BareJid, password: Option<String>) -> Result<BareJid> {
         Ok(self
             .client
             .rooms
             .join_room(&RoomJid::from(room_jid.clone()), password.as_deref())
             .await
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?
-            .into_js_value())
+            .into_inner()
+            .into())
     }
 
     /// XEP-0108: User Activity

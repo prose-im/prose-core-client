@@ -160,7 +160,7 @@ impl RoomsService {
             .await?)
     }
 
-    pub async fn start_conversation(&self, participants: &[BareJid]) -> Result<RoomEnvelope> {
+    pub async fn start_conversation(&self, participants: &[BareJid]) -> Result<RoomJid> {
         if participants.is_empty() {
             bail!("You need at least one participant to start a conversation")
         }
@@ -173,11 +173,7 @@ impl RoomsService {
         }
     }
 
-    pub async fn join_room(
-        &self,
-        room_jid: &RoomJid,
-        password: Option<&str>,
-    ) -> Result<RoomEnvelope> {
+    pub async fn join_room(&self, room_jid: &RoomJid, password: Option<&str>) -> Result<RoomJid> {
         let room = self
             .rooms_domain_service
             .create_or_join_room(CreateOrEnterRoomRequest {
@@ -188,21 +184,21 @@ impl RoomsService {
                 },
                 save_bookmark: true,
                 insert_sidebar_item: true,
-                notify_delegate: false,
+                notify_delegate: true,
             })
             .await?;
-        Ok(self.room_factory.build(room))
+        Ok(room.info.jid.clone())
     }
 
     pub async fn create_room_for_direct_message(
         &self,
         participant_jid: &BareJid,
-    ) -> Result<RoomEnvelope> {
+    ) -> Result<RoomJid> {
         if let Some(room) = self
             .connected_rooms_repo
             .get(&participant_jid.clone().into())
         {
-            return Ok(self.room_factory.build(room));
+            return Ok(room.info.jid.clone());
         }
 
         let user_profile = self
@@ -243,10 +239,13 @@ impl RoomsService {
         // We'll ignore the potential error since we've already checked if the room exists already.
         _ = self.connected_rooms_repo.set(room.clone());
 
-        Ok(self.room_factory.build(room))
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(room.info.jid.clone())
     }
 
-    pub async fn create_room_for_group(&self, participants: &[BareJid]) -> Result<RoomEnvelope> {
+    pub async fn create_room_for_group(&self, participants: &[BareJid]) -> Result<RoomJid> {
         if participants.is_empty() {
             bail!("Group must have at least one other participant.")
         }
@@ -263,17 +262,17 @@ impl RoomsService {
                 },
                 save_bookmark: true,
                 insert_sidebar_item: true,
-                notify_delegate: false,
+                notify_delegate: true,
             })
             .await?;
 
-        Ok(self.room_factory.build(room))
+        Ok(room.info.jid.clone())
     }
 
     pub async fn create_room_for_private_channel(
         &self,
         channel_name: impl AsRef<str>,
-    ) -> Result<RoomEnvelope> {
+    ) -> Result<RoomJid> {
         // Create room…
         info!(
             "Creating private channel with name {}…",
@@ -291,17 +290,17 @@ impl RoomsService {
                 },
                 save_bookmark: true,
                 insert_sidebar_item: true,
-                notify_delegate: false,
+                notify_delegate: true,
             })
             .await?;
 
-        Ok(self.room_factory.build(room))
+        Ok(room.info.jid.clone())
     }
 
     pub async fn create_room_for_public_channel(
         &self,
         channel_name: impl AsRef<str>,
-    ) -> Result<RoomEnvelope> {
+    ) -> Result<RoomJid> {
         let available_rooms = self
             .room_management_service
             .load_public_rooms(&self.ctx.muc_service()?)
@@ -335,11 +334,11 @@ impl RoomsService {
                 },
                 save_bookmark: true,
                 insert_sidebar_item: true,
-                notify_delegate: false,
+                notify_delegate: true,
             })
             .await?;
 
-        Ok(self.room_factory.build(room))
+        Ok(room.info.jid.clone())
     }
 
     pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {

@@ -242,7 +242,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
             },
             save_bookmark: true,
             insert_sidebar_item: true,
-            notify_delegate: false,
+            notify_delegate: true,
         }))
         .returning(move |_| {
             Box::pin(async move {
