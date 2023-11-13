@@ -189,6 +189,21 @@ impl MUC {
             return Ok(occupancy);
         }
 
+        self.configure_room(&room_jid.to_bare(), handler).await?;
+
+        Ok(occupancy)
+    }
+
+    /// Subsequent Room Configuration
+    /// https://xmpp.org/extensions/xep-0045.html#roomconfig
+    pub async fn configure_room<T>(
+        &self,
+        room_jid: &BareJid,
+        handler: impl FnOnce(DataForm) -> T,
+    ) -> Result<(), RequestError>
+    where
+        T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
+    {
         let iq = Iq::from_get(
             self.ctx.generate_id(),
             muc::Query {
@@ -196,7 +211,7 @@ impl MUC {
                 payloads: vec![],
             },
         )
-        .with_to(room_jid.to_bare().into());
+        .with_to(room_jid.clone().into());
 
         let mut query = muc::Query::try_from(
             self.ctx
@@ -234,11 +249,11 @@ impl MUC {
                 payloads: vec![response_form.into()],
             },
         )
-        .with_to(room_jid.to_bare().into());
+        .with_to(room_jid.clone().into());
 
         self.ctx.send_iq(iq).await?;
 
-        Ok(occupancy)
+        Ok(())
     }
 
     /// Destroys a room.

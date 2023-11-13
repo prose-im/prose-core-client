@@ -28,6 +28,12 @@ use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::dtos::PublicRoomInfo;
 use crate::ClientEvent;
 
+#[derive(thiserror::Error, Debug)]
+pub enum RoomError {
+    #[error("A room with the chosen name exists already.")]
+    Conflict,
+}
+
 #[derive(InjectDependencies)]
 pub struct RoomsService {
     #[inject]
@@ -102,7 +108,10 @@ impl RoomsService {
                     .await;
 
                 match result {
-                    Ok(_) => (),
+                    Ok(room) => {
+                        sidebar_item.name =
+                            room.state.read().name.clone().unwrap_or(sidebar_item.name)
+                    }
                     Err(error) => sidebar_item.error = Some(error.to_string()),
                 }
             }
@@ -289,6 +298,22 @@ impl RoomsService {
         &self,
         channel_name: impl AsRef<str>,
     ) -> Result<RoomEnvelope> {
+        let available_rooms = self
+            .room_management_service
+            .load_public_rooms(&self.ctx.muc_service()?)
+            .await?;
+
+        let lowercase_channel_name = channel_name.as_ref().to_lowercase();
+        for room in available_rooms {
+            let Some(mut room_name) = room.name else {
+                continue;
+            };
+            room_name.make_ascii_lowercase();
+            if room_name == lowercase_channel_name {
+                return Err(RoomError::Conflict.into());
+            }
+        }
+
         // Create room…
         info!(
             "Creating public channel with name {}…",

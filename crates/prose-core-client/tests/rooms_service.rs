@@ -11,13 +11,17 @@ use parking_lot::Mutex;
 
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::repos::ConnectedRoomsRepository;
-use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequestType;
+use prose_core_client::domain::rooms::services::{
+    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
+};
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
+use prose_core_client::dtos::PublicRoomInfo;
 use prose_core_client::infra::rooms::InMemoryConnectedRoomsRepository;
 use prose_core_client::services::RoomsService;
 use prose_core_client::test::{mock_data, MockAppDependencies};
 use prose_core_client::ClientEvent;
 use prose_xmpp::bare;
+use prose_xmpp::test::ConstantIDProvider;
 
 #[tokio::test]
 async fn test_connects_to_bookmarked_rooms() -> Result<()> {
@@ -178,6 +182,80 @@ async fn test_connects_to_bookmarked_rooms() -> Result<()> {
             // so that we can guarantee to not lose any events targeting that room.
         ]
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.room_management_service
+        .expect_load_public_rooms()
+        .once()
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(vec![PublicRoomInfo {
+                    jid: bare!("room@conference.prose.org"),
+                    name: Some("new channel".to_string()),
+                }])
+            })
+        });
+
+    let service = RoomsService::from(&deps.into_deps());
+    assert!(service
+        .create_room_for_public_channel("New Channel")
+        .await
+        .is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.short_id_provider = Arc::new(ConstantIDProvider::new("room-hash"));
+
+    deps.room_management_service
+        .expect_load_public_rooms()
+        .once()
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(vec![PublicRoomInfo {
+                    jid: bare!("room@conference.prose.org"),
+                    name: Some("Old Channel".to_string()),
+                }])
+            })
+        });
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .with(predicate::eq(CreateOrEnterRoomRequest {
+            r#type: CreateOrEnterRoomRequestType::Create {
+                service: mock_data::muc_service(),
+                room_type: CreateRoomType::PublicChannel {
+                    name: "New Channel".to_string(),
+                },
+            },
+            save_bookmark: true,
+            insert_sidebar_item: true,
+            notify_delegate: false,
+        }))
+        .returning(move |_| {
+            Box::pin(async move {
+                Ok(Arc::new(RoomInternals::public_channel(&bare!(
+                    "new-room@conference.prose.org"
+                ))))
+            })
+        });
+
+    let service = RoomsService::from(&deps.into_deps());
+    assert!(service
+        .create_room_for_public_channel("New Channel")
+        .await
+        .is_ok());
 
     Ok(())
 }

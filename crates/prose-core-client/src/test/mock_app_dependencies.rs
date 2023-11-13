@@ -15,9 +15,10 @@ use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full};
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynDraftsRepository, DynIDProvider, DynMessageArchiveService,
-    DynMessagesRepository, DynMessagingService, DynRoomParticipationService, DynRoomTopicService,
-    DynTimeProvider, DynUserProfileRepository,
+    AppContext, AppDependencies, DynBookmarksService, DynClientEventDispatcher,
+    DynDraftsRepository, DynIDProvider, DynMessageArchiveService, DynMessagesRepository,
+    DynMessagingService, DynRoomAttributesService, DynRoomParticipationService,
+    DynSidebarRepository, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::MockEventDispatcher;
 use crate::app::services::RoomInner;
@@ -32,7 +33,7 @@ use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesR
 use crate::domain::messaging::services::mocks::{MockMessageArchiveService, MockMessagingService};
 use crate::domain::rooms::repos::mocks::MockConnectedRoomsRepository;
 use crate::domain::rooms::services::mocks::{
-    MockRoomManagementService, MockRoomParticipationService, MockRoomTopicService,
+    MockRoomAttributesService, MockRoomManagementService, MockRoomParticipationService,
     MockRoomsDomainService,
 };
 use crate::domain::rooms::services::RoomFactory;
@@ -96,7 +97,7 @@ pub struct MockAppDependencies {
     pub rooms_domain_service: MockRoomsDomainService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
-    pub room_topic_service: MockRoomTopicService,
+    pub room_attributes_service: MockRoomAttributesService,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub short_id_provider: DynIDProvider,
     pub sidebar_repo: MockSidebarRepository,
@@ -127,30 +128,37 @@ impl From<MockAppDependencies> for AppDependencies {
         let messaging_service = Arc::new(mock.messaging_service);
         let room_management_service = Arc::new(mock.room_management_service);
         let room_participation_service = Arc::new(mock.room_participation_service);
-        let room_topic_service = Arc::new(mock.room_topic_service);
+        let room_attributes_service = Arc::new(mock.room_attributes_service);
+        let sidebar_repo = Arc::new(mock.sidebar_repo);
         let user_profile_repo = Arc::new(mock.user_profile_repo);
 
         let room_factory = {
+            let bookmarks_service = bookmarks_service.clone();
+            let client_event_dispatcher = client_event_dispatcher.clone();
             let drafts_repo = drafts_repo.clone();
             let message_archive_service = message_archive_service.clone();
             let message_repo = messages_repo.clone();
             let messaging_service = messaging_service.clone();
             let participation_service = room_participation_service.clone();
+            let sidebar_repo = sidebar_repo.clone();
             let time_provider = mock.time_provider.clone();
-            let topic_service = room_topic_service.clone();
+            let topic_service = room_attributes_service.clone();
             let user_profile_repo = user_profile_repo.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
+                    bookmarks_service: bookmarks_service.clone(),
                     time_provider: time_provider.clone(),
                     messaging_service: messaging_service.clone(),
                     message_archive_service: message_archive_service.clone(),
                     participation_service: participation_service.clone(),
-                    topic_service: topic_service.clone(),
+                    attributes_service: topic_service.clone(),
                     message_repo: message_repo.clone(),
                     drafts_repo: drafts_repo.clone(),
                     user_profile_repo: user_profile_repo.clone(),
+                    client_event_dispatcher: client_event_dispatcher.clone(),
+                    sidebar_repo: sidebar_repo.clone(),
                 }
                 .into()
             }))
@@ -175,10 +183,10 @@ impl From<MockAppDependencies> for AppDependencies {
             room_factory,
             room_management_service,
             room_participation_service,
-            room_topic_service,
+            room_attributes_service,
             rooms_domain_service: Arc::new(mock.rooms_domain_service),
             short_id_provider: mock.short_id_provider,
-            sidebar_repo: Arc::new(mock.sidebar_repo),
+            sidebar_repo,
             time_provider: mock.time_provider,
             user_account_service: Arc::new(mock.user_account_service),
             user_info_repo: Arc::new(mock.user_info_repo),
@@ -192,38 +200,47 @@ impl From<MockAppDependencies> for AppDependencies {
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct MockRoomFactoryDependencies {
+    pub bookmarks_service: MockBookmarksService,
+    pub client_event_dispatcher: MockEventDispatcher<ClientEvent>,
     pub drafts_repo: MockDraftsRepository,
     pub message_archive_service: MockMessageArchiveService,
     pub message_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
     pub participation_service: MockRoomParticipationService,
+    pub sidebar_repo: MockSidebarRepository,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
-    pub topic_service: MockRoomTopicService,
+    pub attributes_service: MockRoomAttributesService,
     pub user_profile_repo: MockUserProfileRepository,
 }
 
 pub struct MockSealedRoomFactoryDependencies {
+    pub bookmarks_service: DynBookmarksService,
+    pub client_event_dispatcher: DynClientEventDispatcher,
     pub drafts_repo: DynDraftsRepository,
     pub message_archive_service: DynMessageArchiveService,
     pub message_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
     pub participation_service: DynRoomParticipationService,
+    pub sidebar_repo: DynSidebarRepository,
     pub time_provider: DynTimeProvider,
-    pub topic_service: DynRoomTopicService,
+    pub topic_service: DynRoomAttributesService,
     pub user_profile_repo: DynUserProfileRepository,
 }
 
 impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
     fn from(value: MockRoomFactoryDependencies) -> Self {
         Self {
+            bookmarks_service: Arc::new(value.bookmarks_service),
+            client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             drafts_repo: Arc::new(value.drafts_repo),
             message_archive_service: Arc::new(value.message_archive_service),
             message_repo: Arc::new(value.message_repo),
             messaging_service: Arc::new(value.messaging_service),
             participation_service: Arc::new(value.participation_service),
+            sidebar_repo: Arc::new(value.sidebar_repo),
             time_provider: Arc::new(value.time_provider),
-            topic_service: Arc::new(value.topic_service),
+            topic_service: Arc::new(value.attributes_service),
             user_profile_repo: Arc::new(value.user_profile_repo),
         }
     }
@@ -234,13 +251,16 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
         RoomFactory::new(Arc::new(move |data| {
             RoomInner {
                 data: data.clone(),
+                bookmarks_service: value.bookmarks_service.clone(),
+                client_event_dispatcher: value.client_event_dispatcher.clone(),
                 drafts_repo: value.drafts_repo.clone(),
                 message_archive_service: value.message_archive_service.clone(),
                 message_repo: value.message_repo.clone(),
                 messaging_service: value.messaging_service.clone(),
                 participation_service: value.participation_service.clone(),
+                sidebar_repo: value.sidebar_repo.clone(),
                 time_provider: value.time_provider.clone(),
-                topic_service: value.topic_service.clone(),
+                attributes_service: value.topic_service.clone(),
                 user_profile_repo: value.user_profile_repo.clone(),
             }
             .into()

@@ -100,23 +100,29 @@ impl From<PlatformDependencies> for AppDependencies {
         ));
 
         let room_factory = {
+            let bookmarks_service = d.xmpp.clone();
+            let client_event_dispatcher = client_event_dispatcher.clone();
             let xmpp = d.xmpp.clone();
             let time_provider = time_provider.clone();
             let message_repo = messages_repo.clone();
             let drafts_repo = drafts_repo.clone();
             let user_profile_repo = user_profile_repo.clone();
+            let sidebar_repo = sidebar_repo.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
+                    bookmarks_service: bookmarks_service.clone(),
                     time_provider: time_provider.clone(),
                     messaging_service: xmpp.clone(),
                     message_archive_service: xmpp.clone(),
                     participation_service: xmpp.clone(),
-                    topic_service: xmpp.clone(),
+                    attributes_service: xmpp.clone(),
                     message_repo: message_repo.clone(),
                     drafts_repo: drafts_repo.clone(),
                     user_profile_repo: user_profile_repo.clone(),
+                    client_event_dispatcher: client_event_dispatcher.clone(),
+                    sidebar_repo: sidebar_repo.clone(),
                 }
                 .into()
             }))
@@ -127,7 +133,7 @@ impl From<PlatformDependencies> for AppDependencies {
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
             ctx: ctx.clone(),
-            id_provider: id_provider.clone(),
+            id_provider: d.short_id_provider.clone(),
             room_management_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),
             sidebar_repo: sidebar_repo.clone(),
@@ -152,7 +158,7 @@ impl From<PlatformDependencies> for AppDependencies {
             messages_repo,
             messaging_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),
-            room_topic_service: d.xmpp.clone(),
+            room_attributes_service: d.xmpp.clone(),
             rooms_domain_service: Arc::new(rooms_domain_service),
             short_id_provider: d.short_id_provider,
             sidebar_repo,

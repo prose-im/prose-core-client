@@ -32,7 +32,14 @@ impl SidebarRepository for InMemorySidebarRepository {
     }
 
     fn get_all(&self) -> Vec<SidebarItem> {
-        self.sidebar_items.read().values().cloned().collect()
+        let mut items = self
+            .sidebar_items
+            .read()
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        items
     }
 
     fn get(&self, jid: &BareJid) -> Option<SidebarItem> {

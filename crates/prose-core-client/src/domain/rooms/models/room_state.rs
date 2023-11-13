@@ -14,6 +14,8 @@ use xmpp_parsers::muc::user::Affiliation;
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct RoomState {
+    /// The name of the room.
+    pub name: Option<String>,
     /// The room's subject.
     pub subject: Option<String>,
     /// The occupants of the room. The key is either the user's FullJid in a MUC room or the user's

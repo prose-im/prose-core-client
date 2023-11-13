@@ -57,6 +57,10 @@ export interface RoomMUC {
     setTopic(topic?: string): Promise<void>;
 }
 
+export interface RoomMutableName {
+    setName(name: string): Promise<void>;
+}
+
 export interface RoomChannel {
     /// Pass an array of valid BareJid strings.
     inviteUsers(users: string[]): Promise<void>;
@@ -74,11 +78,11 @@ export interface RoomGroup extends RoomBase, RoomMUC {
   resendInvitesToMembers(): Promise<void>;
 }
 
-export interface RoomPrivateChannel extends RoomBase, RoomMUC, RoomChannel {
+export interface RoomPrivateChannel extends RoomBase, RoomMUC, RoomChannel, RoomMutableName {
   type: RoomType.PrivateChannel;
 }
 
-export interface RoomPublicChannel extends RoomBase, RoomMUC, RoomChannel {
+export interface RoomPublicChannel extends RoomBase, RoomMUC, RoomChannel, RoomMutableName {
   type: RoomType.PublicChannel;
 }
 
@@ -297,6 +301,22 @@ macro_rules! muc_room_impl {
     };
 }
 
+macro_rules! mut_name_impl {
+    ($t:ident) => {
+        #[wasm_bindgen]
+        impl $t {
+            #[wasm_bindgen(js_name = "setName")]
+            pub async fn set_name(&self, name: &str) -> Result<()> {
+                self.room
+                    .set_name(name.to_string())
+                    .await
+                    .map_err(WasmError::from)?;
+                Ok(())
+            }
+        }
+    };
+}
+
 macro_rules! channel_room_impl {
     ($t:ident) => {
         #[wasm_bindgen]
@@ -336,6 +356,10 @@ muc_room_impl!(RoomGroup);
 muc_room_impl!(RoomPrivateChannel);
 muc_room_impl!(RoomPublicChannel);
 muc_room_impl!(RoomGeneric);
+
+mut_name_impl!(RoomPrivateChannel);
+mut_name_impl!(RoomPublicChannel);
+mut_name_impl!(RoomGeneric);
 
 channel_room_impl!(RoomPrivateChannel);
 channel_room_impl!(RoomPublicChannel);

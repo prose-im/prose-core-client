@@ -209,8 +209,7 @@ impl From<RoomEnvelope> for JidWithName {
                 value
                     .to_generic_room()
                     .name()
-                    .unwrap_or("<untitled>")
-                    .to_string()
+                    .unwrap_or("<untitled>".to_string())
             ),
         }
     }
@@ -263,8 +262,7 @@ impl Display for ConnectedRoomEnvelope {
             self.0
                 .to_generic_room()
                 .name()
-                .unwrap_or("<untitled>")
-                .to_string()
+                .unwrap_or("<untitled>".to_string())
                 .truncate_to(40),
             self.0.to_generic_room().jid().to_string().truncate_to(70),
             self.0
@@ -610,7 +608,7 @@ fn compare_room_envelopes(lhs: &RoomEnvelope, rhs: &RoomEnvelope) -> Ordering {
     lhs.to_generic_room()
         .name()
         .unwrap_or_default()
-        .cmp(rhs.to_generic_room().name().unwrap_or_default())
+        .cmp(&rhs.to_generic_room().name().unwrap_or_default())
 }
 
 struct Delegate {}
@@ -731,6 +729,8 @@ enum Selection {
     DestroyPublicRoom,
     #[strum(serialize = "List connected rooms")]
     ListConnectedRooms,
+    #[strum(serialize = "Rename connected room")]
+    RenameConnectedRoom,
     #[strum(serialize = "List sidebar items")]
     ListSidebarItems,
     #[strum(serialize = "Toggle Favorite for sidebar item")]
@@ -854,6 +854,18 @@ async fn main() -> Result<()> {
             Selection::ListConnectedRooms => {
                 list_connected_rooms(&client).await?;
             }
+            Selection::RenameConnectedRoom => {
+                let room = select_room(&client).await?;
+                let name = prompt_string("Enter a new name:");
+
+                match room {
+                    RoomEnvelope::DirectMessage(_) => println!("Cannot rename DirectMessage"),
+                    RoomEnvelope::Group(_) => println!("Cannot rename Group"),
+                    RoomEnvelope::PrivateChannel(room) => room.set_name(name).await?,
+                    RoomEnvelope::PublicChannel(room) => room.set_name(name).await?,
+                    RoomEnvelope::Generic(room) => room.set_name(name).await?,
+                }
+            }
             Selection::ListSidebarItems => {
                 let items = client.sidebar.sidebar_items().into_iter().fold(
                     HashMap::new(),
@@ -884,8 +896,7 @@ async fn main() -> Result<()> {
                                 .room
                                 .to_generic_room()
                                 .name()
-                                .unwrap_or("<untitled>")
-                                .to_string()
+                                .unwrap_or("<untitled>".to_string())
                                 .truncate_to(36),
                             value.has_draft,
                             value.unread_count

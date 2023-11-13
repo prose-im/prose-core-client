@@ -25,8 +25,6 @@ pub struct RoomInternals {
 pub struct RoomInfo {
     /// The JID of the room.
     pub jid: BareJid,
-    /// The name of the room.
-    pub name: Option<String>,
     /// The description of the room.
     pub description: Option<String>,
     /// The JID of our logged-in user.
@@ -49,7 +47,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 jid: room_jid.clone(),
-                name: None,
                 description: None,
                 user_jid: user_jid.clone(),
                 user_nickname: nickname.to_string(),
@@ -74,7 +71,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 jid: contact_jid.clone(),
-                name: Some(contact_name.to_string()),
                 description: None,
                 user_jid: user_jid.clone(),
                 user_nickname: "no_nickname".to_string(),
@@ -87,6 +83,7 @@ impl RoomInternals {
                 room_type: RoomType::DirectMessage,
             },
             state: RwLock::new(RoomState {
+                name: Some(contact_name.to_string()),
                 subject: None,
                 occupants: HashMap::from([(
                     Jid::Bare(contact_jid.clone()),
@@ -136,7 +133,6 @@ mod tests {
             RoomInternals {
                 info: RoomInfo {
                     jid: bare!("contact@prose.org"),
-                    name: Some("Jane Doe".to_string()),
                     description: None,
                     user_jid: bare!("logged-in-user@prose.org"),
                     user_nickname: "no_nickname".to_string(),
@@ -149,6 +145,7 @@ mod tests {
                     room_type: RoomType::DirectMessage,
                 },
                 state: RwLock::new(RoomState {
+                    name: Some("Jane Doe".to_string()),
                     subject: None,
                     occupants: HashMap::from([(
                         jid!("contact@prose.org"),

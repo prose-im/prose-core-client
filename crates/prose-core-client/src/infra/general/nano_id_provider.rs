@@ -10,6 +10,6 @@ impl IDProvider for NanoIDProvider {
             .chain('A'..='Z')
             .chain('0'..='9')
             .collect::<Vec<char>>();
-        nanoid!(6, &chars)
+        nanoid!(8, &chars)
     }
 }

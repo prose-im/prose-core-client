@@ -37,7 +37,6 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
     let room = Arc::new(RoomInternals {
         info: RoomInfo {
             jid: bare!("room@conference.prose.org"),
-            name: None,
             description: None,
             user_jid: mock_data::account_jid().into_bare(),
             user_nickname: "".to_string(),

@@ -18,7 +18,7 @@ use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
 use crate::domain::messaging::services::{MessageArchiveService, MessagingService};
 use crate::domain::rooms::repos::ConnectedRoomsRepository;
 use crate::domain::rooms::services::{
-    RoomFactory, RoomManagementService, RoomParticipationService, RoomTopicService,
+    RoomAttributesService, RoomFactory, RoomManagementService, RoomParticipationService,
     RoomsDomainService,
 };
 use crate::domain::settings::repos::AccountSettingsRepository;
@@ -48,7 +48,7 @@ pub type DynRequestHandlingService = Arc<dyn RequestHandlingService>;
 pub type DynRoomFactory = RoomFactory;
 pub type DynRoomManagementService = Arc<dyn RoomManagementService>;
 pub type DynRoomParticipationService = Arc<dyn RoomParticipationService>;
-pub type DynRoomTopicService = Arc<dyn RoomTopicService>;
+pub type DynRoomAttributesService = Arc<dyn RoomAttributesService>;
 pub type DynRoomsDomainService = Arc<dyn RoomsDomainService>;
 pub type DynSidebarRepository = Arc<dyn SidebarRepository>;
 pub type DynTimeProvider = Arc<dyn TimeProvider>;
@@ -77,7 +77,7 @@ pub struct AppDependencies {
     pub room_factory: DynRoomFactory,
     pub room_management_service: DynRoomManagementService,
     pub room_participation_service: DynRoomParticipationService,
-    pub room_topic_service: DynRoomTopicService,
+    pub room_attributes_service: DynRoomAttributesService,
     pub rooms_domain_service: DynRoomsDomainService,
     pub short_id_provider: DynIDProvider,
     pub sidebar_repo: DynSidebarRepository,

@@ -109,19 +109,17 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .await
                 }
                 CreateRoomType::PublicChannel { name } => {
-                    // Public channels should be able to conflict, i.e. there should only be
-                    // one channel for any given name. Since these can be discovered publicly
-                    // and joined by anyone there should be no harm in exposing the name in
-                    // the jid.
+                    // While it would be ideal to have channel names conflict, this could only
+                    // happen via its JID since this is the only thing that is unique. We do
+                    // have the requirement however that users should be able to rename their
+                    // channels, which is why they shouldn't conflict since the JIDs cannot be
+                    // changed after the fact. So we'll use a unique ID here as well.
+                    let channel_id = self.id_provider.new_id();
 
                     self.create_or_join_room_with_config(
                         &service,
                         &user_jid,
-                        &format!(
-                            "{}.{}",
-                            PUBLIC_CHANNEL_PREFIX,
-                            name.to_ascii_lowercase().replace(" ", "-")
-                        ),
+                        &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
                         default_nickname,
                         RoomConfig::public_channel(&name),
                         |_| async { Ok(()) },
@@ -159,30 +157,31 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
         let room_jid = metadata.room_jid.clone();
+        let room_name = metadata.settings.name.clone();
         let room_info = self.collect_room_info(&user_jid, metadata).await?;
 
-        let Some(room) = self.connected_rooms_repo.update(
-            &room_jid.to_bare(),
+        let Some(room) = self.connected_rooms_repo.update(&room_jid.to_bare(), {
+            let room_name = room_name.clone();
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
                 assert!(room.is_pending(), "Cannot promote a non-pending room");
 
+                let mut state = room.state.read().clone();
+                state.name = room_name;
+
                 RoomInternals {
                     info: room_info,
-                    state: RwLock::new(room.state.read().clone()),
+                    state: RwLock::new(state),
                 }
-            }),
-        ) else {
+            })
+        }) else {
             return Err(RequestError::Generic {
                 msg: "Room was modified during connection".to_string(),
             }
             .into());
         };
 
-        let room_name = room
-            .info
-            .name
-            .as_ref()
+        let room_name = room_name
             .map(|name| name.to_string())
             .unwrap_or(room.info.jid.to_string());
 
@@ -525,7 +524,6 @@ impl RoomsDomainService {
 
         let room_info = RoomInfo {
             jid: metadata.room_jid.to_bare(),
-            name: metadata.settings.name,
             description: metadata.settings.description,
             user_jid: user_jid.clone(),
             user_nickname: metadata.room_jid.resource_str().to_string(),

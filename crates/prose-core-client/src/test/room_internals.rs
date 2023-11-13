@@ -19,7 +19,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 jid: jid.clone(),
-                name: None,
                 description: None,
                 user_jid: mock_data::account_jid().into_bare(),
                 user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
@@ -34,7 +33,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 jid: jid.clone(),
-                name: None,
                 description: None,
                 user_jid: mock_data::account_jid().into_bare(),
                 user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
@@ -49,7 +47,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 jid: jid.clone(),
-                name: None,
                 description: None,
                 user_jid: mock_data::account_jid().into_bare(),
                 user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
@@ -65,8 +62,8 @@ impl RoomInternals {
         self
     }
 
-    pub fn with_name(mut self, name: impl Into<String>) -> Self {
-        self.info.name = Some(name.into());
+    pub fn with_name(self, name: impl Into<String>) -> Self {
+        self.state.write().name = Some(name.into());
         self
     }
 

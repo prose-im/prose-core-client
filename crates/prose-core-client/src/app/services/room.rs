@@ -14,16 +14,19 @@ use jid::{BareJid, Jid};
 use tracing::{debug, info};
 
 use crate::app::deps::{
-    DynDraftsRepository, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
-    DynRoomParticipationService, DynRoomTopicService, DynTimeProvider, DynUserProfileRepository,
+    DynBookmarksService, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
+    DynMessagesRepository, DynMessagingService, DynRoomAttributesService,
+    DynRoomParticipationService, DynSidebarRepository, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::RoomInternals;
 use crate::domain::shared::models::RoomType;
+use crate::domain::sidebar::models::{Bookmark, BookmarkType};
 use crate::dtos::{
     Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
 };
 use crate::util::jid_ext::{BareJidExt, JidExt};
+use crate::ClientEvent;
 
 pub struct Room<Kind> {
     inner: Arc<RoomInner>,
@@ -43,23 +46,30 @@ impl Channel for PrivateChannel {}
 impl Channel for PublicChannel {}
 
 pub trait HasTopic {}
+pub trait HasMutableName {}
 
 impl HasTopic for Group {}
 impl HasTopic for PrivateChannel {}
 impl HasTopic for PublicChannel {}
 impl HasTopic for Generic {}
 
+impl HasMutableName for PrivateChannel {}
+impl HasMutableName for PublicChannel {}
+impl HasMutableName for Generic {}
+
 pub struct RoomInner {
     pub(crate) data: Arc<RoomInternals>,
 
-    pub(crate) time_provider: DynTimeProvider,
-    pub(crate) messaging_service: DynMessagingService,
-    pub(crate) message_archive_service: DynMessageArchiveService,
-    pub(crate) participation_service: DynRoomParticipationService,
-    pub(crate) topic_service: DynRoomTopicService,
-
-    pub(crate) message_repo: DynMessagesRepository,
+    pub(crate) bookmarks_service: DynBookmarksService,
+    pub(crate) client_event_dispatcher: DynClientEventDispatcher,
     pub(crate) drafts_repo: DynDraftsRepository,
+    pub(crate) message_archive_service: DynMessageArchiveService,
+    pub(crate) message_repo: DynMessagesRepository,
+    pub(crate) messaging_service: DynMessagingService,
+    pub(crate) participation_service: DynRoomParticipationService,
+    pub(crate) sidebar_repo: DynSidebarRepository,
+    pub(crate) time_provider: DynTimeProvider,
+    pub(crate) attributes_service: DynRoomAttributesService,
     pub(crate) user_profile_repo: DynUserProfileRepository,
 }
 
@@ -90,7 +100,7 @@ impl<Kind> Debug for Room<Kind> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Room")
             .field("jid", &self.data.info.jid)
-            .field("name", &self.data.info.name)
+            .field("name", &self.data.state.read().name)
             .field("description", &self.data.info.description)
             .field("user_jid", &self.data.info.user_jid)
             .field("user_nickname", &self.data.info.user_nickname)
@@ -117,8 +127,8 @@ impl<Kind> Room<Kind> {
         &self.data.info.jid
     }
 
-    pub fn name(&self) -> Option<&str> {
-        self.data.info.name.as_deref()
+    pub fn name(&self) -> Option<String> {
+        self.data.state.read().name.clone()
     }
 
     pub fn description(&self) -> Option<&str> {
@@ -376,8 +386,69 @@ where
     Kind: HasTopic,
 {
     pub async fn set_topic(&self, topic: Option<&str>) -> Result<()> {
-        self.topic_service
+        self.attributes_service
             .set_topic(&self.data.info.jid, topic)
             .await
+    }
+}
+
+impl<Kind> Room<Kind>
+where
+    Kind: HasMutableName,
+{
+    pub async fn set_name(&self, name: impl AsRef<str>) -> Result<()> {
+        if self
+            .data
+            .state
+            .read()
+            .name
+            .as_ref()
+            .map(|name| name.to_lowercase())
+            == Some(name.as_ref().to_lowercase())
+        {
+            return Ok(());
+        }
+
+        self.attributes_service
+            .set_name(&self.data.info.jid, name.as_ref())
+            .await?;
+
+        self.data.state.write().name = Some(name.as_ref().to_string());
+
+        let bookmark_type = match self.data.info.room_type {
+            RoomType::Pending => return Ok(()),
+            RoomType::DirectMessage => BookmarkType::DirectMessage,
+            RoomType::Group => BookmarkType::Group,
+            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
+            RoomType::PublicChannel => BookmarkType::PublicChannel,
+            RoomType::Generic => return Ok(()),
+        };
+
+        let mut bookmark = Bookmark {
+            name: name.as_ref().to_string(),
+            jid: self.data.info.jid.clone(),
+            r#type: bookmark_type,
+            is_favorite: false,
+            in_sidebar: false,
+        };
+
+        let mut sidebar_changed = false;
+
+        if let Some(mut sidebar_item) = self.sidebar_repo.get(&self.data.info.jid) {
+            bookmark.in_sidebar = true;
+
+            sidebar_item.name = name.as_ref().to_string();
+            self.sidebar_repo.put(&sidebar_item);
+            sidebar_changed = true;
+        }
+
+        self.bookmarks_service.save_bookmark(&bookmark).await?;
+
+        if sidebar_changed {
+            self.client_event_dispatcher
+                .dispatch_event(ClientEvent::SidebarChanged);
+        }
+
+        Ok(())
     }
 }

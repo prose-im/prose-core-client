@@ -233,7 +233,8 @@ impl MessagesEventHandler {
         }
 
         let bookmark_name = room
-            .info
+            .state
+            .read()
             .name
             .clone()
             .unwrap_or("Untitled Conversation".to_string());
