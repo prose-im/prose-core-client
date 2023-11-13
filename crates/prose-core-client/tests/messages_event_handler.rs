@@ -7,12 +7,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use mockall::predicate;
+use xmpp_parsers::message::MessageType;
 
 use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
+use prose_core_client::dtos::UserProfile;
 use prose_core_client::test::{mock_data, MockAppDependencies};
 use prose_core_client::{room, ClientEvent, RoomEventType};
 use prose_xmpp::mods::chat;
@@ -115,14 +117,38 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
         "Jane Doe",
     ));
 
-    {
-        let room = room.clone();
-        deps.connected_rooms_repo
-            .expect_get()
-            .once()
-            .with(predicate::eq(room!("jane.doe@prose.org")))
-            .return_once(|_| Some(room));
-    }
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room!("jane.doe@prose.org")))
+        .return_once(|_| None);
+
+    deps.user_profile_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(bare!("jane.doe@prose.org")))
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(Some(UserProfile {
+                    first_name: Some("Jane".to_string()),
+                    last_name: Some("Doe".to_string()),
+                    nickname: None,
+                    org: None,
+                    role: None,
+                    title: None,
+                    email: None,
+                    tel: None,
+                    url: None,
+                    address: None,
+                }))
+            })
+        });
+
+    deps.connected_rooms_repo
+        .expect_set()
+        .once()
+        .with(predicate::eq(room.clone()))
+        .return_once(|_| Ok(()));
 
     deps.sidebar_repo
         .expect_get()
@@ -185,6 +211,7 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
     event_handler
         .handle_event(XMPPEvent::Chat(chat::Event::Message(
             Message::default()
+                .set_type(MessageType::Chat)
                 .set_id("message-id".into())
                 .set_from(jid!("jane.doe@prose.org/macOS"))
                 .set_body("Hello World"),

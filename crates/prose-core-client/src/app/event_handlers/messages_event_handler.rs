@@ -9,6 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
 use tracing::{debug, error};
+use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::chat;
@@ -17,19 +18,22 @@ use prose_xmpp::stanza::Message;
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
+    DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynMessagesRepository, DynMessagingService, DynRoomFactory, DynSidebarRepository,
-    DynTimeProvider,
+    DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::domain::rooms::models::RoomInternals;
 use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::utils::build_contact_name;
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::{ClientEvent, RoomEventType};
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     bookmarks_service: DynBookmarksService,
     #[inject]
@@ -46,6 +50,8 @@ pub struct MessagesEventHandler {
     time_provider: DynTimeProvider,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
+    #[inject]
+    user_profile_repo: DynUserProfileRepository,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -107,6 +113,18 @@ impl ReceivedMessage {
                 .map(|jid| jid.to_bare()),
         }
     }
+
+    pub fn r#type(&self) -> Option<MessageType> {
+        match self {
+            ReceivedMessage::Message(message) => Some(message.type_.clone()),
+            ReceivedMessage::Carbon(Carbon::Received(message)) => {
+                message.stanza.as_ref().map(|m| m.type_.clone())
+            }
+            ReceivedMessage::Carbon(Carbon::Sent(message)) => {
+                message.stanza.as_ref().map(|m| m.type_.clone())
+            }
+        }
+    }
 }
 
 impl MessagesEventHandler {
@@ -118,7 +136,30 @@ impl MessagesEventHandler {
 
         let from = RoomJid::from(from);
 
-        let Some(room) = self.connected_rooms_repo.get(&from) else {
+        let mut room = self.connected_rooms_repo.get(&from);
+
+        if room.is_none() && message.r#type() == Some(MessageType::Chat) {
+            let user_profile = self
+                .user_profile_repo
+                .get(&from)
+                .await
+                .ok()
+                .map(|maybe_profile| maybe_profile.unwrap_or_default())
+                .unwrap_or_default();
+
+            let user_jid = self.ctx.connected_jid()?.into_bare();
+            let contact_name = build_contact_name(&from, &user_profile);
+
+            let created_room = Arc::new(RoomInternals::for_direct_message(
+                &user_jid,
+                &from,
+                &contact_name,
+            ));
+            _ = self.connected_rooms_repo.set(created_room.clone());
+            room = Some(created_room);
+        }
+
+        let Some(room) = room else {
             error!("Received message from sender for which we do not have a room.");
             return Ok(());
         };
