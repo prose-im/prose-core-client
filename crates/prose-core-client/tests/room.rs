@@ -13,11 +13,12 @@ use xmpp_parsers::rsm::SetResult;
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
+use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::shared::models::RoomType;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use prose_core_client::dtos::{Member, Occupant};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
-use prose_core_client::ClientEvent;
+use prose_core_client::{room, ClientEvent};
 use prose_xmpp::stanza::message::MucUser;
 use prose_xmpp::{bare, jid};
 
@@ -25,7 +26,7 @@ use prose_xmpp::{bare, jid};
 async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(&bare!("room@conference.prose.org"))
+    let internals = RoomInternals::group(room!("room@conference.prose.org"))
         .with_members([(
             bare!("a@prose.org"),
             Member {
@@ -103,7 +104,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(&bare!("room@conference.prose.org"))
+    let internals = RoomInternals::group(room!("room@conference.prose.org"))
         .with_members([(
             bare!("a@prose.org"),
             Member {
@@ -241,7 +242,7 @@ async fn test_toggle_reaction() -> Result<()> {
         )
         .return_once(|_, _, _, _| Box::pin(async { Ok(()) }));
 
-    let internals = RoomInternals::group(&bare!("room@conference.prose.org"));
+    let internals = RoomInternals::group(room!("room@conference.prose.org"));
 
     let room = RoomFactory::from(deps)
         .build(Arc::new(internals))
@@ -269,11 +270,11 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conference.prose.org")))
+        .with(predicate::eq(room!("room@conference.prose.org")))
         .return_once(|_| {
             Some(SidebarItem {
                 name: "Old Name".to_string(),
-                jid: bare!("room@conference.prose.org"),
+                jid: room!("room@conference.prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,
@@ -285,7 +286,7 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         .once()
         .with(predicate::eq(SidebarItem {
             name: "New Name".to_string(),
-            jid: bare!("room@conference.prose.org"),
+            jid: room!("room@conference.prose.org"),
             r#type: BookmarkType::PublicChannel,
             is_favorite: false,
             error: None,
@@ -297,7 +298,7 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         .once()
         .with(predicate::eq(Bookmark {
             name: "New Name".to_string(),
-            jid: bare!("room@conference.prose.org"),
+            jid: room!("room@conference.prose.org"),
             r#type: BookmarkType::PublicChannel,
             is_favorite: false,
             in_sidebar: true,
@@ -312,8 +313,7 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
 
     let room = RoomFactory::from(deps)
         .build(Arc::new(
-            RoomInternals::public_channel(&bare!("room@conference.prose.org"))
-                .with_name("Old Name"),
+            RoomInternals::public_channel(room!("room@conference.prose.org")).with_name("Old Name"),
         ))
         .to_generic_room();
 
@@ -338,7 +338,7 @@ async fn test_renames_channel_not_in_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conference.prose.org")))
+        .with(predicate::eq(room!("room@conference.prose.org")))
         .return_once(|_| None);
 
     deps.bookmarks_service
@@ -346,7 +346,7 @@ async fn test_renames_channel_not_in_sidebar() -> Result<()> {
         .once()
         .with(predicate::eq(Bookmark {
             name: "New Name".to_string(),
-            jid: bare!("room@conference.prose.org"),
+            jid: room!("room@conference.prose.org"),
             r#type: BookmarkType::PrivateChannel,
             is_favorite: false,
             in_sidebar: false,
@@ -355,7 +355,7 @@ async fn test_renames_channel_not_in_sidebar() -> Result<()> {
 
     let room = RoomFactory::from(deps)
         .build(Arc::new(
-            RoomInternals::private_channel(&bare!("room@conference.prose.org"))
+            RoomInternals::private_channel(room!("room@conference.prose.org"))
                 .with_name("Old Name"),
         ))
         .to_generic_room();

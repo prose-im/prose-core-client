@@ -6,6 +6,7 @@
 use core::fmt::{Debug, Display, Formatter};
 use core::str::FromStr;
 
+use prose_core_client::dtos::RoomJid;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -86,5 +87,11 @@ impl AsRef<jid::BareJid> for BareJid {
 impl Display for BareJid {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         Display::fmt(&self.0, f)
+    }
+}
+
+impl From<BareJid> for RoomJid {
+    fn from(value: BareJid) -> Self {
+        RoomJid::from(value.0)
     }
 }

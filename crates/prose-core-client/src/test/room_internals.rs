@@ -10,15 +10,15 @@ use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::muc::user::Affiliation;
 
 use crate::domain::rooms::models::{RoomInfo, RoomInternals};
-use crate::domain::shared::models::RoomType;
+use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::dtos::{Member, Occupant};
 use crate::test::mock_data;
 
 impl RoomInternals {
-    pub fn group(jid: &BareJid) -> Self {
+    pub fn group(jid: impl Into<RoomJid>) -> Self {
         Self {
             info: RoomInfo {
-                jid: jid.clone(),
+                jid: jid.into(),
                 description: None,
                 user_jid: mock_data::account_jid().into_bare(),
                 user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
@@ -29,10 +29,10 @@ impl RoomInternals {
         }
     }
 
-    pub fn public_channel(jid: &BareJid) -> Self {
+    pub fn public_channel(jid: impl Into<RoomJid>) -> Self {
         Self {
             info: RoomInfo {
-                jid: jid.clone(),
+                jid: jid.into(),
                 description: None,
                 user_jid: mock_data::account_jid().into_bare(),
                 user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
@@ -43,10 +43,10 @@ impl RoomInternals {
         }
     }
 
-    pub fn private_channel(jid: &BareJid) -> Self {
+    pub fn private_channel(jid: impl Into<RoomJid>) -> Self {
         Self {
             info: RoomInfo {
-                jid: jid.clone(),
+                jid: jid.into(),
                 description: None,
                 user_jid: mock_data::account_jid().into_bare(),
                 user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),

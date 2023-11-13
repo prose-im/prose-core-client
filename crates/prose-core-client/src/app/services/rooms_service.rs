@@ -23,6 +23,7 @@ use crate::domain::rooms::models::RoomInternals;
 use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
 };
+use crate::domain::shared::models::RoomJid;
 use crate::domain::shared::utils::build_contact_name;
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::dtos::PublicRoomInfo;
@@ -174,7 +175,7 @@ impl RoomsService {
 
     pub async fn join_room(
         &self,
-        room_jid: &BareJid,
+        room_jid: &RoomJid,
         password: Option<&str>,
     ) -> Result<RoomEnvelope> {
         let room = self
@@ -197,7 +198,10 @@ impl RoomsService {
         &self,
         participant_jid: &BareJid,
     ) -> Result<RoomEnvelope> {
-        if let Some(room) = self.connected_rooms_repo.get(participant_jid) {
+        if let Some(room) = self
+            .connected_rooms_repo
+            .get(&participant_jid.clone().into())
+        {
             return Ok(self.room_factory.build(room));
         }
 
@@ -220,7 +224,7 @@ impl RoomsService {
 
         let bookmark = Bookmark {
             name: contact_name.clone(),
-            jid: participant_jid.clone(),
+            jid: participant_jid.clone().into(),
             r#type: BookmarkType::DirectMessage,
             is_favorite: false,
             in_sidebar: true,
@@ -229,7 +233,7 @@ impl RoomsService {
 
         let sidebar_item = SidebarItem {
             name: contact_name,
-            jid: participant_jid.clone(),
+            jid: participant_jid.clone().into(),
             r#type: BookmarkType::DirectMessage,
             is_favorite: false,
             error: None,

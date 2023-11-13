@@ -24,7 +24,7 @@ use crate::app::deps::{
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::domain::rooms::models::RoomInternals;
-use crate::domain::shared::models::RoomType;
+use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::{ClientEvent, RoomEventType};
 
@@ -116,6 +116,8 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
+        let from = RoomJid::from(from);
+
         let Some(room) = self.connected_rooms_repo.get(&from) else {
             error!("Received message from sender for which we do not have a room.");
             return Ok(());
@@ -195,7 +197,7 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        let to = to.to_bare();
+        let to = RoomJid::from(to.to_bare());
 
         let Some(room) = self.connected_rooms_repo.get(&to) else {
             error!("Sent message to recipient for which we do not have a room.");

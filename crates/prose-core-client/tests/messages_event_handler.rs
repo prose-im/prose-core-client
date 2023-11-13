@@ -11,9 +11,10 @@ use mockall::predicate;
 use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
+use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use prose_core_client::test::{mock_data, MockAppDependencies};
-use prose_core_client::{ClientEvent, RoomEventType};
+use prose_core_client::{room, ClientEvent, RoomEventType};
 use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, jid};
@@ -22,23 +23,22 @@ use prose_xmpp::{bare, jid};
 async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(&bare!("group@conference.prose.org")).with_name("Group Name"),
-    );
+    let room =
+        Arc::new(RoomInternals::group(room!("group@conference.prose.org")).with_name("Group Name"));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("group@conference.prose.org")))
+            .with(predicate::eq(room!("group@conference.prose.org")))
             .return_once(|_| Some(room));
     }
 
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("group@conference.prose.org")))
+        .with(predicate::eq(room!("group@conference.prose.org")))
         .return_once(|_| None);
 
     deps.bookmarks_service
@@ -46,7 +46,7 @@ async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()>
         .once()
         .with(predicate::eq(Bookmark {
             name: "Group Name".to_string(),
-            jid: bare!("group@conference.prose.org"),
+            jid: room!("group@conference.prose.org"),
             r#type: BookmarkType::Group,
             is_favorite: false,
             in_sidebar: true,
@@ -58,7 +58,7 @@ async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()>
         .once()
         .with(predicate::eq(SidebarItem {
             name: "Group Name".to_string(),
-            jid: bare!("group@conference.prose.org"),
+            jid: room!("group@conference.prose.org"),
             r#type: BookmarkType::Group,
             is_favorite: false,
             error: None,
@@ -120,14 +120,14 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("jane.doe@prose.org")))
+            .with(predicate::eq(room!("jane.doe@prose.org")))
             .return_once(|_| Some(room));
     }
 
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("jane.doe@prose.org")))
+        .with(predicate::eq(room!("jane.doe@prose.org")))
         .return_once(|_| None);
 
     deps.bookmarks_service
@@ -135,7 +135,7 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
         .once()
         .with(predicate::eq(Bookmark {
             name: "Jane Doe".to_string(),
-            jid: bare!("jane.doe@prose.org"),
+            jid: room!("jane.doe@prose.org"),
             r#type: BookmarkType::DirectMessage,
             is_favorite: false,
             in_sidebar: true,
@@ -147,7 +147,7 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
         .once()
         .with(predicate::eq(SidebarItem {
             name: "Jane Doe".to_string(),
-            jid: bare!("jane.doe@prose.org"),
+            jid: room!("jane.doe@prose.org"),
             r#type: BookmarkType::DirectMessage,
             is_favorite: false,
             error: None,
@@ -199,14 +199,14 @@ async fn test_receiving_message_from_channel_does_not_add_channel_to_sidebar() -
     let mut deps = MockAppDependencies::default();
 
     let room = Arc::new(
-        RoomInternals::public_channel(&bare!("channel@conference.prose.org"))
+        RoomInternals::public_channel(room!("channel@conference.prose.org"))
             .with_name("Channel Name"),
     );
 
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| Some(room));
 
     deps.messages_repo

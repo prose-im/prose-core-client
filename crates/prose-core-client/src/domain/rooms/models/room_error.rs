@@ -3,17 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::BareJid;
 use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_xmpp::RequestError;
 
 use crate::domain::rooms::models::RoomValidationError;
+use crate::domain::shared::models::RoomJid;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RoomError {
     #[error("Room is already connected ({0}).")]
-    RoomIsAlreadyConnected(BareJid),
+    RoomIsAlreadyConnected(RoomJid),
     #[error(transparent)]
     RequestError(#[from] RequestError),
     #[error(transparent)]

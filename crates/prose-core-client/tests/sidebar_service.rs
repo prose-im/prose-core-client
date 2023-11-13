@@ -9,10 +9,11 @@ use anyhow::Result;
 use mockall::predicate;
 
 use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use prose_core_client::services::SidebarService;
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::ClientEvent;
+use prose_core_client::{room, ClientEvent};
 use prose_xmpp::{bare, full};
 
 #[tokio::test]
@@ -24,7 +25,7 @@ async fn test_toggle_favorite() -> Result<()> {
         .once()
         .with(predicate::eq(Bookmark {
             name: "Channel Name".to_string(),
-            jid: bare!("channel@conference.prose.org"),
+            jid: room!("channel@conference.prose.org"),
             r#type: BookmarkType::PublicChannel,
             is_favorite: true,
             in_sidebar: true,
@@ -34,11 +35,11 @@ async fn test_toggle_favorite() -> Result<()> {
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| {
             Some(SidebarItem {
                 name: "Channel Name".to_string(),
-                jid: bare!("channel@conference.prose.org"),
+                jid: room!("channel@conference.prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,
@@ -50,7 +51,7 @@ async fn test_toggle_favorite() -> Result<()> {
         .once()
         .with(predicate::eq(SidebarItem {
             name: "Channel Name".to_string(),
-            jid: bare!("channel@conference.prose.org"),
+            jid: room!("channel@conference.prose.org"),
             r#type: BookmarkType::PublicChannel,
             is_favorite: true,
             error: None,
@@ -65,7 +66,7 @@ async fn test_toggle_favorite() -> Result<()> {
 
     let service = SidebarService::from(&deps.into_deps());
     service
-        .toggle_favorite(&bare!("channel@conference.prose.org"))
+        .toggle_favorite(&room!("channel@conference.prose.org"))
         .await?;
 
     Ok(())
@@ -84,11 +85,11 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| {
             Some(SidebarItem {
                 name: "".to_string(),
-                jid: bare!("channel@conference.prose.org"),
+                jid: room!("channel@conference.prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,
@@ -98,16 +99,16 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| ());
 
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(move |_| {
             Some(Arc::new(
-                RoomInternals::public_channel(&bare!("channel@conference.prose.org"))
+                RoomInternals::public_channel(room!("channel@conference.prose.org"))
                     .with_user_nickname("jane.doe"),
             ))
         });
@@ -128,7 +129,7 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
 
     let service = SidebarService::from(&deps.into_deps());
     service
-        .remove_from_sidebar(&bare!("channel@conference.prose.org"))
+        .remove_from_sidebar(&room!("channel@conference.prose.org"))
         .await?;
 
     Ok(())
@@ -143,7 +144,7 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
         .once()
         .with(predicate::eq(Bookmark {
             name: "Channel Name".to_string(),
-            jid: bare!("channel@conference.prose.org"),
+            jid: room!("channel@conference.prose.org"),
             r#type: BookmarkType::PrivateChannel,
             // The channel should be removed from favorites
             is_favorite: false,
@@ -154,11 +155,11 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| {
             Some(SidebarItem {
                 name: "Channel Name".to_string(),
-                jid: bare!("channel@conference.prose.org"),
+                jid: room!("channel@conference.prose.org"),
                 r#type: BookmarkType::PrivateChannel,
                 is_favorite: true,
                 error: None,
@@ -168,16 +169,16 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| ());
 
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(move |_| {
             Some(Arc::new(
-                RoomInternals::private_channel(&bare!("channel@conference.prose.org"))
+                RoomInternals::private_channel(room!("channel@conference.prose.org"))
                     .with_user_nickname("jane.doe"),
             ))
         });
@@ -201,7 +202,7 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
 
     let service = SidebarService::from(&deps.into_deps());
     service
-        .remove_from_sidebar(&bare!("channel@conference.prose.org"))
+        .remove_from_sidebar(&room!("channel@conference.prose.org"))
         .await?;
 
     Ok(())
@@ -216,7 +217,7 @@ async fn test_removes_group_from_sidebar() -> Result<()> {
         .once()
         .with(predicate::eq(Bookmark {
             name: "Group Name".to_string(),
-            jid: bare!("group@conference.prose.org"),
+            jid: room!("group@conference.prose.org"),
             r#type: BookmarkType::Group,
             // The group should be removed from favorites
             is_favorite: false,
@@ -227,11 +228,11 @@ async fn test_removes_group_from_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("group@conference.prose.org")))
+        .with(predicate::eq(room!("group@conference.prose.org")))
         .return_once(|_| {
             Some(SidebarItem {
                 name: "Group Name".to_string(),
-                jid: bare!("group@conference.prose.org"),
+                jid: room!("group@conference.prose.org"),
                 r#type: BookmarkType::Group,
                 is_favorite: true,
                 error: None,
@@ -241,7 +242,7 @@ async fn test_removes_group_from_sidebar() -> Result<()> {
     deps.sidebar_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("group@conference.prose.org")))
+        .with(predicate::eq(room!("group@conference.prose.org")))
         .return_once(|_| ());
 
     // Unlike channels, groups should never be exited. This is because a Group should basically
@@ -255,7 +256,7 @@ async fn test_removes_group_from_sidebar() -> Result<()> {
 
     let service = SidebarService::from(&deps.into_deps());
     service
-        .remove_from_sidebar(&bare!("group@conference.prose.org"))
+        .remove_from_sidebar(&room!("group@conference.prose.org"))
         .await?;
 
     Ok(())

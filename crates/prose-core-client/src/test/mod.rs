@@ -18,3 +18,10 @@ pub mod mock_data {
         mock_reference_date as reference_date,
     };
 }
+
+#[macro_export]
+macro_rules! room {
+    ($jid:expr) => {
+        RoomJid::from($jid.parse::<jid::BareJid>().unwrap())
+    };
+}

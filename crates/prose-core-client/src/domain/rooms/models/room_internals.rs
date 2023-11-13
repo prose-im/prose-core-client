@@ -11,7 +11,7 @@ use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::muc::user::Affiliation;
 
 use crate::domain::rooms::models::RoomState;
-use crate::domain::shared::models::RoomType;
+use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::dtos::Occupant;
 
 /// Contains information about a connected room and its state.
@@ -24,7 +24,7 @@ pub struct RoomInternals {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoomInfo {
     /// The JID of the room.
-    pub jid: BareJid,
+    pub jid: RoomJid,
     /// The description of the room.
     pub description: Option<String>,
     /// The JID of our logged-in user.
@@ -43,7 +43,7 @@ pub struct Member {
 }
 
 impl RoomInternals {
-    pub fn pending(room_jid: &BareJid, user_jid: &BareJid, nickname: &str) -> Self {
+    pub fn pending(room_jid: &RoomJid, user_jid: &BareJid, nickname: &str) -> Self {
         Self {
             info: RoomInfo {
                 jid: room_jid.clone(),
@@ -70,7 +70,7 @@ impl RoomInternals {
     ) -> Self {
         Self {
             info: RoomInfo {
-                jid: contact_jid.clone(),
+                jid: contact_jid.clone().into(),
                 description: None,
                 user_jid: user_jid.clone(),
                 user_nickname: "no_nickname".to_string(),
@@ -132,7 +132,7 @@ mod tests {
             internals,
             RoomInternals {
                 info: RoomInfo {
-                    jid: bare!("contact@prose.org"),
+                    jid: bare!("contact@prose.org").into(),
                     description: None,
                     user_jid: bare!("logged-in-user@prose.org"),
                     user_nickname: "no_nickname".to_string(),

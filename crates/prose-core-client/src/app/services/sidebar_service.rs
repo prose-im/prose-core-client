@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use jid::BareJid;
 use tracing::error;
 
 use prose_proc_macros::InjectDependencies;
@@ -13,6 +12,7 @@ use crate::app::deps::{
     DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository, DynRoomFactory,
     DynRoomManagementService, DynSidebarRepository,
 };
+use crate::domain::shared::models::RoomJid;
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::dtos::SidebarItem as SidebarItemDTO;
 use crate::ClientEvent;
@@ -62,7 +62,7 @@ impl SidebarService {
         item_dtos
     }
 
-    pub async fn toggle_favorite(&self, jid: &BareJid) -> Result<()> {
+    pub async fn toggle_favorite(&self, jid: &RoomJid) -> Result<()> {
         let Some(mut sidebar_item) = self.sidebar_repo.get(jid) else {
             return Ok(());
         };
@@ -79,7 +79,7 @@ impl SidebarService {
         Ok(())
     }
 
-    pub async fn remove_from_sidebar(&self, jid: &BareJid) -> Result<()> {
+    pub async fn remove_from_sidebar(&self, jid: &RoomJid) -> Result<()> {
         let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
             return Ok(());
         };

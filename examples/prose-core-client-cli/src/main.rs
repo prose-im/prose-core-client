@@ -202,7 +202,7 @@ impl Display for JidWithName {
 impl From<RoomEnvelope> for JidWithName {
     fn from(value: RoomEnvelope) -> Self {
         Self {
-            jid: value.to_generic_room().jid().clone(),
+            jid: value.to_generic_room().jid().clone().into_inner(),
             name: format!(
                 "{} {}",
                 value.kind(),
@@ -227,7 +227,7 @@ impl From<muc::Room> for JidWithName {
 impl From<PublicRoomInfo> for JidWithName {
     fn from(value: PublicRoomInfo) -> Self {
         Self {
-            jid: value.jid,
+            jid: value.jid.into_inner(),
             name: value.name.as_deref().unwrap_or("<untitled>").to_string(),
         }
     }
@@ -245,7 +245,7 @@ impl From<Contact> for JidWithName {
 impl From<SidebarItem> for JidWithName {
     fn from(value: SidebarItem) -> Self {
         Self {
-            jid: value.room.to_generic_room().jid().clone(),
+            jid: value.room.to_generic_room().jid().clone().into_inner(),
             name: value.name,
         }
     }

@@ -11,6 +11,7 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::{RoomError, RoomInternals};
+use crate::domain::shared::models::RoomJid;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreateRoomType {
@@ -33,7 +34,7 @@ pub enum CreateOrEnterRoomRequestType {
         room_type: CreateRoomType,
     },
     Join {
-        room_jid: BareJid,
+        room_jid: RoomJid,
         nickname: Option<String>,
         password: Option<String>,
     },

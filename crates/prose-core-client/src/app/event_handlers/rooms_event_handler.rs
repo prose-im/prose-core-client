@@ -24,6 +24,7 @@ use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::RoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
+use crate::domain::shared::models::RoomJid;
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
@@ -121,10 +122,10 @@ impl RoomsEventHandler {
         };
 
         let from = from;
-        let bare_from = from.to_bare();
+        let bare_from = RoomJid::from(from.to_bare());
 
         // Ignore presences that were sent by us. We don't have a room for the logged-in user.
-        if bare_from == self.ctx.connected_jid()?.into_bare() {
+        if *bare_from == self.ctx.connected_jid()?.into_bare() {
             return Ok(());
         }
 
@@ -176,6 +177,7 @@ impl RoomsEventHandler {
 
     async fn handle_invite(&self, room_jid: BareJid, password: Option<String>) -> Result<()> {
         info!("Joining room {} after receiving invite…", room_jid);
+        let room_jid = RoomJid::from(room_jid);
 
         self.rooms_domain_service
             .create_or_join_room(CreateOrEnterRoomRequest {
@@ -199,7 +201,7 @@ impl RoomsEventHandler {
         chat_state: ChatState,
         message_type: MessageType,
     ) -> Result<()> {
-        let bare_from = from.to_bare();
+        let bare_from = RoomJid::from(from.to_bare());
 
         let Some(room) = self.connected_rooms_repo.get(&bare_from) else {
             error!("Received chat state from sender for which we do not have a room.");
@@ -209,7 +211,7 @@ impl RoomsEventHandler {
         let jid = if message_type == MessageType::Groupchat {
             from
         } else {
-            Jid::Bare(bare_from)
+            Jid::Bare(bare_from.into_inner())
         };
         let now = self.time_provider.now();
 

@@ -4,24 +4,26 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+
+use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{BookmarkType, SidebarItem};
 use prose_core_client::domain::sidebar::repos::SidebarRepository;
 use prose_core_client::infra::sidebar::InMemorySidebarRepository;
-use prose_xmpp::bare;
+use prose_core_client::room;
 
 #[tokio::test]
 async fn test_put_sidebar_item() -> Result<()> {
     let repo = InMemorySidebarRepository::new();
     repo.put(&SidebarItem {
         name: "A".to_string(),
-        jid: bare!("a@prose.org"),
+        jid: room!("a@prose.org"),
         r#type: BookmarkType::PublicChannel,
         is_favorite: false,
         error: None,
     });
     repo.put(&SidebarItem {
         name: "B".to_string(),
-        jid: bare!("b@prose.org"),
+        jid: room!("b@prose.org"),
         r#type: BookmarkType::PublicChannel,
         is_favorite: false,
         error: None,
@@ -32,14 +34,14 @@ async fn test_put_sidebar_item() -> Result<()> {
         vec![
             SidebarItem {
                 name: "A".to_string(),
-                jid: bare!("a@prose.org"),
+                jid: room!("a@prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,
             },
             SidebarItem {
                 name: "B".to_string(),
-                jid: bare!("b@prose.org"),
+                jid: room!("b@prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,
@@ -49,7 +51,7 @@ async fn test_put_sidebar_item() -> Result<()> {
 
     repo.put(&SidebarItem {
         name: "C".to_string(),
-        jid: bare!("b@prose.org"),
+        jid: room!("b@prose.org"),
         r#type: BookmarkType::PublicChannel,
         is_favorite: false,
         error: None,
@@ -60,14 +62,14 @@ async fn test_put_sidebar_item() -> Result<()> {
         vec![
             SidebarItem {
                 name: "A".to_string(),
-                jid: bare!("a@prose.org"),
+                jid: room!("a@prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,
             },
             SidebarItem {
                 name: "C".to_string(),
-                jid: bare!("b@prose.org"),
+                jid: room!("b@prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: false,
                 error: None,

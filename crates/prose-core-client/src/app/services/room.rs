@@ -20,7 +20,7 @@ use crate::app::deps::{
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::RoomInternals;
-use crate::domain::shared::models::RoomType;
+use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
 use crate::dtos::{
     Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
@@ -123,7 +123,7 @@ impl<Kind> Room<Kind> {
 }
 
 impl<Kind> Room<Kind> {
-    pub fn jid(&self) -> &BareJid {
+    pub fn jid(&self) -> &RoomJid {
         &self.data.info.jid
     }
 

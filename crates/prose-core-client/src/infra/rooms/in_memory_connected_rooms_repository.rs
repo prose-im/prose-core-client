@@ -8,14 +8,14 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 use parking_lot::RwLock;
 
 use crate::domain::rooms::models::RoomInternals;
 use crate::domain::rooms::repos::{ConnectedRoomsRepository, RoomAlreadyExistsError};
+use crate::domain::shared::models::RoomJid;
 
 pub struct InMemoryConnectedRoomsRepository {
-    rooms: RwLock<HashMap<BareJid, Arc<RoomInternals>>>,
+    rooms: RwLock<HashMap<RoomJid, Arc<RoomInternals>>>,
 }
 
 impl InMemoryConnectedRoomsRepository {
@@ -29,7 +29,7 @@ impl InMemoryConnectedRoomsRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
-    fn get(&self, room_jid: &BareJid) -> Option<Arc<RoomInternals>> {
+    fn get(&self, room_jid: &RoomJid) -> Option<Arc<RoomInternals>> {
         self.rooms.read().get(room_jid).cloned()
     }
 
@@ -57,7 +57,7 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
 
     fn update(
         &self,
-        room_jid: &BareJid,
+        room_jid: &RoomJid,
         block: Box<dyn FnOnce(Arc<RoomInternals>) -> RoomInternals + Send>,
     ) -> Option<Arc<RoomInternals>> {
         let mut rooms = self.rooms.write();
@@ -69,7 +69,7 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         Some(modified_room)
     }
 
-    fn delete(&self, room_jids: &[&BareJid]) {
+    fn delete(&self, room_jids: &[&RoomJid]) {
         let jids_to_delete = room_jids.iter().map(|jid| *jid).collect::<HashSet<_>>();
         self.rooms
             .write()

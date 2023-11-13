@@ -7,7 +7,7 @@ use base64::{engine::general_purpose, Engine as _};
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::{SoftwareVersion, UserActivity};
+use prose_core_client::dtos::{RoomJid, SoftwareVersion, UserActivity};
 use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, StoreAvatarCache};
 
 use crate::connector::{Connector, ProseConnectionProvider};
@@ -251,7 +251,7 @@ impl Client {
         Ok(self
             .client
             .rooms
-            .join_room(&room_jid.into(), password.as_deref())
+            .join_room(&RoomJid::from(room_jid.clone()), password.as_deref())
             .await
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?
             .into_js_value())

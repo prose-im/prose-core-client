@@ -14,12 +14,13 @@ use prose_core_client::domain::rooms::repos::ConnectedRoomsRepository;
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
 };
+use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use prose_core_client::dtos::PublicRoomInfo;
 use prose_core_client::infra::rooms::InMemoryConnectedRoomsRepository;
 use prose_core_client::services::RoomsService;
 use prose_core_client::test::{mock_data, MockAppDependencies};
-use prose_core_client::ClientEvent;
+use prose_core_client::{room, ClientEvent};
 use prose_xmpp::bare;
 use prose_xmpp::test::ConstantIDProvider;
 
@@ -35,56 +36,56 @@ async fn test_connects_to_bookmarked_rooms() -> Result<()> {
                 Ok(vec![
                     Bookmark {
                         name: "Jane Doe".to_string(),
-                        jid: bare!("dm1@prose.org"),
+                        jid: room!("dm1@prose.org"),
                         r#type: BookmarkType::DirectMessage,
                         is_favorite: false,
                         in_sidebar: false,
                     },
                     Bookmark {
                         name: "John Doe".to_string(),
-                        jid: bare!("dm2@prose.org"),
+                        jid: room!("dm2@prose.org"),
                         r#type: BookmarkType::DirectMessage,
                         is_favorite: false,
                         in_sidebar: true,
                     },
                     Bookmark {
                         name: "Group 1".to_string(),
-                        jid: bare!("group1@conference.prose.org"),
+                        jid: room!("group1@conference.prose.org"),
                         r#type: BookmarkType::Group,
                         is_favorite: false,
                         in_sidebar: true,
                     },
                     Bookmark {
                         name: "Group 2".to_string(),
-                        jid: bare!("group2@conference.prose.org"),
+                        jid: room!("group2@conference.prose.org"),
                         r#type: BookmarkType::Group,
                         is_favorite: false,
                         in_sidebar: false,
                     },
                     Bookmark {
                         name: "Public Channel 1".to_string(),
-                        jid: bare!("pub-channel1@conference.prose.org"),
+                        jid: room!("pub-channel1@conference.prose.org"),
                         r#type: BookmarkType::PublicChannel,
                         is_favorite: false,
                         in_sidebar: false,
                     },
                     Bookmark {
                         name: "Public Channel 2".to_string(),
-                        jid: bare!("pub-channel2@conference.prose.org"),
+                        jid: room!("pub-channel2@conference.prose.org"),
                         r#type: BookmarkType::PublicChannel,
                         is_favorite: true,
                         in_sidebar: true,
                     },
                     Bookmark {
                         name: "Private Channel 1".to_string(),
-                        jid: bare!("priv-channel1@conference.prose.org"),
+                        jid: room!("priv-channel1@conference.prose.org"),
                         r#type: BookmarkType::PrivateChannel,
                         is_favorite: false,
                         in_sidebar: true,
                     },
                     Bookmark {
                         name: "Private Channel 2".to_string(),
-                        jid: bare!("priv-channel2@conference.prose.org"),
+                        jid: room!("priv-channel2@conference.prose.org"),
                         r#type: BookmarkType::PrivateChannel,
                         is_favorite: false,
                         in_sidebar: false,
@@ -94,13 +95,13 @@ async fn test_connects_to_bookmarked_rooms() -> Result<()> {
         });
 
     let room_responses = Mutex::new(vec![
-        Arc::new(RoomInternals::group(&bare!("group1@conference.prose.org"))),
+        Arc::new(RoomInternals::group(room!("group1@conference.prose.org"))),
         // Groups should always be connected regardless if they're in the sidebar or not.
-        Arc::new(RoomInternals::group(&bare!("group2@conference.prose.org"))),
-        Arc::new(RoomInternals::group(&bare!(
+        Arc::new(RoomInternals::group(room!("group2@conference.prose.org"))),
+        Arc::new(RoomInternals::group(room!(
             "pub-channel2@conference.prose.org"
         ))),
-        Arc::new(RoomInternals::group(&bare!(
+        Arc::new(RoomInternals::group(room!(
             "priv-channel1@conference.prose.org"
         ))),
     ]);
@@ -123,28 +124,28 @@ async fn test_connects_to_bookmarked_rooms() -> Result<()> {
         .with(predicate::eq(vec![
             SidebarItem {
                 name: "John Doe".to_string(),
-                jid: bare!("dm2@prose.org"),
+                jid: room!("dm2@prose.org"),
                 r#type: BookmarkType::DirectMessage,
                 is_favorite: false,
                 error: None,
             },
             SidebarItem {
                 name: "Group 1".to_string(),
-                jid: bare!("group1@conference.prose.org"),
+                jid: room!("group1@conference.prose.org"),
                 r#type: BookmarkType::Group,
                 is_favorite: false,
                 error: None,
             },
             SidebarItem {
                 name: "Public Channel 2".to_string(),
-                jid: bare!("pub-channel2@conference.prose.org"),
+                jid: room!("pub-channel2@conference.prose.org"),
                 r#type: BookmarkType::PublicChannel,
                 is_favorite: true,
                 error: None,
             },
             SidebarItem {
                 name: "Private Channel 1".to_string(),
-                jid: bare!("priv-channel1@conference.prose.org"),
+                jid: room!("priv-channel1@conference.prose.org"),
                 r#type: BookmarkType::PrivateChannel,
                 is_favorite: false,
                 error: None,
@@ -196,7 +197,7 @@ async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: bare!("room@conference.prose.org"),
+                    jid: room!("room@conference.prose.org"),
                     name: Some("new channel".to_string()),
                 }])
             })
@@ -223,7 +224,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: bare!("room@conference.prose.org"),
+                    jid: room!("room@conference.prose.org"),
                     name: Some("Old Channel".to_string()),
                 }])
             })
@@ -245,7 +246,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         }))
         .returning(move |_| {
             Box::pin(async move {
-                Ok(Arc::new(RoomInternals::public_channel(&bare!(
+                Ok(Arc::new(RoomInternals::public_channel(room!(
                     "new-room@conference.prose.org"
                 ))))
             })

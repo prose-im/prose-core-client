@@ -31,7 +31,7 @@ impl RoomManagementService for XMPPClient {
             .await?
             .into_iter()
             .map(|room| PublicRoomInfo {
-                jid: room.jid.into_bare(),
+                jid: room.jid.into_bare().into(),
                 name: room.name,
             })
             .collect();

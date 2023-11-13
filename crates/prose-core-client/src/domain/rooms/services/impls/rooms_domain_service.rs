@@ -28,7 +28,7 @@ use crate::app::deps::{
 use crate::domain::rooms::models::{
     Member, RoomConfig, RoomError, RoomInfo, RoomInternals, RoomMetadata,
 };
-use crate::domain::shared::models::RoomType;
+use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
@@ -156,11 +156,11 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
-        let room_jid = metadata.room_jid.clone();
+        let room_jid = RoomJid::from(metadata.room_jid.to_bare());
         let room_name = metadata.settings.name.clone();
         let room_info = self.collect_room_info(&user_jid, metadata).await?;
 
-        let Some(room) = self.connected_rooms_repo.update(&room_jid.to_bare(), {
+        let Some(room) = self.connected_rooms_repo.update(&room_jid, {
             let room_name = room_name.clone();
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
@@ -200,7 +200,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .bookmarks_service
                     .save_bookmark(&Bookmark {
                         name: room_name.clone(),
-                        jid: room_jid.to_bare(),
+                        jid: room_jid.clone(),
                         r#type: bookmark_type.clone(),
                         is_favorite: false,
                         in_sidebar: insert_sidebar_item,
@@ -218,7 +218,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             if insert_sidebar_item {
                 self.sidebar_repo.put(&SidebarItem {
                     name: room_name,
-                    jid: room_jid.to_bare(),
+                    jid: room_jid.clone(),
                     r#type: bookmark_type.clone(),
                     is_favorite: false,
                     error: None,
@@ -357,8 +357,10 @@ impl RoomsDomainService {
             };
             attempt += 1;
 
-            let room_jid =
-                BareJid::from_parts(Some(&NodePart::new(&unique_room_name)?), &service.domain());
+            let room_jid = RoomJid::from(BareJid::from_parts(
+                Some(&NodePart::new(&unique_room_name)?),
+                &service.domain(),
+            ));
             let full_room_jid = room_jid.with_resource_str(nickname)?;
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
@@ -443,7 +445,7 @@ impl RoomsDomainService {
 
     async fn join_room_by_resolving_nickname_conflict(
         &self,
-        room_jid: &BareJid,
+        room_jid: &RoomJid,
         user_jid: &BareJid,
         preferred_nickname: &str,
         password: Option<&str>,
@@ -523,7 +525,7 @@ impl RoomsDomainService {
         };
 
         let room_info = RoomInfo {
-            jid: metadata.room_jid.to_bare(),
+            jid: metadata.room_jid.to_bare().into(),
             description: metadata.settings.description,
             user_jid: user_jid.clone(),
             user_nickname: metadata.room_jid.resource_str().to_string(),
@@ -538,7 +540,7 @@ impl RoomsDomainService {
 impl RoomsDomainService {
     fn insert_pending_room(
         &self,
-        room_jid: &BareJid,
+        room_jid: &RoomJid,
         user_jid: &BareJid,
         nickname: &str,
     ) -> Result<(), RoomError> {
