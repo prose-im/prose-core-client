@@ -99,9 +99,11 @@ impl SidebarService {
                 self.bookmarks_service.delete_bookmark(&jid).await?;
             }
 
-            if let Some(room) = self.connected_rooms_repo.get(jid) {
-                let full_jid = room.info.jid.with_resource_str(&room.info.user_nickname)?;
-                self.room_management_service.exit_room(&full_jid).await?;
+            if sidebar_item.r#type != BookmarkType::DirectMessage {
+                if let Some(room) = self.connected_rooms_repo.get(jid) {
+                    let full_jid = room.info.jid.with_resource_str(&room.info.user_nickname)?;
+                    self.room_management_service.exit_room(&full_jid).await?;
+                }
             }
         }
 
