@@ -9,28 +9,22 @@ use tracing::error;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository, DynRoomFactory,
-    DynRoomManagementService, DynSidebarRepository,
+    DynConnectedRoomsReadOnlyRepository, DynRoomFactory, DynSidebarDomainService,
+    DynSidebarReadOnlyRepository,
 };
 use crate::domain::shared::models::RoomJid;
-use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::dtos::SidebarItem as SidebarItemDTO;
-use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct SidebarService {
     #[inject]
-    bookmarks_service: DynBookmarksService,
-    #[inject]
-    client_event_dispatcher: DynClientEventDispatcher,
-    #[inject]
-    connected_rooms_repo: DynConnectedRoomsRepository,
+    connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     room_factory: DynRoomFactory,
     #[inject]
-    room_management_service: DynRoomManagementService,
+    sidebar_domain_service: DynSidebarDomainService,
     #[inject]
-    sidebar_repo: DynSidebarRepository,
+    sidebar_repo: DynSidebarReadOnlyRepository,
 }
 
 impl SidebarService {
@@ -63,66 +57,14 @@ impl SidebarService {
     }
 
     pub async fn toggle_favorite(&self, jid: &RoomJid) -> Result<()> {
-        let Some(mut sidebar_item) = self.sidebar_repo.get(jid) else {
-            return Ok(());
-        };
-
-        sidebar_item.is_favorite ^= true;
-
-        self.bookmarks_service
-            .save_bookmark(&Bookmark::from(&sidebar_item))
+        self.sidebar_domain_service
+            .toggle_item_is_favorite(jid)
             .await?;
-        self.sidebar_repo.put(&sidebar_item);
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::SidebarChanged);
-
         Ok(())
     }
 
     pub async fn remove_from_sidebar(&self, jid: &RoomJid) -> Result<()> {
-        let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
-            return Ok(());
-        };
-
-        if sidebar_item.r#type == BookmarkType::Group {
-            let mut bookmark = Bookmark::from(&sidebar_item);
-            bookmark.is_favorite = false;
-            bookmark.in_sidebar = false;
-            self.bookmarks_service.save_bookmark(&bookmark).await?;
-        } else {
-            if sidebar_item.r#type == BookmarkType::PrivateChannel {
-                let mut bookmark = Bookmark::from(&sidebar_item);
-                bookmark.is_favorite = false;
-                bookmark.in_sidebar = false;
-                self.bookmarks_service.save_bookmark(&bookmark).await?;
-            } else {
-                self.bookmarks_service.delete_bookmark(&jid).await?;
-            }
-
-            if sidebar_item.r#type != BookmarkType::DirectMessage {
-                if let Some(room) = self.connected_rooms_repo.get(jid) {
-                    let full_jid = room.info.jid.with_resource_str(&room.info.user_nickname)?;
-                    self.room_management_service.exit_room(&full_jid).await?;
-                }
-            }
-        }
-
-        self.sidebar_repo.delete(&jid);
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::SidebarChanged);
-
+        self.sidebar_domain_service.remove_items(&[jid]).await?;
         Ok(())
-    }
-}
-
-impl From<&SidebarItem> for Bookmark {
-    fn from(value: &SidebarItem) -> Self {
-        Self {
-            name: value.name.clone(),
-            jid: value.jid.clone(),
-            r#type: value.r#type.clone(),
-            is_favorite: value.is_favorite,
-            in_sidebar: true,
-        }
     }
 }

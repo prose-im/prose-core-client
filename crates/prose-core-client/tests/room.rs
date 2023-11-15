@@ -15,10 +15,9 @@ use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use prose_core_client::dtos::{Member, Occupant};
+use prose_core_client::room;
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
-use prose_core_client::{room, ClientEvent};
 use prose_xmpp::stanza::message::MucUser;
 use prose_xmpp::{bare, jid};
 
@@ -258,105 +257,18 @@ async fn test_toggle_reaction() -> Result<()> {
 async fn test_renames_channel_in_sidebar() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    deps.attributes_service
-        .expect_set_name()
+    deps.sidebar_domain_service
+        .expect_rename_item()
         .once()
         .with(
-            predicate::eq(bare!("room@conference.prose.org")),
+            predicate::eq(room!("room@conference.prose.org")),
             predicate::eq("New Name"),
         )
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
-
-    deps.sidebar_repo
-        .expect_get()
-        .once()
-        .with(predicate::eq(room!("room@conference.prose.org")))
-        .return_once(|_| {
-            Some(SidebarItem {
-                name: "Old Name".to_string(),
-                jid: room!("room@conference.prose.org"),
-                r#type: BookmarkType::PublicChannel,
-                is_favorite: false,
-                error: None,
-            })
-        });
-
-    deps.sidebar_repo
-        .expect_put()
-        .once()
-        .with(predicate::eq(SidebarItem {
-            name: "New Name".to_string(),
-            jid: room!("room@conference.prose.org"),
-            r#type: BookmarkType::PublicChannel,
-            is_favorite: false,
-            error: None,
-        }))
-        .return_once(|_| ());
-
-    deps.bookmarks_service
-        .expect_save_bookmark()
-        .once()
-        .with(predicate::eq(Bookmark {
-            name: "New Name".to_string(),
-            jid: room!("room@conference.prose.org"),
-            r#type: BookmarkType::PublicChannel,
-            is_favorite: false,
-            in_sidebar: true,
-        }))
-        .return_once(|_| Box::pin(async move { Ok(()) }));
-
-    deps.client_event_dispatcher
-        .expect_dispatch_event()
-        .once()
-        .with(predicate::eq(ClientEvent::SidebarChanged))
-        .return_once(|_| ());
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
         .build(Arc::new(
             RoomInternals::public_channel(room!("room@conference.prose.org")).with_name("Old Name"),
-        ))
-        .to_generic_room();
-
-    room.set_name("New Name").await?;
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_renames_channel_not_in_sidebar() -> Result<()> {
-    let mut deps = MockRoomFactoryDependencies::default();
-
-    deps.attributes_service
-        .expect_set_name()
-        .once()
-        .with(
-            predicate::eq(bare!("room@conference.prose.org")),
-            predicate::eq("New Name"),
-        )
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
-
-    deps.sidebar_repo
-        .expect_get()
-        .once()
-        .with(predicate::eq(room!("room@conference.prose.org")))
-        .return_once(|_| None);
-
-    deps.bookmarks_service
-        .expect_save_bookmark()
-        .once()
-        .with(predicate::eq(Bookmark {
-            name: "New Name".to_string(),
-            jid: room!("room@conference.prose.org"),
-            r#type: BookmarkType::PrivateChannel,
-            is_favorite: false,
-            in_sidebar: false,
-        }))
-        .return_once(|_| Box::pin(async move { Ok(()) }));
-
-    let room = RoomFactory::from(deps)
-        .build(Arc::new(
-            RoomInternals::private_channel(room!("room@conference.prose.org"))
-                .with_name("Old Name"),
         ))
         .to_generic_room();
 

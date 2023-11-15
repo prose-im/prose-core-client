@@ -8,7 +8,7 @@ pub use contact::{Availability, Contact};
 pub use jid::BareJid;
 pub use js_array::*;
 pub use message::Message;
-pub use room::{RoomEnvelopeExt, RoomsArray};
+pub use room::RoomEnvelopeExt;
 pub use sidebar_item::{SidebarItem, SidebarItemsArray};
 pub use user_info::{UserBasicInfo, UserBasicInfoArray, UserPresenceInfo, UserPresenceInfoArray};
 pub use user_metadata::UserMetadata;

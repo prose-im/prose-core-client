@@ -9,12 +9,30 @@ use crate::domain::shared::models::RoomJid;
 use crate::domain::sidebar::models::SidebarItem;
 
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait SidebarRepository: SendUnlessWasm + SyncUnlessWasm {
-    fn set_all(&self, items: Vec<SidebarItem>);
-    fn get_all(&self) -> Vec<SidebarItem>;
+pub trait SidebarReadOnlyRepository: SendUnlessWasm + SyncUnlessWasm {
     fn get(&self, jid: &RoomJid) -> Option<SidebarItem>;
-    fn put(&self, item: &SidebarItem);
-    fn delete(&self, item: &RoomJid);
+    fn get_all(&self) -> Vec<SidebarItem>;
+}
 
-    fn clear_cache(&self);
+pub trait SidebarRepository: SidebarReadOnlyRepository {
+    fn put(&self, item: &SidebarItem);
+
+    fn delete(&self, item: &RoomJid);
+    fn delete_all(&self);
+}
+
+#[cfg(feature = "test")]
+mockall::mock! {
+    pub SidebarReadWriteRepository {}
+
+    impl SidebarReadOnlyRepository for SidebarReadWriteRepository {
+        fn get(&self, jid: &RoomJid) -> Option<SidebarItem>;
+        fn get_all(&self) -> Vec<SidebarItem>;
+    }
+
+    impl SidebarRepository for SidebarReadWriteRepository {
+        fn put(&self, item: &SidebarItem);
+        fn delete(&self, item: &RoomJid);
+        fn delete_all(&self);
+    }
 }

@@ -21,7 +21,9 @@ use strum_macros::{Display, EnumIter};
 use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
-use prose_core_client::dtos::{Address, Contact, Message, Occupant, PublicRoomInfo, SidebarItem};
+use prose_core_client::dtos::{
+    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, SidebarItem,
+};
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
 use prose_core_client::{
@@ -29,7 +31,6 @@ use prose_core_client::{
 };
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
-use prose_xmpp::stanza::ConferenceBookmark;
 
 async fn configure_client() -> Result<(BareJid, Client)> {
     let cache_path = env::current_dir()?
@@ -251,6 +252,15 @@ impl From<SidebarItem> for JidWithName {
     }
 }
 
+impl From<Bookmark> for JidWithName {
+    fn from(value: Bookmark) -> Self {
+        Self {
+            jid: value.jid.into_inner(),
+            name: value.name,
+        }
+    }
+}
+
 struct ConnectedRoomEnvelope(RoomEnvelope);
 
 impl Display for ConnectedRoomEnvelope {
@@ -274,9 +284,6 @@ impl Display for ConnectedRoomEnvelope {
     }
 }
 
-#[derive(Debug)]
-struct BookmarkEnvelope(ConferenceBookmark);
-
 struct OccupantEnvelope(Occupant);
 
 impl Display for OccupantEnvelope {
@@ -295,25 +302,6 @@ impl Display for OccupantEnvelope {
                 .clone()
                 .into_attribute_value()
                 .unwrap_or("<no affiliation>".to_string()),
-        )
-    }
-}
-
-impl Display for BookmarkEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:<30} | {:<70} | autojoin: {:?} | nick: {}",
-            self.0
-                .conference
-                .name
-                .as_deref()
-                .unwrap_or("<untitled>")
-                .to_string()
-                .truncate_to(30),
-            self.0.jid.to_string().truncate_to(70),
-            self.0.conference.autojoin,
-            self.0.conference.nick.as_deref().unwrap_or("<no nick>")
         )
     }
 }
@@ -339,21 +327,26 @@ async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
 }
 
 async fn select_room(client: &Client) -> Result<RoomEnvelope> {
-    let mut rooms = client.rooms.connected_rooms();
+    let mut rooms = client
+        .sidebar
+        .sidebar_items()
+        .into_iter()
+        .map(|item| item.room)
+        .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
 
 async fn select_muc_room(client: &Client) -> Result<RoomEnvelope> {
     let mut rooms = client
-        .rooms
-        .connected_rooms()
+        .sidebar
+        .sidebar_items()
         .into_iter()
-        .filter(|room| {
-            if let &RoomEnvelope::DirectMessage(_) = room {
-                return false;
+        .filter_map(|room| {
+            if let RoomEnvelope::DirectMessage(_) = room.room {
+                return None;
             }
-            true
+            Some(room.room)
         })
         .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
@@ -681,7 +674,12 @@ impl ConnectedRoomExt for RoomEnvelope {
 }
 
 async fn list_connected_rooms(client: &Client) -> Result<()> {
-    let mut rooms = client.rooms.connected_rooms();
+    let mut rooms = client
+        .sidebar
+        .sidebar_items()
+        .into_iter()
+        .map(|item| item.room)
+        .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
 
     let rooms = rooms
@@ -743,7 +741,11 @@ enum Selection {
     ListRoomOccupants,
     #[strum(serialize = "List members in room")]
     ListRoomMembers,
-    #[strum(serialize = "Send raw XML")]
+    #[strum(serialize = "[Debug] Load bookmarks")]
+    LoadBookmarks,
+    #[strum(serialize = "[Debug] Delete bookmarks PubSub node")]
+    DeleteBookmarksPubSubNode,
+    #[strum(serialize = "[Debug] Send raw XML")]
     SendRawXML,
     Disconnect,
     Noop,
@@ -797,6 +799,10 @@ async fn main() -> Result<()> {
             }
             Selection::StartConversation => {
                 let contacts = select_multiple_contacts(&client).await?;
+                if contacts.is_empty() {
+                    println!("No contact selected.");
+                    continue;
+                }
                 client.rooms.start_conversation(contacts.as_slice()).await?;
             }
             Selection::CreatePublicChannel => {
@@ -951,6 +957,20 @@ async fn main() -> Result<()> {
                     .map(|info| info.jid.to_string())
                     .collect::<Vec<_>>();
                 println!("{}", members.join("\n"))
+            }
+            Selection::LoadBookmarks => {
+                let bookmarks = client
+                    .debug
+                    .load_bookmarks()
+                    .await?
+                    .into_iter()
+                    .map(|b| JidWithName::from(b).to_string())
+                    .collect::<Vec<_>>();
+                println!("{}", bookmarks.join("\n"));
+            }
+            Selection::DeleteBookmarksPubSubNode => {
+                println!("Deleting PubSub node…");
+                client.debug.delete_bookmarks_pubsub_node().await?;
             }
             Selection::SendRawXML => {
                 let input = Input::<String>::with_theme(&ColorfulTheme::default())

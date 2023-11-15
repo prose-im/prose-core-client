@@ -7,6 +7,8 @@ pub use account_service::AccountService;
 pub use cache_service::CacheService;
 pub use connection_service::ConnectionService;
 pub use contacts_service::ContactsService;
+#[cfg(feature = "debug")]
+pub use debug_service::DebugService;
 pub(crate) use room::RoomInner;
 pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
 pub use room_envelope::RoomEnvelope;
@@ -18,6 +20,8 @@ mod account_service;
 mod cache_service;
 mod connection_service;
 mod contacts_service;
+#[cfg(feature = "debug")]
+mod debug_service;
 mod room;
 mod room_envelope;
 mod rooms_service;

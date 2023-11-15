@@ -364,12 +364,6 @@ mut_name_impl!(RoomGeneric);
 channel_room_impl!(RoomPrivateChannel);
 channel_room_impl!(RoomPublicChannel);
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(typescript_type = "Room[]")]
-    pub type RoomsArray;
-}
-
 pub trait RoomEnvelopeExt {
     fn into_js_value(self) -> JsValue;
 }
@@ -398,14 +392,5 @@ impl RoomEnvelopeExt for RoomEnvelope {
                 room,
             }),
         }
-    }
-}
-
-impl From<Vec<RoomEnvelope>> for RoomsArray {
-    fn from(value: Vec<RoomEnvelope>) -> Self {
-        value
-            .into_iter()
-            .map(|envelope| envelope.into_js_value())
-            .collect_into_js_array::<RoomsArray>()
     }
 }

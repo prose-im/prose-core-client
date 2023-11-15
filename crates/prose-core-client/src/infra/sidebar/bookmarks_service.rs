@@ -63,7 +63,7 @@ impl BookmarksService for XMPPClient {
     async fn delete_bookmark(&self, jid: &BareJid) -> Result<()> {
         let pubsub = self.client.get_mod::<mods::PubSub>();
         pubsub
-            .delete_items_with_ids(ns::PROSE_BOOKMARK, [jid.to_string()])
+            .delete_items_with_ids(ns::PROSE_BOOKMARK, [jid.to_string()], true)
             .await?;
         Ok(())
     }

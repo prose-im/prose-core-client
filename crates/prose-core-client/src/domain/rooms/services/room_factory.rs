@@ -25,7 +25,7 @@ impl RoomFactory {
     }
 
     pub fn build(&self, room: Arc<RoomInternals>) -> RoomEnvelope {
-        let room_type = room.info.room_type.clone();
+        let room_type = room.r#type.clone();
         let inner = Arc::new((self.builder)(room));
 
         match room_type {

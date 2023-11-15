@@ -13,67 +13,69 @@ use crate::domain::rooms::models::{RoomInfo, RoomInternals};
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::dtos::{Member, Occupant};
 use crate::test::mock_data;
+use crate::util::jid_ext::BareJidExt;
 
 impl RoomInternals {
+    pub fn direct_message(jid: impl Into<BareJid>) -> Self {
+        let jid = jid.into();
+
+        Self::for_direct_message(
+            &jid,
+            &mock_data::account_jid().into_bare(),
+            &jid.to_display_name(),
+        )
+    }
+
     pub fn group(jid: impl Into<RoomJid>) -> Self {
-        Self {
-            info: RoomInfo {
-                jid: jid.into(),
-                description: None,
-                user_jid: mock_data::account_jid().into_bare(),
-                user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-                members: HashMap::new(),
-                room_type: RoomType::Group,
-            },
-            state: Default::default(),
-        }
+        Self::new(RoomInfo {
+            jid: jid.into(),
+            description: None,
+            user_jid: mock_data::account_jid().into_bare(),
+            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            members: HashMap::new(),
+            r#type: RoomType::Group,
+        })
     }
 
     pub fn public_channel(jid: impl Into<RoomJid>) -> Self {
-        Self {
-            info: RoomInfo {
-                jid: jid.into(),
-                description: None,
-                user_jid: mock_data::account_jid().into_bare(),
-                user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-                members: HashMap::new(),
-                room_type: RoomType::PublicChannel,
-            },
-            state: Default::default(),
-        }
+        Self::new(RoomInfo {
+            jid: jid.into(),
+            description: None,
+            user_jid: mock_data::account_jid().into_bare(),
+            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            members: HashMap::new(),
+            r#type: RoomType::PublicChannel,
+        })
     }
 
     pub fn private_channel(jid: impl Into<RoomJid>) -> Self {
-        Self {
-            info: RoomInfo {
-                jid: jid.into(),
-                description: None,
-                user_jid: mock_data::account_jid().into_bare(),
-                user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-                members: HashMap::new(),
-                room_type: RoomType::PrivateChannel,
-            },
-            state: Default::default(),
-        }
+        Self::new(RoomInfo {
+            jid: jid.into(),
+            description: None,
+            user_jid: mock_data::account_jid().into_bare(),
+            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            members: HashMap::new(),
+            r#type: RoomType::PrivateChannel,
+        })
     }
 
     pub fn with_user_nickname(mut self, nickname: impl Into<String>) -> Self {
-        self.info.user_nickname = nickname.into();
+        self.user_nickname = nickname.into();
         self
     }
 
-    pub fn with_name(self, name: impl Into<String>) -> Self {
-        self.state.write().name = Some(name.into());
+    pub fn with_name(self, name: impl AsRef<str>) -> Self {
+        self.set_name(name.as_ref());
         self
     }
 
     pub fn with_members(mut self, members: impl IntoIterator<Item = (BareJid, Member)>) -> Self {
-        self.info.members = members.into_iter().collect();
+        self.members = members.into_iter().collect();
         self
     }
 
     pub fn with_occupants(self, occupant: impl IntoIterator<Item = (Jid, Occupant)>) -> Self {
-        self.state.write().occupants = occupant.into_iter().collect();
+        self.set_occupants(occupant.into_iter().collect());
         self
     }
 }

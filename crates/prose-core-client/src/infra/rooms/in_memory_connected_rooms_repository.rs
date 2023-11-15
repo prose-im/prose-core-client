@@ -3,15 +3,16 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
-use async_trait::async_trait;
 use parking_lot::RwLock;
 
 use crate::domain::rooms::models::RoomInternals;
-use crate::domain::rooms::repos::{ConnectedRoomsRepository, RoomAlreadyExistsError};
+use crate::domain::rooms::repos::{
+    ConnectedRoomsReadOnlyRepository, ConnectedRoomsRepository, RoomAlreadyExistsError,
+};
 use crate::domain::shared::models::RoomJid;
 
 pub struct InMemoryConnectedRoomsRepository {
@@ -26,9 +27,7 @@ impl InMemoryConnectedRoomsRepository {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
-#[async_trait]
-impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
+impl ConnectedRoomsReadOnlyRepository for InMemoryConnectedRoomsRepository {
     fn get(&self, room_jid: &RoomJid) -> Option<Arc<RoomInternals>> {
         self.rooms.read().get(room_jid).cloned()
     }
@@ -36,23 +35,18 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
     fn get_all(&self) -> Vec<Arc<RoomInternals>> {
         self.rooms.read().values().cloned().collect()
     }
+}
 
+impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
     fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError> {
         let mut rooms = self.rooms.write();
 
-        if rooms.contains_key(&room.info.jid) {
+        if rooms.contains_key(&room.jid) {
             return Err(RoomAlreadyExistsError);
         }
 
-        rooms.insert(room.info.jid.clone(), room);
+        rooms.insert(room.jid.clone(), room);
         Ok(())
-    }
-
-    fn replace(&self, rooms: Vec<RoomInternals>) {
-        *self.rooms.write() = rooms
-            .into_iter()
-            .map(|room| (room.info.jid.clone(), Arc::new(room)))
-            .collect();
     }
 
     fn update(
@@ -69,15 +63,11 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         Some(modified_room)
     }
 
-    fn delete(&self, room_jids: &[&RoomJid]) {
-        let jids_to_delete = room_jids.iter().map(|jid| *jid).collect::<HashSet<_>>();
-        self.rooms
-            .write()
-            .retain(|room_jid, _| !jids_to_delete.contains(room_jid));
+    fn delete(&self, room_jid: &RoomJid) {
+        self.rooms.write().remove(room_jid);
     }
 
-    async fn clear_cache(&self) -> Result<()> {
+    fn delete_all(&self) {
         self.rooms.write().clear();
-        Ok(())
     }
 }

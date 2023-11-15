@@ -11,18 +11,16 @@ use xmpp_parsers::message::MessageType;
 
 use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::RoomInternals;
-use prose_core_client::domain::rooms::services::RoomFactory;
+use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
 use prose_core_client::domain::shared::models::RoomJid;
-use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
-use prose_core_client::dtos::UserProfile;
 use prose_core_client::test::{mock_data, MockAppDependencies};
-use prose_core_client::{room, ClientEvent, RoomEventType};
+use prose_core_client::{room, RoomEventType};
 use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, jid};
 
 #[tokio::test]
-async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()> {
+async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room =
@@ -37,35 +35,11 @@ async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()>
             .return_once(|_| Some(room));
     }
 
-    deps.sidebar_repo
-        .expect_get()
+    deps.sidebar_domain_service
+        .expect_insert_item_for_received_message_if_needed()
         .once()
         .with(predicate::eq(room!("group@conference.prose.org")))
-        .return_once(|_| None);
-
-    deps.bookmarks_service
-        .expect_save_bookmark()
-        .once()
-        .with(predicate::eq(Bookmark {
-            name: "Group Name".to_string(),
-            jid: room!("group@conference.prose.org"),
-            r#type: BookmarkType::Group,
-            is_favorite: false,
-            in_sidebar: true,
-        }))
         .return_once(|_| Box::pin(async { Ok(()) }));
-
-    deps.sidebar_repo
-        .expect_put()
-        .once()
-        .with(predicate::eq(SidebarItem {
-            name: "Group Name".to_string(),
-            jid: room!("group@conference.prose.org"),
-            r#type: BookmarkType::Group,
-            is_favorite: false,
-            error: None,
-        }))
-        .return_once(|_| ());
 
     deps.messages_repo
         .expect_append()
@@ -78,21 +52,15 @@ async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()>
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
-        .expect_dispatch_event()
+        .expect_dispatch_room_event()
         .once()
-        .with(predicate::eq(ClientEvent::SidebarChanged))
-        .return_once(|_| ());
-
-    deps.client_event_dispatcher
-        .expect_dispatch_event()
-        .once()
-        .with(predicate::eq(ClientEvent::RoomChanged {
-            room: RoomFactory::mock().build(room.clone()),
-            r#type: RoomEventType::MessagesAppended {
+        .with(
+            predicate::eq(room),
+            predicate::eq(RoomEventType::MessagesAppended {
                 message_ids: vec!["message-id".into()],
-            },
-        }))
-        .return_once(|_| ());
+            }),
+        )
+        .return_once(|_, _| ());
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
@@ -108,14 +76,10 @@ async fn test_receiving_message_from_group_adds_group_to_sidebar() -> Result<()>
 }
 
 #[tokio::test]
-async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result<()> {
+async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::for_direct_message(
-        &mock_data::account_jid().into_bare(),
-        &bare!("jane.doe@prose.org"),
-        "Jane Doe",
-    ));
+    let room = Arc::new(RoomInternals::direct_message(bare!("jane.doe@prose.org")));
 
     deps.connected_rooms_repo
         .expect_get()
@@ -123,62 +87,31 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
         .with(predicate::eq(room!("jane.doe@prose.org")))
         .return_once(|_| None);
 
-    deps.user_profile_repo
-        .expect_get()
+    deps.sidebar_domain_service
+        .expect_insert_item_by_creating_or_joining_room()
         .once()
-        .with(predicate::eq(bare!("jane.doe@prose.org")))
-        .return_once(|_| {
-            Box::pin(async {
-                Ok(Some(UserProfile {
-                    first_name: Some("Jane".to_string()),
-                    last_name: Some("Doe".to_string()),
-                    nickname: None,
-                    org: None,
-                    role: None,
-                    title: None,
-                    email: None,
-                    tel: None,
-                    url: None,
-                    address: None,
-                }))
-            })
-        });
-
-    deps.connected_rooms_repo
-        .expect_set()
-        .once()
-        .with(predicate::eq(room.clone()))
-        .return_once(|_| Ok(()));
-
-    deps.sidebar_repo
-        .expect_get()
-        .once()
-        .with(predicate::eq(room!("jane.doe@prose.org")))
-        .return_once(|_| None);
-
-    deps.bookmarks_service
-        .expect_save_bookmark()
-        .once()
-        .with(predicate::eq(Bookmark {
-            name: "Jane Doe".to_string(),
-            jid: room!("jane.doe@prose.org"),
-            r#type: BookmarkType::DirectMessage,
-            is_favorite: false,
-            in_sidebar: true,
+        .with(predicate::eq(CreateOrEnterRoomRequest::Create {
+            service: mock_data::muc_service(),
+            room_type: CreateRoomType::DirectMessage {
+                participant: bare!("jane.doe@prose.org"),
+            },
         }))
+        .return_once(|_| Box::pin(async { Ok(room!("jane.doe@prose.org")) }));
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .with(predicate::eq(room!("jane.doe@prose.org")))
+            .return_once(|_| Some(room));
+    }
+
+    deps.sidebar_domain_service
+        .expect_insert_item_for_received_message_if_needed()
+        .once()
+        .with(predicate::eq(room!("jane.doe@prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
-
-    deps.sidebar_repo
-        .expect_put()
-        .once()
-        .with(predicate::eq(SidebarItem {
-            name: "Jane Doe".to_string(),
-            jid: room!("jane.doe@prose.org"),
-            r#type: BookmarkType::DirectMessage,
-            is_favorite: false,
-            error: None,
-        }))
-        .return_once(|_| ());
 
     deps.messages_repo
         .expect_append()
@@ -191,21 +124,15 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
-        .expect_dispatch_event()
+        .expect_dispatch_room_event()
         .once()
-        .with(predicate::eq(ClientEvent::SidebarChanged))
-        .return_once(|_| ());
-
-    deps.client_event_dispatcher
-        .expect_dispatch_event()
-        .once()
-        .with(predicate::eq(ClientEvent::RoomChanged {
-            room: RoomFactory::mock().build(room.clone()),
-            r#type: RoomEventType::MessagesAppended {
+        .with(
+            predicate::eq(room),
+            predicate::eq(RoomEventType::MessagesAppended {
                 message_ids: vec!["message-id".into()],
-            },
-        }))
-        .return_once(|_| ());
+            }),
+        )
+        .return_once(|_, _| ());
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
@@ -213,50 +140,7 @@ async fn test_receiving_message_from_contact_adds_contact_to_sidebar() -> Result
             Message::default()
                 .set_type(MessageType::Chat)
                 .set_id("message-id".into())
-                .set_from(jid!("jane.doe@prose.org/macOS"))
-                .set_body("Hello World"),
-        )))
-        .await?;
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_receiving_message_from_channel_does_not_add_channel_to_sidebar() -> Result<()> {
-    let mut deps = MockAppDependencies::default();
-
-    let room = Arc::new(
-        RoomInternals::public_channel(room!("channel@conference.prose.org"))
-            .with_name("Channel Name"),
-    );
-
-    deps.connected_rooms_repo
-        .expect_get()
-        .once()
-        .with(predicate::eq(room!("channel@conference.prose.org")))
-        .return_once(|_| Some(room));
-
-    deps.messages_repo
-        .expect_append()
-        .once()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
-
-    deps.messaging_service
-        .expect_send_read_receipt()
-        .once()
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
-
-    deps.client_event_dispatcher
-        .expect_dispatch_event()
-        .once()
-        .return_once(|_| ());
-
-    let event_handler = MessagesEventHandler::from(&deps.into_deps());
-    event_handler
-        .handle_event(XMPPEvent::Chat(chat::Event::Message(
-            Message::default()
-                .set_id("message-id".into())
-                .set_from(jid!("channel@conference.prose.org/jane.doe"))
+                .set_from(jid!("jane.doe@prose.org"))
                 .set_body("Hello World"),
         )))
         .await?;

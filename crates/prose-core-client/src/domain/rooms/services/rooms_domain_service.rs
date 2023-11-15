@@ -15,6 +15,9 @@ use crate::domain::shared::models::RoomJid;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreateRoomType {
+    DirectMessage {
+        participant: BareJid,
+    },
     Group {
         participants: Vec<BareJid>,
         send_invites: bool,
@@ -28,7 +31,7 @@ pub enum CreateRoomType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CreateOrEnterRoomRequestType {
+pub enum CreateOrEnterRoomRequest {
     Create {
         service: BareJid,
         room_type: CreateRoomType,
@@ -40,14 +43,6 @@ pub enum CreateOrEnterRoomRequestType {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct CreateOrEnterRoomRequest {
-    pub r#type: CreateOrEnterRoomRequestType,
-    pub save_bookmark: bool,
-    pub insert_sidebar_item: bool,
-    pub notify_delegate: bool,
-}
-
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
@@ -56,4 +51,15 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         request: CreateOrEnterRoomRequest,
     ) -> Result<Arc<RoomInternals>, RoomError>;
+
+    /// Renames the room identified by `room_jid` to `name`.
+    ///
+    /// If the room is not connected no action is performed, otherwise:
+    /// - Panics if the Room is not of type `RoomType::PublicChannel`, `RoomType::PrivateChannel`
+    ///   or `RoomType::Generic`.
+    /// - Fails with `RoomError::PublicChannelNameConflict` if the room is of type
+    ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
+    /// - Dispatches `ClientEvent::RoomChanged` of type `RoomEventType::AttributesChanged`
+    ///   after processing.
+    async fn rename_room(&self, room_jid: &RoomJid, name: &str) -> Result<(), RoomError>;
 }

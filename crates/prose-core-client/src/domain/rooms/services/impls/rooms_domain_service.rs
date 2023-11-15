@@ -11,9 +11,9 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use jid::{BareJid, NodePart};
-use parking_lot::RwLock;
+use prose_proc_macros::DependenciesStruct;
 use sha1::{Digest, Sha1};
-use tracing::{error, info};
+use tracing::info;
 use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_wasm_utils::PinnedFuture;
@@ -21,38 +21,37 @@ use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::RequestError;
 
 use crate::app::deps::{
-    DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
-    DynIDProvider, DynRoomManagementService, DynRoomParticipationService, DynSidebarRepository,
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynIDProvider,
+    DynRoomAttributesService, DynRoomManagementService, DynRoomParticipationService,
     DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
     Member, RoomConfig, RoomError, RoomInfo, RoomInternals, RoomMetadata,
 };
 use crate::domain::shared::models::{RoomJid, RoomType};
-use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
+use crate::domain::shared::utils::build_contact_name;
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
-use crate::ClientEvent;
+use crate::RoomEventType;
 
 use super::super::{
-    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, CreateRoomType,
-    RoomsDomainService as RoomsDomainServiceTrait,
+    CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
 };
 
 const GROUP_PREFIX: &str = "org.prose.group";
 const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
 const PUBLIC_CHANNEL_PREFIX: &str = "org.prose.public-channel";
 
+#[derive(DependenciesStruct)]
 pub struct RoomsDomainService {
-    pub(crate) bookmarks_service: DynBookmarksService,
-    pub(crate) client_event_dispatcher: DynClientEventDispatcher,
-    pub(crate) connected_rooms_repo: DynConnectedRoomsRepository,
-    pub(crate) ctx: DynAppContext,
-    pub(crate) id_provider: DynIDProvider,
-    pub(crate) room_management_service: DynRoomManagementService,
-    pub(crate) room_participation_service: DynRoomParticipationService,
-    pub(crate) sidebar_repo: DynSidebarRepository,
-    pub(crate) user_profile_repo: DynUserProfileRepository,
+    client_event_dispatcher: DynClientEventDispatcher,
+    connected_rooms_repo: DynConnectedRoomsRepository,
+    ctx: DynAppContext,
+    id_provider: DynIDProvider,
+    room_attributes_service: DynRoomAttributesService,
+    room_management_service: DynRoomManagementService,
+    room_participation_service: DynRoomParticipationService,
+    user_profile_repo: DynUserProfileRepository,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -60,12 +59,7 @@ pub struct RoomsDomainService {
 impl RoomsDomainServiceTrait for RoomsDomainService {
     async fn create_or_join_room(
         &self,
-        CreateOrEnterRoomRequest {
-            r#type,
-            save_bookmark,
-            insert_sidebar_item,
-            notify_delegate,
-        }: CreateOrEnterRoomRequest,
+        request: CreateOrEnterRoomRequest,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let user_jid = self
             .ctx
@@ -76,8 +70,11 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             .into_bare();
         let default_nickname = user_jid.node_str().unwrap_or("unknown-user");
 
-        let result = match r#type {
-            CreateOrEnterRoomRequestType::Create { service, room_type } => match room_type {
+        let result = match request {
+            CreateOrEnterRoomRequest::Create { service, room_type } => match room_type {
+                CreateRoomType::DirectMessage { participant } => {
+                    return Ok(self.create_or_join_direct_message(&participant).await?)
+                }
                 CreateRoomType::Group {
                     participants,
                     send_invites,
@@ -109,6 +106,11 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .await
                 }
                 CreateRoomType::PublicChannel { name } => {
+                    // Prevent channels with duplicate names from being created…
+                    if !self.is_public_channel_name_unique(&name).await? {
+                        return Err(RoomError::PublicChannelNameConflict);
+                    }
+
                     // While it would be ideal to have channel names conflict, this could only
                     // happen via its JID since this is the only thing that is unique. We do
                     // have the requirement however that users should be able to rename their
@@ -127,7 +129,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .await
                 }
             },
-            CreateOrEnterRoomRequestType::Join {
+            CreateOrEnterRoomRequest::Join {
                 room_jid,
                 nickname,
                 password,
@@ -164,15 +166,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             let room_name = room_name.clone();
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
-                assert!(room.is_pending(), "Cannot promote a non-pending room");
-
-                let mut state = room.state.read().clone();
-                state.name = room_name;
-
-                RoomInternals {
-                    info: room_info,
-                    state: RwLock::new(state),
-                }
+                room.by_resolving_with_info(room_name, room_info)
             })
         }) else {
             return Err(RequestError::Generic {
@@ -181,61 +175,83 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             .into());
         };
 
-        let room_name = room_name
-            .map(|name| name.to_string())
-            .unwrap_or(room.info.jid.to_string());
+        Ok(room)
+    }
 
-        let bookmark_type = match room.info.room_type {
-            RoomType::Pending => None,
-            RoomType::DirectMessage => Some(BookmarkType::DirectMessage),
-            RoomType::Group => Some(BookmarkType::Group),
-            RoomType::PrivateChannel => Some(BookmarkType::PrivateChannel),
-            RoomType::PublicChannel => Some(BookmarkType::PublicChannel),
-            RoomType::Generic => None,
+    /// Renames the room identified by `room_jid` to `name`.
+    ///
+    /// - If the room is not connected no action is performed.
+    /// - Panics if the Room is not of type `RoomType::PublicChannel`, `RoomType::PrivateChannel`
+    ///   or `RoomType::Generic`.
+    /// - Fails with `RoomError::PublicChannelNameConflict` if the room is of type
+    ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
+    async fn rename_room(&self, room_jid: &RoomJid, name: &str) -> Result<(), RoomError> {
+        let Some(room) = self.connected_rooms_repo.get(room_jid) else {
+            return Ok(());
         };
 
-        if let Some(bookmark_type) = bookmark_type {
-            if save_bookmark {
-                let result = self
-                    .bookmarks_service
-                    .save_bookmark(&Bookmark {
-                        name: room_name.clone(),
-                        jid: room_jid.clone(),
-                        r#type: bookmark_type.clone(),
-                        is_favorite: false,
-                        in_sidebar: insert_sidebar_item,
-                    })
-                    .await;
-
-                match result {
-                    Ok(_) => (),
-                    Err(error) => {
-                        error!("Failed to save bookmark for room {}. {}", room_jid, error)
-                    }
+        match room.r#type {
+            // We do not allow renaming Direct Messages or Groups since those names should always
+            // represent the list of participants.
+            RoomType::Pending | RoomType::DirectMessage | RoomType::Group => {
+                panic!("Unsupported action")
+            }
+            RoomType::PublicChannel => {
+                // Ensure that the new name doesn't exist already.
+                if !self.is_public_channel_name_unique(name).await? {
+                    return Err(RoomError::PublicChannelNameConflict);
                 }
             }
-
-            if insert_sidebar_item {
-                self.sidebar_repo.put(&SidebarItem {
-                    name: room_name,
-                    jid: room_jid.clone(),
-                    r#type: bookmark_type.clone(),
-                    is_favorite: false,
-                    error: None,
-                });
-            }
+            RoomType::PrivateChannel | RoomType::Generic => (),
         }
 
-        if notify_delegate {
-            self.client_event_dispatcher
-                .dispatch_event(ClientEvent::SidebarChanged);
-        }
+        self.room_attributes_service
+            .set_name(&room.jid, name.as_ref())
+            .await?;
+        room.set_name(name);
 
-        Ok(room)
+        self.client_event_dispatcher
+            .dispatch_room_event(room, RoomEventType::AttributesChanged);
+
+        Ok(())
     }
 }
 
 impl RoomsDomainService {
+    async fn create_or_join_direct_message(
+        &self,
+        participant_jid: &BareJid,
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        if let Some(room) = self
+            .connected_rooms_repo
+            .get(&participant_jid.clone().into())
+        {
+            return Ok(room);
+        }
+
+        let user_profile = self
+            .user_profile_repo
+            .get(participant_jid)
+            .await
+            .ok()
+            .map(|maybe_profile| maybe_profile.unwrap_or_default())
+            .unwrap_or_default();
+
+        let user_jid = self.ctx.connected_jid()?.into_bare();
+        let contact_name = build_contact_name(&participant_jid, &user_profile);
+
+        let room = Arc::new(RoomInternals::for_direct_message(
+            &user_jid,
+            &participant_jid,
+            &contact_name,
+        ));
+
+        // We'll ignore the potential error since we've already checked if the room exists already.
+        _ = self.connected_rooms_repo.set(room.clone());
+
+        Ok(room)
+    }
+
     async fn create_or_join_group(
         &self,
         service: &BareJid,
@@ -244,6 +260,10 @@ impl RoomsDomainService {
         participants: Vec<BareJid>,
         send_invites: bool,
     ) -> Result<RoomMetadata, RoomError> {
+        if participants.len() < 2 {
+            return Err(RoomError::InvalidNumberOfParticipants);
+        }
+
         // Load participant infos so that we can build a nice human-readable name for the group…
         let mut participant_names = vec![];
         let participants_including_self = participants
@@ -387,7 +407,7 @@ impl RoomsDomainService {
                 Ok(occupancy) => occupancy,
                 Err(error) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(&[&room_jid]);
+                    self.connected_rooms_repo.delete(&room_jid);
 
                     // We've received a conflict which means that the room exists but that our
                     // nickname is taken.
@@ -416,7 +436,7 @@ impl RoomsDomainService {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(&[&room_jid]);
+                    self.connected_rooms_repo.delete(&room_jid);
                     // If the validation failed and we've created the room we'll destroy it again.
                     if room_has_been_created {
                         _ = self.room_management_service.destroy_room(&room_jid).await;
@@ -429,7 +449,7 @@ impl RoomsDomainService {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(&[&room_jid]);
+                    self.connected_rooms_repo.delete(&room_jid);
                     // Again, if the additional configuration fails and we've created the room
                     // we'll destroy it again.
                     if room_has_been_created {
@@ -480,7 +500,7 @@ impl RoomsDomainService {
                 }
                 Err(RoomError::RequestError(error)) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(&[room_jid]);
+                    self.connected_rooms_repo.delete(room_jid);
 
                     if error.defined_condition() == Some(DefinedCondition::Conflict) {
                         info!("Nickname was already taken in room. Will try again with modified nickname…");
@@ -491,7 +511,7 @@ impl RoomsDomainService {
                 }
                 Err(error) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(&[room_jid]);
+                    self.connected_rooms_repo.delete(room_jid);
                     Err(error)
                 }
             };
@@ -530,14 +550,32 @@ impl RoomsDomainService {
             user_jid: user_jid.clone(),
             user_nickname: metadata.room_jid.resource_str().to_string(),
             members,
-            room_type,
+            r#type: room_type,
         };
 
         Ok(room_info)
     }
-}
 
-impl RoomsDomainService {
+    async fn is_public_channel_name_unique(&self, channel_name: &str) -> Result<bool> {
+        let available_rooms = self
+            .room_management_service
+            .load_public_rooms(&self.ctx.muc_service()?)
+            .await?;
+
+        let lowercase_channel_name = channel_name.to_lowercase();
+        for room in available_rooms {
+            let Some(mut room_name) = room.name else {
+                continue;
+            };
+            room_name.make_ascii_lowercase();
+            if room_name == lowercase_channel_name {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
     fn insert_pending_room(
         &self,
         room_jid: &RoomJid,

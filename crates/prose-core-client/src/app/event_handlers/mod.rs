@@ -3,9 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
 
+pub use bookmarks_event_handler::BookmarksEventHandler;
 pub use client_event_dispatcher::ClientEventDispatcher;
 pub use connection_event_handler::ConnectionEventHandler;
 pub use event_handler_queue::XMPPEventHandlerQueue;
@@ -16,6 +19,10 @@ pub use requests_event_handler::RequestsEventHandler;
 pub use rooms_event_handler::RoomsEventHandler;
 pub use user_state_event_handler::UserStateEventHandler;
 
+use crate::domain::rooms::models::RoomInternals;
+use crate::{ClientEvent, RoomEventType};
+
+mod bookmarks_event_handler;
 mod client_event_dispatcher;
 mod connection_event_handler;
 mod event_handler_queue;
@@ -38,9 +45,7 @@ pub trait XMPPEventHandler: SendUnlessWasm + SyncUnlessWasm {
 }
 
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait EventDispatcher<E>: SendUnlessWasm + SyncUnlessWasm
-where
-    E: SendUnlessWasm + SyncUnlessWasm,
-{
-    fn dispatch_event(&self, event: E);
+pub trait ClientEventDispatcherTrait: SendUnlessWasm + SyncUnlessWasm {
+    fn dispatch_event(&self, event: ClientEvent);
+    fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: RoomEventType);
 }

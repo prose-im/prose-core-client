@@ -112,6 +112,13 @@ extern "C" {
         room: JsValue,
         ids: Vec<JsValue>,
     ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "roomAttributesChanged")]
+    fn room_attributes_changed(
+        this: &JSDelegate,
+        client: Client,
+        room: JsValue,
+    ) -> Result<(), JsValue>;
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -214,6 +221,9 @@ impl Delegate {
                 RoomEventType::ComposingUsersChanged => self
                     .inner
                     .composing_users_changed(client, room.into_js_value())?,
+                RoomEventType::AttributesChanged => self
+                    .inner
+                    .room_attributes_changed(client, room.into_js_value())?,
             },
         }
         Ok(())

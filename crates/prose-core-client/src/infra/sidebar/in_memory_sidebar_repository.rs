@@ -9,7 +9,7 @@ use parking_lot::RwLock;
 
 use crate::domain::shared::models::RoomJid;
 use crate::domain::sidebar::models::SidebarItem;
-use crate::domain::sidebar::repos::SidebarRepository;
+use crate::domain::sidebar::repos::{SidebarReadOnlyRepository, SidebarRepository};
 
 pub struct InMemorySidebarRepository {
     sidebar_items: RwLock<HashMap<RoomJid, SidebarItem>>,
@@ -23,12 +23,9 @@ impl InMemorySidebarRepository {
     }
 }
 
-impl SidebarRepository for InMemorySidebarRepository {
-    fn set_all(&self, items: Vec<SidebarItem>) {
-        *self.sidebar_items.write() = items
-            .into_iter()
-            .map(|item| (item.jid.clone(), item))
-            .collect()
+impl SidebarReadOnlyRepository for InMemorySidebarRepository {
+    fn get(&self, jid: &RoomJid) -> Option<SidebarItem> {
+        self.sidebar_items.read().get(jid).cloned()
     }
 
     fn get_all(&self) -> Vec<SidebarItem> {
@@ -41,11 +38,9 @@ impl SidebarRepository for InMemorySidebarRepository {
         items.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         items
     }
+}
 
-    fn get(&self, jid: &RoomJid) -> Option<SidebarItem> {
-        self.sidebar_items.read().get(jid).cloned()
-    }
-
+impl SidebarRepository for InMemorySidebarRepository {
     fn put(&self, item: &SidebarItem) {
         self.sidebar_items
             .write()
@@ -56,7 +51,7 @@ impl SidebarRepository for InMemorySidebarRepository {
         self.sidebar_items.write().remove(item);
     }
 
-    fn clear_cache(&self) {
-        self.sidebar_items.write().clear();
+    fn delete_all(&self) {
+        self.sidebar_items.write().clear()
     }
 }

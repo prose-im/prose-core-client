@@ -3,17 +3,21 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use anyhow::Result;
+use jid::Jid;
 use minidom::Element;
 use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::disco::Item as DiscoItem;
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub::owner::Configure;
-use xmpp_parsers::pubsub::pubsub::{Item, Items, PublishOptions, Retract};
+use xmpp_parsers::pubsub::pubsub::{Item, Items, Notify, PublishOptions, Retract};
 use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName};
 
 use crate::client::ModuleContext;
+use crate::event::Event as ClientEvent;
 use crate::mods::Module;
+use crate::stanza::PubSubMessage;
 use crate::util::RequestError;
 use crate::{ns, ElementExt};
 
@@ -22,9 +26,22 @@ pub struct PubSub {
     ctx: ModuleContext,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Event {
+    PubSubMessage { message: PubSubMessage },
+}
+
 impl Module for PubSub {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context
+    }
+
+    fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
+        self.ctx
+            .schedule_event(ClientEvent::PubSub(Event::PubSubMessage {
+                message: pubsub.clone(),
+            }));
+        Ok(())
     }
 }
 
@@ -135,12 +152,13 @@ impl PubSub {
         &self,
         node: impl AsRef<str>,
         item_ids: impl IntoIterator<Item = ID>,
+        notify: bool,
     ) -> Result<(), RequestError> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             pubsub::PubSub::Retract(Retract {
                 node: NodeName(node.as_ref().to_string()),
-                notify: Default::default(),
+                notify: if notify { Notify::True } else { Notify::False },
                 items: item_ids
                     .into_iter()
                     .map(|id| {
@@ -227,5 +245,35 @@ impl PubSub {
         Ok(Some(
             configure.form.ok_or(RequestError::UnexpectedResponse)?,
         ))
+    }
+
+    pub async fn subscribe_to_node(
+        &self,
+        jid: &Jid,
+        node: Option<&str>,
+    ) -> Result<pubsub::SubscriptionElem, RequestError> {
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            pubsub::PubSub::Subscribe {
+                subscribe: Some(pubsub::Subscribe {
+                    jid: jid.clone(),
+                    node: node.map(|n| NodeName(n.to_string())),
+                }),
+                options: None,
+            },
+        );
+
+        let response = pubsub::PubSub::try_from(
+            self.ctx
+                .send_iq(iq)
+                .await?
+                .ok_or(RequestError::UnexpectedResponse)?,
+        )?;
+
+        let pubsub::PubSub::Subscription(sub) = response else {
+            return Err(RequestError::UnexpectedResponse);
+        };
+
+        Ok(sub)
     }
 }

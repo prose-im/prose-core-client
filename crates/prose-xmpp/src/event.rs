@@ -15,6 +15,7 @@ pub enum Event {
     MUC(mods::muc::Event),
     Ping(mods::ping::Event),
     Profile(mods::profile::Event),
+    PubSub(mods::pubsub::Event),
     Roster(mods::roster::Event),
     Status(mods::status::Event),
 }

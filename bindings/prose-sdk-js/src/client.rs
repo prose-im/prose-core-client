@@ -14,8 +14,7 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
-    ContactsArray, IntoJSArray, RoomsArray, SidebarItem, SidebarItemsArray, UserMetadata,
-    UserProfile,
+    ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray, UserMetadata, UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -153,11 +152,6 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(())
-    }
-
-    #[wasm_bindgen(js_name = "connectedRooms")]
-    pub fn connected_rooms(&self) -> Result<RoomsArray> {
-        Ok(self.client.rooms.connected_rooms().into())
     }
 
     #[wasm_bindgen(js_name = "sidebarItems")]

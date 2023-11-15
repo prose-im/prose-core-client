@@ -9,7 +9,7 @@ use minidom::Element;
 use xmpp_parsers::message::Message;
 use xmpp_parsers::pubsub::PubSubEvent;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PubSubMessage {
     pub from: Jid,
     pub events: Vec<PubSubEvent>,

@@ -17,28 +17,25 @@ use prose_xmpp::mods::{bookmark, bookmark2, chat, muc, status};
 use prose_xmpp::{ns, Event};
 
 use crate::app::deps::{
-    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynRoomFactory,
-    DynRoomsDomainService, DynTimeProvider, DynUserProfileRepository,
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
+    DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::client_event::RoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
-use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType};
+use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::RoomJid;
-use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
     #[inject]
     ctx: DynAppContext,
     #[inject]
-    connected_rooms_repo: DynConnectedRoomsRepository,
+    connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
-    rooms_domain_service: DynRoomsDomainService,
+    sidebar_domain_service: DynSidebarDomainService,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
-    #[inject]
-    room_factory: DynRoomFactory,
     #[inject]
     time_provider: DynTimeProvider,
     #[inject]
@@ -168,27 +165,19 @@ impl RoomsEventHandler {
         let bare_jid = jid.into_bare();
         let name = self.user_profile_repo.get_display_name(&bare_jid).await?;
 
-        room.state
-            .write()
-            .insert_occupant(&from, Some(&bare_jid), name.as_deref(), &affiliation);
+        room.insert_occupant(&from, Some(&bare_jid), name.as_deref(), &affiliation);
 
         Ok(())
     }
 
     async fn handle_invite(&self, room_jid: BareJid, password: Option<String>) -> Result<()> {
         info!("Joining room {} after receiving invite…", room_jid);
-        let room_jid = RoomJid::from(room_jid);
 
-        self.rooms_domain_service
-            .create_or_join_room(CreateOrEnterRoomRequest {
-                r#type: CreateOrEnterRoomRequestType::Join {
-                    room_jid,
-                    nickname: None,
-                    password,
-                },
-                save_bookmark: true,
-                insert_sidebar_item: true,
-                notify_delegate: true,
+        self.sidebar_domain_service
+            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Join {
+                room_jid: RoomJid::from(room_jid),
+                nickname: None,
+                password,
             })
             .await?;
 
@@ -215,15 +204,10 @@ impl RoomsEventHandler {
         };
         let now = self.time_provider.now();
 
-        room.state
-            .write()
-            .set_occupant_chat_state(&jid, &now, chat_state);
+        room.set_occupant_chat_state(&jid, &now, chat_state);
 
         self.client_event_dispatcher
-            .dispatch_event(ClientEvent::RoomChanged {
-                room: self.room_factory.build(room.clone()),
-                r#type: RoomEventType::ComposingUsersChanged,
-            });
+            .dispatch_room_event(room, RoomEventType::ComposingUsersChanged);
 
         Ok(())
     }

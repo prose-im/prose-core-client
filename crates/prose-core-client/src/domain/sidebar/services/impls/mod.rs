@@ -3,6 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use rooms_domain_service::{RoomsDomainService, RoomsDomainServiceDependencies};
+pub use sidebar_domain_service::{SidebarDomainService, SidebarDomainServiceDependencies};
 
-mod rooms_domain_service;
+mod sidebar_domain_service;

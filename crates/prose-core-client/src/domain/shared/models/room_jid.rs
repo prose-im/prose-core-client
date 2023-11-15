@@ -5,6 +5,7 @@
 
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::Deref;
+use std::str::FromStr;
 
 use jid::BareJid;
 use minidom::IntoAttributeValue;
@@ -42,5 +43,13 @@ impl Display for RoomJid {
 impl IntoAttributeValue for RoomJid {
     fn into_attribute_value(self) -> Option<String> {
         self.0.into_attribute_value()
+    }
+}
+
+impl FromStr for RoomJid {
+    type Err = jid::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(BareJid::from_str(s)?))
     }
 }

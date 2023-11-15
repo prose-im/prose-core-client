@@ -14,19 +14,18 @@ use jid::{BareJid, Jid};
 use tracing::{debug, info};
 
 use crate::app::deps::{
-    DynBookmarksService, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
-    DynMessagesRepository, DynMessagingService, DynRoomAttributesService,
-    DynRoomParticipationService, DynSidebarRepository, DynTimeProvider, DynUserProfileRepository,
+    DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService, DynMessagesRepository,
+    DynMessagingService, DynRoomAttributesService, DynRoomParticipationService,
+    DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::RoomInternals;
 use crate::domain::shared::models::{RoomJid, RoomType};
-use crate::domain::sidebar::models::{Bookmark, BookmarkType};
 use crate::dtos::{
     Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
 };
 use crate::util::jid_ext::{BareJidExt, JidExt};
-use crate::ClientEvent;
+use crate::RoomEventType;
 
 pub struct Room<Kind> {
     inner: Arc<RoomInner>,
@@ -60,16 +59,15 @@ impl HasMutableName for Generic {}
 pub struct RoomInner {
     pub(crate) data: Arc<RoomInternals>,
 
-    pub(crate) bookmarks_service: DynBookmarksService,
+    pub(crate) attributes_service: DynRoomAttributesService,
     pub(crate) client_event_dispatcher: DynClientEventDispatcher,
     pub(crate) drafts_repo: DynDraftsRepository,
     pub(crate) message_archive_service: DynMessageArchiveService,
     pub(crate) message_repo: DynMessagesRepository,
     pub(crate) messaging_service: DynMessagingService,
     pub(crate) participation_service: DynRoomParticipationService,
-    pub(crate) sidebar_repo: DynSidebarRepository,
+    pub(crate) sidebar_domain_service: DynSidebarDomainService,
     pub(crate) time_provider: DynTimeProvider,
-    pub(crate) attributes_service: DynRoomAttributesService,
     pub(crate) user_profile_repo: DynUserProfileRepository,
 }
 
@@ -99,20 +97,20 @@ impl<Kind> Deref for Room<Kind> {
 impl<Kind> Debug for Room<Kind> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Room")
-            .field("jid", &self.data.info.jid)
-            .field("name", &self.data.state.read().name)
-            .field("description", &self.data.info.description)
-            .field("user_jid", &self.data.info.user_jid)
-            .field("user_nickname", &self.data.info.user_nickname)
-            .field("subject", &self.data.state.read().subject)
-            .field("occupants", &self.data.state.read().occupants)
+            .field("jid", &self.data.jid)
+            .field("name", &self.data.name())
+            .field("description", &self.data.description)
+            .field("user_jid", &self.data.user_jid)
+            .field("user_nickname", &self.data.user_nickname)
+            .field("subject", &self.data.topic())
+            .field("occupants", &self.data.occupants())
             .finish_non_exhaustive()
     }
 }
 
 impl<Kind> PartialEq for Room<Kind> {
     fn eq(&self, other: &Self) -> bool {
-        self.data.info.jid == other.data.info.jid
+        self.data.jid == other.data.jid
     }
 }
 
@@ -124,28 +122,27 @@ impl<Kind> Room<Kind> {
 
 impl<Kind> Room<Kind> {
     pub fn jid(&self) -> &RoomJid {
-        &self.data.info.jid
+        &self.data.jid
     }
 
     pub fn name(&self) -> Option<String> {
-        self.data.state.read().name.clone()
+        self.data.name()
     }
 
     pub fn description(&self) -> Option<&str> {
-        self.data.info.description.as_deref()
+        self.data.description.as_deref()
     }
 
     pub fn user_nickname(&self) -> &str {
-        &self.data.info.user_nickname
+        &self.data.user_nickname
     }
 
     pub fn subject(&self) -> Option<String> {
-        self.data.state.read().subject.clone()
+        self.data.topic()
     }
 
     pub fn members(&self) -> Vec<UserPresenceInfo> {
         self.data
-            .info
             .members
             .iter()
             .map(|(jid, member)| UserPresenceInfo {
@@ -158,18 +155,13 @@ impl<Kind> Room<Kind> {
 
     pub fn occupants(&self) -> Vec<UserBasicInfo> {
         self.data
-            .state
-            .read()
-            .occupants
-            .values()
+            .occupants()
+            .into_iter()
             .filter_map(|occupant| {
-                let Some(jid) = occupant.jid.clone() else {
+                let Some(jid) = occupant.jid else {
                     return None;
                 };
-                let name = occupant
-                    .name
-                    .clone()
-                    .unwrap_or_else(|| jid.to_display_name());
+                let name = occupant.name.unwrap_or_else(|| jid.to_display_name());
                 Some(UserBasicInfo { jid, name })
             })
             .collect()
@@ -179,38 +171,33 @@ impl<Kind> Room<Kind> {
 impl<Kind> Room<Kind> {
     pub async fn send_message(&self, body: impl Into<String>) -> Result<()> {
         self.messaging_service
-            .send_message(&self.data.info.jid, &self.data.info.room_type, body.into())
+            .send_message(&self.data.jid, &self.data.r#type, body.into())
             .await
     }
 
     pub async fn update_message(&self, id: MessageId, body: impl Into<String>) -> Result<()> {
         self.messaging_service
-            .update_message(
-                &self.data.info.jid,
-                &self.data.info.room_type,
-                &id,
-                body.into(),
-            )
+            .update_message(&self.data.jid, &self.data.r#type, &id, body.into())
             .await
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
-        let messages = self.message_repo.get(&self.data.info.jid, &id).await?;
+        let messages = self.message_repo.get(&self.data.jid, &id).await?;
 
         let mut message = Message::reducing_messages(messages)
             .pop()
             .ok_or(format_err!("No message with id {}", id))?;
 
-        message.toggle_reaction(&self.data.info.user_jid, emoji);
+        message.toggle_reaction(&self.data.user_jid, emoji);
         let all_emojis = message
-            .reactions_from(&self.data.info.user_jid)
+            .reactions_from(&self.data.user_jid)
             .cloned()
             .collect::<Vec<_>>();
 
         self.messaging_service
             .react_to_message(
-                &self.data.info.jid,
-                &self.data.info.room_type,
+                &self.data.jid,
+                &self.data.r#type,
                 &id,
                 all_emojis.as_slice(),
             )
@@ -219,18 +206,18 @@ impl<Kind> Room<Kind> {
 
     pub async fn retract_message(&self, id: MessageId) -> Result<()> {
         self.messaging_service
-            .retract_message(&self.data.info.jid, &self.data.info.room_type, &id)
+            .retract_message(&self.data.jid, &self.data.r#type, &id)
             .await
     }
 
     pub async fn load_messages_with_ids(&self, ids: &[&MessageId]) -> Result<Vec<MessageDTO>> {
-        let messages = self.message_repo.get_all(&self.data.info.jid, ids).await?;
+        let messages = self.message_repo.get_all(&self.data.jid, ids).await?;
         Ok(self.reduce_messages_and_add_sender(messages).await)
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
         self.messaging_service
-            .set_user_is_composing(&self.data.info.jid, &self.data.info.room_type, is_composing)
+            .set_user_is_composing(&self.data.jid, &self.data.r#type, is_composing)
             .await
     }
 
@@ -238,15 +225,15 @@ impl<Kind> Room<Kind> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
         let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
-        Ok(self.data.state.read().composing_users(thirty_secs_ago))
+        Ok(self.data.composing_users(thirty_secs_ago))
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
-        self.drafts_repo.set(&self.data.info.jid, text).await
+        self.drafts_repo.set(&self.data.jid, text).await
     }
 
     pub async fn load_draft(&self) -> Result<Option<String>> {
-        self.drafts_repo.get(&self.data.info.jid).await
+        self.drafts_repo.get(&self.data.jid).await
     }
 
     pub async fn load_latest_messages(&self) -> Result<Vec<MessageDTO>> {
@@ -254,7 +241,7 @@ impl<Kind> Room<Kind> {
 
         let result = self
             .message_archive_service
-            .load_messages(&self.data.info.jid, &self.data.info.room_type, None, None)
+            .load_messages(&self.data.jid, &self.data.r#type, None, None)
             .await?;
 
         let messages = result
@@ -266,7 +253,7 @@ impl<Kind> Room<Kind> {
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo
             .append(
-                &self.data.info.jid,
+                &self.data.jid,
                 messages.iter().collect::<Vec<_>>().as_slice(),
             )
             .await?;
@@ -306,17 +293,14 @@ impl<Kind> Room<Kind> {
 
     async fn resolve_user_name(&self, jid: &Jid) -> String {
         let name = {
-            let state = &*self.data.state.read();
-
             match jid {
                 Jid::Bare(bare) => self
                     .data
-                    .info
                     .members
                     .get(bare)
                     .map(|member| member.name.clone())
-                    .or_else(|| state.occupants.get(jid).and_then(|o| o.name.clone())),
-                Jid::Full(_) => state.occupants.get(jid).and_then(|o| o.name.clone()),
+                    .or_else(|| self.data.get_occupant(jid).and_then(|o| o.name)),
+                Jid::Full(_) => self.data.get_occupant(jid).and_then(|o| o.name),
             }
         };
 
@@ -335,7 +319,7 @@ impl<Kind> Room<Kind> {
             };
         }
 
-        if self.data.info.room_type == RoomType::DirectMessage {
+        if self.data.r#type == RoomType::DirectMessage {
             jid.node_to_display_name()
         } else {
             jid.resource_to_display_name()
@@ -346,7 +330,7 @@ impl<Kind> Room<Kind> {
 #[cfg(feature = "debug")]
 impl<Kind> Room<Kind> {
     pub fn occupants_dbg(&self) -> Vec<crate::domain::rooms::models::Occupant> {
-        self.data.state.read().occupants.values().cloned().collect()
+        self.data.occupants()
     }
 }
 
@@ -354,15 +338,9 @@ impl Room<Group> {
     pub async fn resend_invites_to_members(&self) -> Result<()> {
         info!("Sending invites to group members…");
 
-        let member_jids = self
-            .data
-            .info
-            .members
-            .keys()
-            .map(|jid| jid)
-            .collect::<Vec<_>>();
+        let member_jids = self.data.members.keys().map(|jid| jid).collect::<Vec<_>>();
         self.participation_service
-            .invite_users_to_room(&self.data.info.jid, member_jids.as_slice())
+            .invite_users_to_room(&self.data.jid, member_jids.as_slice())
             .await?;
         Ok(())
     }
@@ -375,7 +353,7 @@ where
     pub async fn invite_users(&self, users: impl IntoIterator<Item = &BareJid>) -> Result<()> {
         let user_jids = users.into_iter().collect::<Vec<_>>();
         self.participation_service
-            .invite_users_to_room(&self.data.info.jid, user_jids.as_slice())
+            .invite_users_to_room(&self.data.jid, user_jids.as_slice())
             .await?;
         Ok(())
     }
@@ -387,8 +365,14 @@ where
 {
     pub async fn set_topic(&self, topic: Option<&str>) -> Result<()> {
         self.attributes_service
-            .set_topic(&self.data.info.jid, topic)
-            .await
+            .set_topic(&self.data.jid, topic)
+            .await?;
+        self.data.set_topic(topic);
+
+        self.client_event_dispatcher
+            .dispatch_room_event(self.data.clone(), RoomEventType::AttributesChanged);
+
+        Ok(())
     }
 }
 
@@ -397,58 +381,9 @@ where
     Kind: HasMutableName,
 {
     pub async fn set_name(&self, name: impl AsRef<str>) -> Result<()> {
-        if self
-            .data
-            .state
-            .read()
-            .name
-            .as_ref()
-            .map(|name| name.to_lowercase())
-            == Some(name.as_ref().to_lowercase())
-        {
-            return Ok(());
-        }
-
-        self.attributes_service
-            .set_name(&self.data.info.jid, name.as_ref())
+        self.sidebar_domain_service
+            .rename_item(&self.data.jid, name.as_ref())
             .await?;
-
-        self.data.state.write().name = Some(name.as_ref().to_string());
-
-        let bookmark_type = match self.data.info.room_type {
-            RoomType::Pending => return Ok(()),
-            RoomType::DirectMessage => BookmarkType::DirectMessage,
-            RoomType::Group => BookmarkType::Group,
-            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
-            RoomType::PublicChannel => BookmarkType::PublicChannel,
-            RoomType::Generic => return Ok(()),
-        };
-
-        let mut bookmark = Bookmark {
-            name: name.as_ref().to_string(),
-            jid: self.data.info.jid.clone(),
-            r#type: bookmark_type,
-            is_favorite: false,
-            in_sidebar: false,
-        };
-
-        let mut sidebar_changed = false;
-
-        if let Some(mut sidebar_item) = self.sidebar_repo.get(&self.data.info.jid) {
-            bookmark.in_sidebar = true;
-
-            sidebar_item.name = name.as_ref().to_string();
-            self.sidebar_repo.put(&sidebar_item);
-            sidebar_changed = true;
-        }
-
-        self.bookmarks_service.save_bookmark(&bookmark).await?;
-
-        if sidebar_changed {
-            self.client_event_dispatcher
-                .dispatch_event(ClientEvent::SidebarChanged);
-        }
-
         Ok(())
     }
 }

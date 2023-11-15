@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::future::Future;
+use std::ops::Deref;
 use std::sync::Arc;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
@@ -20,6 +21,14 @@ impl XMPPClient {
         XMPPClientBuilder {
             builder: Client::builder(),
         }
+    }
+}
+
+impl Deref for XMPPClient {
+    type Target = Client;
+
+    fn deref(&self) -> &Self::Target {
+        self.client.as_ref()
     }
 }
 

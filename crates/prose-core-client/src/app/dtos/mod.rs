@@ -19,6 +19,9 @@ pub use crate::domain::{
     user_profiles::models::{Address, UserProfile},
 };
 
+#[cfg(feature = "debug")]
+pub use crate::domain::sidebar::models::Bookmark;
+
 mod contact;
 mod message;
 mod sidebar_item;

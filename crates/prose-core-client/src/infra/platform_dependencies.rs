@@ -12,8 +12,11 @@ use crate::app::deps::{
     AppContext, AppDependencies, DynClientEventDispatcher, DynIDProvider, DynTimeProvider,
 };
 use crate::app::services::RoomInner;
-use crate::domain::rooms::services::impls::RoomsDomainService;
+use crate::domain::rooms::services::impls::{RoomsDomainService, RoomsDomainServiceDependencies};
 use crate::domain::rooms::services::RoomFactory;
+use crate::domain::sidebar::services::impls::{
+    SidebarDomainService, SidebarDomainServiceDependencies,
+};
 use crate::infra::avatars::AvatarCache;
 use crate::infra::contacts::CachingContactsRepository;
 use crate::infra::messaging::{
@@ -99,20 +102,46 @@ impl From<PlatformDependencies> for AppDependencies {
             d.xmpp.clone(),
         ));
 
+        let rooms_domain_service_dependencies = RoomsDomainServiceDependencies {
+            client_event_dispatcher: client_event_dispatcher.clone(),
+            connected_rooms_repo: connected_rooms_repo.clone(),
+            ctx: ctx.clone(),
+            id_provider: d.short_id_provider.clone(),
+            room_attributes_service: d.xmpp.clone(),
+            room_management_service: d.xmpp.clone(),
+            room_participation_service: d.xmpp.clone(),
+            user_profile_repo: user_profile_repo.clone(),
+        };
+
+        let rooms_domain_service =
+            Arc::new(RoomsDomainService::from(rooms_domain_service_dependencies));
+
+        let sidebar_domain_service_dependencies = SidebarDomainServiceDependencies {
+            bookmarks_service: d.xmpp.clone(),
+            client_event_dispatcher: client_event_dispatcher.clone(),
+            connected_rooms_repo: connected_rooms_repo.clone(),
+            ctx: ctx.clone(),
+            room_management_service: d.xmpp.clone(),
+            rooms_domain_service: rooms_domain_service.clone(),
+            sidebar_repo: sidebar_repo.clone(),
+        };
+
+        let sidebar_domain_service = Arc::new(SidebarDomainService::from(
+            sidebar_domain_service_dependencies,
+        ));
+
         let room_factory = {
-            let bookmarks_service = d.xmpp.clone();
             let client_event_dispatcher = client_event_dispatcher.clone();
             let xmpp = d.xmpp.clone();
             let time_provider = time_provider.clone();
             let message_repo = messages_repo.clone();
             let drafts_repo = drafts_repo.clone();
             let user_profile_repo = user_profile_repo.clone();
-            let sidebar_repo = sidebar_repo.clone();
+            let sidebar_domain_service = sidebar_domain_service.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
-                    bookmarks_service: bookmarks_service.clone(),
                     time_provider: time_provider.clone(),
                     messaging_service: xmpp.clone(),
                     message_archive_service: xmpp.clone(),
@@ -122,28 +151,15 @@ impl From<PlatformDependencies> for AppDependencies {
                     drafts_repo: drafts_repo.clone(),
                     user_profile_repo: user_profile_repo.clone(),
                     client_event_dispatcher: client_event_dispatcher.clone(),
-                    sidebar_repo: sidebar_repo.clone(),
+                    sidebar_domain_service: sidebar_domain_service.clone(),
                 }
                 .into()
             }))
         };
 
-        let rooms_domain_service = RoomsDomainService {
-            bookmarks_service: d.xmpp.clone(),
-            client_event_dispatcher: client_event_dispatcher.clone(),
-            connected_rooms_repo: connected_rooms_repo.clone(),
-            ctx: ctx.clone(),
-            id_provider: d.short_id_provider.clone(),
-            room_management_service: d.xmpp.clone(),
-            room_participation_service: d.xmpp.clone(),
-            sidebar_repo: sidebar_repo.clone(),
-            user_profile_repo: user_profile_repo.clone(),
-        };
-
         Self {
             account_settings_repo: Arc::new(AccountSettingsRepository::new(d.store.clone())),
             avatar_repo: Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache)),
-            bookmarks_service: d.xmpp.clone(),
             client_event_dispatcher,
             connected_rooms_repo,
             connection_service: d.xmpp.clone(),
@@ -159,8 +175,9 @@ impl From<PlatformDependencies> for AppDependencies {
             messaging_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),
             room_attributes_service: d.xmpp.clone(),
-            rooms_domain_service: Arc::new(rooms_domain_service),
+            rooms_domain_service,
             short_id_provider: d.short_id_provider,
+            sidebar_domain_service,
             sidebar_repo,
             time_provider,
             user_account_service: d.xmpp.clone(),

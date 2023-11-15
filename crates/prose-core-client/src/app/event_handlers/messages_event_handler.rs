@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
@@ -18,40 +16,31 @@ use prose_xmpp::stanza::Message;
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
-    DynMessagesRepository, DynMessagingService, DynRoomFactory, DynSidebarRepository,
-    DynTimeProvider, DynUserProfileRepository,
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
+    DynMessagesRepository, DynMessagingService, DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
-use crate::domain::rooms::models::RoomInternals;
-use crate::domain::shared::models::{RoomJid, RoomType};
-use crate::domain::shared::utils::build_contact_name;
-use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
-use crate::{ClientEvent, RoomEventType};
+use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
+use crate::domain::shared::models::RoomJid;
+use crate::RoomEventType;
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
     #[inject]
     ctx: DynAppContext,
     #[inject]
-    bookmarks_service: DynBookmarksService,
-    #[inject]
-    connected_rooms_repo: DynConnectedRoomsRepository,
+    connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     messages_repo: DynMessagesRepository,
     #[inject]
     messaging_service: DynMessagingService,
     #[inject]
-    room_factory: DynRoomFactory,
-    #[inject]
-    sidebar_repo: DynSidebarRepository,
+    sidebar_domain_service: DynSidebarDomainService,
     #[inject]
     time_provider: DynTimeProvider,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
-    #[inject]
-    user_profile_repo: DynUserProfileRepository,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -139,24 +128,15 @@ impl MessagesEventHandler {
         let mut room = self.connected_rooms_repo.get(&from);
 
         if room.is_none() && message.r#type() == Some(MessageType::Chat) {
-            let user_profile = self
-                .user_profile_repo
-                .get(&from)
-                .await
-                .ok()
-                .map(|maybe_profile| maybe_profile.unwrap_or_default())
-                .unwrap_or_default();
-
-            let user_jid = self.ctx.connected_jid()?.into_bare();
-            let contact_name = build_contact_name(&from, &user_profile);
-
-            let created_room = Arc::new(RoomInternals::for_direct_message(
-                &user_jid,
-                &from,
-                &contact_name,
-            ));
-            _ = self.connected_rooms_repo.set(created_room.clone());
-            room = Some(created_room);
+            self.sidebar_domain_service
+                .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
+                    service: self.ctx.muc_service()?,
+                    room_type: CreateRoomType::DirectMessage {
+                        participant: from.clone().into_inner(),
+                    },
+                })
+                .await?;
+            room = self.connected_rooms_repo.get(&from);
         }
 
         let Some(room) = room else {
@@ -166,11 +146,7 @@ impl MessagesEventHandler {
 
         if let ReceivedMessage::Message(message) = &message {
             if let Some(subject) = &message.subject() {
-                room.state.write().subject = if subject.is_empty() {
-                    None
-                } else {
-                    Some(subject.to_string())
-                };
+                room.set_topic((!subject.is_empty()).then_some(subject));
                 return Ok(());
             }
         }
@@ -206,17 +182,18 @@ impl MessagesEventHandler {
         self.messages_repo.append(&from, &[&message]).await?;
 
         if message.payload.is_message() {
-            match self.add_sidebar_item_if_needed(&room).await {
+            match self
+                .sidebar_domain_service
+                .insert_item_for_received_message_if_needed(&from)
+                .await
+            {
                 Ok(_) => (),
                 Err(err) => error!("Could not add group to sidebar. {}", err.to_string()),
             }
         }
 
         self.client_event_dispatcher
-            .dispatch_event(ClientEvent::RoomChanged {
-                room: self.room_factory.build(room.clone()),
-                r#type: RoomEventType::from(&message),
-            });
+            .dispatch_room_event(room.clone(), RoomEventType::from(&message));
 
         // Don't send delivery receipts for carbons or anything other than a regular message.
         if message_is_carbon || !message.payload.is_message() {
@@ -225,7 +202,7 @@ impl MessagesEventHandler {
 
         if let Some(message_id) = message.id.into_original_id() {
             self.messaging_service
-                .send_read_receipt(&room.info.jid, &room.info.room_type, &message_id)
+                .send_read_receipt(&room.jid, &room.r#type, &message_id)
                 .await?;
         }
 
@@ -254,54 +231,7 @@ impl MessagesEventHandler {
         self.messages_repo.append(&to, &[&message]).await?;
 
         self.client_event_dispatcher
-            .dispatch_event(ClientEvent::RoomChanged {
-                room: self.room_factory.build(room),
-                r#type: RoomEventType::from(&message),
-            });
-
-        Ok(())
-    }
-}
-
-impl MessagesEventHandler {
-    async fn add_sidebar_item_if_needed(&self, room: &Arc<RoomInternals>) -> Result<()> {
-        let bookmark_type = match room.info.room_type {
-            RoomType::DirectMessage => BookmarkType::DirectMessage,
-            RoomType::Group => BookmarkType::Group,
-            _ => return Ok(()),
-        };
-
-        if self.sidebar_repo.get(&room.info.jid).is_some() {
-            return Ok(());
-        }
-
-        let bookmark_name = room
-            .state
-            .read()
-            .name
-            .clone()
-            .unwrap_or("Untitled Conversation".to_string());
-
-        self.bookmarks_service
-            .save_bookmark(&Bookmark {
-                name: bookmark_name.clone(),
-                jid: room.info.jid.clone(),
-                r#type: bookmark_type.clone(),
-                is_favorite: false,
-                in_sidebar: true,
-            })
-            .await?;
-
-        self.sidebar_repo.put(&SidebarItem {
-            name: bookmark_name,
-            jid: room.info.jid.clone(),
-            r#type: bookmark_type,
-            is_favorite: false,
-            error: None,
-        });
-
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::SidebarChanged);
+            .dispatch_room_event(room, RoomEventType::from(&message));
 
         Ok(())
     }

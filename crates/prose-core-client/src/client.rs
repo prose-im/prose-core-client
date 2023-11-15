@@ -35,13 +35,15 @@ impl Client {
 }
 
 pub struct ClientInner {
-    pub(crate) connection: ConnectionService,
     pub account: AccountService,
+    pub cache: CacheService,
     pub contacts: ContactsService,
+    #[cfg(feature = "debug")]
+    pub debug: crate::services::DebugService,
     pub rooms: RoomsService,
     pub sidebar: SidebarService,
     pub user_data: UserDataService,
-    pub cache: CacheService,
+    pub(crate) connection: ConnectionService,
 }
 
 impl From<Arc<ClientInner>> for Client {

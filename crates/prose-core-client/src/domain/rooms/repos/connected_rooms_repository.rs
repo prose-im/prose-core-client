@@ -6,7 +6,6 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
@@ -17,23 +16,36 @@ type UpdateHandler = Box<dyn FnOnce(Arc<RoomInternals>) -> RoomInternals + Send>
 
 pub struct RoomAlreadyExistsError;
 
-#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
-#[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait ConnectedRoomsRepository: SendUnlessWasm + SyncUnlessWasm {
+pub trait ConnectedRoomsReadOnlyRepository: SendUnlessWasm + SyncUnlessWasm {
     fn get(&self, room_jid: &RoomJid) -> Option<Arc<RoomInternals>>;
     fn get_all(&self) -> Vec<Arc<RoomInternals>>;
+}
 
+pub trait ConnectedRoomsRepository: ConnectedRoomsReadOnlyRepository {
     fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError>;
-
-    /// Replaces all rooms with `rooms`.
-    fn replace(&self, rooms: Vec<RoomInternals>);
 
     /// If a room with `room_jid` was found returns the room returned by `block` otherwise
     /// returns `None`.
     fn update(&self, room_jid: &RoomJid, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
 
-    fn delete<'a>(&self, room_jids: &[&'a RoomJid]);
+    fn delete(&self, room_jid: &RoomJid);
+    fn delete_all(&self);
+}
 
-    async fn clear_cache(&self) -> Result<()>;
+#[cfg(feature = "test")]
+mockall::mock! {
+    pub ConnectedRoomsReadWriteRepository {}
+
+    impl ConnectedRoomsReadOnlyRepository for ConnectedRoomsReadWriteRepository {
+        fn get(&self, room_jid: &RoomJid) -> Option<Arc<RoomInternals>>;
+        fn get_all(&self) -> Vec<Arc<RoomInternals>>;
+    }
+
+    impl ConnectedRoomsRepository for ConnectedRoomsReadWriteRepository {
+        fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError>;
+        fn update(&self, room_jid: &RoomJid, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
+        fn delete(&self, room_jid: &RoomJid);
+        fn delete_all(&self);
+    }
 }

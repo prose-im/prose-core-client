@@ -41,6 +41,9 @@ pub enum RoomEventType {
     /// A message was deleted.
     MessagesDeleted { message_ids: Vec<MessageId> },
 
+    /// Attributes changed like name or topic.
+    AttributesChanged,
+
     /// A user in `conversation` started or stopped typing.
     ComposingUsersChanged,
 }

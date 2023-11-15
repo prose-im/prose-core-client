@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -16,17 +15,14 @@ use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
 use prose_core_client::app::event_handlers::{RoomsEventHandler, XMPPEvent, XMPPEventHandler};
-use prose_core_client::domain::rooms::models::{RoomInfo, RoomInternals};
-use prose_core_client::domain::rooms::services::{
-    CreateOrEnterRoomRequest, CreateOrEnterRoomRequestType, RoomFactory,
-};
+use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, RoomFactory};
 use prose_core_client::domain::shared::models::RoomJid;
-use prose_core_client::domain::shared::models::RoomType;
 use prose_core_client::dtos::{Occupant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
-use prose_core_client::{room, ClientEvent, RoomEventType};
+use prose_core_client::{room, RoomEventType};
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::muc::MediatedInvite;
 use prose_xmpp::{bare, full, jid, mods};
@@ -35,17 +31,7 @@ use prose_xmpp::{bare, full, jid, mods};
 async fn test_handles_presence_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals {
-        info: RoomInfo {
-            jid: room!("room@conference.prose.org"),
-            description: None,
-            user_jid: mock_data::account_jid().into_bare(),
-            user_nickname: "".to_string(),
-            members: HashMap::new(),
-            room_type: RoomType::Group,
-        },
-        state: Default::default(),
-    });
+    let room = Arc::new(RoomInternals::group(room!("room@conference.prose.org")));
 
     {
         let room = room.clone();
@@ -77,13 +63,10 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
         )))
         .await?;
 
-    assert_eq!(room.state.read().occupants.len(), 1);
+    assert_eq!(room.occupants().len(), 1);
 
     let occupant = room
-        .state
-        .read()
-        .occupants
-        .get(&jid!("room@conference.prose.org/nick"))
+        .get_occupant(&jid!("room@conference.prose.org/nick"))
         .unwrap()
         .clone();
 
@@ -124,13 +107,13 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
     deps.client_event_dispatcher
-        .expect_dispatch_event()
+        .expect_dispatch_room_event()
         .once()
-        .with(predicate::eq(ClientEvent::RoomChanged {
-            room: RoomFactory::mock().build(room.clone()),
-            r#type: RoomEventType::ComposingUsersChanged,
-        }))
-        .return_once(|_| ());
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(RoomEventType::ComposingUsersChanged),
+        )
+        .return_once(|_, _| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
@@ -143,10 +126,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         .await?;
 
     let occupant = room
-        .state
-        .read()
-        .occupants
-        .get(&jid!("room@conference.prose.org/nickname"))
+        .get_occupant(&jid!("room@conference.prose.org/nickname"))
         .unwrap()
         .clone();
 
@@ -197,13 +177,13 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
     deps.client_event_dispatcher
-        .expect_dispatch_event()
+        .expect_dispatch_room_event()
         .once()
-        .with(predicate::eq(ClientEvent::RoomChanged {
-            room: RoomFactory::mock().build(room.clone()),
-            r#type: RoomEventType::ComposingUsersChanged,
-        }))
-        .return_once(|_| ());
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(RoomEventType::ComposingUsersChanged),
+        )
+        .return_once(|_, _| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
@@ -216,10 +196,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
         .await?;
 
     let occupant = room
-        .state
-        .read()
-        .occupants
-        .get(&jid!("contact@prose.org"))
+        .get_occupant(&jid!("contact@prose.org"))
         .unwrap()
         .clone();
 
@@ -254,27 +231,15 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
 async fn test_handles_invite() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    deps.rooms_domain_service
-        .expect_create_or_join_room()
+    deps.sidebar_domain_service
+        .expect_insert_item_by_creating_or_joining_room()
         .once()
-        .with(predicate::eq(CreateOrEnterRoomRequest {
-            r#type: CreateOrEnterRoomRequestType::Join {
-                room_jid: room!("group@conference.prose.org"),
-                nickname: None,
-                password: None,
-            },
-            save_bookmark: true,
-            insert_sidebar_item: true,
-            notify_delegate: true,
+        .with(predicate::eq(CreateOrEnterRoomRequest::Join {
+            room_jid: room!("group@conference.prose.org"),
+            nickname: None,
+            password: None,
         }))
-        .returning(move |req| {
-            let CreateOrEnterRoomRequestType::Join { room_jid, .. } = req.r#type else {
-                panic!("Expected CreateOrEnterRoomRequestType::Join")
-            };
-            let response = Arc::new(RoomInternals::group(room!("group@conference.prose.org")));
-            assert_eq!(room_jid, response.info.jid);
-            Box::pin(async move { Ok(response) })
-        });
+        .return_once(|_| Box::pin(async move { Ok(room!("group@conference.prose.org")) }));
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
     event_handler
