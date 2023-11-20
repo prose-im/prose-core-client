@@ -7,15 +7,16 @@ use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use async_trait::async_trait;
-use prose_proc_macros::DependenciesStruct;
 use tracing::error;
 
+use prose_proc_macros::DependenciesStruct;
+
 use crate::app::deps::{
-    DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
+    DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService, DynSidebarRepository,
 };
 use crate::domain::rooms::models::RoomInternals;
-use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
+use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::ClientEvent;
@@ -27,7 +28,6 @@ pub struct SidebarDomainService {
     bookmarks_service: DynBookmarksService,
     client_event_dispatcher: DynClientEventDispatcher,
     connected_rooms_repo: DynConnectedRoomsRepository,
-    ctx: DynAppContext,
     room_management_service: DynRoomManagementService,
     rooms_domain_service: DynRoomsDomainService,
     sidebar_repo: DynSidebarRepository,
@@ -477,11 +477,8 @@ impl SidebarDomainService {
             // insert the placeholder room instead.
             BookmarkType::DirectMessage => Some(
                 self.rooms_domain_service
-                    .create_or_join_room(CreateOrEnterRoomRequest::Create {
-                        service: self.ctx.muc_service()?,
-                        room_type: CreateRoomType::DirectMessage {
-                            participant: bookmark.jid.clone().into_inner(),
-                        },
+                    .create_or_join_room(CreateOrEnterRoomRequest::JoinDirectMessage {
+                        participant: bookmark.jid.clone().into_inner(),
                     })
                     .await?,
             ),
@@ -493,9 +490,8 @@ impl SidebarDomainService {
             BookmarkType::Group | BookmarkType::PublicChannel | BookmarkType::PrivateChannel => {
                 Some(
                     self.rooms_domain_service
-                        .create_or_join_room(CreateOrEnterRoomRequest::Join {
+                        .create_or_join_room(CreateOrEnterRoomRequest::JoinRoom {
                             room_jid: bookmark.jid.clone(),
-                            nickname: None,
                             password: None,
                         })
                         .await?,

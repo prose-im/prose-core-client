@@ -11,14 +11,11 @@ use std::sync::Arc;
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use jid::{BareJid, NodePart};
-use prose_proc_macros::DependenciesStruct;
 use sha1::{Digest, Sha1};
 use tracing::info;
-use xmpp_parsers::stanza_error::DefinedCondition;
 
-use prose_wasm_utils::PinnedFuture;
-use prose_xmpp::mods::muc::RoomConfigResponse;
-use prose_xmpp::RequestError;
+use prose_proc_macros::DependenciesStruct;
+use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynIDProvider,
@@ -26,17 +23,16 @@ use crate::app::deps::{
     DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
-    Member, RoomConfig, RoomError, RoomInfo, RoomInternals, RoomMetadata,
+    Member, RoomError, RoomInfo, RoomInternals, RoomSessionInfo, RoomSpec,
 };
+use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::shared::utils::build_contact_name;
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
 use crate::RoomEventType;
 
-use super::super::{
-    CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
-};
+use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
 
 const GROUP_PREFIX: &str = "org.prose.group";
 const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
@@ -61,121 +57,17 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         &self,
         request: CreateOrEnterRoomRequest,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        let user_jid = self
-            .ctx
-            .connected_jid()
-            .map_err(|err| RequestError::Generic {
-                msg: err.to_string(),
-            })?
-            .into_bare();
-        let default_nickname = user_jid.node_str().unwrap_or("unknown-user");
-
-        let result = match request {
-            CreateOrEnterRoomRequest::Create { service, room_type } => match room_type {
-                CreateRoomType::DirectMessage { participant } => {
-                    return Ok(self.create_or_join_direct_message(&participant).await?)
-                }
-                CreateRoomType::Group {
-                    participants,
-                    send_invites,
-                } => {
-                    self.create_or_join_group(
-                        &service,
-                        &user_jid,
-                        default_nickname,
-                        participants,
-                        send_invites,
-                    )
-                    .await
-                }
-                CreateRoomType::PrivateChannel { name } => {
-                    // We'll use a random ID for the jid of the private channel. This way
-                    // different people can create private channels with the same name without
-                    // creating a conflict. A conflict might also potentially be a security
-                    // issue if jid would contain sensitive information.
-                    let channel_id = self.id_provider.new_id();
-
-                    self.create_or_join_room_with_config(
-                        &service,
-                        &user_jid,
-                        &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
-                        default_nickname,
-                        RoomConfig::private_channel(&name),
-                        |_| async { Ok(()) },
-                    )
-                    .await
-                }
-                CreateRoomType::PublicChannel { name } => {
-                    // Prevent channels with duplicate names from being created…
-                    if !self.is_public_channel_name_unique(&name).await? {
-                        return Err(RoomError::PublicChannelNameConflict);
-                    }
-
-                    // While it would be ideal to have channel names conflict, this could only
-                    // happen via its JID since this is the only thing that is unique. We do
-                    // have the requirement however that users should be able to rename their
-                    // channels, which is why they shouldn't conflict since the JIDs cannot be
-                    // changed after the fact. So we'll use a unique ID here as well.
-                    let channel_id = self.id_provider.new_id();
-
-                    self.create_or_join_room_with_config(
-                        &service,
-                        &user_jid,
-                        &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
-                        default_nickname,
-                        RoomConfig::public_channel(&name),
-                        |_| async { Ok(()) },
-                    )
-                    .await
-                }
-            },
-            CreateOrEnterRoomRequest::Join {
-                room_jid,
-                nickname,
-                password,
-            } => {
-                self.join_room_by_resolving_nickname_conflict(
-                    &room_jid,
-                    &user_jid,
-                    nickname.as_deref().unwrap_or(default_nickname),
-                    password.as_deref(),
-                    0,
-                )
-                .await
+        match request {
+            CreateOrEnterRoomRequest::Create { service, room_type } => {
+                self.create_room(&service, room_type).await
             }
-        };
-
-        let metadata = match result {
-            Ok(metadata) => metadata,
-            Err(RoomError::RoomIsAlreadyConnected(room_jid)) => {
-                if let Some(room) = self.connected_rooms_repo.get(&room_jid) {
-                    return Ok(room);
-                };
-                return Err(RoomError::RoomIsAlreadyConnected(room_jid));
+            CreateOrEnterRoomRequest::JoinRoom { room_jid, password } => {
+                self.join_room(&room_jid, password.as_deref()).await
             }
-            Err(error) => return Err(error),
-        };
-
-        // It could be the case that the room_jid was modified, i.e. if the preferred JID was
-        // taken already.
-        let room_jid = RoomJid::from(metadata.room_jid.to_bare());
-        let room_name = metadata.settings.name.clone();
-        let room_info = self.collect_room_info(&user_jid, metadata).await?;
-
-        let Some(room) = self.connected_rooms_repo.update(&room_jid, {
-            let room_name = room_name.clone();
-            Box::new(move |room| {
-                // Convert the temporary room to its final form…
-                room.by_resolving_with_info(room_name, room_info)
-            })
-        }) else {
-            return Err(RequestError::Generic {
-                msg: "Room was modified during connection".to_string(),
+            CreateOrEnterRoomRequest::JoinDirectMessage { participant } => {
+                self.join_direct_message(&participant).await
             }
-            .into());
-        };
-
-        Ok(room)
+        }
     }
 
     /// Renames the room identified by `room_jid` to `name`.
@@ -218,48 +110,160 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 }
 
 impl RoomsDomainService {
-    async fn create_or_join_direct_message(
+    async fn join_room(
         &self,
-        participant_jid: &BareJid,
+        room_jid: &RoomJid,
+        password: Option<&str>,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        if let Some(room) = self
-            .connected_rooms_repo
-            .get(&participant_jid.clone().into())
+        let user_jid = self.ctx.connected_jid()?.into_bare();
+        // We generate a random suffix to prevent any nickname conflicts…
+        let nickname = format!(
+            "{}-{}",
+            user_jid.node_str().unwrap_or("unknown-user"),
+            self.id_provider.new_id()
+        );
+
+        // Insert pending room so that we don't miss any stanzas for this room while we're
+        // connecting to it…
+        self.insert_pending_room(room_jid, &user_jid, &nickname)?;
+
+        let full_room_jid = room_jid.with_resource_str(&nickname)?;
+
+        info!(
+            "Trying to join room {} with nickname {}…",
+            room_jid, nickname
+        );
+
+        let info = match self
+            .room_management_service
+            .join_room(&full_room_jid, password)
+            .await
         {
+            Ok(info) => {
+                info!("Successfully joined room.");
+                Ok(info)
+            }
+            Err(error) => {
+                // Remove pending room again…
+                self.connected_rooms_repo.delete(room_jid);
+                Err(error)
+            }
+        }?;
+
+        self.finalize_pending_room(&user_jid, info).await
+    }
+
+    async fn join_direct_message(
+        &self,
+        participant: &BareJid,
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        if let Some(room) = self.connected_rooms_repo.get(&participant.clone().into()) {
             return Ok(room);
         }
 
         let user_profile = self
             .user_profile_repo
-            .get(participant_jid)
+            .get(participant)
             .await
             .ok()
             .map(|maybe_profile| maybe_profile.unwrap_or_default())
             .unwrap_or_default();
 
         let user_jid = self.ctx.connected_jid()?.into_bare();
-        let contact_name = build_contact_name(&participant_jid, &user_profile);
+        let contact_name = build_contact_name(&participant, &user_profile);
 
         let room = Arc::new(RoomInternals::for_direct_message(
             &user_jid,
-            &participant_jid,
+            &participant,
             &contact_name,
         ));
 
-        // We'll ignore the potential error since we've already checked if the room exists already.
-        _ = self.connected_rooms_repo.set(room.clone());
+        match self.connected_rooms_repo.set(room.clone()) {
+            Ok(()) => Ok(room),
+            Err(_err) => {
+                let room_jid = RoomJid::from(participant.clone());
+                if let Some(room) = self.connected_rooms_repo.get(&room_jid) {
+                    return Ok(room);
+                }
+                return Err(RoomError::RoomIsAlreadyConnected(room_jid));
+            }
+        }
+    }
 
-        Ok(room)
+    async fn create_room(
+        &self,
+        service: &BareJid,
+        request: CreateRoomType,
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        let user_jid = self.ctx.connected_jid()?.into_bare();
+
+        let result = match request {
+            CreateRoomType::Group { participants } => {
+                self.create_or_join_group(&service, &user_jid, participants)
+                    .await
+            }
+            CreateRoomType::PrivateChannel { name } => {
+                // We'll use a random ID for the jid of the private channel. This way
+                // different people can create private channels with the same name without
+                // creating a conflict. A conflict might also potentially be a security
+                // issue if jid would contain sensitive information.
+                let channel_id = self.id_provider.new_id();
+
+                self.create_or_join_room_with_spec(
+                    &service,
+                    &user_jid,
+                    &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
+                    &name,
+                    RoomSpec::PrivateChannel,
+                    |_| async { Ok(()) },
+                )
+                .await
+            }
+            CreateRoomType::PublicChannel { name } => {
+                // Prevent channels with duplicate names from being created…
+                if !self.is_public_channel_name_unique(&name).await? {
+                    return Err(RoomError::PublicChannelNameConflict);
+                }
+
+                // While it would be ideal to have channel names conflict, this could only
+                // happen via its JID since this is the only thing that is unique. We do
+                // have the requirement however that users should be able to rename their
+                // channels, which is why they shouldn't conflict since the JIDs cannot be
+                // changed after the fact. So we'll use a unique ID here as well.
+                let channel_id = self.id_provider.new_id();
+
+                self.create_or_join_room_with_spec(
+                    &service,
+                    &user_jid,
+                    &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
+                    &name,
+                    RoomSpec::PublicChannel,
+                    |_| async { Ok(()) },
+                )
+                .await
+            }
+        };
+
+        let info = match result {
+            Ok(metadata) => metadata,
+            Err(RoomError::RoomIsAlreadyConnected(room_jid)) => {
+                if let Some(room) = self.connected_rooms_repo.get(&room_jid) {
+                    return Ok(room);
+                };
+                return Err(RoomError::RoomIsAlreadyConnected(room_jid));
+            }
+            Err(error) => return Err(error),
+        };
+
+        self.finalize_pending_room(&user_jid, info).await
     }
 
     async fn create_or_join_group(
         &self,
         service: &BareJid,
         user_jid: &BareJid,
-        nickname: &str,
         participants: Vec<BareJid>,
-        send_invites: bool,
-    ) -> Result<RoomMetadata, RoomError> {
+    ) -> Result<RoomSessionInfo, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
         }
@@ -302,31 +306,28 @@ impl RoomsDomainService {
                 .join(", ")
         );
 
-        let metadata = self
-            .create_or_join_room_with_config(
+        let info = self
+            .create_or_join_room_with_spec(
                 service,
                 user_jid,
                 &group_hash,
-                nickname,
-                RoomConfig::group(group_name, participants_including_self.iter()),
-                |room_metadata| {
+                &group_name,
+                RoomSpec::Group,
+                |info| {
                     // Try to promote all participants to owners…
                     info!("Update participant affiliations…");
-                    let room_jid = room_metadata.room_jid.to_bare();
-                    let room_has_been_created = room_metadata.room_has_been_created();
+                    let room_jid = info.room_jid.clone();
+                    let room_has_been_created = info.room_has_been_created;
                     let service = self.room_management_service.clone();
 
                     async move {
                         let owners = participants_including_self.iter().collect::<Vec<_>>();
 
                         if room_has_been_created {
-                            service.set_room_owners(
-                  &room_jid,
-                  owners.as_slice()
-                ).await
-                    .context(
-                      "Failed to update user affiliations of created group to type 'owner'",
-                    )
+                            service.set_room_owners(&room_jid, owners.as_slice()).await
+                                .context(
+                                    "Failed to update user affiliations of created group to type 'owner'",
+                                )
                         } else {
                             Ok(())
                         }
@@ -336,93 +337,68 @@ impl RoomsDomainService {
             .await?;
 
         // Send invites…
-        if send_invites && metadata.room_has_been_created() {
+        if info.room_has_been_created {
             info!("Sending invites for created group…");
             let participants = participants.iter().collect::<Vec<_>>();
             self.room_participation_service
-                .invite_users_to_room(&metadata.room_jid.to_bare(), participants.as_slice())
+                .invite_users_to_room(&info.room_jid, participants.as_slice())
                 .await?;
         }
 
-        Ok(metadata)
+        Ok(info)
     }
 
-    async fn create_or_join_room_with_config<Fut: Future<Output = Result<()>> + 'static>(
+    async fn create_or_join_room_with_spec<Fut: Future<Output = Result<()>> + 'static>(
         &self,
         service: &BareJid,
         user_jid: &BareJid,
+        room_id: &str,
         room_name: &str,
-        nickname: &str,
-        config: RoomConfig,
-        perform_additional_config: impl FnOnce(&RoomMetadata) -> Fut,
-    ) -> Result<RoomMetadata, RoomError> {
+        spec: RoomSpec,
+        perform_additional_config: impl FnOnce(&RoomSessionInfo) -> Fut,
+    ) -> Result<RoomSessionInfo, RoomError> {
+        // We generate a random suffix to prevent any nickname conflicts…
+        let nickname = format!(
+            "{}-{}",
+            user_jid.node_str().unwrap_or("unknown-user"),
+            self.id_provider.new_id()
+        );
+
         let mut attempt = 0;
 
-        // Algo is…
-        // 1. Try to create or enter room with given room name and nickname
-        // 2. If server returns "conflict" error (room exists and nickname is taken) append
-        //    "#($ATTEMPT)" to nickname and continue at 1.
-        // 2. If server returns "gone" error (room existed once but was deleted in the meantime)
-        //    append "#($ATTEMPT)" to room name and continue at 1.
-        // 3. Get room info
-        // 4. Validate created/joined room with room info
-        // 5. If validation fails and the room was created by us, delete room and return error
-        // 6. Return final room jid, user and info.
-
         loop {
-            let unique_room_name = if attempt == 0 {
-                room_name.to_string()
+            let unique_room_id = if attempt == 0 {
+                room_id.to_string()
             } else {
-                format!("{}#{}", room_name, attempt)
+                format!("{}#{}", room_id, attempt)
             };
             attempt += 1;
 
             let room_jid = RoomJid::from(BareJid::from_parts(
-                Some(&NodePart::new(&unique_room_name)?),
+                Some(&NodePart::new(&unique_room_id)?),
                 &service.domain(),
             ));
-            let full_room_jid = room_jid.with_resource_str(nickname)?;
+            let full_room_jid = room_jid.with_resource_str(&nickname)?;
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
             self.insert_pending_room(&room_jid, user_jid, &nickname)?;
 
             // Try to create or enter the room and configure it…
-            let room_config = config.clone();
             let result = self
                 .room_management_service
-                .create_reserved_room(
-                    &full_room_jid,
-                    Box::new(|form| {
-                        Box::pin(async move {
-                            Ok(RoomConfigResponse::Submit(
-                                room_config.populate_form(&form)?,
-                            ))
-                        }) as PinnedFuture<_>
-                    }),
-                )
+                .create_or_join_room(&full_room_jid, room_name, spec.clone())
                 .await;
 
-            let metadata = match result {
+            let info = match result {
                 Ok(occupancy) => occupancy,
                 Err(error) => {
                     // Remove pending room again…
                     self.connected_rooms_repo.delete(&room_jid);
 
-                    // We've received a conflict which means that the room exists but that our
-                    // nickname is taken.
-                    if error.is_conflict_err() {
-                        // So we'll try to connect again by modifying our nickname…
-                        return self
-                            .join_room_by_resolving_nickname_conflict(
-                                &room_jid, user_jid, nickname, None, 1,
-                            )
-                            .await
-                            .map_err(|err| err.into());
-                    }
                     // In this case the room existed in the past but was deleted. We'll modify
                     // the name and try again…
-                    else if error.is_gone_err() {
+                    if error.is_gone_err() {
                         continue;
                     }
 
@@ -430,102 +406,35 @@ impl RoomsDomainService {
                 }
             };
 
-            let room_has_been_created = metadata.room_has_been_created();
-
-            match config.validate(&metadata.settings) {
-                Ok(_) => (),
-                Err(error) => {
-                    // Remove pending room again…
-                    self.connected_rooms_repo.delete(&room_jid);
-                    // If the validation failed and we've created the room we'll destroy it again.
-                    if room_has_been_created {
-                        _ = self.room_management_service.destroy_room(&room_jid).await;
-                    }
-                    return Err(error.into());
-                }
-            }
-
-            match (perform_additional_config)(&metadata).await {
+            match (perform_additional_config)(&info).await {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
                     self.connected_rooms_repo.delete(&room_jid);
                     // Again, if the additional configuration fails and we've created the room
                     // we'll destroy it again.
-                    if room_has_been_created {
+                    if info.room_has_been_created {
                         _ = self.room_management_service.destroy_room(&room_jid).await;
                     }
                     return Err(error.into());
                 }
             }
 
-            return Ok(metadata);
+            return Ok(info);
         }
     }
 
-    async fn join_room_by_resolving_nickname_conflict(
-        &self,
-        room_jid: &RoomJid,
-        user_jid: &BareJid,
-        preferred_nickname: &str,
-        password: Option<&str>,
-        attempt: u32,
-    ) -> Result<RoomMetadata, RoomError> {
-        let mut attempt = attempt;
-
-        loop {
-            let nickname = if attempt == 0 {
-                preferred_nickname.to_string()
-            } else {
-                format!("{}#{}", preferred_nickname, attempt)
-            };
-            attempt += 1;
-
-            // Insert pending room so that we don't miss any stanzas for this room while we're
-            // connecting to it…
-            self.insert_pending_room(room_jid, user_jid, &nickname)?;
-
-            info!(
-                "Trying to join room {} with nickname {}…",
-                room_jid, nickname
-            );
-            return match self
-                .room_management_service
-                .join_room(&room_jid.with_resource_str(&nickname)?, password)
-                .await
-            {
-                Ok(metadata) => {
-                    info!("Successfully joined room.");
-                    Ok(metadata)
-                }
-                Err(RoomError::RequestError(error)) => {
-                    // Remove pending room again…
-                    self.connected_rooms_repo.delete(room_jid);
-
-                    if error.defined_condition() == Some(DefinedCondition::Conflict) {
-                        info!("Nickname was already taken in room. Will try again with modified nickname…");
-                        continue;
-                    }
-
-                    Err(error.into())
-                }
-                Err(error) => {
-                    // Remove pending room again…
-                    self.connected_rooms_repo.delete(room_jid);
-                    Err(error)
-                }
-            };
-        }
-    }
-
-    async fn collect_room_info(
+    async fn finalize_pending_room(
         &self,
         user_jid: &BareJid,
-        metadata: RoomMetadata,
-    ) -> Result<RoomInfo> {
-        let mut members = HashMap::with_capacity(metadata.members.len());
+        info: RoomSessionInfo,
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        // It could be the case that the room_jid was modified, i.e. if the preferred JID was
+        // taken already.
+        let room_name = info.room_name;
 
-        for jid in metadata.members {
+        let mut members = HashMap::with_capacity(info.members.len());
+        for jid in info.members {
             let name = self
                 .user_profile_repo
                 .get_display_name(&jid)
@@ -535,25 +444,29 @@ impl RoomsDomainService {
             members.insert(jid, Member { name });
         }
 
-        let features = &metadata.settings.features;
-
-        let room_type = match features {
-            _ if features.can_act_as_group() => RoomType::Group,
-            _ if features.can_act_as_private_channel() => RoomType::PrivateChannel,
-            _ if features.can_act_as_public_channel() => RoomType::PublicChannel,
-            _ => RoomType::Generic,
-        };
-
         let room_info = RoomInfo {
-            jid: metadata.room_jid.to_bare().into(),
-            description: metadata.settings.description,
+            jid: info.room_jid.clone(),
+            description: info.room_description,
             user_jid: user_jid.clone(),
-            user_nickname: metadata.room_jid.resource_str().to_string(),
+            user_nickname: info.user_nickname,
             members,
-            r#type: room_type,
+            r#type: info.room_type,
         };
 
-        Ok(room_info)
+        let Some(room) = self.connected_rooms_repo.update(&info.room_jid, {
+            let room_name = room_name;
+            Box::new(move |room| {
+                // Convert the temporary room to its final form…
+                room.by_resolving_with_info(room_name, room_info)
+            })
+        }) else {
+            return Err(RequestError::Generic {
+                msg: "Room was modified during connection".to_string(),
+            }
+            .into());
+        };
+
+        Ok(room)
     }
 
     async fn is_public_channel_name_unique(&self, channel_name: &str) -> Result<bool> {

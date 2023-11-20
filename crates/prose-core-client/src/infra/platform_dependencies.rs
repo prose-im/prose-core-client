@@ -120,7 +120,6 @@ impl From<PlatformDependencies> for AppDependencies {
             bookmarks_service: d.xmpp.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
-            ctx: ctx.clone(),
             room_management_service: d.xmpp.clone(),
             rooms_domain_service: rooms_domain_service.clone(),
             sidebar_repo: sidebar_repo.clone(),

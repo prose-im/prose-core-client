@@ -8,16 +8,16 @@ use std::sync::Arc;
 use anyhow::Result;
 use mockall::predicate;
 
-use prose_core_client::domain::rooms::models::{RoomError, RoomInternals, RoomMetadata};
+use prose_core_client::domain::rooms::models::{RoomError, RoomInternals, RoomSessionInfo};
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
 };
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::{RoomJid, RoomType};
 use prose_core_client::dtos::PublicRoomInfo;
 use prose_core_client::room;
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
-use prose_xmpp::test::ConstantIDProvider;
+use prose_xmpp::test::IncrementingIDProvider;
 
 #[tokio::test]
 async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
@@ -56,7 +56,7 @@ async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
 async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
 
-    deps.id_provider = Arc::new(ConstantIDProvider::new("room-hash"));
+    deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
 
     deps.room_management_service
         .expect_load_public_rooms()
@@ -74,21 +74,21 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_set()
         .once()
         .with(predicate::eq(Arc::new(RoomInternals::pending(
-            &room!("org.prose.public-channel.room-hash@conference.prose.org"),
+            &room!("org.prose.public-channel.hash-1@conference.prose.org"),
             &mock_data::account_jid().into_bare(),
-            mock_data::account_jid().node_str().unwrap(),
+            &format!("{}-hash-2", mock_data::account_jid().node_str().unwrap()),
         ))))
         .return_once(|_| Ok(()));
 
     deps.room_management_service
-        .expect_create_reserved_room()
+        .expect_create_or_join_room()
         .once()
-        .return_once(|_, _| {
+        .return_once(|_, _, _| {
             Box::pin(async {
-                Ok(RoomMetadata::new_room(room!(
-                    "org.prose.public-channel.room-hash@conference.prose.org"
+                Ok(RoomSessionInfo::new_room(
+                    room!("org.prose.public-channel.hash-1@conference.prose.org"),
+                    RoomType::PublicChannel,
                 ))
-                .with_public_channel_features())
             })
         });
 
@@ -97,13 +97,13 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .once()
         .with(
             predicate::eq(room!(
-                "org.prose.public-channel.room-hash@conference.prose.org"
+                "org.prose.public-channel.hash-1@conference.prose.org"
             )),
             predicate::always(),
         )
         .return_once(|_, _| {
             Some(Arc::new(RoomInternals::public_channel(room!(
-                "org.prose.public-channel.room-hash@conference.prose.org"
+                "org.prose.public-channel.hash-1@conference.prose.org"
             ))))
         });
 

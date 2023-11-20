@@ -7,7 +7,6 @@ use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_xmpp::RequestError;
 
-use crate::domain::rooms::models::RoomValidationError;
 use crate::domain::shared::models::RoomJid;
 
 #[derive(thiserror::Error, Debug)]
@@ -20,8 +19,8 @@ pub enum RoomError {
     InvalidNumberOfParticipants,
     #[error(transparent)]
     RequestError(#[from] RequestError),
-    #[error(transparent)]
-    RoomValidationError(#[from] RoomValidationError),
+    #[error("{0}")]
+    RoomValidationError(String),
     #[error(transparent)]
     Anyhow(#[from] anyhow::Error),
     #[error(transparent)]
@@ -31,13 +30,6 @@ pub enum RoomError {
 }
 
 impl RoomError {
-    pub(crate) fn is_conflict_err(&self) -> bool {
-        let Self::RequestError(error) = &self else {
-            return false;
-        };
-        error.defined_condition() == Some(DefinedCondition::Conflict)
-    }
-
     pub(crate) fn is_gone_err(&self) -> bool {
         let Self::RequestError(error) = &self else {
             return false;

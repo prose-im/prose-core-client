@@ -234,9 +234,8 @@ async fn test_handles_invite() -> Result<()> {
     deps.sidebar_domain_service
         .expect_insert_item_by_creating_or_joining_room()
         .once()
-        .with(predicate::eq(CreateOrEnterRoomRequest::Join {
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
             room_jid: room!("group@conference.prose.org"),
-            nickname: None,
             password: None,
         }))
         .return_once(|_| Box::pin(async move { Ok(room!("group@conference.prose.org")) }));

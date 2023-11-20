@@ -16,19 +16,17 @@ use prose_xmpp::stanza::Message;
 use prose_xmpp::Event;
 
 use crate::app::deps::{
-    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynMessagesRepository, DynMessagingService, DynSidebarDomainService, DynTimeProvider,
+    DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository, DynMessagesRepository,
+    DynMessagingService, DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
-use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
+use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::RoomJid;
 use crate::RoomEventType;
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
-    #[inject]
-    ctx: DynAppContext,
     #[inject]
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
@@ -129,12 +127,11 @@ impl MessagesEventHandler {
 
         if room.is_none() && message.r#type() == Some(MessageType::Chat) {
             self.sidebar_domain_service
-                .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
-                    service: self.ctx.muc_service()?,
-                    room_type: CreateRoomType::DirectMessage {
+                .insert_item_by_creating_or_joining_room(
+                    CreateOrEnterRoomRequest::JoinDirectMessage {
                         participant: from.clone().into_inner(),
                     },
-                })
+                )
                 .await?;
             room = self.connected_rooms_repo.get(&from);
         }

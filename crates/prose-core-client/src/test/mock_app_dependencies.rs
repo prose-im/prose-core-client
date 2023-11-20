@@ -225,7 +225,6 @@ impl From<MockSidebarDomainServiceDependencies> for SidebarDomainServiceDependen
             bookmarks_service: Arc::new(value.bookmarks_service),
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
-            ctx: Arc::new(value.ctx),
             room_management_service: Arc::new(value.room_management_service),
             rooms_domain_service: Arc::new(value.rooms_domain_service),
             sidebar_repo: Arc::new(value.sidebar_repo),

@@ -15,19 +15,9 @@ use crate::domain::shared::models::RoomJid;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreateRoomType {
-    DirectMessage {
-        participant: BareJid,
-    },
-    Group {
-        participants: Vec<BareJid>,
-        send_invites: bool,
-    },
-    PrivateChannel {
-        name: String,
-    },
-    PublicChannel {
-        name: String,
-    },
+    Group { participants: Vec<BareJid> },
+    PrivateChannel { name: String },
+    PublicChannel { name: String },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -36,10 +26,12 @@ pub enum CreateOrEnterRoomRequest {
         service: BareJid,
         room_type: CreateRoomType,
     },
-    Join {
+    JoinRoom {
         room_jid: RoomJid,
-        nickname: Option<String>,
         password: Option<String>,
+    },
+    JoinDirectMessage {
+        participant: BareJid,
     },
 }
 

@@ -7,5 +7,7 @@ pub(crate) mod availability;
 pub(crate) mod bookmark;
 pub(crate) mod caps;
 pub(crate) mod presence;
+pub(crate) mod room_info;
+pub(crate) mod room_spec;
 pub(crate) mod stanza_error;
 pub(crate) mod user_activity;

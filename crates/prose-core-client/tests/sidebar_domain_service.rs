@@ -31,9 +31,8 @@ async fn test_extends_sidebar() -> Result<()> {
     deps.rooms_domain_service
         .expect_create_or_join_room()
         .once()
-        .with(predicate::eq(CreateOrEnterRoomRequest::Join {
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
             room_jid: room!("group@prose.org"),
-            nickname: None,
             password: None,
         }))
         .return_once(|_| {

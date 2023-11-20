@@ -3,9 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::fmt::Formatter;
-
-use anyhow::Result;
 use xmpp_parsers::disco;
 use xmpp_parsers::disco::DiscoInfoResult;
 
@@ -13,7 +10,7 @@ use prose_xmpp::stanza::muc;
 use prose_xmpp::{ns, parse_bool, ParseError};
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct RoomSettings {
+pub struct RoomInfo {
     pub features: Features,
     pub name: Option<String>,
     pub description: Option<String>,
@@ -70,152 +67,12 @@ pub struct Features {
     pub supports_stable_id: bool,
 }
 
-#[derive(thiserror::Error, Debug)]
-pub struct RoomValidationError {
-    room_type: String,
-    failures: Vec<String>,
-}
-
-impl std::fmt::Display for RoomValidationError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "MUC room does not qualify as {}. The following expectations failed:\n{}",
-            self.room_type,
-            self.failures
-                .iter()
-                .map(|failure| format!("  - {}", failure))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
-    }
-}
-
-macro_rules! expect {
-    ($msg:expr, $actual:expr, $expected:expr) => {
-        FeatureExpectation {
-            feature: $msg.to_string(),
-            actual_value: $actual,
-            expected_value: $expected,
-        }
-    };
-}
-
-impl Features {
-    pub fn validate_as_group(&self) -> Result<(), RoomValidationError> {
-        use prose_xmpp::stanza::muc::ns::disco_feature as feat;
-
-        Self::validate(
-            "Group",
-            &[
-                expect!(feat::PERSISTENT, self.is_persistent, true),
-                expect!(feat::HIDDEN, self.is_hidden, true),
-                expect!(feat::MEMBERS_ONLY, self.is_members_only, true),
-                expect!(feat::NON_ANONYMOUS, self.is_nonanonymous, true),
-                expect!(
-                    muc::ns::roomconfig::ALLOW_INVITES,
-                    self.is_invites_allowed,
-                    false
-                ),
-                expect!(
-                    muc::ns::roomconfig::ALLOW_MEMBER_INVITES,
-                    self.is_member_invites_allowed,
-                    false
-                ),
-            ],
-        )
-    }
-
-    pub fn validate_as_private_channel(&self) -> Result<(), RoomValidationError> {
-        use prose_xmpp::stanza::muc::ns::disco_feature as feat;
-
-        Self::validate(
-            "Private Channel",
-            &[
-                expect!(feat::PERSISTENT, self.is_persistent, true),
-                expect!(feat::HIDDEN, self.is_hidden, true),
-                expect!(feat::MEMBERS_ONLY, self.is_members_only, true),
-                expect!(
-                    muc::ns::roomconfig::ALLOW_INVITES,
-                    self.is_invites_allowed,
-                    true
-                ),
-                expect!(
-                    muc::ns::roomconfig::ALLOW_MEMBER_INVITES,
-                    self.is_member_invites_allowed,
-                    true
-                ),
-            ],
-        )
-    }
-
-    pub fn validate_as_public_channel(&self) -> Result<(), RoomValidationError> {
-        use prose_xmpp::stanza::muc::ns::disco_feature as feat;
-
-        Self::validate(
-            "Public Channel",
-            &[
-                expect!(feat::PERSISTENT, self.is_persistent, true),
-                expect!(feat::PUBLIC, self.is_public, true),
-                expect!(feat::OPEN, self.is_open, true),
-            ],
-        )
-    }
-
-    pub fn can_act_as_group(&self) -> bool {
-        self.validate_as_group().is_ok()
-    }
-
-    pub fn can_act_as_private_channel(&self) -> bool {
-        self.validate_as_private_channel().is_ok()
-    }
-
-    pub fn can_act_as_public_channel(&self) -> bool {
-        self.validate_as_public_channel().is_ok()
-    }
-}
-
-struct FeatureExpectation {
-    feature: String,
-    actual_value: bool,
-    expected_value: bool,
-}
-
-impl Features {
-    fn validate(
-        room_type: &str,
-        expectations: &[FeatureExpectation],
-    ) -> Result<(), RoomValidationError> {
-        let mut failures = vec![];
-        for expectation in expectations {
-            if expectation.actual_value != expectation.expected_value {
-                failures.push(format!(
-                    "{} should be {}",
-                    expectation.feature,
-                    if expectation.expected_value {
-                        "true"
-                    } else {
-                        "false"
-                    }
-                ))
-            }
-        }
-        if failures.is_empty() {
-            return Ok(());
-        }
-        return Err(RoomValidationError {
-            room_type: room_type.to_string(),
-            failures,
-        });
-    }
-}
-
-impl TryFrom<DiscoInfoResult> for RoomSettings {
+impl TryFrom<DiscoInfoResult> for RoomInfo {
     type Error = ParseError;
 
     fn try_from(value: DiscoInfoResult) -> Result<Self, Self::Error> {
         let features = Features::from(value.features.as_slice());
-        let mut result = RoomSettings {
+        let mut result = RoomInfo {
             features,
             name: None,
             description: None,

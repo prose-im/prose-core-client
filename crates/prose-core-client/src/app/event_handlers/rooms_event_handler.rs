@@ -174,9 +174,8 @@ impl RoomsEventHandler {
         info!("Joining room {} after receiving invite…", room_jid);
 
         self.sidebar_domain_service
-            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Join {
+            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
                 room_jid: RoomJid::from(room_jid),
-                nickname: None,
                 password,
             })
             .await?;

@@ -59,9 +59,8 @@ impl RoomsService {
 
     pub async fn join_room(&self, room_jid: &RoomJid, password: Option<&str>) -> Result<RoomJid> {
         self.sidebar_domain_service
-            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Join {
+            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
                 room_jid: room_jid.clone(),
-                nickname: None,
                 password: password.map(ToString::to_string),
             })
             .await
@@ -72,11 +71,8 @@ impl RoomsService {
         participant_jid: &BareJid,
     ) -> Result<RoomJid> {
         self.sidebar_domain_service
-            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
-                service: self.ctx.muc_service()?,
-                room_type: CreateRoomType::DirectMessage {
-                    participant: participant_jid.clone(),
-                },
+            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinDirectMessage {
+                participant: participant_jid.clone(),
             })
             .await
     }
@@ -87,7 +83,6 @@ impl RoomsService {
                 service: self.ctx.muc_service()?,
                 room_type: CreateRoomType::Group {
                     participants: participants.to_vec(),
-                    send_invites: true,
                 },
             })
             .await

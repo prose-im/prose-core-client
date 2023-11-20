@@ -11,9 +11,9 @@ use xmpp_parsers::message::MessageType;
 
 use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::RoomInternals;
-use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
+use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
 use prose_core_client::domain::shared::models::RoomJid;
-use prose_core_client::test::{mock_data, MockAppDependencies};
+use prose_core_client::test::MockAppDependencies;
 use prose_core_client::{room, RoomEventType};
 use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
@@ -90,11 +90,8 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     deps.sidebar_domain_service
         .expect_insert_item_by_creating_or_joining_room()
         .once()
-        .with(predicate::eq(CreateOrEnterRoomRequest::Create {
-            service: mock_data::muc_service(),
-            room_type: CreateRoomType::DirectMessage {
-                participant: bare!("jane.doe@prose.org"),
-            },
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinDirectMessage {
+            participant: bare!("jane.doe@prose.org"),
         }))
         .return_once(|_| Box::pin(async { Ok(room!("jane.doe@prose.org")) }));
 

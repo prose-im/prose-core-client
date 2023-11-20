@@ -5,15 +5,10 @@
 
 use async_trait::async_trait;
 use jid::{BareJid, FullJid};
-use xmpp_parsers::data_forms::DataForm;
 
-use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
-use prose_xmpp::mods::muc::RoomConfigResponse;
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomMetadata};
-
-type ConfigureRoomHandler =
-    Box<dyn FnOnce(DataForm) -> PinnedFuture<anyhow::Result<RoomConfigResponse>> + 'static + Send>;
+use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomSessionInfo, RoomSpec};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -24,17 +19,18 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         muc_service: &BareJid,
     ) -> Result<Vec<PublicRoomInfo>, RoomError>;
 
-    async fn create_reserved_room(
+    async fn create_or_join_room(
         &self,
         room_jid: &FullJid,
-        handler: ConfigureRoomHandler,
-    ) -> Result<RoomMetadata, RoomError>;
+        room_name: &str,
+        spec: RoomSpec,
+    ) -> Result<RoomSessionInfo, RoomError>;
 
     async fn join_room(
         &self,
         room_jid: &FullJid,
         password: Option<&str>,
-    ) -> Result<RoomMetadata, RoomError>;
+    ) -> Result<RoomSessionInfo, RoomError>;
 
     async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError>;
 
