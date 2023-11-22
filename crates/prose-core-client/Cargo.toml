@@ -55,6 +55,7 @@ chrono = { workspace = true, features = ["serde"] }
 uniffi = { workspace = true, features = ["build"] }
 
 [features]
+debug = []
 default = []
 test = ["prose-xmpp/test", "dep:tokio", "tokio/macros", "dep:mockall", "dep:derivative"]
-debug = []
+trace-stanzas = ["prose-xmpp/trace-stanzas"]

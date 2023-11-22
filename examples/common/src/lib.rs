@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::env;
+use std::ffi::OsStr;
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -14,11 +15,38 @@ pub use tracing::Level;
 use tracing_oslog::OsLogger;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::Layer;
+use tracing_subscriber::{Layer, Registry};
 
 pub fn enable_debug_logging(max_level: Level) {
-    tracing_subscriber::registry()
-        .with(OsLogger::new("org.prose", "default").with_filter(LevelFilter::from_level(max_level)))
+    // Get the current executable path
+    let exe_path = env::current_exe().expect("Failed to get the current executable path");
+
+    // Extract the file stem (name without extension)
+    let exe_stem = exe_path
+        .file_stem()
+        .and_then(OsStr::to_str)
+        .expect("Failed to extract file stem from executable name");
+
+    let oslog_layer =
+        OsLogger::new("org.prose", "default").with_filter(LevelFilter::from_level(max_level));
+
+    let appender = tracing_appender::rolling::hourly(
+        env::current_dir()
+            .expect("Cannot determine current directory")
+            .join("examples")
+            .join(exe_stem)
+            .join("logs"),
+        format!("{}.log", exe_stem),
+    );
+
+    Registry::default()
+        .with(oslog_layer)
+        .with(
+            tracing_subscriber::fmt::Layer::new()
+                .with_writer(appender)
+                .with_ansi(false)
+                .with_filter(LevelFilter::from_level(max_level)),
+        )
         .init();
 }
 

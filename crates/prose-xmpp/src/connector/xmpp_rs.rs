@@ -6,7 +6,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::client::ConnectorProvider;
 use anyhow::Result;
 use async_trait::async_trait;
 use futures::stream::StreamExt;
@@ -20,6 +19,7 @@ use tokio::{task, time};
 use tokio_xmpp::{AsyncClient, Error, Event, Packet};
 use tracing::error;
 
+use crate::client::ConnectorProvider;
 use crate::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
     Connector as ConnectorTrait,
@@ -111,6 +111,9 @@ impl Connection {
                         }
                         Event::Online { .. } => (),
                         Event::Stanza(stanza) => {
+                            #[cfg(feature = "trace-stanzas")]
+                            tracing::info!("RECV {}", String::from(&stanza));
+
                             let fut = (event_handler)(&conn, ConnectionEvent::Stanza(stanza));
                             task::spawn(async move { fut.await });
                         }
@@ -180,6 +183,8 @@ impl Connection {
 
 impl ConnectionTrait for Connection {
     fn send_stanza(&self, stanza: Element) -> Result<()> {
+        #[cfg(feature = "trace-stanzas")]
+        tracing::info!("SEND {}", String::from(&stanza));
         self.sender.send(Packet::Stanza(stanza))?;
         Ok(())
     }
