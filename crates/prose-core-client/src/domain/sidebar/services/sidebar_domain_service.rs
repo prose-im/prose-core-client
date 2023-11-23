@@ -8,6 +8,7 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
+use crate::domain::rooms::models::RoomSpec;
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::RoomJid;
 use crate::domain::sidebar::models::Bookmark;
@@ -72,6 +73,20 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
     async fn toggle_item_is_favorite(&self, room_jid: &RoomJid) -> Result<()>;
 
+    /// Reconfigures the sidebar item identified by `room_jid` according to `spec` and renames it
+    /// to `new_name`.
+    ///
+    /// If the item is not in the list of sidebar items no action is performed, otherwise:
+    ///   - The corresponding room will be reconfigured.
+    ///   - The corresponding bookmark's type will be updated.
+    ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
+    async fn reconfigure_item_with_spec(
+        &self,
+        room_jid: &RoomJid,
+        spec: RoomSpec,
+        new_name: &str,
+    ) -> Result<()>;
+
     /// Removes multiple sidebar items associated with the provided `room_jids`.
     ///
     /// - Disconnects channels and updates the repository state for each provided JID.
@@ -95,6 +110,14 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// This method exists to handle the (rare) case where our bookmarks PubSub node is either
     /// purged or deleted altogether. It should usually only happen when debugging.
     async fn handle_remote_purge(&self) -> Result<()>;
+
+    async fn handle_destroyed_room(
+        &self,
+        room_jid: &RoomJid,
+        alternate_room: Option<RoomJid>,
+    ) -> Result<()>;
+
+    async fn handle_removal_from_room(&self, room_jid: &RoomJid, is_permanent: bool) -> Result<()>;
 
     /// Removes all connected rooms and sidebar items.
     ///

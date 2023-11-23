@@ -135,7 +135,7 @@ impl TryFrom<Element> for Destroy {
         Ok(Destroy {
             jid: root.attr("jid").map(BareJid::from_str).transpose()?,
             reason: root
-                .get_child("destroy", ns::MUC_OWNER)
+                .get_child("reason", ns::MUC_OWNER)
                 .map(|node| node.text()),
         })
     }

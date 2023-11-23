@@ -10,6 +10,9 @@ keywords = ["xmpp", "xmpp-client", "library"]
 categories = ["network-programming"]
 authors = ["Marc Bauer <mb@nesium.com>"]
 
+[dependencies]
+futures = { workspace = true }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { workspace = true }
 wasm-bindgen-futures = { workspace = true }

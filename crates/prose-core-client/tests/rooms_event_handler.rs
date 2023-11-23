@@ -3,15 +3,16 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::str::FromStr;
 use std::sync::Arc;
 
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
+use minidom::Element;
 use mockall::predicate;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::{Affiliation, Item, Role};
-use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence::Presence;
 
 use prose_core_client::app::event_handlers::{RoomsEventHandler, XMPPEvent, XMPPEventHandler};
@@ -24,7 +25,7 @@ use prose_core_client::test::{
 };
 use prose_core_client::{room, RoomEventType};
 use prose_xmpp::mods::muc;
-use prose_xmpp::stanza::muc::MediatedInvite;
+use prose_xmpp::stanza::muc::{MediatedInvite, MucUser};
 use prose_xmpp::{bare, full, jid, mods};
 
 #[tokio::test]
@@ -80,6 +81,61 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
             chat_state_updated: Default::default(),
         }
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_handles_disconnected_participant() -> Result<()> {
+    panic!("Implement me")
+}
+
+#[tokio::test]
+async fn test_handles_kicked_user() -> Result<()> {
+    panic!("Implement me")
+}
+
+#[tokio::test]
+async fn test_handles_disconnected_user() -> Result<()> {
+    panic!("Implement me")
+}
+
+#[tokio::test]
+async fn test_handles_destroyed_room() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room!("group@prose.org")))
+        .return_once(|_| Some(Arc::new(RoomInternals::group(room!("group@prose.org")))));
+
+    deps.sidebar_domain_service
+        .expect_handle_destroyed_room()
+        .once()
+        .with(
+            predicate::eq(room!("group@prose.org")),
+            predicate::eq(Some(room!("private-channel@prose.org"))),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    let xml = format!(
+        r#"<presence xmlns='jabber:client' from="group@prose.org" to="{user}" type="unavailable">
+        <x xmlns='http://jabber.org/protocol/muc#user'>
+            <destroy jid="private-channel@prose.org" />
+            <item affiliation="owner" jid="{user}" role="none" />
+            <status code="110" />
+        </x>
+    </presence>"#,
+        user = mock_data::account_jid()
+    );
+
+    let presence = Presence::try_from(Element::from_str(&xml)?)?;
+    event_handler
+        .handle_event(XMPPEvent::Status(mods::status::Event::Presence(presence)))
+        .await?;
 
     Ok(())
 }

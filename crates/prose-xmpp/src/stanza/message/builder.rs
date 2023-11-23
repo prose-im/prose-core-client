@@ -7,6 +7,7 @@ use jid::Jid;
 
 use minidom::Element;
 use xmpp_parsers::chatstates::ChatState;
+use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::{Body, MessagePayload, MessageType, Subject};
 use xmpp_parsers::message_correct::Replace;
 
@@ -46,6 +47,11 @@ impl Message {
 
     pub fn set_subject(mut self, subject: impl Into<String>) -> Self {
         self.subjects.insert("".into(), Subject(subject.into()));
+        self
+    }
+
+    pub fn set_delay(mut self, delay: Delay) -> Self {
+        self.payloads.push(delay.into());
         self
     }
 

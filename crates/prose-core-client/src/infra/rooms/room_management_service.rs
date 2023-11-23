@@ -6,10 +6,10 @@
 use async_trait::async_trait;
 use jid::{BareJid, FullJid};
 use strum::IntoEnumIterator;
+use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
-use prose_wasm_utils::PinnedFuture;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
 
@@ -60,7 +60,7 @@ impl RoomManagementService for XMPPClient {
                         Ok(RoomConfigResponse::Submit(
                             spec.populate_form(&room_name, &form)?,
                         ))
-                    }) as PinnedFuture<_>
+                    })
                 }),
             )
             .await?;
@@ -76,7 +76,7 @@ impl RoomManagementService for XMPPClient {
             // If the room was created but doesn't match our spec, we'll try to delete it again.
             if room_has_been_created {
                 // Ignore the error since it would not be indicative of what happened.
-                _ = muc_mod.destroy_room(&room_jid).await;
+                _ = muc_mod.destroy_room(&room_jid, None).await;
             }
 
             return Err(RoomError::RoomValidationError(error.to_string()));
@@ -144,6 +144,41 @@ impl RoomManagementService for XMPPClient {
         })
     }
 
+    async fn reconfigure_room(
+        &self,
+        room_jid: &RoomJid,
+        spec: RoomSpec,
+        new_name: &str,
+    ) -> Result<(), RoomError> {
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+
+        // Reconfigure the room…
+        muc_mod
+            .configure_room(
+                room_jid,
+                Box::new(|form: DataForm| {
+                    let spec = spec.clone();
+                    let room_name = new_name.to_string();
+
+                    Box::pin(async move {
+                        Ok(RoomConfigResponse::Submit(
+                            spec.populate_form(&room_name, &form)?,
+                        ))
+                    })
+                }),
+            )
+            .await?;
+
+        let room_info = self.load_room_info(&room_jid).await?;
+
+        // Then validate it against our spec…
+        if let Err(error) = spec.validate_against(&room_info) {
+            return Err(RoomError::RoomValidationError(error.to_string()));
+        }
+
+        Ok(())
+    }
+
     async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         muc_mod.exit_room(room_jid).await?;
@@ -164,9 +199,15 @@ impl RoomManagementService for XMPPClient {
         Ok(())
     }
 
-    async fn destroy_room(&self, room_jid: &BareJid) -> Result<(), RoomError> {
+    async fn destroy_room(
+        &self,
+        room_jid: &RoomJid,
+        alternate_room: Option<RoomJid>,
+    ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        muc_mod.destroy_room(room_jid).await?;
+        muc_mod
+            .destroy_room(room_jid, alternate_room.map(|j| j.into_inner()).as_ref())
+            .await?;
         Ok(())
     }
 }

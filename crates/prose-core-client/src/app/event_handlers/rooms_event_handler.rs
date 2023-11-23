@@ -9,11 +9,12 @@ use jid::{BareJid, Jid};
 use tracing::{error, info, warn};
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
-use xmpp_parsers::muc::MucUser;
+use xmpp_parsers::muc::user::{Role, Status};
 use xmpp_parsers::presence::Presence;
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::{bookmark, bookmark2, chat, muc, status};
+use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::{ns, Event};
 
 use crate::app::deps::{
@@ -134,7 +135,7 @@ impl RoomsEventHandler {
             return Ok(());
         };
 
-        let Some(muc_user) = presence
+        let Some(mut muc_user) = presence
             .payloads
             .into_iter()
             .filter_map(|payload| {
@@ -149,23 +150,81 @@ impl RoomsEventHandler {
             return Ok(());
         };
 
-        // Let's try to pull out the real jid of our user…
-        let Some((jid, affiliation)) = muc_user
-            .items
-            .into_iter()
-            .filter_map(|item| item.jid.map(|jid| (jid, item.affiliation)))
-            .take(1)
-            .next()
-        else {
+        let is_self_presence = muc_user.status.contains(&Status::SelfPresence);
+        if is_self_presence {
+            if let Some(destroy) = muc_user.destroy.take() {
+                info!(
+                    "Room {} has been destroyed. Alternative is {}",
+                    room.jid,
+                    destroy
+                        .jid
+                        .as_ref()
+                        .map(|j| j.to_string())
+                        .as_deref()
+                        .unwrap_or("<none>")
+                );
+                self.sidebar_domain_service
+                    .handle_destroyed_room(&room.jid, destroy.jid.map(RoomJid::from))
+                    .await?;
+                return Ok(());
+            }
+        }
+
+        let Some(item) = muc_user.items.first() else {
             return Ok(());
         };
 
-        info!("Received real jid for {}: {}", from, jid);
+        // User has been removed or went offline…
+        if item.role == Role::None {
+            room.remove_occupant(&from);
 
-        let bare_jid = jid.into_bare();
-        let name = self.user_profile_repo.get_display_name(&bare_jid).await?;
+            if is_self_presence {
+                let was_removed = muc_user
+                    .status
+                    .iter()
+                    .find(|s| match s {
+                        Status::Banned
+                        | Status::Kicked
+                        | Status::RemovalFromRoom
+                        | Status::ConfigMembersOnly
+                        | Status::ServiceShutdown
+                        | Status::ServiceErrorKick => true,
+                        _ => false,
+                    })
+                    .is_some();
 
-        room.insert_occupant(&from, Some(&bare_jid), name.as_deref(), &affiliation);
+                if was_removed {
+                    let is_permanent = muc_user
+                        .status
+                        .iter()
+                        .find(|s| match s {
+                            Status::Banned
+                            | Status::Kicked
+                            | Status::RemovalFromRoom
+                            | Status::ConfigMembersOnly => true,
+                            _ => false,
+                        })
+                        .is_some();
+
+                    self.sidebar_domain_service
+                        .handle_removal_from_room(&room.jid, is_permanent)
+                        .await?;
+                }
+            }
+        } else {
+            // Let's try to pull out the real jid of our user…
+            let (real_jid, name) = {
+                if let Some(jid) = &item.jid {
+                    let bare_jid = jid.to_bare();
+                    let name = self.user_profile_repo.get_display_name(&bare_jid).await?;
+                    (Some(bare_jid), name)
+                } else {
+                    (None, None)
+                }
+            };
+
+            room.insert_occupant(&from, real_jid.as_ref(), name.as_deref(), &item.affiliation);
+        }
 
         Ok(())
     }

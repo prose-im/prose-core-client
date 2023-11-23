@@ -7,13 +7,16 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
 use xmpp_parsers::chatstates::ChatState;
+use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods;
+use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
-use crate::domain::messaging::models::{Emoji, MessageId};
+use crate::domain::messaging::models::{Emoji, MessageId, StanzaParseError};
 use crate::domain::messaging::services::MessagingService;
 use crate::domain::shared::models::RoomType;
+use crate::dtos::RoomJid;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -112,6 +115,43 @@ impl MessagingService for XMPPClient {
             room_jid.clone(),
             &room_type.message_type(),
         )?;
+        Ok(())
+    }
+
+    async fn relay_archived_message_to_room(
+        &self,
+        room_jid: &RoomJid,
+        room_type: &RoomType,
+        message: ArchivedMessage,
+    ) -> Result<()> {
+        let timestamp = message
+            .forwarded
+            .delay
+            .ok_or(StanzaParseError::missing_child_node("delay"))?
+            .stamp;
+
+        let mut message = *message
+            .forwarded
+            .stanza
+            .ok_or(StanzaParseError::missing_child_node("message"))?;
+
+        let from = message
+            .from
+            .take()
+            .ok_or(StanzaParseError::missing_attribute("from"))?;
+
+        let message = message
+            .set_to(room_jid.clone().into_inner())
+            .set_type(room_type.message_type())
+            .set_delay(Delay {
+                from: Some(from),
+                stamp: timestamp,
+                data: None,
+            });
+
+        let chat = self.client.get_mod::<mods::Chat>();
+        chat.send_raw_message(message)?;
+
         Ok(())
     }
 }

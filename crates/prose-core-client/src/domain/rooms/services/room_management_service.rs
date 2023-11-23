@@ -9,6 +9,7 @@ use jid::{BareJid, FullJid};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomSessionInfo, RoomSpec};
+use crate::dtos::RoomJid;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -32,6 +33,13 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         password: Option<&str>,
     ) -> Result<RoomSessionInfo, RoomError>;
 
+    async fn reconfigure_room(
+        &self,
+        room_jid: &RoomJid,
+        spec: RoomSpec,
+        new_name: &str,
+    ) -> Result<(), RoomError>;
+
     async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError>;
 
     async fn set_room_owners(
@@ -40,5 +48,11 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         users: &[&BareJid],
     ) -> Result<(), RoomError>;
 
-    async fn destroy_room(&self, room_jid: &BareJid) -> Result<(), RoomError>;
+    /// Destroys the room identified by `room_jid`. If specified sets `alternate_room` as
+    /// replacement room, so that users will be redirected there.
+    async fn destroy_room(
+        &self,
+        room_jid: &RoomJid,
+        alternate_room: Option<RoomJid>,
+    ) -> Result<(), RoomError>;
 }

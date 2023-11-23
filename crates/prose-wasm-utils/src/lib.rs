@@ -1,5 +1,14 @@
+// prose-wasm-utils/prose-wasm-utils
+//
+// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// License: Mozilla Public License v2.0 (MPL v2.0)
+
 use std::future::Future;
 use std::pin::Pin;
+
+pub use future_ext::ProseFutureExt;
+
+mod future_ext;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub trait SendUnlessWasm: Send {}

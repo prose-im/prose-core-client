@@ -258,11 +258,15 @@ impl MUC {
 
     /// Destroys a room.
     /// https://xmpp.org/extensions/xep-0045.html#destroyroom
-    pub async fn destroy_room(&self, jid: &BareJid) -> Result<()> {
+    pub async fn destroy_room(
+        &self,
+        jid: &BareJid,
+        alternate_room: Option<&BareJid>,
+    ) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             Query::new(Role::Owner).with_payload(Destroy {
-                jid: None,
+                jid: alternate_room.cloned(),
                 reason: None,
             }),
         )

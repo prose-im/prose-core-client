@@ -31,7 +31,9 @@ use crate::domain::contacts::services::mocks::MockContactsService;
 use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
 use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
-use crate::domain::messaging::services::mocks::{MockMessageArchiveService, MockMessagingService};
+use crate::domain::messaging::services::mocks::{
+    MockMessageArchiveService, MockMessageMigrationDomainService, MockMessagingService,
+};
 use crate::domain::rooms::repos::mocks::{
     MockConnectedRoomsReadOnlyRepository, MockConnectedRoomsReadWriteRepository,
 };
@@ -240,6 +242,7 @@ pub struct MockRoomsDomainServiceDependencies {
     pub ctx: AppContext,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub id_provider: DynIDProvider,
+    pub message_migration_domain_service: MockMessageMigrationDomainService,
     pub room_attributes_service: MockRoomAttributesService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
@@ -259,6 +262,7 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
             ctx: Arc::new(value.ctx),
             id_provider: Arc::new(value.id_provider),
+            message_migration_domain_service: Arc::new(value.message_migration_domain_service),
             room_attributes_service: Arc::new(value.room_attributes_service),
             room_management_service: Arc::new(value.room_management_service),
             room_participation_service: Arc::new(value.room_participation_service),

@@ -3,12 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
-use mockall::predicate;
+use mockall::{predicate, Sequence};
 
-use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::rooms::models::{RoomInternals, RoomSpec};
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
 use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
@@ -16,7 +16,7 @@ use prose_core_client::domain::sidebar::services::impls::SidebarDomainService;
 use prose_core_client::domain::sidebar::services::SidebarDomainService as SidebarDomainServiceTrait;
 use prose_core_client::test::MockSidebarDomainServiceDependencies;
 use prose_core_client::{room, ClientEvent};
-use prose_xmpp::{bare, full};
+use prose_xmpp::full;
 
 #[tokio::test]
 async fn test_extends_sidebar() -> Result<()> {
@@ -170,7 +170,7 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.bookmarks_service
         .expect_delete_bookmark()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
+        .with(predicate::eq(room!("channel@conference.prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.sidebar_repo
@@ -219,7 +219,7 @@ async fn test_removes_direct_message_from_sidebar() -> Result<()> {
     deps.bookmarks_service
         .expect_delete_bookmark()
         .once()
-        .with(predicate::eq(bare!("contact@prose.org")))
+        .with(predicate::eq(room!("contact@prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.sidebar_repo
@@ -576,4 +576,196 @@ async fn test_toggle_favorite() -> Result<()> {
         .await?;
 
     Ok(())
+}
+
+#[tokio::test]
+async fn test_convert_group_to_private_channel() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    // Make sure that the method calls are in the exact order…
+    let mut seq = Sequence::new();
+
+    let service = Arc::new(OnceLock::<SidebarDomainService>::new());
+
+    {
+        let service = service.clone();
+
+        // Sequence starts in SidebarDomainService where reconfigure_item_with_spec is called.
+        // The SidebarDomainService first calls into RoomsDomainService…
+        deps.rooms_domain_service
+            .expect_reconfigure_room_with_spec()
+            .once()
+            .in_sequence(&mut seq)
+            .with(
+                predicate::eq(room!("group@conference.prose.org")),
+                predicate::eq(RoomSpec::PrivateChannel),
+                predicate::eq("My Private Channel"),
+            )
+            .return_once(|_, _, _| {
+                Box::pin(async move {
+                    // RoomsDomainService then creates a new room, migrates the messages and when
+                    // it finally destroys the original room, the server will send us a presence
+                    // to notify us that the room was destroyed. This will be handled by
+                    // the RoomsEventHandler which calls into the SidebarDomainService. So we'll
+                    // simulate this here as well…
+                    service
+                        .get()
+                        .unwrap()
+                        .handle_destroyed_room(
+                            &room!("group@conference.prose.org"),
+                            Some(room!("private-channel@conference.prose.org")),
+                        )
+                        .await?;
+
+                    Ok(Arc::new(
+                        RoomInternals::private_channel(room!(
+                            "private-channel@conference.prose.org"
+                        ))
+                        .with_name("My Private Channel"),
+                    ))
+                })
+            });
+    }
+
+    // handle_destroyed_room
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("group@conference.prose.org")))
+        .return_once(|_| {
+            Some(SidebarItem::group(
+                room!("group@conference.prose.org"),
+                "My Group",
+            ))
+        });
+    // handle_destroyed_room
+    deps.connected_rooms_repo
+        .expect_delete()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("group@conference.prose.org")))
+        .return_once(|_| ());
+    // handle_destroyed_room
+    deps.sidebar_repo
+        .expect_delete()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("group@conference.prose.org")))
+        .return_once(|_| ());
+    // handle_destroyed_room
+    deps.bookmarks_service
+        .expect_delete_bookmark()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("group@conference.prose.org")))
+        .return_once(|_| Box::pin(async { Ok(()) }));
+    // handle_destroyed_room -> connect alternate_room
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("private-channel@conference.prose.org")))
+        .return_once(|_| None);
+    // handle_destroyed_room -> connect alternate_room
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+            room_jid: room!("private-channel@conference.prose.org"),
+            password: None,
+        }))
+        .return_once(|_| {
+            Box::pin(async move {
+                Ok(Arc::new(
+                    RoomInternals::private_channel(room!("private-channel@conference.prose.org"))
+                        .with_name("My Private Channel"),
+                ))
+            })
+        });
+    // handle_destroyed_room -> connect alternate_room -> insert_item_by_creating_or_joining_room -> insert_or_update_sidebar_item_and_bookmark_for_room_if_needed
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("private-channel@conference.prose.org")))
+        .return_once(|_| None);
+    // handle_destroyed_room -> connect alternate_room -> insert_item_by_creating_or_joining_room -> insert_or_update_sidebar_item_and_bookmark_for_room_if_need
+    deps.sidebar_repo
+        .expect_put()
+        .once()
+        .with(predicate::eq(SidebarItem::private_channel(
+            room!("private-channel@conference.prose.org"),
+            "My Private Channel",
+        )))
+        .return_once(|_| ());
+    // handle_destroyed_room -> connect alternate_room -> insert_item_by_creating_or_joining_room -> insert_or_update_sidebar_item_and_bookmark_for_room_if_need
+    deps.bookmarks_service
+        .expect_save_bookmark()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(
+            Bookmark::private_channel(
+                room!("private-channel@conference.prose.org"),
+                "My Private Channel",
+            )
+            .set_in_sidebar(true),
+        ))
+        .return_once(|_| Box::pin(async { Ok(()) }));
+    // handle_destroyed_room -> connect alternate_room -> insert_item_by_creating_or_joining_room -> insert_or_update_sidebar_item_and_bookmark_for_room_if_need
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+    // reconfigure_item_with_spec
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("private-channel@conference.prose.org")))
+        .return_once(|_| {
+            Some(SidebarItem::private_channel(
+                room!("private-channel@conference.prose.org"),
+                "My Private Channel",
+            ))
+        });
+
+    service
+        .set(SidebarDomainService::from(deps.into_deps()))
+        .map_err(|_| ())
+        .unwrap();
+
+    service
+        .get()
+        .unwrap()
+        .reconfigure_item_with_spec(
+            &room!("group@conference.prose.org"),
+            RoomSpec::PrivateChannel,
+            "My Private Channel",
+        )
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_convert_private_to_public_channel() -> Result<()> {
+    panic!("Implement me!")
+}
+
+#[tokio::test]
+async fn test_handle_destroyed_room() -> Result<()> {
+    panic!("Implement me!")
+}
+
+#[tokio::test]
+async fn test_handle_temporary_removal_from_room() -> Result<()> {
+    panic!("Implement me!")
+}
+
+#[tokio::test]
+async fn test_handle_permanent_removal_from_room() -> Result<()> {
+    panic!("Implement me!")
 }

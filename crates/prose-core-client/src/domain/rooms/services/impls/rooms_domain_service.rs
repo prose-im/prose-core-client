@@ -12,15 +12,15 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use jid::{BareJid, NodePart};
 use sha1::{Digest, Sha1};
-use tracing::info;
+use tracing::{debug, error, info, warn};
 
 use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynIDProvider,
-    DynRoomAttributesService, DynRoomManagementService, DynRoomParticipationService,
-    DynUserProfileRepository,
+    DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
+    DynRoomParticipationService, DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
     Member, RoomError, RoomInfo, RoomInternals, RoomSessionInfo, RoomSpec,
@@ -44,6 +44,7 @@ pub struct RoomsDomainService {
     connected_rooms_repo: DynConnectedRoomsRepository,
     ctx: DynAppContext,
     id_provider: DynIDProvider,
+    message_migration_domain_service: DynMessageMigrationDomainService,
     room_attributes_service: DynRoomAttributesService,
     room_management_service: DynRoomManagementService,
     room_participation_service: DynRoomParticipationService,
@@ -79,7 +80,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
     ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
     async fn rename_room(&self, room_jid: &RoomJid, name: &str) -> Result<(), RoomError> {
         let Some(room) = self.connected_rooms_repo.get(room_jid) else {
-            return Ok(());
+            return Err(RoomError::RoomNotFound);
         };
 
         match room.r#type {
@@ -106,6 +107,138 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             .dispatch_room_event(room, RoomEventType::AttributesChanged);
 
         Ok(())
+    }
+
+    /// Reconfigures the room identified by `room_jid` according to `spec` and renames it to `new_name`.
+    ///
+    /// If the room is not connected no action is performed, otherwise:
+    /// - Panics if the reconfiguration is not not allowed. Allowed reconfigurations are:
+    ///   - `RoomType::Group` -> `RoomType::PrivateChannel`
+    ///   - `RoomType::PublicChannel` -> `RoomType::PrivateChannel`
+    ///   - `RoomType::PrivateChannel` -> `RoomType::PublicChannel`
+    /// - Dispatches `ClientEvent::RoomChanged` of type `RoomEventType::AttributesChanged`
+    ///   after processing.
+    async fn reconfigure_room_with_spec(
+        &self,
+        room_jid: &RoomJid,
+        spec: RoomSpec,
+        new_name: &str,
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        let Some(room) = self.connected_rooms_repo.get(room_jid) else {
+            return Err(RoomError::RoomNotFound);
+        };
+
+        match (&room.r#type, spec.room_type()) {
+            (RoomType::Group, RoomType::PrivateChannel) => {
+                // Remove room first so that we don't run into problems with reentrancy…
+                self.connected_rooms_repo.delete(room_jid);
+
+                let service = BareJid::from_parts(None, &room_jid.domain());
+
+                // Create new room
+                debug!("Creating new room {}…", new_name);
+                let new_room = match self
+                    .create_room(
+                        &service,
+                        CreateRoomType::PrivateChannel {
+                            name: new_name.to_string(),
+                        },
+                    )
+                    .await
+                {
+                    Ok(room) => room,
+                    Err(err) => {
+                        // Something went wrong, let's put the room back…
+                        _ = self.connected_rooms_repo.set(room);
+                        return Err(err);
+                    }
+                };
+
+                // Migrate messages to new room
+                debug!("Copying messages to new room {}…", new_name);
+                match self
+                    .message_migration_domain_service
+                    .copy_all_messages_from_room(
+                        &room.jid,
+                        &room.r#type,
+                        &new_room.jid,
+                        &new_room.r#type,
+                    )
+                    .await
+                {
+                    Ok(_) => (),
+                    Err(err) => {
+                        // If that failed, let's put the initial room back and delete the new room?!
+                        _ = self.connected_rooms_repo.set(room);
+                        _ = self
+                            .room_management_service
+                            .destroy_room(&new_room.jid, None)
+                            .await;
+                        return Err(err.into());
+                    }
+                }
+
+                // Now grant the members of the original group access to the new channel…
+                debug!("Granting membership to members of new room {}…", new_name);
+                for member in room.members.keys() {
+                    // Our user is already admin, no need to set them as a member…
+                    if member == &room.user_jid {
+                        continue;
+                    }
+
+                    match self
+                        .room_participation_service
+                        .grant_membership(&new_room.jid, member)
+                        .await
+                    {
+                        Ok(_) => (),
+                        Err(err) => {
+                            error!(
+                                "Could not grant membership for new private channel {} to {}. Reason: {}",
+                                new_room.jid, member, err.to_string()
+                            );
+                        }
+                    }
+                }
+
+                // And finally destroy the original room. Since we pass in the JID to the new room
+                // we do not need to send invites to the members of the original group.
+                debug!("Destroying old room {}…", room.jid);
+                match self
+                    .room_management_service
+                    .destroy_room(room_jid, Some(new_room.jid.clone()))
+                    .await
+                {
+                    Ok(_) => (),
+                    Err(err) => {
+                        // If that failed, no reason to stop here. Let's just log the error…
+                        warn!("Failed to delete the initial group after trying to convert it to a Private Channel. Reason: {}", err.to_string());
+                    }
+                }
+
+                Ok(new_room)
+            }
+            (RoomType::PrivateChannel, RoomType::PublicChannel)
+            | (RoomType::PublicChannel, RoomType::PrivateChannel) => {
+                self.room_management_service
+                    .reconfigure_room(room_jid, spec, new_name)
+                    .await?;
+
+                Ok(room)
+            }
+            (RoomType::Group, _)
+            | (RoomType::PrivateChannel, _)
+            | (RoomType::PublicChannel, _)
+            | (RoomType::DirectMessage, _)
+            | (RoomType::Pending, _)
+            | (RoomType::Generic, _) => {
+                panic!(
+                    "Cannot convert room of type {} to type {}.",
+                    room.r#type,
+                    spec.room_type()
+                );
+            }
+        }
     }
 }
 
@@ -339,7 +472,6 @@ impl RoomsDomainService {
         // Send invites…
         if info.room_has_been_created {
             info!("Sending invites for created group…");
-            let participants = participants.iter().collect::<Vec<_>>();
             self.room_participation_service
                 .invite_users_to_room(&info.room_jid, participants.as_slice())
                 .await?;
@@ -414,7 +546,10 @@ impl RoomsDomainService {
                     // Again, if the additional configuration fails and we've created the room
                     // we'll destroy it again.
                     if info.room_has_been_created {
-                        _ = self.room_management_service.destroy_room(&room_jid).await;
+                        _ = self
+                            .room_management_service
+                            .destroy_room(&room_jid, None)
+                            .await;
                     }
                     return Err(error.into());
                 }

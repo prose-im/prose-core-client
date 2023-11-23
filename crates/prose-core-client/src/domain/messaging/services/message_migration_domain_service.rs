@@ -5,17 +5,19 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::sidebar::models::Bookmark;
-use crate::dtos::RoomJid;
+use crate::domain::shared::models::{RoomJid, RoomType};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait BookmarksService: SendUnlessWasm + SyncUnlessWasm {
-    async fn load_bookmarks(&self) -> Result<Vec<Bookmark>>;
-    async fn save_bookmark(&self, bookmark: &Bookmark) -> Result<()>;
-    async fn delete_bookmark(&self, jid: &RoomJid) -> Result<()>;
+pub trait MessageMigrationDomainService: SendUnlessWasm + SyncUnlessWasm {
+    async fn copy_all_messages_from_room(
+        &self,
+        source_room: &RoomJid,
+        source_room_type: &RoomType,
+        target_room: &RoomJid,
+        target_room_type: &RoomType,
+    ) -> Result<()>;
 }

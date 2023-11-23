@@ -19,7 +19,7 @@ use crate::app::deps::{
     DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
-use crate::domain::rooms::models::RoomInternals;
+use crate::domain::rooms::models::{RoomInternals, RoomSpec};
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::dtos::{
     Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
@@ -338,20 +338,63 @@ impl Room<Group> {
     pub async fn resend_invites_to_members(&self) -> Result<()> {
         info!("Sending invites to group members…");
 
-        let member_jids = self.data.members.keys().map(|jid| jid).collect::<Vec<_>>();
+        let member_jids = self.data.members.keys().cloned().collect::<Vec<_>>();
         self.participation_service
             .invite_users_to_room(&self.data.jid, member_jids.as_slice())
             .await?;
         Ok(())
     }
+
+    pub async fn convert_to_private_channel(&self, name: impl AsRef<str>) -> Result<()> {
+        self.sidebar_domain_service
+            .reconfigure_item_with_spec(&self.data.jid, RoomSpec::PrivateChannel, name.as_ref())
+            .await?;
+        Ok(())
+    }
 }
 
-impl<Kind> Room<Kind>
-where
-    Kind: Channel,
-{
+impl Room<PrivateChannel> {
+    pub async fn convert_to_public_channel(&self) -> Result<()> {
+        self.sidebar_domain_service
+            .reconfigure_item_with_spec(
+                &self.data.jid,
+                RoomSpec::PublicChannel,
+                self.data.name().as_deref().unwrap_or_default(),
+            )
+            .await?;
+        Ok(())
+    }
+
     pub async fn invite_users(&self, users: impl IntoIterator<Item = &BareJid>) -> Result<()> {
-        let user_jids = users.into_iter().collect::<Vec<_>>();
+        let user_jids = users.into_iter().cloned().collect::<Vec<_>>();
+        self.participation_service
+            .invite_users_to_room(&self.data.jid, user_jids.as_slice())
+            .await?;
+        Ok(())
+    }
+}
+
+impl Room<PublicChannel> {
+    pub async fn convert_to_private_channel(&self) -> Result<()> {
+        self.sidebar_domain_service
+            .reconfigure_item_with_spec(
+                &self.data.jid,
+                RoomSpec::PrivateChannel,
+                self.data.name().as_deref().unwrap_or_default(),
+            )
+            .await?;
+        Ok(())
+    }
+
+    pub async fn invite_users(&self, users: impl IntoIterator<Item = &BareJid>) -> Result<()> {
+        let user_jids = users.into_iter().cloned().collect::<Vec<_>>();
+
+        for user in user_jids.iter() {
+            self.participation_service
+                .grant_membership(&self.data.jid, user)
+                .await?;
+        }
+
         self.participation_service
             .invite_users_to_room(&self.data.jid, user_jids.as_slice())
             .await?;

@@ -15,7 +15,9 @@ use crate::domain::contacts::repos::ContactsRepository;
 use crate::domain::contacts::services::ContactsService;
 use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
-use crate::domain::messaging::services::{MessageArchiveService, MessagingService};
+use crate::domain::messaging::services::{
+    MessageArchiveService, MessageMigrationDomainService, MessagingService,
+};
 use crate::domain::rooms::repos::{ConnectedRoomsReadOnlyRepository, ConnectedRoomsRepository};
 use crate::domain::rooms::services::{
     RoomAttributesService, RoomFactory, RoomManagementService, RoomParticipationService,
@@ -59,6 +61,7 @@ pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
 pub type DynUserProfileService = Arc<dyn UserProfileService>;
+pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 
 pub struct AppDependencies {
     pub account_settings_repo: DynAccountSettingsRepository,

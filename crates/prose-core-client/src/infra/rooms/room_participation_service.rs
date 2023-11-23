@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use jid::{BareJid, Jid};
+use xmpp_parsers::muc::user::Affiliation;
 
 use crate::domain::rooms::models::RoomError;
 use crate::domain::rooms::services::RoomParticipationService;
@@ -20,24 +21,39 @@ impl RoomParticipationService for XMPPClient {
     async fn invite_users_to_room(
         &self,
         room_jid: &RoomJid,
-        participants: &[&BareJid],
+        participants: &[BareJid],
+    ) -> Result<(), RoomError> {
+        let muc_mod = self.client.get_mod::<mods::MUC>();
+
+        // It seems like the server doesn't send invites to each member if you put them into
+        // a single mediated invite. So we'll send one for each participant…
+        for participant in participants {
+            muc_mod
+                .send_mediated_invite(
+                    room_jid,
+                    MediatedInvite {
+                        invites: vec![mediated_invite::Invite {
+                            from: None,
+                            to: Some(Jid::Bare(participant.clone())),
+                            reason: None,
+                        }],
+                        password: None,
+                    },
+                )
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    async fn grant_membership(
+        &self,
+        room_jid: &RoomJid,
+        participant: &BareJid,
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         muc_mod
-            .send_mediated_invite(
-                room_jid,
-                MediatedInvite {
-                    invites: participants
-                        .iter()
-                        .map(|participant| mediated_invite::Invite {
-                            from: None,
-                            to: Some(Jid::Bare((*participant).clone())),
-                            reason: None,
-                        })
-                        .collect(),
-                    password: None,
-                },
-            )
+            .update_user_affiliations(room_jid, vec![(participant.clone(), Affiliation::Member)])
             .await?;
         Ok(())
     }

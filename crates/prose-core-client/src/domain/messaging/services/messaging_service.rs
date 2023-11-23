@@ -8,9 +8,10 @@ use async_trait::async_trait;
 use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
 use crate::domain::messaging::models::{Emoji, MessageId};
-use crate::domain::shared::models::RoomType;
+use crate::domain::shared::models::{RoomJid, RoomType};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -58,5 +59,12 @@ pub trait MessagingService: SendUnlessWasm + SyncUnlessWasm {
         room_jid: &BareJid,
         room_type: &RoomType,
         message_id: &MessageId,
+    ) -> Result<()>;
+
+    async fn relay_archived_message_to_room(
+        &self,
+        room_jid: &RoomJid,
+        room_type: &RoomType,
+        message: ArchivedMessage,
     ) -> Result<()>;
 }

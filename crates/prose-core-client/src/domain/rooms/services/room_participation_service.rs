@@ -18,6 +18,12 @@ pub trait RoomParticipationService: SendUnlessWasm + SyncUnlessWasm {
     async fn invite_users_to_room(
         &self,
         room_jid: &RoomJid,
-        participants: &[&BareJid],
+        participants: &[BareJid],
+    ) -> Result<(), RoomError>;
+
+    async fn grant_membership(
+        &self,
+        room_jid: &RoomJid,
+        participant: &BareJid,
     ) -> Result<(), RoomError>;
 }

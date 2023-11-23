@@ -12,6 +12,9 @@ use crate::app::deps::{
     AppContext, AppDependencies, DynClientEventDispatcher, DynIDProvider, DynTimeProvider,
 };
 use crate::app::services::RoomInner;
+use crate::domain::messaging::services::impls::{
+    MessageMigrationDomainService, MessageMigrationDomainServiceDependencies,
+};
 use crate::domain::rooms::services::impls::{RoomsDomainService, RoomsDomainServiceDependencies};
 use crate::domain::rooms::services::RoomFactory;
 use crate::domain::sidebar::services::impls::{
@@ -102,11 +105,22 @@ impl From<PlatformDependencies> for AppDependencies {
             d.xmpp.clone(),
         ));
 
+        let message_migration_domain_service_dependencies =
+            MessageMigrationDomainServiceDependencies {
+                message_archive_service: d.xmpp.clone(),
+                messaging_service: d.xmpp.clone(),
+            };
+
+        let message_migration_domain_service = Arc::new(MessageMigrationDomainService::from(
+            message_migration_domain_service_dependencies,
+        ));
+
         let rooms_domain_service_dependencies = RoomsDomainServiceDependencies {
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
             ctx: ctx.clone(),
             id_provider: d.short_id_provider.clone(),
+            message_migration_domain_service: message_migration_domain_service.clone(),
             room_attributes_service: d.xmpp.clone(),
             room_management_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),

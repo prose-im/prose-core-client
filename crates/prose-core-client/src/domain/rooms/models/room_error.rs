@@ -13,6 +13,8 @@ use crate::domain::shared::models::RoomJid;
 pub enum RoomError {
     #[error("Room is already connected ({0}).")]
     RoomIsAlreadyConnected(RoomJid),
+    #[error("No room exists with the specified JID.")]
+    RoomNotFound,
     #[error("A public channel with the chosen name exists already.")]
     PublicChannelNameConflict,
     #[error("Group must have at least two participants.")]

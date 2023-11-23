@@ -326,31 +326,41 @@ async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
     Ok(select_multiple_jids_from_list(contacts))
 }
 
-async fn select_room(client: &Client) -> Result<RoomEnvelope> {
-    let mut rooms = client
-        .sidebar
-        .sidebar_items()
-        .into_iter()
-        .map(|item| item.room)
-        .collect::<Vec<_>>();
-    rooms.sort_by(compare_room_envelopes);
-    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
-}
-
-async fn select_muc_room(client: &Client) -> Result<RoomEnvelope> {
+async fn select_room(
+    client: &Client,
+    filter: impl Fn(&SidebarItem) -> bool,
+) -> Result<Option<RoomEnvelope>> {
     let mut rooms = client
         .sidebar
         .sidebar_items()
         .into_iter()
         .filter_map(|room| {
-            if let RoomEnvelope::DirectMessage(_) = room.room {
+            if !filter(&room) {
                 return None;
             }
             Some(room.room)
         })
         .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
-    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+
+    if rooms.is_empty() {
+        println!("Could not find any matching rooms.");
+        return Ok(None);
+    }
+
+    Ok(Some(
+        select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone(),
+    ))
+}
+
+async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
+    select_room(client, |room| {
+        if let RoomEnvelope::DirectMessage(_) = room.room {
+            return false;
+        }
+        true
+    })
+    .await
 }
 
 async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
@@ -522,7 +532,9 @@ async fn load_contacts(client: &Client) -> Result<()> {
 }
 
 async fn load_messages(client: &Client) -> Result<()> {
-    let room = select_room(client).await?;
+    let Some(room) = select_room(client, |_| true).await? else {
+        return Ok(());
+    };
 
     let messages = match room {
         RoomEnvelope::DirectMessage(room) => room.load_latest_messages().await?,
@@ -559,7 +571,9 @@ impl Display for MessageEnvelope {
 }
 
 async fn send_message(client: &Client) -> Result<()> {
-    let room = select_room(client).await?.to_generic_room();
+    let Some(room) = select_room(client, |_| true).await? else {
+        return Ok(());
+    };
 
     let body = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message")
@@ -568,7 +582,7 @@ async fn send_message(client: &Client) -> Result<()> {
         .interact_text()
         .unwrap();
 
-    room.send_message(body).await
+    room.to_generic_room().send_message(body).await
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -741,6 +755,12 @@ enum Selection {
     ListRoomOccupants,
     #[strum(serialize = "List members in room")]
     ListRoomMembers,
+    #[strum(serialize = "Resend group invites")]
+    ResendGroupInvites,
+    #[strum(serialize = "Invite user to private channel")]
+    InviteUserToPrivateChannel,
+    #[strum(serialize = "Convert group to private channel")]
+    ConvertGroupToPrivateChannel,
     #[strum(serialize = "[Debug] Load bookmarks")]
     LoadBookmarks,
     #[strum(serialize = "[Debug] Delete bookmarks PubSub node")]
@@ -755,7 +775,7 @@ enum Selection {
 #[tokio::main]
 async fn main() -> Result<()> {
     env::set_var("RUST_BACKTRACE", "1");
-    enable_debug_logging(Level::TRACE);
+    enable_debug_logging(Level::INFO);
 
     let (jid, client) = configure_client().await?;
 
@@ -855,13 +875,18 @@ async fn main() -> Result<()> {
                     .interact()
                     .unwrap();
                 println!();
-                client.rooms.destroy_room(&rooms[selection].jid).await?;
+                client
+                    .rooms
+                    .destroy_room(&rooms[selection].jid.clone().into())
+                    .await?;
             }
             Selection::ListConnectedRooms => {
                 list_connected_rooms(&client).await?;
             }
             Selection::RenameConnectedRoom => {
-                let room = select_room(&client).await?;
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
                 let name = prompt_string("Enter a new name:");
 
                 match room {
@@ -929,7 +954,9 @@ async fn main() -> Result<()> {
                     .await?;
             }
             Selection::SetRoomTopic => {
-                let room = select_muc_room(&client).await?;
+                let Some(room) = select_muc_room(&client).await? else {
+                    continue;
+                };
                 let subject = prompt_string("Enter a subject:");
 
                 match room {
@@ -941,22 +968,72 @@ async fn main() -> Result<()> {
                 }?;
             }
             Selection::ListRoomOccupants => {
-                let room = select_muc_room(&client).await?.to_generic_room();
+                let Some(room) = select_muc_room(&client).await? else {
+                    continue;
+                };
                 let occupants = room
+                    .to_generic_room()
                     .occupants_dbg()
                     .into_iter()
                     .map(|o| OccupantEnvelope(o).to_string())
                     .collect::<Vec<_>>();
                 println!("{}", occupants.join("\n"))
             }
+            Selection::ResendGroupInvites => {
+                let Some(RoomEnvelope::Group(room)) = select_room(&client, |item| {
+                    if let RoomEnvelope::Group(_) = item.room {
+                        return true;
+                    }
+                    false
+                })
+                .await?
+                else {
+                    continue;
+                };
+
+                room.resend_invites_to_members().await?;
+            }
+            Selection::InviteUserToPrivateChannel => {
+                let Some(RoomEnvelope::PrivateChannel(room)) = select_room(&client, |item| {
+                    if let RoomEnvelope::PrivateChannel(_) = item.room {
+                        return true;
+                    }
+                    false
+                })
+                .await?
+                else {
+                    continue;
+                };
+
+                let contact = select_contact(&client).await?;
+                room.invite_users(vec![&contact]).await?;
+            }
             Selection::ListRoomMembers => {
-                let room = select_muc_room(&client).await?.to_generic_room();
+                let Some(room) = select_muc_room(&client).await? else {
+                    continue;
+                };
                 let members = room
+                    .to_generic_room()
                     .members()
                     .iter()
                     .map(|info| info.jid.to_string())
                     .collect::<Vec<_>>();
                 println!("{}", members.join("\n"))
+            }
+            Selection::ConvertGroupToPrivateChannel => {
+                let Some(RoomEnvelope::Group(room)) = select_room(&client, |item| {
+                    if let RoomEnvelope::Group(_) = item.room {
+                        return true;
+                    }
+                    false
+                })
+                .await?
+                else {
+                    continue;
+                };
+
+                let channel_name = prompt_string("Enter a name for the private channel");
+                room.convert_to_private_channel(&channel_name).await?;
             }
             Selection::LoadBookmarks => {
                 let bookmarks = client

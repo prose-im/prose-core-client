@@ -95,6 +95,10 @@ impl RoomInternals {
             .insert_occupant(jid, real_jid, name, affiliation)
     }
 
+    pub fn remove_occupant(&self, jid: &Jid) {
+        self.state.write().occupants.remove(jid);
+    }
+
     pub fn set_occupant_chat_state(
         &self,
         occupant_jid: &Jid,

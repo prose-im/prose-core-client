@@ -25,6 +25,14 @@ impl RoomInternals {
             &jid.to_display_name(),
         )
     }
+    
+    pub fn mock_pending_room(jid: impl Into<RoomJid>, next_hash: &str) -> Self {
+        Self::pending(
+            &jid.into(),
+            &mock_data::account_jid().into_bare(),
+            &format!("{}-{}", mock_data::account_jid().node_str().unwrap(), next_hash),
+        )
+    }
 
     pub fn group(jid: impl Into<RoomJid>) -> Self {
         Self::new(RoomInfo {
