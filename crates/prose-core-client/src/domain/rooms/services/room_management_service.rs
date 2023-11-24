@@ -42,11 +42,8 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError>;
 
-    async fn set_room_owners(
-        &self,
-        room_jid: &BareJid,
-        users: &[&BareJid],
-    ) -> Result<(), RoomError>;
+    async fn set_room_owners(&self, room_jid: &RoomJid, users: &[BareJid])
+        -> Result<(), RoomError>;
 
     /// Destroys the room identified by `room_jid`. If specified sets `alternate_room` as
     /// replacement room, so that users will be redirected there.

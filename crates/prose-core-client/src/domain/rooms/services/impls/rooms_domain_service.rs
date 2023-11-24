@@ -330,52 +330,53 @@ impl RoomsDomainService {
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let user_jid = self.ctx.connected_jid()?.into_bare();
 
-        let result = match request {
-            CreateRoomType::Group { participants } => {
-                self.create_or_join_group(&service, &user_jid, participants)
-                    .await
-            }
-            CreateRoomType::PrivateChannel { name } => {
-                // We'll use a random ID for the jid of the private channel. This way
-                // different people can create private channels with the same name without
-                // creating a conflict. A conflict might also potentially be a security
-                // issue if jid would contain sensitive information.
-                let channel_id = self.id_provider.new_id();
-
-                self.create_or_join_room_with_spec(
-                    &service,
-                    &user_jid,
-                    &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
-                    &name,
-                    RoomSpec::PrivateChannel,
-                    |_| async { Ok(()) },
-                )
-                .await
-            }
-            CreateRoomType::PublicChannel { name } => {
-                // Prevent channels with duplicate names from being created…
-                if !self.is_public_channel_name_unique(&name).await? {
-                    return Err(RoomError::PublicChannelNameConflict);
+        let result =
+            match request {
+                CreateRoomType::Group { participants } => {
+                    self.create_or_join_group(&service, &user_jid, participants)
+                        .await
                 }
+                CreateRoomType::PrivateChannel { name } => {
+                    // We'll use a random ID for the jid of the private channel. This way
+                    // different people can create private channels with the same name without
+                    // creating a conflict. A conflict might also potentially be a security
+                    // issue if jid would contain sensitive information.
+                    let channel_id = self.id_provider.new_id();
 
-                // While it would be ideal to have channel names conflict, this could only
-                // happen via its JID since this is the only thing that is unique. We do
-                // have the requirement however that users should be able to rename their
-                // channels, which is why they shouldn't conflict since the JIDs cannot be
-                // changed after the fact. So we'll use a unique ID here as well.
-                let channel_id = self.id_provider.new_id();
+                    self.create_or_join_room_with_spec(
+                        &service,
+                        &user_jid,
+                        &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
+                        &name,
+                        RoomSpec::PrivateChannel,
+                        |_| async { Ok(()) },
+                    )
+                    .await
+                }
+                CreateRoomType::PublicChannel { name } => {
+                    // Prevent channels with duplicate names from being created…
+                    if !self.is_public_channel_name_unique(&name).await? {
+                        return Err(RoomError::PublicChannelNameConflict);
+                    }
 
-                self.create_or_join_room_with_spec(
-                    &service,
-                    &user_jid,
-                    &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
-                    &name,
-                    RoomSpec::PublicChannel,
-                    |_| async { Ok(()) },
-                )
-                .await
-            }
-        };
+                    // While it would be ideal to have channel names conflict, this could only
+                    // happen via its JID since this is the only thing that is unique. We do
+                    // have the requirement however that users should be able to rename their
+                    // channels, which is why they shouldn't conflict since the JIDs cannot be
+                    // changed after the fact. So we'll use a unique ID here as well.
+                    let channel_id = self.id_provider.new_id();
+
+                    self.create_or_join_room_with_spec(
+                        &service,
+                        &user_jid,
+                        &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
+                        &name,
+                        RoomSpec::PublicChannel,
+                        |_| async { Ok(()) },
+                    )
+                    .await
+                }
+            };
 
         let info = match result {
             Ok(metadata) => metadata,
@@ -453,11 +454,15 @@ impl RoomsDomainService {
                     let room_has_been_created = info.room_has_been_created;
                     let service = self.room_management_service.clone();
 
-                    async move {
-                        let owners = participants_including_self.iter().collect::<Vec<_>>();
+                    for participant in &participants {
+                        if !info.members.contains(participant) {
+                            info.members.push(participant.clone())
+                        }
+                    }
 
+                    async move {
                         if room_has_been_created {
-                            service.set_room_owners(&room_jid, owners.as_slice()).await
+                            service.set_room_owners(&room_jid, participants_including_self.as_slice()).await
                                 .context(
                                     "Failed to update user affiliations of created group to type 'owner'",
                                 )
@@ -487,7 +492,7 @@ impl RoomsDomainService {
         room_id: &str,
         room_name: &str,
         spec: RoomSpec,
-        perform_additional_config: impl FnOnce(&RoomSessionInfo) -> Fut,
+        perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
         // We generate a random suffix to prevent any nickname conflicts…
         let nickname = format!(
@@ -522,7 +527,7 @@ impl RoomsDomainService {
                 .create_or_join_room(&full_room_jid, room_name, spec.clone())
                 .await;
 
-            let info = match result {
+            let mut info = match result {
                 Ok(occupancy) => occupancy,
                 Err(error) => {
                     // Remove pending room again…
@@ -538,7 +543,7 @@ impl RoomsDomainService {
                 }
             };
 
-            match (perform_additional_config)(&info).await {
+            match (perform_additional_config)(&mut info).await {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
@@ -631,9 +636,7 @@ impl RoomsDomainService {
         nickname: &str,
     ) -> Result<(), RoomError> {
         self.connected_rooms_repo
-            .set(Arc::new(RoomInternals::pending(
-                room_jid, user_jid, nickname,
-            )))
+            .set(Arc::new(RoomInternals::pending(room_jid, user_jid, nickname)))
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
     }
 }
@@ -656,7 +659,7 @@ impl ParticipantsVecExt for Vec<BareJid> {
 
 #[cfg(test)]
 mod tests {
-    use prose_xmpp::jid;
+    use prose_xmpp::bare;
 
     use super::*;
 
@@ -664,9 +667,9 @@ mod tests {
     fn test_group_name_for_participants() {
         assert_eq!(
             vec![
-                jid!("a@prose.org").into_bare(),
-                jid!("b@prose.org").into_bare(),
-                jid!("c@prose.org").into_bare()
+                bare!("a@prose.org"),
+                bare!("b@prose.org"),
+                bare!("c@prose.org")
             ]
             .group_name_hash(),
             "org.prose.group.7c138d7281db96e0d42fe026a4195c85a7dc2cae".to_string()
@@ -674,15 +677,15 @@ mod tests {
 
         assert_eq!(
             vec![
-                jid!("a@prose.org").into_bare(),
-                jid!("b@prose.org").into_bare(),
-                jid!("c@prose.org").into_bare()
+                bare!("a@prose.org"),
+                bare!("b@prose.org"),
+                bare!("c@prose.org")
             ]
             .group_name_hash(),
             vec![
-                jid!("c@prose.org").into_bare(),
-                jid!("a@prose.org").into_bare(),
-                jid!("b@prose.org").into_bare()
+                bare!("c@prose.org"),
+                bare!("a@prose.org"),
+                bare!("b@prose.org")
             ]
             .group_name_hash()
         )

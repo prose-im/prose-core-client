@@ -188,8 +188,8 @@ impl RoomManagementService for XMPPClient {
 
     async fn set_room_owners<'a, 'b, 'c>(
         &'a self,
-        room_jid: &'b BareJid,
-        users: &'c [&BareJid],
+        room_jid: &'b RoomJid,
+        users: &'c [BareJid],
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         let owners = users
