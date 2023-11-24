@@ -49,21 +49,22 @@ impl RoomManagementService for XMPPClient {
         let muc_mod = self.client.get_mod::<mods::MUC>();
 
         // Create the room…
-        let occupancy = muc_mod
-            .create_reserved_room(
-                &room_jid,
-                Box::new(|form| {
-                    let spec = spec.clone();
-                    let room_name = room_name.to_string();
+        let occupancy =
+            muc_mod
+                .create_reserved_room(
+                    &room_jid,
+                    Box::new(|form| {
+                        let spec = spec.clone();
+                        let room_name = room_name.to_string();
 
-                    Box::pin(async move {
-                        Ok(RoomConfigResponse::Submit(
-                            spec.populate_form(&room_name, &form)?,
-                        ))
-                    })
-                }),
-            )
-            .await?;
+                        Box::pin(async move {
+                            Ok(RoomConfigResponse::Submit(
+                                spec.populate_form(&room_name, &form)?,
+                            ))
+                        })
+                    }),
+                )
+                .await?;
 
         let user_nickname = room_jid.resource_str().to_string();
         let room_jid = RoomJid::from(room_jid.to_bare());
@@ -113,6 +114,7 @@ impl RoomManagementService for XMPPClient {
                     defined_condition: DefinedCondition::ItemNotFound,
                     texts: Default::default(),
                     other: None,
+                    new_location: None,
                 },
             }
             .into());
@@ -122,14 +124,15 @@ impl RoomManagementService for XMPPClient {
         let room_jid = RoomJid::from(room_jid.to_bare());
         let room_info = self.load_room_info(&room_jid).await?;
 
-        let room_type = 'room_type: {
-            for room_spec in RoomSpec::iter() {
-                if room_spec.is_satisfied_by(&room_info) {
-                    break 'room_type room_spec.room_type();
+        let room_type =
+            'room_type: {
+                for room_spec in RoomSpec::iter() {
+                    if room_spec.is_satisfied_by(&room_info) {
+                        break 'room_type room_spec.room_type();
+                    }
                 }
-            }
-            RoomType::Generic
-        };
+                RoomType::Generic
+            };
 
         let members = self.load_room_owners(&room_jid).await?;
 
@@ -161,9 +164,7 @@ impl RoomManagementService for XMPPClient {
                     let room_name = new_name.to_string();
 
                     Box::pin(async move {
-                        Ok(RoomConfigResponse::Submit(
-                            spec.populate_form(&room_name, &form)?,
-                        ))
+                        Ok(RoomConfigResponse::Submit(spec.populate_form(&room_name, &form)?))
                     })
                 }),
             )

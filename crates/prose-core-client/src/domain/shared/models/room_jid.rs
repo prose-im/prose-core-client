@@ -53,3 +53,43 @@ impl FromStr for RoomJid {
         Ok(Self(BareJid::from_str(s)?))
     }
 }
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+pub enum RoomJidParseError {
+    #[error("Missing xmpp: prefix in IRI")]
+    InvalidIRI,
+    #[error(transparent)]
+    JID(#[from] jid::Error),
+}
+
+impl RoomJid {
+    pub fn from_iri(iri: &str) -> Result<Self, RoomJidParseError> {
+        let Some(mut iri) = iri.strip_prefix("xmpp:") else {
+            return Err(RoomJidParseError::InvalidIRI);
+        };
+        if let Some(idx) = iri.rfind("?join") {
+            iri = &iri[..idx];
+        }
+        Ok(Self::from_str(iri)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::room;
+
+    use super::*;
+
+    #[test]
+    fn test_from_iri() {
+        assert!(RoomJid::from_iri("").is_err());
+        assert_eq!(
+            RoomJid::from_iri("xmpp:room@muc.example.org?join"),
+            Ok(room!("room@muc.example.org"))
+        );
+        assert_eq!(
+            RoomJid::from_iri("xmpp:room@muc.example.org"),
+            Ok(room!("room@muc.example.org"))
+        );
+    }
+}

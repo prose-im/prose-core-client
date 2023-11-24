@@ -3,10 +3,10 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::env;
 use std::ffi::OsStr;
 use std::str::FromStr;
 use std::time::Instant;
+use std::{env, fs};
 
 use dotenvy;
 use jid::{BareJid, FullJid, ResourcePart};
@@ -30,23 +30,29 @@ pub fn enable_debug_logging(max_level: Level) {
     let oslog_layer =
         OsLogger::new("org.prose", "default").with_filter(LevelFilter::from_level(max_level));
 
-    let appender = tracing_appender::rolling::hourly(
-        env::current_dir()
-            .expect("Cannot determine current directory")
-            .join("examples")
-            .join(exe_stem)
-            .join("logs"),
-        format!("{}.log", exe_stem),
-    );
+    let log_dir = env::current_dir()
+        .expect("Cannot determine current directory")
+        .join("examples")
+        .join(exe_stem)
+        .join("logs");
+    let log_filename = format!("{}.log", exe_stem);
+
+    let log_file_path = log_dir.join(&log_filename);
+    if log_file_path.exists() {
+        _ = fs::remove_file(log_file_path);
+    }
+
+    let appender = tracing_appender::rolling::never(log_dir, log_filename);
+
+    let json_layer = tracing_subscriber::fmt::Layer::new()
+        .json() // Use the JSON formatter
+        .with_writer(appender)
+        .with_ansi(false)
+        .with_filter(LevelFilter::from_level(max_level));
 
     Registry::default()
         .with(oslog_layer)
-        .with(
-            tracing_subscriber::fmt::Layer::new()
-                .with_writer(appender)
-                .with_ansi(false)
-                .with_filter(LevelFilter::from_level(max_level)),
-        )
+        .with(json_layer)
         .init();
 }
 
@@ -69,10 +75,11 @@ pub fn load_credentials() -> (FullJid, String) {
         );
     }
 
-    let path = env::current_dir()
-        .expect("Cannot determine current directory")
-        .join("examples")
-        .join(".env");
+    let path =
+        env::current_dir()
+            .expect("Cannot determine current directory")
+            .join("examples")
+            .join(".env");
 
     dotenvy::from_path(&path).expect(&format!("Missing .env file at {:?}.", path));
 

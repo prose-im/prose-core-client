@@ -22,7 +22,7 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, SidebarItem,
+    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, RoomJid, SidebarItem,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
@@ -763,7 +763,9 @@ enum Selection {
     ConvertGroupToPrivateChannel,
     #[strum(serialize = "[Debug] Load bookmarks")]
     LoadBookmarks,
-    #[strum(serialize = "[Debug] Delete bookmarks PubSub node")]
+    #[strum(serialize = "[Debug] Delete individual bookmarks")]
+    DeleteIndividualBookmarks,
+    #[strum(serialize = "[Debug] Delete whole bookmarks PubSub node")]
     DeleteBookmarksPubSubNode,
     #[strum(serialize = "[Debug] Send raw XML")]
     SendRawXML,
@@ -922,13 +924,19 @@ async fn main() -> Result<()> {
                     let values = items.get(key).unwrap();
                     for value in values {
                         println!(
-                            "  - {:<36} | has draft: {} | unread count: {}",
+                            "  - {:<36} | {:<50} | has draft: {} | unread count: {}",
                             value
                                 .room
                                 .to_generic_room()
                                 .name()
                                 .unwrap_or("<untitled>".to_string())
                                 .truncate_to(36),
+                            value
+                                .room
+                                .to_generic_room()
+                                .jid()
+                                .to_string()
+                                .truncate_to(50),
                             value.has_draft,
                             value.unread_count
                         );
@@ -1044,6 +1052,20 @@ async fn main() -> Result<()> {
                     .map(|b| JidWithName::from(b).to_string())
                     .collect::<Vec<_>>();
                 println!("{}", bookmarks.join("\n"));
+            }
+            Selection::DeleteIndividualBookmarks => {
+                let bookmarks = client
+                    .debug
+                    .load_bookmarks()
+                    .await?
+                    .into_iter()
+                    .map(JidWithName::from)
+                    .collect::<Vec<_>>();
+                let selected_bookmarks = select_multiple_jids_from_list(bookmarks);
+                client
+                    .debug
+                    .delete_bookmarks(selected_bookmarks.into_iter().map(RoomJid::from))
+                    .await?;
             }
             Selection::DeleteBookmarksPubSubNode => {
                 println!("Deleting PubSub node…");

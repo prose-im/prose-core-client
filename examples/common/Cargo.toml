@@ -11,4 +11,4 @@ jid = { workspace = true }
 tracing = { workspace = true }
 tracing-appender = "0.2"
 tracing-oslog = "0.1.2"
-tracing-subscriber = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["json"] }

@@ -3,22 +3,24 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashSet;
+use std::mem;
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
 use futures::FutureExt;
-use prose_wasm_utils::ProseFutureExt;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use prose_proc_macros::DependenciesStruct;
+use prose_wasm_utils::ProseFutureExt;
 
 use crate::app::deps::{
     DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService, DynSidebarRepository,
 };
-use crate::domain::rooms::models::{RoomInternals, RoomSpec};
+use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
@@ -43,6 +45,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///
     /// Loads the remote bookmarks then proceeds with the logic details
     /// in `extend_items_from_bookmarks`.
+    #[tracing::instrument(skip(self))]
     async fn load_and_extend_items_from_bookmarks(&self) -> Result<()> {
         let bookmarks = self.bookmarks_service.load_bookmarks().await?;
         self.extend_items_from_bookmarks(bookmarks).await?;
@@ -65,7 +68,10 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     async fn extend_items_from_bookmarks(&self, bookmarks: Vec<Bookmark>) -> Result<()> {
         let mut sidebar_changed = false;
 
-        for bookmark in bookmarks {
+        let mut sidebar_items_to_delete = HashSet::<RoomJid>::new();
+        let mut bookmarks_to_save = Vec::<Bookmark>::new();
+
+        for mut bookmark in bookmarks {
             if let Some(mut sidebar_item) = self.sidebar_repo.get(&bookmark.jid) {
                 // Update basic properties
                 sidebar_item.name = bookmark.name;
@@ -92,10 +98,43 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 continue;
             }
 
-            let join_result = self
-                .join_room_identified_by_bookmark_if_needed(&bookmark)
-                .await;
+            let mut bookmark_modified = false;
+
+            let join_result = 'result: loop {
+                let result = self
+                    .join_room_identified_by_bookmark_if_needed(&bookmark)
+                    .await;
+
+                match result {
+                    Ok(room) => break 'result Ok(room),
+                    Err(err) => {
+                        // The room is gone…
+                        info!("Bookmarked room {} is gone.", bookmark.jid);
+                        if let Some(gone_err) = err.gone_err() {
+                            // Does it have a new location?
+                            if let Some(new_location) = gone_err.new_location {
+                                // Do we have a sidebar item already with that location?
+                                if self.sidebar_repo.get(&new_location).is_some() {
+                                    break 'result Ok(None);
+                                }
+                                info!("Following to new location {}…", new_location);
+                                let gone_room_jid = mem::replace(&mut bookmark.jid, new_location);
+                                if !bookmark_modified {
+                                    sidebar_items_to_delete.insert(gone_room_jid);
+                                    bookmark_modified = true;
+                                }
+                                continue;
+                            }
+                        }
+                        break 'result Err(err);
+                    }
+                }
+            };
             sidebar_changed = true;
+
+            if bookmark_modified {
+                bookmarks_to_save.push(bookmark.clone());
+            }
 
             let sidebar_item = match join_result {
                 Ok(None) => continue,
@@ -116,6 +155,28 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             };
 
             self.sidebar_repo.put(&sidebar_item);
+        }
+
+        for jid in sidebar_items_to_delete {
+            match self.bookmarks_service.delete_bookmark(&jid).await {
+                Ok(()) => (),
+                Err(err) => warn!(
+                    "Could not delete outdated bookmark. Reason {}",
+                    err.to_string()
+                ),
+            }
+        }
+
+        for bookmark in bookmarks_to_save {
+            match self.bookmarks_service.save_bookmark(&bookmark).await {
+                Ok(()) => (),
+                Err(err) => {
+                    warn!(
+                        "Could not save updated bookmark. Reason {}",
+                        err.to_string()
+                    )
+                }
+            }
         }
 
         if sidebar_changed {
@@ -494,7 +555,7 @@ impl SidebarDomainService {
     async fn join_room_identified_by_bookmark_if_needed(
         &self,
         bookmark: &Bookmark,
-    ) -> Result<Option<Arc<RoomInternals>>> {
+    ) -> Result<Option<Arc<RoomInternals>>, RoomError> {
         let room = match bookmark.r#type {
             BookmarkType::DirectMessage if !bookmark.in_sidebar => None,
 

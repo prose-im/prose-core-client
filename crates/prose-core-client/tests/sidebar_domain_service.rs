@@ -7,8 +7,9 @@ use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
 use mockall::{predicate, Sequence};
+use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
-use prose_core_client::domain::rooms::models::{RoomInternals, RoomSpec};
+use prose_core_client::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
 use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
@@ -16,7 +17,7 @@ use prose_core_client::domain::sidebar::services::impls::SidebarDomainService;
 use prose_core_client::domain::sidebar::services::SidebarDomainService as SidebarDomainServiceTrait;
 use prose_core_client::test::MockSidebarDomainServiceDependencies;
 use prose_core_client::{room, ClientEvent};
-use prose_xmpp::full;
+use prose_xmpp::{full, RequestError};
 
 #[tokio::test]
 async fn test_extends_sidebar() -> Result<()> {
@@ -35,17 +36,14 @@ async fn test_extends_sidebar() -> Result<()> {
             room_jid: room!("group@prose.org"),
             password: None,
         }))
-        .return_once(|_| {
-            Box::pin(async { Ok(Arc::new(RoomInternals::group(room!("group@prose.org")))) })
-        });
+        .return_once(
+            |_| Box::pin(async { Ok(Arc::new(RoomInternals::group(room!("group@prose.org")))) })
+        );
 
     deps.sidebar_repo
         .expect_put()
         .once()
-        .with(predicate::eq(SidebarItem::group(
-            room!("group@prose.org"),
-            "Group",
-        )))
+        .with(predicate::eq(SidebarItem::group(room!("group@prose.org"), "Group")))
         .return_once(|_| ());
 
     deps.client_event_dispatcher
@@ -56,9 +54,140 @@ async fn test_extends_sidebar() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![
-            Bookmark::group(room!("group@prose.org"), "Group").set_in_sidebar(true)
-        ])
+        .extend_items_from_bookmarks(vec![Bookmark::group(room!("group@prose.org"), "Group")
+            .set_in_sidebar(true)])
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_extends_sidebar_and_follows_new_locations() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    // Make sure that the method calls are in the exact order…
+    let mut seq = Sequence::new();
+
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("a0@prose.org")))
+        .return_once(|_| None);
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+            room_jid: room!("a0@prose.org"),
+            password: None,
+        }))
+        .return_once(|_| {
+            Box::pin(async {
+                Err(RoomError::RequestError(RequestError::XMPP {
+                    err: StanzaError {
+                        type_: ErrorType::Cancel,
+                        by: None,
+                        defined_condition: DefinedCondition::Gone,
+                        texts: Default::default(),
+                        other: None,
+                        new_location: Some("xmpp:a1@prose.org?join".to_string()),
+                    },
+                }))
+            })
+        });
+
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("a1@prose.org")))
+        .return_once(|_| None);
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+            room_jid: room!("a1@prose.org"),
+            password: None,
+        }))
+        .return_once(|_| {
+            Box::pin(async {
+                Err(RoomError::RequestError(RequestError::XMPP {
+                    err: StanzaError {
+                        type_: ErrorType::Cancel,
+                        by: None,
+                        defined_condition: DefinedCondition::Gone,
+                        texts: Default::default(),
+                        other: None,
+                        new_location: Some("xmpp:a2@prose.org?join".to_string()),
+                    },
+                }))
+            })
+        });
+
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("a2@prose.org")))
+        .return_once(|_| None);
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+            room_jid: room!("a2@prose.org"),
+            password: None,
+        }))
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(Arc::new(RoomInternals::group(room!("a2@prose.org")).with_name("Group")))
+            })
+        });
+
+    deps.sidebar_repo
+        .expect_put()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(SidebarItem::group(room!("a2@prose.org"), "Group").set_is_favorite(true))
+        )
+        .return_once(|_| ());
+
+    deps.bookmarks_service
+        .expect_delete_bookmark()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room!("a0@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    deps.bookmarks_service
+        .expect_save_bookmark()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(
+            Bookmark::group(room!("a2@prose.org"), "Group")
+                .set_in_sidebar(true)
+                .set_is_favorite(true),
+        ))
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .extend_items_from_bookmarks(vec![Bookmark::group(room!("a0@prose.org"), "Group")
+            .set_in_sidebar(true)
+            .set_is_favorite(true)])
         .await?;
 
     Ok(())
@@ -88,9 +217,8 @@ async fn test_handles_removed_item() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![
-            Bookmark::group(room!("group@prose.org"), "Group").set_in_sidebar(false)
-        ])
+        .extend_items_from_bookmarks(vec![Bookmark::group(room!("group@prose.org"), "Group")
+            .set_in_sidebar(false)])
         .await?;
 
     Ok(())
@@ -108,9 +236,8 @@ async fn test_does_not_add_removed_item() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![
-            Bookmark::group(room!("group@prose.org"), "Group").set_in_sidebar(false)
-        ])
+        .extend_items_from_bookmarks(vec![Bookmark::group(room!("group@prose.org"), "Group")
+            .set_in_sidebar(false)])
         .await?;
 
     Ok(())
@@ -124,9 +251,9 @@ async fn test_handles_updated_bookmark() -> Result<()> {
         .expect_get()
         .once()
         .with(predicate::eq(room!("group@prose.org")))
-        .return_once(|_| {
-            Some(SidebarItem::group(room!("group@prose.org"), "Group").set_is_favorite(false))
-        });
+        .return_once(
+            |_| Some(SidebarItem::group(room!("group@prose.org"), "Group").set_is_favorite(false))
+        );
 
     deps.sidebar_repo
         .expect_put()
@@ -193,9 +320,7 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.room_management_service
         .expect_exit_room()
         .once()
-        .with(predicate::eq(full!(
-            "channel@conference.prose.org/jane.doe"
-        )))
+        .with(predicate::eq(full!("channel@conference.prose.org/jane.doe")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
@@ -375,9 +500,7 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
     deps.room_management_service
         .expect_exit_room()
         .once()
-        .with(predicate::eq(full!(
-            "channel@conference.prose.org/jane.doe"
-        )))
+        .with(predicate::eq(full!("channel@conference.prose.org/jane.doe")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     // Unlike public channels, private channels should never be deleted. Otherwise we cannot
@@ -618,9 +741,9 @@ async fn test_convert_group_to_private_channel() -> Result<()> {
                         .await?;
 
                     Ok(Arc::new(
-                        RoomInternals::private_channel(room!(
-                            "private-channel@conference.prose.org"
-                        ))
+                        RoomInternals::private_channel(
+                            room!("private-channel@conference.prose.org")
+                        )
                         .with_name("My Private Channel"),
                     ))
                 })
@@ -757,7 +880,100 @@ async fn test_convert_private_to_public_channel() -> Result<()> {
 
 #[tokio::test]
 async fn test_handle_destroyed_room() -> Result<()> {
-    panic!("Implement me!")
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    // Make sure that the method calls are in the exact order…
+    let mut seq = Sequence::new();
+
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room!("group@muc.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Some(SidebarItem::group(room!("group@muc.prose.org"), "Group")));
+    deps.connected_rooms_repo
+        .expect_delete()
+        .once()
+        .with(predicate::eq(room!("group@muc.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| ());
+    deps.sidebar_repo
+        .expect_delete()
+        .once()
+        .with(predicate::eq(room!("group@muc.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| ());
+    deps.bookmarks_service
+        .expect_delete_bookmark()
+        .once()
+        .with(predicate::eq(room!("group@muc.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room!("channel@muc.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| None);
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+            room_jid: room!("channel@muc.prose.org"),
+            password: None,
+        }))
+        .in_sequence(&mut seq)
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(Arc::new(
+                    RoomInternals::private_channel(room!("channel@muc.prose.org"))
+                        .with_name("The Channel"),
+                ))
+            })
+        });
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+
+    deps.sidebar_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room!("channel@muc.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| None);
+    deps.sidebar_repo
+        .expect_put()
+        .once()
+        .with(predicate::eq(SidebarItem::private_channel(
+            room!("channel@muc.prose.org"),
+            "The Channel",
+        )))
+        .in_sequence(&mut seq)
+        .return_once(|_| ());
+    deps.bookmarks_service
+        .expect_save_bookmark()
+        .once()
+        .with(predicate::eq(
+            Bookmark::private_channel(room!("channel@muc.prose.org"), "The Channel")
+                .set_in_sidebar(true),
+        ))
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .handle_destroyed_room(
+            &room!("group@muc.prose.org"),
+            Some(room!("channel@muc.prose.org")),
+        )
+        .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
