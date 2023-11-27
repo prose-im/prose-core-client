@@ -317,6 +317,20 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             room_jid, room.jid
         );
 
+        // The returned room has a new JID, which implies that the old room has been deleted…
+        if room_jid != &room.jid {
+            self.connected_rooms_repo.delete(room_jid);
+            self.sidebar_repo.delete(room_jid);
+
+            if let Err(err) = self.bookmarks_service.delete_bookmark(room_jid).await {
+                warn!(
+                    "Could not delete bookmark {}. Reason: {}",
+                    room_jid,
+                    err.to_string()
+                );
+            }
+        }
+
         self.insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(room)
             .await?;
 

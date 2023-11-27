@@ -27,6 +27,7 @@ pub struct RoomsService {
 }
 
 impl RoomsService {
+    #[tracing::instrument(skip(self))]
     pub async fn start_observing_rooms(&self) -> Result<()> {
         if self.ctx.is_observing_rooms.swap(true, Ordering::Acquire) {
             return Ok(());
