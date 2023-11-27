@@ -66,12 +66,13 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 fn select_command() -> Selection {
     let options: Vec<Selection> = Selection::iter().collect();
 
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("What do you want to do?")
-        .default(0)
-        .items(&options[..])
-        .interact()
-        .ok();
+    let selection =
+        Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("What do you want to do?")
+            .default(0)
+            .items(&options[..])
+            .interact()
+            .ok();
 
     let Some(selection) = selection else {
         return Selection::Noop;
@@ -317,12 +318,13 @@ async fn select_contact(client: &Client) -> Result<BareJid> {
 }
 
 async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
-    let contacts = client
-        .contacts
-        .load_contacts()
-        .await?
-        .into_iter()
-        .map(JidWithName::from);
+    let contacts =
+        client
+            .contacts
+            .load_contacts()
+            .await?
+            .into_iter()
+            .map(JidWithName::from);
     Ok(select_multiple_jids_from_list(contacts))
 }
 
@@ -330,17 +332,18 @@ async fn select_room(
     client: &Client,
     filter: impl Fn(&SidebarItem) -> bool,
 ) -> Result<Option<RoomEnvelope>> {
-    let mut rooms = client
-        .sidebar
-        .sidebar_items()
-        .into_iter()
-        .filter_map(|room| {
-            if !filter(&room) {
-                return None;
-            }
-            Some(room.room)
-        })
-        .collect::<Vec<_>>();
+    let mut rooms =
+        client
+            .sidebar
+            .sidebar_items()
+            .into_iter()
+            .filter_map(|room| {
+                if !filter(&room) {
+                    return None;
+                }
+                Some(room.room)
+            })
+            .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
 
     if rooms.is_empty() {
@@ -348,9 +351,7 @@ async fn select_room(
         return Ok(None);
     }
 
-    Ok(Some(
-        select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone(),
-    ))
+    Ok(Some(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone()))
 }
 
 async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
@@ -373,9 +374,7 @@ async fn select_sidebar_item(client: &Client) -> Result<Option<SidebarItem>> {
     if items.is_empty() {
         return Ok(None);
     }
-    Ok(Some(
-        select_item_from_list(items, |item| JidWithName::from(item.clone())).clone(),
-    ))
+    Ok(Some(select_item_from_list(items, |item| JidWithName::from(item.clone())).clone()))
 }
 
 fn select_item_from_list<T, O: ToString>(
@@ -384,12 +383,13 @@ fn select_item_from_list<T, O: ToString>(
 ) -> T {
     let mut list = iter.into_iter().collect::<Vec<_>>();
     let display_list = list.iter().map(format).collect::<Vec<_>>();
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select a contact")
-        .default(0)
-        .items(display_list.as_slice())
-        .interact()
-        .unwrap();
+    let selection =
+        Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Select a contact")
+            .default(0)
+            .items(display_list.as_slice())
+            .interact()
+            .unwrap();
     println!();
     list.swap_remove(selection)
 }
@@ -739,6 +739,8 @@ enum Selection {
     JoinPublicRoom,
     #[strum(serialize = "Destroy public room")]
     DestroyPublicRoom,
+    #[strum(serialize = "Destroy connected room")]
+    DestroyConnectedRoom,
     #[strum(serialize = "List connected rooms")]
     ListConnectedRooms,
     #[strum(serialize = "Rename connected room")]
@@ -880,6 +882,15 @@ async fn main() -> Result<()> {
                 client
                     .rooms
                     .destroy_room(&rooms[selection].jid.clone().into())
+                    .await?;
+            }
+            Selection::DestroyConnectedRoom => {
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+                client
+                    .rooms
+                    .destroy_room(room.to_generic_room().jid())
                     .await?;
             }
             Selection::ListConnectedRooms => {
