@@ -5,19 +5,19 @@
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 use crate::domain::sidebar::models::SidebarItem;
 
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait SidebarReadOnlyRepository: SendUnlessWasm + SyncUnlessWasm {
-    fn get(&self, jid: &RoomJid) -> Option<SidebarItem>;
+    fn get(&self, jid: &RoomId) -> Option<SidebarItem>;
     fn get_all(&self) -> Vec<SidebarItem>;
 }
 
 pub trait SidebarRepository: SidebarReadOnlyRepository {
     fn put(&self, item: &SidebarItem);
 
-    fn delete(&self, item: &RoomJid);
+    fn delete(&self, item: &RoomId);
     fn delete_all(&self);
 }
 
@@ -26,13 +26,13 @@ mockall::mock! {
     pub SidebarReadWriteRepository {}
 
     impl SidebarReadOnlyRepository for SidebarReadWriteRepository {
-        fn get(&self, jid: &RoomJid) -> Option<SidebarItem>;
+        fn get(&self, jid: &RoomId) -> Option<SidebarItem>;
         fn get_all(&self) -> Vec<SidebarItem>;
     }
 
     impl SidebarRepository for SidebarReadWriteRepository {
         fn put(&self, item: &SidebarItem);
-        fn delete(&self, item: &RoomJid);
+        fn delete(&self, item: &RoomId);
         fn delete_all(&self);
     }
 }

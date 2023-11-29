@@ -9,7 +9,7 @@ use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation};
 use prose_core_client::domain::shared::models::{
     RoomEvent, RoomEventType, RoomUserInfo, ServerEvent,
 };
-use prose_core_client::dtos::{Availability, RoomJid};
+use prose_core_client::dtos::{Availability, RoomId};
 use prose_core_client::room;
 use prose_core_client::test::parse_xml;
 use prose_proc_macros::mt_test;

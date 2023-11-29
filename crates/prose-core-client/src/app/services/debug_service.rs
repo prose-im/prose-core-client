@@ -11,7 +11,7 @@ use prose_xmpp::mods;
 
 use crate::domain::sidebar::models::Bookmark;
 use crate::domain::sidebar::services::BookmarksService;
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 use crate::infra::xmpp::type_conversions::bookmark::ns;
 use crate::infra::xmpp::XMPPClient;
 
@@ -36,7 +36,7 @@ impl DebugService {
         self.client.load_bookmarks().await
     }
 
-    pub async fn delete_bookmarks(&self, jids: impl IntoIterator<Item = RoomJid>) -> Result<()> {
+    pub async fn delete_bookmarks(&self, jids: impl IntoIterator<Item = RoomId>) -> Result<()> {
         for jid in jids.into_iter() {
             self.client.delete_bookmark(&jid).await?;
         }

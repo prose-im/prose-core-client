@@ -11,7 +11,7 @@ use jid::{BareJid, FullJid, Jid};
 use parking_lot::RwLock;
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomState};
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 use crate::dtos::{Occupant, UserBasicInfo};
 
 /// Contains information about a connected room and its state.
@@ -24,7 +24,7 @@ pub struct RoomInternals {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoomInfo {
     /// The JID of the room.
-    pub jid: RoomJid,
+    pub jid: RoomId,
     /// The description of the room.
     pub description: Option<String>,
     /// The JID of our logged-in user.
@@ -116,7 +116,7 @@ impl RoomInternals {
 }
 
 impl RoomInternals {
-    pub fn pending(room_jid: &RoomJid, user_jid: &BareJid, nickname: &str) -> Self {
+    pub fn pending(room_jid: &RoomId, user_jid: &BareJid, nickname: &str) -> Self {
         Self {
             info: RoomInfo {
                 jid: room_jid.clone(),

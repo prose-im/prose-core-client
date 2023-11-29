@@ -11,7 +11,7 @@ use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
 use prose_core_client::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use prose_core_client::domain::sidebar::services::impls::SidebarDomainService;
 use prose_core_client::domain::sidebar::services::SidebarDomainService as SidebarDomainServiceTrait;

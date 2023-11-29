@@ -16,7 +16,7 @@ use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
 };
-use prose_core_client::domain::shared::models::{RoomJid, RoomType};
+use prose_core_client::domain::shared::models::{RoomId, RoomType};
 use prose_core_client::dtos::{Member, PublicRoomInfo, UserProfile};
 use prose_core_client::room;
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};

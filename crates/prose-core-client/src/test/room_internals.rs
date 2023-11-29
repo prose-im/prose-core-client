@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInfo, RoomInternals};
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 use crate::dtos::{Member, Occupant};
 use crate::test::mock_data;
 use crate::util::jid_ext::BareJidExt;
@@ -25,7 +25,7 @@ impl RoomInternals {
         )
     }
 
-    pub fn mock_pending_room(jid: impl Into<RoomJid>, next_hash: &str) -> Self {
+    pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
         Self::pending(
             &jid.into(),
             &mock_data::account_jid().into_bare(),
@@ -37,7 +37,7 @@ impl RoomInternals {
         )
     }
 
-    pub fn group(jid: impl Into<RoomJid>) -> Self {
+    pub fn group(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
             jid: jid.into(),
             description: None,
@@ -48,7 +48,7 @@ impl RoomInternals {
         })
     }
 
-    pub fn public_channel(jid: impl Into<RoomJid>) -> Self {
+    pub fn public_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
             jid: jid.into(),
             description: None,
@@ -59,7 +59,7 @@ impl RoomInternals {
         })
     }
 
-    pub fn private_channel(jid: impl Into<RoomJid>) -> Self {
+    pub fn private_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
             jid: jid.into(),
             description: None,

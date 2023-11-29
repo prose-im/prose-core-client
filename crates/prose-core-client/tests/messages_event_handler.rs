@@ -12,7 +12,7 @@ use xmpp_parsers::message::MessageType;
 use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::{room, ClientRoomEventType};
 use prose_xmpp::mods::chat;

@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -15,9 +15,9 @@ use crate::domain::shared::models::{RoomJid, RoomType};
 pub trait MessageMigrationDomainService: SendUnlessWasm + SyncUnlessWasm {
     async fn copy_all_messages_from_room(
         &self,
-        source_room: &RoomJid,
+        source_room: &RoomId,
         source_room_type: &RoomType,
-        target_room: &RoomJid,
+        target_room: &RoomId,
         target_room_type: &RoomType,
     ) -> Result<()>;
 }

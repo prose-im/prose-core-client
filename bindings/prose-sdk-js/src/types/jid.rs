@@ -6,7 +6,7 @@
 use core::fmt::{Debug, Display, Formatter};
 use core::str::FromStr;
 
-use prose_core_client::dtos::RoomJid;
+use prose_core_client::dtos::RoomId;
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -90,8 +90,8 @@ impl Display for BareJid {
     }
 }
 
-impl From<BareJid> for RoomJid {
+impl From<BareJid> for RoomId {
     fn from(value: BareJid) -> Self {
-        RoomJid::from(value.0)
+        RoomId::from(value.0)
     }
 }

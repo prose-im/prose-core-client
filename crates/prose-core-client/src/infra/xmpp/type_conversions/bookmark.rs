@@ -11,7 +11,7 @@ use xmpp_parsers::pubsub::PubSubPayload;
 
 use prose_xmpp::{ElementExt, ParseError, RequestError};
 
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
 
 pub mod ns {
@@ -26,7 +26,7 @@ impl TryFrom<Element> for Bookmark {
 
         Ok(Self {
             name: value.attr_req("name")?.to_string(),
-            jid: RoomJid::from(BareJid::from_str(&value.attr_req("jid")?)?),
+            jid: RoomId::from(BareJid::from_str(&value.attr_req("jid")?)?),
             r#type: BookmarkType::from_str(&value.attr_req("type")?)?,
             is_favorite: value.attr("favorite").is_some(),
             in_sidebar: value.attr("sidebar").is_some(),

@@ -12,21 +12,21 @@ use minidom::IntoAttributeValue;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A RoomJid while always a BareJid can either stand for a single contact or a MUC room.
-pub struct RoomJid(BareJid);
+pub struct RoomId(BareJid);
 
-impl RoomJid {
+impl RoomId {
     pub fn into_inner(self) -> BareJid {
         self.0
     }
 }
 
-impl From<BareJid> for RoomJid {
+impl From<BareJid> for RoomId {
     fn from(value: BareJid) -> Self {
-        RoomJid(value)
+        RoomId(value)
     }
 }
 
-impl Deref for RoomJid {
+impl Deref for RoomId {
     type Target = BareJid;
 
     fn deref(&self) -> &Self::Target {
@@ -34,19 +34,19 @@ impl Deref for RoomJid {
     }
 }
 
-impl Display for RoomJid {
+impl Display for RoomId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-impl IntoAttributeValue for RoomJid {
+impl IntoAttributeValue for RoomId {
     fn into_attribute_value(self) -> Option<String> {
         self.0.into_attribute_value()
     }
 }
 
-impl FromStr for RoomJid {
+impl FromStr for RoomId {
     type Err = jid::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -62,7 +62,7 @@ pub enum RoomJidParseError {
     JID(#[from] jid::Error),
 }
 
-impl RoomJid {
+impl RoomId {
     pub fn from_iri(iri: &str) -> Result<Self, RoomJidParseError> {
         let Some(mut iri) = iri.strip_prefix("xmpp:") else {
             return Err(RoomJidParseError::InvalidIRI);
@@ -82,13 +82,13 @@ mod tests {
 
     #[test]
     fn test_from_iri() {
-        assert!(RoomJid::from_iri("").is_err());
+        assert!(RoomId::from_iri("").is_err());
         assert_eq!(
-            RoomJid::from_iri("xmpp:room@muc.example.org?join"),
+            RoomId::from_iri("xmpp:room@muc.example.org?join"),
             Ok(room!("room@muc.example.org"))
         );
         assert_eq!(
-            RoomJid::from_iri("xmpp:room@muc.example.org"),
+            RoomId::from_iri("xmpp:room@muc.example.org"),
             Ok(room!("room@muc.example.org"))
         );
     }

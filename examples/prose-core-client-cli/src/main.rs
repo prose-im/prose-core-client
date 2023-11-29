@@ -22,7 +22,7 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, RoomJid, SidebarItem,
+    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, RoomId, SidebarItem,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
@@ -1075,7 +1075,7 @@ async fn main() -> Result<()> {
                 let selected_bookmarks = select_multiple_jids_from_list(bookmarks);
                 client
                     .debug
-                    .delete_bookmarks(selected_bookmarks.into_iter().map(RoomJid::from))
+                    .delete_bookmarks(selected_bookmarks.into_iter().map(RoomId::from))
                     .await?;
             }
             Selection::DeleteBookmarksPubSubNode => {

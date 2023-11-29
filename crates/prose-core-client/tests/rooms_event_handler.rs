@@ -18,7 +18,7 @@ use xmpp_parsers::presence::Presence;
 use prose_core_client::app::event_handlers::{RoomsEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInternals};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, RoomFactory};
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::dtos::{Occupant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,

@@ -26,7 +26,7 @@ use crate::domain::rooms::models::{
     Member, RoomError, RoomInfo, RoomInternals, RoomSessionInfo, RoomSpec,
 };
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 use crate::domain::shared::utils::build_contact_name;
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
@@ -78,7 +78,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
     ///   or `RoomType::Generic`.
     /// - Fails with `RoomError::PublicChannelNameConflict` if the room is of type
     ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
-    async fn rename_room(&self, room_jid: &RoomJid, name: &str) -> Result<(), RoomError> {
+    async fn rename_room(&self, room_jid: &RoomId, name: &str) -> Result<(), RoomError> {
         let Some(room) = self.connected_rooms_repo.get(room_jid) else {
             return Err(RoomError::RoomNotFound);
         };
@@ -120,7 +120,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
     ///   after processing.
     async fn reconfigure_room_with_spec(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<Arc<RoomInternals>, RoomError> {
@@ -245,7 +245,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 impl RoomsDomainService {
     async fn join_room(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         password: Option<&str>,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let user_jid = self.ctx.connected_jid()?.into_bare();
@@ -314,7 +314,7 @@ impl RoomsDomainService {
         match self.connected_rooms_repo.set(room.clone()) {
             Ok(()) => Ok(room),
             Err(_err) => {
-                let room_jid = RoomJid::from(participant.clone());
+                let room_jid = RoomId::from(participant.clone());
                 if let Some(room) = self.connected_rooms_repo.get(&room_jid) {
                     return Ok(room);
                 }
@@ -511,7 +511,7 @@ impl RoomsDomainService {
             };
             attempt += 1;
 
-            let room_jid = RoomJid::from(BareJid::from_parts(
+            let room_jid = RoomId::from(BareJid::from_parts(
                 Some(&NodePart::new(&unique_room_id)?),
                 &service.domain(),
             ));
@@ -631,7 +631,7 @@ impl RoomsDomainService {
 
     fn insert_pending_room(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         user_jid: &BareJid,
         nickname: &str,
     ) -> Result<(), RoomError> {

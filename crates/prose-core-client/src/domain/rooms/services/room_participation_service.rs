@@ -9,7 +9,7 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::RoomError;
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -17,13 +17,13 @@ use crate::dtos::RoomJid;
 pub trait RoomParticipationService: SendUnlessWasm + SyncUnlessWasm {
     async fn invite_users_to_room(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         participants: &[BareJid],
     ) -> Result<(), RoomError>;
 
     async fn grant_membership(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         participant: &BareJid,
     ) -> Result<(), RoomError>;
 }

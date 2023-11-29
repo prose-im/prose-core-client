@@ -19,7 +19,7 @@ use prose_xmpp::Event;
 use crate::app::deps::DynSidebarDomainService;
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::sidebar::models::Bookmark;
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 use crate::infra::xmpp::type_conversions::bookmark::ns;
 
 #[derive(InjectDependencies)]
@@ -57,9 +57,7 @@ impl XMPPEventHandler for BookmarksEventHandler {
                         return Ok(None);
                     }
 
-                    Ok(Some(Event::PubSub(pubsub::Event::PubSubMessage {
-                        message,
-                    })))
+                    Ok(Some(Event::PubSub(pubsub::Event::PubSubMessage { message })))
                 }
             },
             _ => Ok(Some(event)),
@@ -118,7 +116,7 @@ impl BookmarksEventHandler {
     async fn handle_retracted_items(&self, ids: Vec<ItemId>) -> Result<()> {
         let jids = ids
             .into_iter()
-            .map(|id| RoomJid::from_str(&id.0))
+            .map(|id| RoomId::from_str(&id.0))
             .collect::<Result<Vec<_>, _>>()?;
         let jids_refs = jids.iter().collect::<Vec<_>>();
 

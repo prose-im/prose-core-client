@@ -7,12 +7,12 @@ use xmpp_parsers::stanza_error::{DefinedCondition, StanzaError};
 
 use prose_xmpp::RequestError;
 
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 
 #[derive(thiserror::Error, Debug)]
 pub enum RoomError {
     #[error("Room is already connected ({0}).")]
-    RoomIsAlreadyConnected(RoomJid),
+    RoomIsAlreadyConnected(RoomId),
     #[error("No room exists with the specified JID.")]
     RoomNotFound,
     #[error("A public channel with the chosen name exists already.")]
@@ -33,7 +33,7 @@ pub enum RoomError {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoneError {
-    pub new_location: Option<RoomJid>,
+    pub new_location: Option<RoomId>,
 }
 
 impl RoomError {
@@ -66,9 +66,7 @@ impl RoomError {
         }
 
         Some(GoneError {
-            new_location: new_location
-                .as_ref()
-                .and_then(|l| RoomJid::from_iri(l).ok()),
+            new_location: new_location.as_ref().and_then(|l| RoomId::from_iri(l).ok()),
         })
     }
 }

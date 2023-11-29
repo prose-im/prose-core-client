@@ -17,7 +17,7 @@ use prose_xmpp::{
 use crate::app::event_handlers::XMPPEvent;
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{RoomEvent, RoomEventType, ServerEvent};
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
 
 mod message;
@@ -73,7 +73,7 @@ fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
             };
 
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room: RoomJid::from(from.to_bare()),
+                room: RoomId::from(from.to_bare()),
                 r#type: RoomEventType::UserComposeStateChanged {
                     user_id: from.clone(),
                     state: ComposeState::from(chat_state.clone()),
@@ -98,14 +98,14 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
             from: _from,
             invite,
         } => ctx.push_event(ServerEvent::Room(RoomEvent {
-            room: RoomJid::from(invite.jid),
+            room: RoomId::from(invite.jid),
             r#type: RoomEventType::ReceivedInvite {
                 password: invite.password,
             },
         })),
         XMPPMUCEvent::MediatedInvite { from, invite } => {
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room: RoomJid::from(from.to_bare()),
+                room: RoomId::from(from.to_bare()),
                 r#type: RoomEventType::ReceivedInvite {
                     password: invite.password,
                 },

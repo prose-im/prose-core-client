@@ -13,7 +13,7 @@ use prose_proc_macros::InjectDependencies;
 use crate::app::deps::{DynAppContext, DynRoomManagementService, DynSidebarDomainService};
 use crate::domain::rooms::models::constants::MAX_PARTICIPANTS_PER_GROUP;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 use crate::dtos::PublicRoomInfo;
 
 #[derive(InjectDependencies)]
@@ -45,7 +45,7 @@ impl RoomsService {
             .await?)
     }
 
-    pub async fn start_conversation(&self, participants: &[BareJid]) -> Result<RoomJid> {
+    pub async fn start_conversation(&self, participants: &[BareJid]) -> Result<RoomId> {
         if participants.is_empty() {
             bail!("You need at least one participant to start a conversation")
         }
@@ -58,7 +58,7 @@ impl RoomsService {
         }
     }
 
-    pub async fn join_room(&self, room_jid: &RoomJid, password: Option<&str>) -> Result<RoomJid> {
+    pub async fn join_room(&self, room_jid: &RoomId, password: Option<&str>) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
                 room_jid: room_jid.clone(),
@@ -70,7 +70,7 @@ impl RoomsService {
     pub async fn create_room_for_direct_message(
         &self,
         participant_jid: &BareJid,
-    ) -> Result<RoomJid> {
+    ) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant: participant_jid.clone(),
@@ -78,7 +78,7 @@ impl RoomsService {
             .await
     }
 
-    pub async fn create_room_for_group(&self, participants: &[BareJid]) -> Result<RoomJid> {
+    pub async fn create_room_for_group(&self, participants: &[BareJid]) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
                 service: self.ctx.muc_service()?,
@@ -92,7 +92,7 @@ impl RoomsService {
     pub async fn create_room_for_private_channel(
         &self,
         channel_name: impl AsRef<str>,
-    ) -> Result<RoomJid> {
+    ) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
                 service: self.ctx.muc_service()?,
@@ -106,7 +106,7 @@ impl RoomsService {
     pub async fn create_room_for_public_channel(
         &self,
         channel_name: impl AsRef<str>,
-    ) -> Result<RoomJid> {
+    ) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
                 service: self.ctx.muc_service()?,
@@ -117,7 +117,7 @@ impl RoomsService {
             .await
     }
 
-    pub async fn destroy_room(&self, room_jid: &RoomJid) -> Result<()> {
+    pub async fn destroy_room(&self, room_jid: &RoomId) -> Result<()> {
         self.room_management_service
             .destroy_room(room_jid, None)
             .await?;

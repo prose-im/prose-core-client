@@ -22,7 +22,7 @@ use crate::app::deps::{
 };
 use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::ClientEvent;
 
@@ -68,7 +68,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     async fn extend_items_from_bookmarks(&self, bookmarks: Vec<Bookmark>) -> Result<()> {
         let mut sidebar_changed = false;
 
-        let mut sidebar_items_to_delete = HashSet::<RoomJid>::new();
+        let mut sidebar_items_to_delete = HashSet::<RoomId>::new();
         let mut bookmarks_to_save = Vec::<Bookmark>::new();
 
         for mut bookmark in bookmarks {
@@ -196,7 +196,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     async fn insert_item_by_creating_or_joining_room(
         &self,
         request: CreateOrEnterRoomRequest,
-    ) -> Result<RoomJid> {
+    ) -> Result<RoomId> {
         let room = self
             .rooms_domain_service
             .create_or_join_room(request)
@@ -213,7 +213,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// corresponding bookmark.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn insert_item_for_received_message_if_needed(&self, room_jid: &RoomJid) -> Result<()> {
+    async fn insert_item_for_received_message_if_needed(&self, room_jid: &RoomId) -> Result<()> {
         // We do not need to create or join rooms here since we couldn't have received a message
         // from a room we're not connected to. Also rooms for groups are always connected no matter
         // if they are in the sidebar or not.
@@ -238,7 +238,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///   - The corresponding room will be renamed.
     ///   - The corresponding bookmark will be renamed.
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
-    async fn rename_item(&self, room_jid: &RoomJid, name: &str) -> Result<()> {
+    async fn rename_item(&self, room_jid: &RoomId, name: &str) -> Result<()> {
         // If we don't have a sidebar item for this room there's no point in renaming it. It would
         // either not be connected or be a group which cannot be renamed.
         let Some(mut item) = self.sidebar_repo.get(room_jid) else {
@@ -274,7 +274,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// If the item is not in the list of sidebar items no action is performed, otherwise:
     ///   - The corresponding bookmark will be updated to reflect the new status of `is_favorite`.
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
-    async fn toggle_item_is_favorite(&self, room_jid: &RoomJid) -> Result<()> {
+    async fn toggle_item_is_favorite(&self, room_jid: &RoomId) -> Result<()> {
         let Some(mut sidebar_item) = self.sidebar_repo.get(room_jid) else {
             return Ok(());
         };
@@ -301,7 +301,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     #[tracing::instrument(skip(self))]
     async fn reconfigure_item_with_spec(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<()> {
@@ -346,7 +346,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///   persistent connections and can be rediscovered.
     /// - Triggers a `ClientEvent::SidebarChanged` event after processing to notify of the
     ///   sidebar update.
-    async fn remove_items(&self, room_jids: &[&RoomJid]) -> Result<()> {
+    async fn remove_items(&self, room_jids: &[&RoomId]) -> Result<()> {
         for jid in room_jids {
             self.remove_item(*jid).await?;
         }
@@ -362,7 +362,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// - Disconnects channels and updates the repository state for each provided JID.
     /// - Bookmarks remain untouched.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_removed_items(&self, room_jids: &[&RoomJid]) -> Result<()> {
+    async fn handle_removed_items(&self, room_jids: &[&RoomId]) -> Result<()> {
         for jid in room_jids {
             let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
                 continue;
@@ -408,8 +408,8 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
 
     async fn handle_destroyed_room(
         &self,
-        room_jid: &RoomJid,
-        alternate_room: Option<RoomJid>,
+        room_jid: &RoomId,
+        alternate_room: Option<RoomId>,
     ) -> Result<()> {
         // Figure out if this affects the sidebar so that we'll have to send an event…
         let mut dispatch_event = self.sidebar_repo.get(room_jid).is_some();
@@ -455,7 +455,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
-    async fn handle_removal_from_room(&self, room_jid: &RoomJid, is_permanent: bool) -> Result<()> {
+    async fn handle_removal_from_room(&self, room_jid: &RoomId, is_permanent: bool) -> Result<()> {
         if is_permanent {
             return self.handle_destroyed_room(room_jid, None).await;
         }
@@ -499,7 +499,7 @@ impl SidebarDomainService {
     ///   - The bookmarks are fully deleted as DirectMessages do not need to be tracked and
     ///     Public Channels can be rediscovered.
     /// - The `SidebarRepository` is updated by removing the item.
-    async fn remove_item(&self, jid: &RoomJid) -> Result<()> {
+    async fn remove_item(&self, jid: &RoomId) -> Result<()> {
         let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
             return Ok(());
         };
@@ -612,7 +612,7 @@ impl SidebarDomainService {
     async fn insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(
         &self,
         room: Arc<RoomInternals>,
-    ) -> Result<RoomJid> {
+    ) -> Result<RoomId> {
         let room_name = room.name().unwrap_or(room.jid.to_string());
 
         let bookmark_type = match room.r#type {

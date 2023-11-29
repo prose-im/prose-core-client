@@ -16,7 +16,7 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use crate::domain::messaging::models::{Emoji, MessageId, StanzaParseError};
 use crate::domain::messaging::services::MessagingService;
 use crate::domain::shared::models::RoomType;
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -120,7 +120,7 @@ impl MessagingService for XMPPClient {
 
     async fn relay_archived_message_to_room(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         room_type: &RoomType,
         message: ArchivedMessage,
     ) -> Result<()> {

@@ -7,11 +7,11 @@ use jid::BareJid;
 
 use crate::domain::rooms::models::RoomSessionInfo;
 use crate::domain::shared::models::RoomType;
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 use crate::test::mock_data;
 
 impl RoomSessionInfo {
-    pub fn new_room(room_jid: impl Into<RoomJid>, room_type: RoomType) -> Self {
+    pub fn new_room(room_jid: impl Into<RoomId>, room_type: RoomType) -> Self {
         Self {
             room_jid: room_jid.into(),
             room_name: None,

@@ -7,7 +7,7 @@ use anyhow::Result;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::messaging::repos::MessagesRepository;
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::room;
 use prose_core_client::test::MessageBuilder;

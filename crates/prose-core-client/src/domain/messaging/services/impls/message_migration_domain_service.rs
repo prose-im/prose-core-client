@@ -11,7 +11,7 @@ use crate::domain::messaging::models::StanzaId;
 use prose_proc_macros::DependenciesStruct;
 
 use crate::app::deps::{DynMessageArchiveService, DynMessagingService};
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 
 use super::super::MessageMigrationDomainService as MessageMigrationDomainServiceTrait;
 
@@ -26,9 +26,9 @@ pub struct MessageMigrationDomainService {
 impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
     async fn copy_all_messages_from_room(
         &self,
-        source_room: &RoomJid,
+        source_room: &RoomId,
         source_room_type: &RoomType,
-        target_room: &RoomJid,
+        target_room: &RoomId,
         target_room_type: &RoomType,
     ) -> Result<()> {
         let mut first_message_id: Option<StanzaId> = None;

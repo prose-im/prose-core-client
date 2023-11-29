@@ -5,12 +5,12 @@
 
 use jid::BareJid;
 
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType};
 
 /// Contains information about a room after creating or joining it.
 #[derive(Debug, PartialEq, Clone)]
 pub struct RoomSessionInfo {
-    pub room_jid: RoomJid,
+    pub room_jid: RoomId,
     pub room_name: Option<String>,
     pub room_description: Option<String>,
     pub room_type: RoomType,

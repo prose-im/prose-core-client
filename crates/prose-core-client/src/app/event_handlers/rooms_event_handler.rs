@@ -27,7 +27,7 @@ use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::{ComposeState, RoomInternals};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomEventType, RoomJid, ServerEvent};
+use crate::domain::shared::models::{RoomEventType, RoomId, ServerEvent};
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
@@ -118,7 +118,7 @@ impl ServerEventHandler for RoomsEventHandler {
 }
 
 impl RoomsEventHandler {
-    fn get_room(&self, jid: &RoomJid) -> Result<Arc<RoomInternals>> {
+    fn get_room(&self, jid: &RoomId) -> Result<Arc<RoomInternals>> {
         self.connected_rooms_repo
             .get(jid)
             .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))
@@ -202,7 +202,7 @@ impl RoomsEventHandler {
         };
 
         let from = from;
-        let bare_from = RoomJid::from(from.to_bare());
+        let bare_from = RoomId::from(from.to_bare());
 
         // Ignore presences that were sent by us. We don't have a room for the logged-in user.
         if *bare_from == self.ctx.connected_jid()?.into_bare() {
@@ -247,7 +247,7 @@ impl RoomsEventHandler {
                         .unwrap_or("<none>")
                 );
                 self.sidebar_domain_service
-                    .handle_destroyed_room(&room.jid, destroy.jid.map(RoomJid::from))
+                    .handle_destroyed_room(&room.jid, destroy.jid.map(RoomId::from))
                     .await?;
                 return Ok(());
             }
@@ -316,7 +316,7 @@ impl RoomsEventHandler {
         chat_state: ChatState,
         message_type: MessageType,
     ) -> Result<()> {
-        let bare_from = RoomJid::from(from.to_bare());
+        let bare_from = RoomId::from(from.to_bare());
 
         let Some(room) = self.connected_rooms_repo.get(&bare_from) else {
             error!("Received chat state from sender for which we do not have a room.");

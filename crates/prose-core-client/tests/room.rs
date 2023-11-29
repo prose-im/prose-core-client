@@ -13,7 +13,7 @@ use xmpp_parsers::rsm::SetResult;
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::domain::shared::models::RoomType;
 use prose_core_client::dtos::{Member, Occupant};
 use prose_core_client::room;

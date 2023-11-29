@@ -14,7 +14,7 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::shared::models::{RoomEvent, RoomEventType, RoomUserInfo, ServerEvent};
-use crate::dtos::{Availability, RoomJid};
+use crate::dtos::{Availability, RoomId};
 use crate::infra::xmpp::type_conversions::event_parser::{
     missing_attribute, missing_element, Context,
 };
@@ -37,7 +37,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
         return missing_attribute(ctx, "from", presence);
     };
 
-    let room = RoomJid::from(from.to_bare());
+    let room = RoomId::from(from.to_bare());
 
     let Some(item) = muc_user.items.first() else {
         return missing_element(ctx, "item", muc_user);
@@ -60,7 +60,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
         ctx.push_event(ServerEvent::Room(RoomEvent {
             room,
             r#type: RoomEventType::RoomWasDestroyed {
-                alternate_room: destroy.jid.map(RoomJid::from),
+                alternate_room: destroy.jid.map(RoomId::from),
             },
         }));
         return Ok(());

@@ -12,7 +12,7 @@ use crate::app::deps::{
     DynConnectedRoomsReadOnlyRepository, DynRoomFactory, DynSidebarDomainService,
     DynSidebarReadOnlyRepository,
 };
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 use crate::dtos::SidebarItem as SidebarItemDTO;
 
 #[derive(InjectDependencies)]
@@ -56,14 +56,14 @@ impl SidebarService {
         item_dtos
     }
 
-    pub async fn toggle_favorite(&self, jid: &RoomJid) -> Result<()> {
+    pub async fn toggle_favorite(&self, jid: &RoomId) -> Result<()> {
         self.sidebar_domain_service
             .toggle_item_is_favorite(jid)
             .await?;
         Ok(())
     }
 
-    pub async fn remove_from_sidebar(&self, jid: &RoomJid) -> Result<()> {
+    pub async fn remove_from_sidebar(&self, jid: &RoomId) -> Result<()> {
         self.sidebar_domain_service.remove_items(&[jid]).await?;
         Ok(())
     }

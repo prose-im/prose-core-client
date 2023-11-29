@@ -16,7 +16,7 @@ use prose_xmpp::{mods, RequestError};
 use crate::domain::rooms::models::{RoomError, RoomSessionInfo, RoomSpec};
 use crate::domain::rooms::services::RoomManagementService;
 use crate::domain::shared::models::RoomType;
-use crate::dtos::{PublicRoomInfo, RoomJid};
+use crate::dtos::{PublicRoomInfo, RoomId};
 use crate::infra::xmpp::type_conversions::room_info::RoomInfo;
 use crate::infra::xmpp::XMPPClient;
 
@@ -67,7 +67,7 @@ impl RoomManagementService for XMPPClient {
                 .await?;
 
         let user_nickname = room_jid.resource_str().to_string();
-        let room_jid = RoomJid::from(room_jid.to_bare());
+        let room_jid = RoomId::from(room_jid.to_bare());
 
         let room_has_been_created = occupancy.user.status.contains(&Status::RoomHasBeenCreated);
         let room_info = self.load_room_info(&room_jid).await?;
@@ -121,7 +121,7 @@ impl RoomManagementService for XMPPClient {
         }
 
         let user_nickname = room_jid.resource_str().to_string();
-        let room_jid = RoomJid::from(room_jid.to_bare());
+        let room_jid = RoomId::from(room_jid.to_bare());
         let room_info = self.load_room_info(&room_jid).await?;
 
         let room_type =
@@ -149,7 +149,7 @@ impl RoomManagementService for XMPPClient {
 
     async fn reconfigure_room(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<(), RoomError> {
@@ -188,7 +188,7 @@ impl RoomManagementService for XMPPClient {
 
     async fn set_room_owners<'a, 'b, 'c>(
         &'a self,
-        room_jid: &'b RoomJid,
+        room_jid: &'b RoomId,
         users: &'c [BareJid],
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
@@ -202,8 +202,8 @@ impl RoomManagementService for XMPPClient {
 
     async fn destroy_room(
         &self,
-        room_jid: &RoomJid,
-        alternate_room: Option<RoomJid>,
+        room_jid: &RoomId,
+        alternate_room: Option<RoomId>,
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         muc_mod
@@ -214,7 +214,7 @@ impl RoomManagementService for XMPPClient {
 }
 
 impl XMPPClient {
-    async fn load_room_info(&self, jid: &RoomJid) -> Result<RoomInfo, RoomError> {
+    async fn load_room_info(&self, jid: &RoomId) -> Result<RoomInfo, RoomError> {
         let caps = self.client.get_mod::<mods::Caps>();
         Ok(RoomInfo::try_from(
             caps.query_disco_info(jid.clone().into_inner(), None)
@@ -222,7 +222,7 @@ impl XMPPClient {
         )?)
     }
 
-    async fn load_room_owners(&self, jid: &RoomJid) -> Result<Vec<BareJid>, RoomError> {
+    async fn load_room_owners(&self, jid: &RoomId) -> Result<Vec<BareJid>, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         // When creating a group we change all "members" to "owners", so at least for Prose groups
         // this should work as expected. In case it fails we ignore the error, which can happen

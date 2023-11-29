@@ -6,7 +6,7 @@
 use jid::FullJid;
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation};
-use crate::dtos::{Availability, RoomJid};
+use crate::dtos::{Availability, RoomId};
 
 #[derive(Debug, PartialEq)]
 pub enum ServerEvent {
@@ -16,7 +16,7 @@ pub enum ServerEvent {
 
 #[derive(Debug, PartialEq)]
 pub struct RoomEvent {
-    pub room: RoomJid,
+    pub room: RoomId,
     pub r#type: RoomEventType,
 }
 
@@ -48,7 +48,7 @@ pub enum RoomEventType {
     },
 
     RoomWasDestroyed {
-        alternate_room: Option<RoomJid>,
+        alternate_room: Option<RoomId>,
     },
     /// The configuration _or_ name of the room was changed.
     RoomConfigChanged,

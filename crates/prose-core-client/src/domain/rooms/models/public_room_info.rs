@@ -3,10 +3,10 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PublicRoomInfo {
-    pub jid: RoomJid,
+    pub jid: RoomId,
     pub name: Option<String>,
 }

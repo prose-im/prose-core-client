@@ -9,7 +9,7 @@ use xmpp_parsers::muc::user::Affiliation;
 
 use crate::domain::rooms::models::RoomError;
 use crate::domain::rooms::services::RoomParticipationService;
-use crate::dtos::RoomJid;
+use crate::dtos::RoomId;
 use prose_xmpp::mods;
 use prose_xmpp::stanza::muc::{mediated_invite, MediatedInvite};
 
@@ -20,7 +20,7 @@ use crate::infra::xmpp::XMPPClient;
 impl RoomParticipationService for XMPPClient {
     async fn invite_users_to_room(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         participants: &[BareJid],
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
@@ -48,7 +48,7 @@ impl RoomParticipationService for XMPPClient {
 
     async fn grant_membership(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         participant: &BareJid,
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();

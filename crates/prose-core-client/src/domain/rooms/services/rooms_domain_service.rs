@@ -11,7 +11,7 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreateRoomType {
@@ -27,7 +27,7 @@ pub enum CreateOrEnterRoomRequest {
         room_type: CreateRoomType,
     },
     JoinRoom {
-        room_jid: RoomJid,
+        room_jid: RoomId,
         password: Option<String>,
     },
     JoinDirectMessage {
@@ -53,7 +53,7 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
     /// - Dispatches `ClientEvent::RoomChanged` of type `RoomEventType::AttributesChanged`
     ///   after processing.
-    async fn rename_room(&self, room_jid: &RoomJid, name: &str) -> Result<(), RoomError>;
+    async fn rename_room(&self, room_jid: &RoomId, name: &str) -> Result<(), RoomError>;
 
     /// Reconfigures the room identified by `room_jid` according to `spec` and renames it to `new_name`.
     ///
@@ -66,7 +66,7 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   after processing.
     async fn reconfigure_room_with_spec(
         &self,
-        room_jid: &RoomJid,
+        room_jid: &RoomId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<Arc<RoomInternals>, RoomError>;
