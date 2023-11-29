@@ -6,6 +6,7 @@
 use jid::FullJid;
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation};
+use crate::domain::shared::models::{OccupantId, UserResourceId};
 use crate::dtos::{Availability, RoomId};
 
 #[derive(Debug, PartialEq)]
@@ -16,14 +17,14 @@ pub enum ServerEvent {
 
 #[derive(Debug, PartialEq)]
 pub struct RoomEvent {
-    pub room: RoomId,
+    pub room_id: RoomId,
     pub r#type: RoomEventType,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct RoomUserInfo {
-    pub jid: FullJid,
-    pub real_jid: Option<FullJid>,
+    pub id: OccupantId,
+    pub real_id: Option<UserResourceId>,
     pub affiliation: RoomAffiliation,
     pub availability: Availability,
     /// Is this the current (logged-in) user?

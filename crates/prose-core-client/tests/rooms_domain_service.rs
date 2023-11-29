@@ -18,7 +18,7 @@ use prose_core_client::domain::rooms::services::{
 };
 use prose_core_client::domain::shared::models::{RoomId, RoomType};
 use prose_core_client::dtos::{Member, PublicRoomInfo, UserProfile};
-use prose_core_client::room;
+use prose_core_client::room_id;
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full};
@@ -33,7 +33,7 @@ async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: room!("room@conference.prose.org"),
+                    jid: room_id!("room@conference.prose.org"),
                     name: Some("new channel".to_string()),
                 }])
             })
@@ -66,7 +66,7 @@ async fn test_creates_group() -> Result<()> {
 
     // jane.doe@prose.org + a@prose.org + b@prose.org + c@prose.org
     let group_jid =
-        room!("org.prose.group.b41be06eda5bac6e7fc5ad069d6cd863c4f329eb@conference.prose.org");
+        room_id!("org.prose.group.b41be06eda5bac6e7fc5ad069d6cd863c4f329eb@conference.prose.org");
     let group_full_jid = full!(format!("{}/jane.doe-hash-1", group_jid));
 
     let account_node = mock_data::account_jid()
@@ -259,7 +259,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: room!("room@conference.prose.org"),
+                    jid: room_id!("room@conference.prose.org"),
                     name: Some("Old Channel".to_string()),
                 }])
             })
@@ -269,7 +269,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_set()
         .once()
         .with(predicate::eq(Arc::new(RoomInternals::mock_pending_room(
-            room!("org.prose.public-channel.hash-1@conference.prose.org"),
+            room_id!("org.prose.public-channel.hash-1@conference.prose.org"),
             "hash-2",
         ))))
         .return_once(|_| Ok(()));
@@ -280,7 +280,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(RoomSessionInfo::new_room(
-                    room!("org.prose.public-channel.hash-1@conference.prose.org"),
+                    room_id!("org.prose.public-channel.hash-1@conference.prose.org"),
                     RoomType::PublicChannel,
                 ))
             })
@@ -290,12 +290,12 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(room!("org.prose.public-channel.hash-1@conference.prose.org")),
+            predicate::eq(room_id!("org.prose.public-channel.hash-1@conference.prose.org")),
             predicate::always(),
         )
         .return_once(|_, _| {
             Some(Arc::new(RoomInternals::public_channel(
-                room!("org.prose.public-channel.hash-1@conference.prose.org")
+                room_id!("org.prose.public-channel.hash-1@conference.prose.org")
             )))
         });
 
@@ -318,7 +318,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
 
-    let channel_jid = room!("org.prose.private-channel.hash-1@conf.prose.org");
+    let channel_jid = room_id!("org.prose.private-channel.hash-1@conf.prose.org");
     let full_jid = channel_jid
         .clone()
         .into_inner()
@@ -332,10 +332,10 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(room!("group@conf.prose.org")))
+        .with(predicate::eq(room_id!("group@conf.prose.org")))
         .return_once(|_| {
             Some(Arc::new(
-                RoomInternals::group(room!("group@conf.prose.org")).with_members(vec![
+                RoomInternals::group(room_id!("group@conf.prose.org")).with_members(vec![
                     (
                         mock_data::account_jid().into_bare(),
                         Member {
@@ -362,7 +362,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .expect_delete()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(room!("group@conf.prose.org")))
+        .with(predicate::eq(room_id!("group@conf.prose.org")))
         .return_once(|_| ());
 
     deps.connected_rooms_repo
@@ -413,7 +413,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .once()
         .in_sequence(&mut seq)
         .with(
-            predicate::eq(room!("group@conf.prose.org")),
+            predicate::eq(room_id!("group@conf.prose.org")),
             predicate::eq(RoomType::Group),
             predicate::eq(channel_jid.clone()),
             predicate::eq(RoomType::PrivateChannel),
@@ -435,7 +435,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .once()
         .in_sequence(&mut seq)
         .with(
-            predicate::eq(room!("group@conf.prose.org")),
+            predicate::eq(room_id!("group@conf.prose.org")),
             predicate::eq(Some(channel_jid.clone())),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
@@ -444,7 +444,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
 
     service
         .reconfigure_room_with_spec(
-            &room!("group@conf.prose.org"),
+            &room_id!("group@conf.prose.org"),
             RoomSpec::PrivateChannel,
             "Private Channel",
         )

@@ -23,7 +23,7 @@ use prose_core_client::dtos::{Occupant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
-use prose_core_client::{room, ClientRoomEventType};
+use prose_core_client::{room_id, ClientRoomEventType};
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::muc::{MediatedInvite, MucUser};
 use prose_xmpp::{bare, full, jid, mods};
@@ -32,14 +32,14 @@ use prose_xmpp::{bare, full, jid, mods};
 async fn test_handles_presence_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::group(room!("room@conference.prose.org")));
+    let room = Arc::new(RoomInternals::group(room_id!("room@conference.prose.org")));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("room@conference.prose.org")))
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
 
@@ -112,15 +112,15 @@ async fn test_handles_destroyed_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(room!("group@prose.org")))
-        .return_once(|_| Some(Arc::new(RoomInternals::group(room!("group@prose.org")))));
+        .with(predicate::eq(room_id!("group@prose.org")))
+        .return_once(|_| Some(Arc::new(RoomInternals::group(room_id!("group@prose.org")))));
 
     deps.sidebar_domain_service
         .expect_handle_destroyed_room()
         .once()
         .with(
-            predicate::eq(room!("group@prose.org")),
-            predicate::eq(Some(room!("private-channel@prose.org"))),
+            predicate::eq(room_id!("group@prose.org")),
+            predicate::eq(Some(room_id!("private-channel@prose.org"))),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
@@ -151,7 +151,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
 
     let room =
         Arc::new(
-            RoomInternals::group(room!("room@conference.prose.org")).with_occupants([(
+            RoomInternals::group(room_id!("room@conference.prose.org")).with_occupants([(
                 jid!("room@conference.prose.org/nickname"),
                 Occupant::owner()
                     .set_real_jid(&bare!("nickname@prose.org"))
@@ -164,7 +164,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("room@conference.prose.org")))
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
@@ -234,7 +234,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("contact@prose.org")))
+            .with(predicate::eq(room_id!("contact@prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
@@ -297,10 +297,10 @@ async fn test_handles_invite() -> Result<()> {
         .expect_insert_item_by_creating_or_joining_room()
         .once()
         .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
-            room_jid: room!("group@conference.prose.org"),
+            room_jid: room_id!("group@conference.prose.org"),
             password: None,
         }))
-        .return_once(|_| Box::pin(async move { Ok(room!("group@conference.prose.org")) }));
+        .return_once(|_| Box::pin(async move { Ok(room_id!("group@conference.prose.org")) }));
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
     event_handler

@@ -76,7 +76,7 @@ impl RoomId {
 
 #[cfg(test)]
 mod tests {
-    use crate::room;
+    use crate::room_id;
 
     use super::*;
 
@@ -85,11 +85,11 @@ mod tests {
         assert!(RoomId::from_iri("").is_err());
         assert_eq!(
             RoomId::from_iri("xmpp:room@muc.example.org?join"),
-            Ok(room!("room@muc.example.org"))
+            Ok(room_id!("room@muc.example.org"))
         );
         assert_eq!(
             RoomId::from_iri("xmpp:room@muc.example.org"),
-            Ok(room!("room@muc.example.org"))
+            Ok(room_id!("room@muc.example.org"))
         );
     }
 }

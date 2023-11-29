@@ -14,7 +14,7 @@ use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
 use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::{room, ClientRoomEventType};
+use prose_core_client::{room_id, ClientRoomEventType};
 use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, jid};
@@ -23,22 +23,23 @@ use prose_xmpp::{bare, jid};
 async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room =
-        Arc::new(RoomInternals::group(room!("group@conference.prose.org")).with_name("Group Name"));
+    let room = Arc::new(
+        RoomInternals::group(room_id!("group@conference.prose.org")).with_name("Group Name"),
+    );
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("group@conference.prose.org")))
+            .with(predicate::eq(room_id!("group@conference.prose.org")))
             .return_once(|_| Some(room));
     }
 
     deps.sidebar_domain_service
         .expect_insert_item_for_received_message_if_needed()
         .once()
-        .with(predicate::eq(room!("group@conference.prose.org")))
+        .with(predicate::eq(room_id!("group@conference.prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
@@ -84,7 +85,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(room!("jane.doe@prose.org")))
+        .with(predicate::eq(room_id!("jane.doe@prose.org")))
         .return_once(|_| None);
 
     deps.sidebar_domain_service
@@ -93,21 +94,21 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
         .with(predicate::eq(CreateOrEnterRoomRequest::JoinDirectMessage {
             participant: bare!("jane.doe@prose.org"),
         }))
-        .return_once(|_| Box::pin(async { Ok(room!("jane.doe@prose.org")) }));
+        .return_once(|_| Box::pin(async { Ok(room_id!("jane.doe@prose.org")) }));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("jane.doe@prose.org")))
+            .with(predicate::eq(room_id!("jane.doe@prose.org")))
             .return_once(|_| Some(room));
     }
 
     deps.sidebar_domain_service
         .expect_insert_item_for_received_message_if_needed()
         .once()
-        .with(predicate::eq(room!("jane.doe@prose.org")))
+        .with(predicate::eq(room_id!("jane.doe@prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.messages_repo

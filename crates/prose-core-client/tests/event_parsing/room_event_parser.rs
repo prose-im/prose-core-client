@@ -10,7 +10,7 @@ use prose_core_client::domain::shared::models::{
     RoomEvent, RoomEventType, RoomUserInfo, ServerEvent,
 };
 use prose_core_client::dtos::{Availability, RoomId};
-use prose_core_client::room;
+use prose_core_client::room_id;
 use prose_core_client::test::parse_xml;
 use prose_proc_macros::mt_test;
 use prose_xmpp::full;
@@ -28,7 +28,7 @@ async fn test_room_topic_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::RoomTopicChanged {
                 new_topic: Some("Fire Burn and Cauldron Bubble!".to_string())
             },
@@ -46,7 +46,7 @@ async fn test_room_topic_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::RoomTopicChanged { new_topic: None },
         })]
     );
@@ -74,9 +74,9 @@ async fn test_room_destroyed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::RoomWasDestroyed {
-                alternate_room: Some(room!("new-room@prose.org"))
+                alternate_room: Some(room_id!("new-room@prose.org"))
             },
         })]
     );
@@ -100,7 +100,7 @@ async fn test_room_config_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::RoomConfigChanged,
         })]
     );
@@ -120,7 +120,7 @@ async fn test_room_config_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::RoomConfigChanged,
         })]
     );
@@ -139,7 +139,7 @@ async fn test_room_config_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::RoomConfigChanged,
         })]
     );
@@ -164,11 +164,11 @@ async fn test_user_was_permanently_removed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::UserWasPermanentlyRemoved {
                 user: RoomUserInfo {
-                    jid: full!("room@prose.org/nick"),
-                    real_jid: None,
+                    id: full!("room@prose.org/nick"),
+                    real_id: None,
                     affiliation: RoomAffiliation::None,
                     availability: Availability::Unavailable,
                     is_self: false
@@ -198,11 +198,11 @@ async fn test_user_disconnected() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::UserAvailabilityOrMembershipChanged {
                 user: RoomUserInfo {
-                    jid: full!("room@prose.org/nick"),
-                    real_jid: Some(full!("user@prose.org/res")),
+                    id: full!("room@prose.org/nick"),
+                    real_id: Some(full!("user@prose.org/res")),
                     affiliation: RoomAffiliation::Member,
                     availability: Availability::Unavailable,
                     is_self: false
@@ -232,11 +232,11 @@ async fn test_user_was_disconnected_by_server() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::UserWasDisconnectedByServer {
                 user: RoomUserInfo {
-                    jid: full!("room@prose.org/nick"),
-                    real_jid: Some(full!("user@prose.org/res")),
+                    id: full!("room@prose.org/nick"),
+                    real_id: Some(full!("user@prose.org/res")),
                     affiliation: RoomAffiliation::Member,
                     availability: Availability::Unavailable,
                     is_self: true
@@ -268,11 +268,11 @@ async fn test_user_connected() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::UserAvailabilityOrMembershipChanged {
                 user: RoomUserInfo {
-                    jid: full!("room@prose.org/nick"),
-                    real_jid: Some(full!("user@prose.org/res")),
+                    id: full!("room@prose.org/nick"),
+                    real_id: Some(full!("user@prose.org/res")),
                     affiliation: RoomAffiliation::None,
                     availability: Availability::Available,
                     is_self: false
@@ -304,7 +304,7 @@ async fn test_received_invite() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::ReceivedInvite {
                 password: Some("cauldronburn".to_string())
             },
@@ -328,7 +328,7 @@ async fn test_received_invite() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::ReceivedInvite {
                 password: Some("cauldronburn".to_string())
             },
@@ -353,7 +353,7 @@ async fn test_compose_state_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("room@prose.org"),
+            room_id: room_id!("room@prose.org"),
             r#type: RoomEventType::UserComposeStateChanged {
                 user_id: full!("room@prose.org/user"),
                 state: ComposeState::Composing
@@ -373,7 +373,7 @@ async fn test_compose_state_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room: room!("user@prose.org"),
+            room_id: room_id!("user@prose.org"),
             r#type: RoomEventType::UserComposeStateChanged {
                 user_id: full!("user@prose.org/res"),
                 state: ComposeState::Idle

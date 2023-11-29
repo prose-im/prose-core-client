@@ -66,27 +66,28 @@ impl ServerEventHandler for RoomsEventHandler {
 
                 if user.is_self {
                     self.sidebar_domain_service
-                        .handle_removal_from_room(&room_event.room, true)
+                        .handle_removal_from_room(&room_event.room_id, true)
                         .await?;
                 }
             }
 
             RoomEventType::UserComposeStateChanged { user_id, state } => {
                 todo!("Handle JID properly");
-                self.get_room(&room_event.room)?.set_occupant_compose_state(
-                    &Jid::Full(user_id),
-                    &self.time_provider.now(),
-                    state,
-                );
+                self.get_room(&room_event.room_id)?
+                    .set_occupant_compose_state(
+                        &Jid::Full(user_id),
+                        &self.time_provider.now(),
+                        state,
+                    );
             }
 
             RoomEventType::RoomWasDestroyed { alternate_room } => {
                 info!(
                     "Room {} was destroyed. Alternative is {:?}",
-                    room_event.room, alternate_room
+                    room_event.room_id, alternate_room
                 );
                 self.sidebar_domain_service
-                    .handle_destroyed_room(&room_event.room, alternate_room)
+                    .handle_destroyed_room(&room_event.room_id, alternate_room)
                     .await?;
             }
 
@@ -97,16 +98,19 @@ impl ServerEventHandler for RoomsEventHandler {
             RoomEventType::RoomTopicChanged { new_topic } => {
                 info!(
                     "Updating topic of room {} to '{:?}'",
-                    room_event.room, new_topic
+                    room_event.room_id, new_topic
                 );
-                self.get_room(&room_event.room)?.set_topic(new_topic)
+                self.get_room(&room_event.room_id)?.set_topic(new_topic)
             }
 
             RoomEventType::ReceivedInvite { password } => {
-                info!("Joining room {} after receiving invite…", room_event.room);
+                info!(
+                    "Joining room {} after receiving invite…",
+                    room_event.room_id
+                );
                 self.sidebar_domain_service
                     .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                        room_jid: room_event.room,
+                        room_jid: room_event.room_id,
                         password,
                     })
                     .await?;

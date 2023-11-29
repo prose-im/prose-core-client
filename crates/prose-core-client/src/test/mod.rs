@@ -34,7 +34,7 @@ pub mod mock_data {
 }
 
 #[macro_export]
-macro_rules! room {
+macro_rules! room_id {
     ($jid:expr) => {
         RoomId::from($jid.parse::<jid::BareJid>().unwrap())
     };

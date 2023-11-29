@@ -73,7 +73,7 @@ fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
             };
 
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room: RoomId::from(from.to_bare()),
+                room_id: RoomId::from(from.to_bare()),
                 r#type: RoomEventType::UserComposeStateChanged {
                     user_id: from.clone(),
                     state: ComposeState::from(chat_state.clone()),
@@ -98,14 +98,14 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
             from: _from,
             invite,
         } => ctx.push_event(ServerEvent::Room(RoomEvent {
-            room: RoomId::from(invite.jid),
+            room_id: RoomId::from(invite.jid),
             r#type: RoomEventType::ReceivedInvite {
                 password: invite.password,
             },
         })),
         XMPPMUCEvent::MediatedInvite { from, invite } => {
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room: RoomId::from(from.to_bare()),
+                room_id: RoomId::from(from.to_bare()),
                 r#type: RoomEventType::ReceivedInvite {
                     password: invite.password,
                 },

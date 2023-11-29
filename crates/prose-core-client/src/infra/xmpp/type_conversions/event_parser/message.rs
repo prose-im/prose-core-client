@@ -53,7 +53,7 @@ fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> R
             .is_some()
         {
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room: from.clone(),
+                room_id: from.clone(),
                 r#type: RoomEventType::RoomConfigChanged,
             }))
         }
@@ -61,7 +61,7 @@ fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> R
 
     if let Some(subject) = message.subject() {
         ctx.push_event(ServerEvent::Room(RoomEvent {
-            room: from,
+            room_id: from,
             r#type: RoomEventType::RoomTopicChanged {
                 new_topic: (!subject.is_empty()).then_some(subject.to_string()),
             },

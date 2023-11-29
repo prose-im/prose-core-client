@@ -13,7 +13,9 @@ use crate::domain::rooms::models::RoomAffiliation;
 use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
-use crate::domain::shared::models::{RoomEvent, RoomEventType, RoomUserInfo, ServerEvent};
+use crate::domain::shared::models::{
+    OccupantId, RoomEvent, RoomEventType, RoomUserInfo, ServerEvent, UserResourceId,
+};
 use crate::dtos::{Availability, RoomId};
 use crate::infra::xmpp::type_conversions::event_parser::{
     missing_attribute, missing_element, Context,
@@ -46,8 +48,8 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
     let is_self_presence = muc_user.status.contains(&Status::SelfPresence);
 
     let user = RoomUserInfo {
-        jid: from,
-        real_jid: item.jid.clone(),
+        id: OccupantId::from(from),
+        real_id: item.jid.clone().map(UserResourceId::from),
         affiliation: RoomAffiliation::from(item.affiliation.clone()),
         availability: Availability::from((
             (presence.type_ != presence::Type::None).then_some(presence.type_),
@@ -58,7 +60,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
 
     if let Some(destroy) = muc_user.destroy.take() {
         ctx.push_event(ServerEvent::Room(RoomEvent {
-            room,
+            room_id: room,
             r#type: RoomEventType::RoomWasDestroyed {
                 alternate_room: destroy.jid.map(RoomId::from),
             },
@@ -80,7 +82,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
             .is_some()
         {
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room,
+                room_id: room,
                 r#type: RoomEventType::UserWasPermanentlyRemoved { user },
             }));
             return Ok(());
@@ -96,7 +98,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
             .is_some()
         {
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room,
+                room_id: room,
                 r#type: RoomEventType::UserWasDisconnectedByServer { user },
             }));
             return Ok(());
@@ -104,7 +106,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
     }
 
     ctx.push_event(ServerEvent::Room(RoomEvent {
-        room,
+        room_id: room,
         r#type: RoomEventType::UserAvailabilityOrMembershipChanged { user },
     }));
 

@@ -14,7 +14,9 @@ pub use crate::domain::{
     general::models::SoftwareVersion,
     messaging::models::{Emoji, MessageId, Reaction, StanzaId},
     rooms::models::{Member, Occupant, PublicRoomInfo},
-    shared::models::{Availability, RoomId, UserBasicInfo, UserPresenceInfo},
+    shared::models::{
+        Availability, OccupantId, RoomId, UserBasicInfo, UserId, UserPresenceInfo, UserResourceId,
+    },
     user_info::models::{LastActivity, UserActivity, UserInfo, UserMetadata},
     user_profiles::models::{Address, UserProfile},
 };
