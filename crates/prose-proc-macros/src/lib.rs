@@ -7,7 +7,7 @@ use proc_macro::TokenStream;
 
 use convert_case::{Case, Casing};
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Fields};
+use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Fields, ItemFn};
 
 #[proc_macro_attribute]
 pub fn entity(_attrs: TokenStream, stream: TokenStream) -> TokenStream {
@@ -123,17 +123,18 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
     let name = &input.ident;
     let dependencies_struct_name = format_ident!("{}Dependencies", name);
 
-    let struct_fields = fields
-        .named
-        .iter()
-        .filter_map(|field| {
-            let Some(ref ident) = field.ident else {
-                return None;
-            };
-            let field_type = &field.ty;
-            Some(quote! { pub #ident: #field_type })
-        })
-        .collect::<Vec<_>>();
+    let struct_fields =
+        fields
+            .named
+            .iter()
+            .filter_map(|field| {
+                let Some(ref ident) = field.ident else {
+                    return None;
+                };
+                let field_type = &field.ty;
+                Some(quote! { pub #ident: #field_type })
+            })
+            .collect::<Vec<_>>();
 
     let field_initialization = fields
         .named
@@ -158,6 +159,19 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
                 }
             }
         }
+    };
+
+    TokenStream::from(expanded)
+}
+
+/// Multi-threaded test
+#[proc_macro_attribute]
+pub fn mt_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+
+    let expanded = quote! {
+        #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+        #input
     };
 
     TokenStream::from(expanded)

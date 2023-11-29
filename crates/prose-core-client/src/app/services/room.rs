@@ -25,7 +25,7 @@ use crate::dtos::{
     Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
 };
 use crate::util::jid_ext::{BareJidExt, JidExt};
-use crate::RoomEventType;
+use crate::ClientRoomEventType;
 
 pub struct Room<Kind> {
     inner: Arc<RoomInner>,
@@ -406,14 +406,14 @@ impl<Kind> Room<Kind>
 where
     Kind: HasTopic,
 {
-    pub async fn set_topic(&self, topic: Option<&str>) -> Result<()> {
+    pub async fn set_topic(&self, topic: Option<String>) -> Result<()> {
         self.attributes_service
-            .set_topic(&self.data.jid, topic)
+            .set_topic(&self.data.jid, topic.as_deref())
             .await?;
         self.data.set_topic(topic);
 
         self.client_event_dispatcher
-            .dispatch_room_event(self.data.clone(), RoomEventType::AttributesChanged);
+            .dispatch_room_event(self.data.clone(), ClientRoomEventType::AttributesChanged);
 
         Ok(())
     }

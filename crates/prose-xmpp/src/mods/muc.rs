@@ -111,14 +111,15 @@ impl MUC {
 
         let items = DiscoItemsResult::try_from(response)?;
 
-        let rooms = items
-            .items
-            .into_iter()
-            .map(|item| Room {
-                jid: item.jid,
-                name: item.name,
-            })
-            .collect();
+        let rooms =
+            items
+                .items
+                .into_iter()
+                .map(|item| Room {
+                    jid: item.jid,
+                    name: item.name,
+                })
+                .collect();
 
         Ok(rooms)
     }
@@ -263,14 +264,15 @@ impl MUC {
         jid: &BareJid,
         alternate_room: Option<&BareJid>,
     ) -> Result<()> {
-        let iq = Iq::from_set(
-            self.ctx.generate_id(),
-            Query::new(Role::Owner).with_payload(Destroy {
-                jid: alternate_room.cloned(),
-                reason: None,
-            }),
-        )
-        .with_to(jid.clone().into());
+        let iq =
+            Iq::from_set(
+                self.ctx.generate_id(),
+                Query::new(Role::Owner).with_payload(Destroy {
+                    jid: alternate_room.cloned(),
+                    reason: None,
+                }),
+            )
+            .with_to(jid.clone().into());
         self.ctx.send_iq(iq).await?;
         Ok(())
     }
@@ -401,13 +403,13 @@ impl MUC {
                 )
                 .build()]);
 
-        let (mut self_presence, presences) = self
-            .ctx
-            .send_stanza_with_future(
-                presence,
-                RequestFuture::new_join_room_request(room_jid.clone()),
-            )
-            .await?;
+        let (mut self_presence, presences) =
+            self.ctx
+                .send_stanza_with_future(
+                    presence,
+                    RequestFuture::new_join_room_request(room_jid.clone()),
+                )
+                .await?;
 
         let payload = self_presence
             .payloads

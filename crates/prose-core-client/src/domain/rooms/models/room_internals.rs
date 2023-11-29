@@ -3,16 +3,14 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
+use chrono::{DateTime, Utc};
 use jid::{BareJid, FullJid, Jid};
 use parking_lot::RwLock;
-use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::muc::user::Affiliation;
 
-use crate::domain::rooms::models::RoomState;
+use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomState};
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::dtos::{Occupant, UserBasicInfo};
 
@@ -71,8 +69,8 @@ impl RoomInternals {
         self.state.read().topic.clone()
     }
 
-    pub fn set_topic(&self, topic: Option<&str>) {
-        self.state.write().topic = topic.map(ToString::to_string)
+    pub fn set_topic(&self, topic: Option<String>) {
+        self.state.write().topic = topic
     }
 
     pub fn occupants(&self) -> Vec<Occupant> {
@@ -88,7 +86,7 @@ impl RoomInternals {
         jid: &Jid,
         real_jid: Option<&BareJid>,
         name: Option<&str>,
-        affiliation: &Affiliation,
+        affiliation: &RoomAffiliation,
     ) {
         self.state
             .write()
@@ -99,15 +97,15 @@ impl RoomInternals {
         self.state.write().occupants.remove(jid);
     }
 
-    pub fn set_occupant_chat_state(
+    pub fn set_occupant_compose_state(
         &self,
         occupant_jid: &Jid,
         timestamp: &DateTime<Utc>,
-        chat_state: ChatState,
+        compose_state: ComposeState,
     ) {
         self.state
             .write()
-            .set_occupant_chat_state(occupant_jid, timestamp, chat_state)
+            .set_occupant_compose_state(occupant_jid, timestamp, compose_state)
     }
 
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
@@ -178,9 +176,9 @@ impl RoomInternals {
                     Occupant {
                         jid: Some(contact_jid.clone()),
                         name: Some(contact_name.to_string()),
-                        affiliation: Affiliation::Owner,
-                        chat_state: ChatState::Gone,
-                        chat_state_updated: Default::default(),
+                        affiliation: RoomAffiliation::Owner,
+                        compose_state: ComposeState::Idle,
+                        compose_state_updated: Default::default(),
                     },
                 )]),
             }),
@@ -222,9 +220,6 @@ impl PartialEq for RoomInternals {
 mod tests {
     use std::collections::HashMap;
 
-    use xmpp_parsers::chatstates::ChatState;
-    use xmpp_parsers::muc::user::Affiliation;
-
     use prose_xmpp::{bare, jid};
 
     use crate::dtos::Occupant;
@@ -263,9 +258,9 @@ mod tests {
                         Occupant {
                             jid: Some(bare!("contact@prose.org")),
                             name: Some("Jane Doe".to_string()),
-                            affiliation: Affiliation::Owner,
-                            chat_state: ChatState::Gone,
-                            chat_state_updated: Default::default(),
+                            affiliation: RoomAffiliation::Owner,
+                            compose_state: ComposeState::Idle,
+                            compose_state_updated: Default::default(),
                         }
                     )])
                 })

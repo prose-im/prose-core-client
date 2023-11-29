@@ -20,7 +20,8 @@ pub use rooms_event_handler::RoomsEventHandler;
 pub use user_state_event_handler::UserStateEventHandler;
 
 use crate::domain::rooms::models::RoomInternals;
-use crate::{ClientEvent, RoomEventType};
+use crate::domain::shared::models::ServerEvent;
+use crate::{ClientEvent, ClientRoomEventType};
 
 mod bookmarks_event_handler;
 mod client_event_dispatcher;
@@ -29,6 +30,7 @@ mod event_handler_queue;
 mod messages_event_handler;
 mod requests_event_handler;
 mod rooms_event_handler;
+mod server_event_handler_wrapper;
 mod user_state_event_handler;
 
 /// `XMPPEventHandler` is a trait representing a handler for XMPP events.
@@ -44,8 +46,15 @@ pub trait XMPPEventHandler: SendUnlessWasm + SyncUnlessWasm {
     async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>>;
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
+pub trait ServerEventHandler: SendUnlessWasm + SyncUnlessWasm {
+    fn name(&self) -> &'static str;
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>>;
+}
+
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ClientEventDispatcherTrait: SendUnlessWasm + SyncUnlessWasm {
     fn dispatch_event(&self, event: ClientEvent);
-    fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: RoomEventType);
+    fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: ClientRoomEventType);
 }

@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::{BareJid, Jid};
+use std::sync::Arc;
 use tracing::{error, info, warn};
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::message::MessageType;
@@ -21,11 +22,12 @@ use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
     DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
 };
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
-use crate::client_event::RoomEventType;
+use crate::app::event_handlers::{ServerEventHandler, XMPPEvent, XMPPEventHandler};
+use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
+use crate::domain::rooms::models::{ComposeState, RoomInternals};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::{RoomEventType, RoomJid, ServerEvent};
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
@@ -41,6 +43,86 @@ pub struct RoomsEventHandler {
     time_provider: DynTimeProvider,
     #[inject]
     user_profile_repo: DynUserProfileRepository,
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
+#[async_trait]
+impl ServerEventHandler for RoomsEventHandler {
+    fn name(&self) -> &'static str {
+        "rooms"
+    }
+
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
+        let ServerEvent::Room(room_event) = event else {
+            return Ok(Some(event));
+        };
+
+        match room_event.r#type {
+            RoomEventType::UserAvailabilityOrMembershipChanged { .. } => {}
+            RoomEventType::UserWasDisconnectedByServer { .. } => {}
+
+            RoomEventType::UserWasPermanentlyRemoved { user } => {
+                //self.get_room(&room_event.room)?.remove_occupant(user.jid);
+
+                if user.is_self {
+                    self.sidebar_domain_service
+                        .handle_removal_from_room(&room_event.room, true)
+                        .await?;
+                }
+            }
+
+            RoomEventType::UserComposeStateChanged { user_id, state } => {
+                todo!("Handle JID properly");
+                self.get_room(&room_event.room)?.set_occupant_compose_state(
+                    &Jid::Full(user_id),
+                    &self.time_provider.now(),
+                    state,
+                );
+            }
+
+            RoomEventType::RoomWasDestroyed { alternate_room } => {
+                info!(
+                    "Room {} was destroyed. Alternative is {:?}",
+                    room_event.room, alternate_room
+                );
+                self.sidebar_domain_service
+                    .handle_destroyed_room(&room_event.room, alternate_room)
+                    .await?;
+            }
+
+            RoomEventType::RoomConfigChanged => {
+                todo!("Reload config and validate if room is still configured as expected")
+            }
+
+            RoomEventType::RoomTopicChanged { new_topic } => {
+                info!(
+                    "Updating topic of room {} to '{:?}'",
+                    room_event.room, new_topic
+                );
+                self.get_room(&room_event.room)?.set_topic(new_topic)
+            }
+
+            RoomEventType::ReceivedInvite { password } => {
+                info!("Joining room {} after receiving invite…", room_event.room);
+                self.sidebar_domain_service
+                    .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
+                        room_jid: room_event.room,
+                        password,
+                    })
+                    .await?;
+            }
+        }
+
+        Ok(None)
+    }
+}
+
+impl RoomsEventHandler {
+    fn get_room(&self, jid: &RoomJid) -> Result<Arc<RoomInternals>> {
+        self.connected_rooms_repo
+            .get(jid)
+            .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -135,17 +217,18 @@ impl RoomsEventHandler {
             return Ok(());
         };
 
-        let Some(mut muc_user) = presence
-            .payloads
-            .into_iter()
-            .filter_map(|payload| {
-                if !payload.is("x", ns::MUC_USER) {
-                    return None;
-                }
-                MucUser::try_from(payload).ok()
-            })
-            .take(1)
-            .next()
+        let Some(mut muc_user) =
+            presence
+                .payloads
+                .into_iter()
+                .filter_map(|payload| {
+                    if !payload.is("x", ns::MUC_USER) {
+                        return None;
+                    }
+                    MucUser::try_from(payload).ok()
+                })
+                .take(1)
+                .next()
         else {
             return Ok(());
         };
@@ -194,18 +277,7 @@ impl RoomsEventHandler {
                     .is_some();
 
                 if was_removed {
-                    let is_permanent = muc_user
-                        .status
-                        .iter()
-                        .find(|s| match s {
-                            Status::Banned
-                            | Status::Kicked
-                            | Status::RemovalFromRoom
-                            | Status::ConfigMembersOnly => true,
-                            _ => false,
-                        })
-                        .is_some();
-
+                    let is_permanent = muc_user.user_was_permanently_removed();
                     self.sidebar_domain_service
                         .handle_removal_from_room(&room.jid, is_permanent)
                         .await?;
@@ -223,22 +295,18 @@ impl RoomsEventHandler {
                 }
             };
 
-            room.insert_occupant(&from, real_jid.as_ref(), name.as_deref(), &item.affiliation);
+            room.insert_occupant(
+                &from,
+                real_jid.as_ref(),
+                name.as_deref(),
+                &(item.affiliation.clone().into()),
+            );
         }
 
         Ok(())
     }
 
     async fn handle_invite(&self, room_jid: BareJid, password: Option<String>) -> Result<()> {
-        info!("Joining room {} after receiving invite…", room_jid);
-
-        self.sidebar_domain_service
-            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                room_jid: RoomJid::from(room_jid),
-                password,
-            })
-            .await?;
-
         Ok(())
     }
 
@@ -262,16 +330,24 @@ impl RoomsEventHandler {
         };
         let now = self.time_provider.now();
 
-        room.set_occupant_chat_state(&jid, &now, chat_state);
+        room.set_occupant_compose_state(
+            &jid,
+            &now,
+            if chat_state == ChatState::Composing {
+                ComposeState::Composing
+            } else {
+                ComposeState::Idle
+            },
+        );
 
         self.client_event_dispatcher
-            .dispatch_room_event(room, RoomEventType::ComposingUsersChanged);
+            .dispatch_room_event(room, ClientRoomEventType::ComposingUsersChanged);
 
         Ok(())
     }
 }
 
-impl From<&MessageLike> for RoomEventType {
+impl From<&MessageLike> for ClientRoomEventType {
     fn from(message: &MessageLike) -> Self {
         if let Some(ref target) = message.target {
             if message.payload == MessageLikePayload::Retraction {
@@ -288,5 +364,30 @@ impl From<&MessageLike> for RoomEventType {
                 message_ids: vec![message.id.id().as_ref().into()],
             }
         }
+    }
+}
+
+trait MucUserExt {
+    fn user_was_permanently_removed(&self) -> bool;
+}
+
+impl MucUserExt for MucUser {
+    fn user_was_permanently_removed(&self) -> bool {
+        let Some(ref item) = self.items.first() else {
+            return false;
+        };
+        if item.role != Role::None {
+            return false;
+        }
+        self.status
+            .iter()
+            .find(|s| match s {
+                Status::Banned
+                | Status::Kicked
+                | Status::RemovalFromRoom
+                | Status::ConfigMembersOnly => true,
+                _ => false,
+            })
+            .is_some()
     }
 }

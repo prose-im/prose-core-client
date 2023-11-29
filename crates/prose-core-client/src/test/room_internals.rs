@@ -3,13 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
-use std::collections::HashMap;
-use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::muc::user::Affiliation;
 
-use crate::domain::rooms::models::{RoomInfo, RoomInternals};
+use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInfo, RoomInternals};
 use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::dtos::{Member, Occupant};
 use crate::test::mock_data;
@@ -97,9 +96,9 @@ impl Occupant {
         Occupant {
             jid: None,
             name: None,
-            affiliation: Affiliation::Owner,
-            chat_state: ChatState::Gone,
-            chat_state_updated: Default::default(),
+            affiliation: RoomAffiliation::Owner,
+            compose_state: Default::default(),
+            compose_state_updated: Default::default(),
         }
     }
 
@@ -107,9 +106,9 @@ impl Occupant {
         Occupant {
             jid: None,
             name: None,
-            affiliation: Affiliation::Owner,
-            chat_state: ChatState::Gone,
-            chat_state_updated: Default::default(),
+            affiliation: RoomAffiliation::Owner,
+            compose_state: Default::default(),
+            compose_state_updated: Default::default(),
         }
     }
 
@@ -123,13 +122,13 @@ impl Occupant {
         self
     }
 
-    pub fn set_chat_state(mut self, chat_state: ChatState) -> Self {
-        self.chat_state = chat_state;
+    pub fn set_compose_state(mut self, compose_state: ComposeState) -> Self {
+        self.compose_state = compose_state;
         self
     }
 
-    pub fn set_chat_state_updated(mut self, timestamp: DateTime<Utc>) -> Self {
-        self.chat_state_updated = timestamp;
+    pub fn set_compose_state_updated(mut self, timestamp: DateTime<Utc>) -> Self {
+        self.compose_state_updated = timestamp;
         self
     }
 }

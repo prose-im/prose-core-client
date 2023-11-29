@@ -9,7 +9,7 @@ use crate::app::deps::DynRoomFactory;
 use crate::app::event_handlers::ClientEventDispatcherTrait;
 use crate::client::ClientInner;
 use crate::domain::rooms::models::RoomInternals;
-use crate::{ClientDelegate, ClientEvent, RoomEventType};
+use crate::{ClientDelegate, ClientEvent, ClientRoomEventType};
 
 pub struct ClientEventDispatcher {
     client_inner: OnceLock<Weak<ClientInner>>,
@@ -59,7 +59,7 @@ impl ClientEventDispatcherTrait for ClientEventDispatcher {
         delegate.handle_event(client_inner.into(), event)
     }
 
-    fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: RoomEventType) {
+    fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: ClientRoomEventType) {
         let Some(ref delegate) = self.delegate else {
             return;
         };

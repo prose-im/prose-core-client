@@ -27,7 +27,7 @@ use prose_core_client::dtos::{
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
 use prose_core_client::{
-    open_store, Client, ClientDelegate, ClientEvent, RoomEventType, SqliteDriver,
+    open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, SqliteDriver,
 };
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
@@ -638,7 +638,7 @@ impl Delegate {
         };
 
         match r#type {
-            RoomEventType::MessagesAppended { message_ids } => {
+            ClientRoomEventType::MessagesAppended { message_ids } => {
                 let message_id_refs = message_ids.iter().collect::<Vec<_>>();
                 let messages = room
                     .to_generic_room()

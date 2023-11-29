@@ -14,7 +14,7 @@ use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
 use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::{room, RoomEventType};
+use prose_core_client::{room, ClientRoomEventType};
 use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, jid};
@@ -56,7 +56,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
         .once()
         .with(
             predicate::eq(room),
-            predicate::eq(RoomEventType::MessagesAppended {
+            predicate::eq(ClientRoomEventType::MessagesAppended {
                 message_ids: vec!["message-id".into()],
             }),
         )
@@ -125,7 +125,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
         .once()
         .with(
             predicate::eq(room),
-            predicate::eq(RoomEventType::MessagesAppended {
+            predicate::eq(ClientRoomEventType::MessagesAppended {
                 message_ids: vec!["message-id".into()],
             }),
         )

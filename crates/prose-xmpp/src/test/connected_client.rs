@@ -12,7 +12,7 @@ use jid::{BareJid, FullJid};
 use parking_lot::RwLock;
 
 use crate::test::{BareJidTestAdditions, Connection, Connector, IncrementingIDProvider};
-use crate::{mods, Client, Event, IDProvider};
+use crate::{Client, Event, IDProvider};
 
 #[async_trait(?Send)]
 pub trait ClientTestAdditions {
@@ -41,14 +41,6 @@ impl ClientTestAdditions for Client {
                 handler_events.write().push(event);
                 async {}
             }))
-            .add_mod(mods::Bookmark::default())
-            .add_mod(mods::Bookmark2::default())
-            .add_mod(mods::Caps::default())
-            .add_mod(mods::Chat::default())
-            .add_mod(mods::MAM::default())
-            .add_mod(mods::Profile::default())
-            .add_mod(mods::Roster::default())
-            .add_mod(mods::Status::default())
             .build();
 
         client

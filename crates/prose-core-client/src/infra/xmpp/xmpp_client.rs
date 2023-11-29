@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::client::ConnectorProvider;
-use prose_xmpp::{mods, Client, ClientBuilder, Event, IDProvider, TimeProvider};
+use prose_xmpp::{Client, ClientBuilder, Event, IDProvider, TimeProvider};
 
 #[derive(Clone)]
 pub struct XMPPClient {
@@ -64,19 +64,7 @@ impl XMPPClientBuilder {
     }
 
     pub fn build(self) -> XMPPClient {
-        let client = self
-            .builder
-            .add_mod(mods::Bookmark2::default())
-            .add_mod(mods::Bookmark::default())
-            .add_mod(mods::Caps::default())
-            .add_mod(mods::Chat::default())
-            .add_mod(mods::MAM::default())
-            .add_mod(mods::MUC::default())
-            .add_mod(mods::Profile::default())
-            .add_mod(mods::PubSub::default())
-            .add_mod(mods::Roster::default())
-            .add_mod(mods::Status::default())
-            .build();
+        let client = self.builder.build();
 
         XMPPClient {
             client: Arc::new(client),

@@ -16,14 +16,14 @@ use xmpp_parsers::muc::user::{Affiliation, Item, Role};
 use xmpp_parsers::presence::Presence;
 
 use prose_core_client::app::event_handlers::{RoomsEventHandler, XMPPEvent, XMPPEventHandler};
-use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInternals};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, RoomFactory};
 use prose_core_client::domain::shared::models::RoomJid;
 use prose_core_client::dtos::{Occupant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
-use prose_core_client::{room, RoomEventType};
+use prose_core_client::{room, ClientRoomEventType};
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::muc::{MediatedInvite, MucUser};
 use prose_xmpp::{bare, full, jid, mods};
@@ -76,9 +76,9 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
         Occupant {
             jid: Some(bare!("real-jid@prose.org")),
             name: Some("George Washington".to_string()),
-            affiliation: Affiliation::Member,
-            chat_state: ChatState::Gone,
-            chat_state_updated: Default::default(),
+            affiliation: RoomAffiliation::Member,
+            compose_state: ComposeState::Idle,
+            compose_state_updated: Default::default(),
         }
     );
 
@@ -87,6 +87,11 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
 
 #[tokio::test]
 async fn test_handles_disconnected_participant() -> Result<()> {
+    panic!("Implement me")
+}
+
+#[tokio::test]
+async fn test_handles_added_member() -> Result<()> {
     panic!("Implement me")
 }
 
@@ -144,14 +149,15 @@ async fn test_handles_destroyed_room() -> Result<()> {
 async fn test_handles_chat_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(room!("room@conference.prose.org")).with_occupants([(
-            jid!("room@conference.prose.org/nickname"),
-            Occupant::owner()
-                .set_real_jid(&bare!("nickname@prose.org"))
-                .set_name("Janice Doe"),
-        )]),
-    );
+    let room =
+        Arc::new(
+            RoomInternals::group(room!("room@conference.prose.org")).with_occupants([(
+                jid!("room@conference.prose.org/nickname"),
+                Occupant::owner()
+                    .set_real_jid(&bare!("nickname@prose.org"))
+                    .set_name("Janice Doe"),
+            )]),
+        );
 
     {
         let room = room.clone();
@@ -167,7 +173,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         .once()
         .with(
             predicate::eq(room.clone()),
-            predicate::eq(RoomEventType::ComposingUsersChanged),
+            predicate::eq(ClientRoomEventType::ComposingUsersChanged),
         )
         .return_once(|_, _| ());
 
@@ -186,9 +192,9 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         .unwrap()
         .clone();
 
-    assert_eq!(occupant.chat_state, ChatState::Composing);
+    assert_eq!(occupant.compose_state, ComposeState::Composing);
     assert_eq!(
-        occupant.chat_state_updated,
+        occupant.compose_state_updated,
         Utc.with_ymd_and_hms(2023, 01, 04, 0, 0, 0).unwrap()
     );
 
@@ -237,7 +243,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
         .once()
         .with(
             predicate::eq(room.clone()),
-            predicate::eq(RoomEventType::ComposingUsersChanged),
+            predicate::eq(ClientRoomEventType::ComposingUsersChanged),
         )
         .return_once(|_, _| ());
 
@@ -256,9 +262,9 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
         .unwrap()
         .clone();
 
-    assert_eq!(occupant.chat_state, ChatState::Composing);
+    assert_eq!(occupant.compose_state, ComposeState::Composing);
     assert_eq!(
-        occupant.chat_state_updated,
+        occupant.compose_state_updated,
         Utc.with_ymd_and_hms(2023, 01, 04, 0, 0, 0).unwrap()
     );
 

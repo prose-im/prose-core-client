@@ -26,12 +26,12 @@ pub enum ClientEvent {
 
     RoomChanged {
         room: RoomEnvelope,
-        r#type: RoomEventType,
+        r#type: ClientRoomEventType,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum RoomEventType {
+pub enum ClientRoomEventType {
     /// One or many messages were either received or sent.
     MessagesAppended { message_ids: Vec<MessageId> },
 

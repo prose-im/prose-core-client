@@ -5,12 +5,12 @@
 
 use std::collections::HashMap;
 
-use crate::domain::shared::models::UserBasicInfo;
-use crate::util::jid_ext::BareJidExt;
 use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
-use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::muc::user::Affiliation;
+
+use crate::domain::rooms::models::{ComposeState, RoomAffiliation};
+use crate::domain::shared::models::UserBasicInfo;
+use crate::util::jid_ext::BareJidExt;
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct RoomState {
@@ -28,9 +28,9 @@ pub struct Occupant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.
     pub jid: Option<BareJid>,
     pub name: Option<String>,
-    pub affiliation: Affiliation,
-    pub chat_state: ChatState,
-    pub chat_state_updated: DateTime<Utc>,
+    pub affiliation: RoomAffiliation,
+    pub compose_state: ComposeState,
+    pub compose_state_updated: DateTime<Utc>,
 }
 
 impl Default for Occupant {
@@ -39,8 +39,8 @@ impl Default for Occupant {
             jid: None,
             name: None,
             affiliation: Default::default(),
-            chat_state: ChatState::Gone,
-            chat_state_updated: Default::default(),
+            compose_state: ComposeState::Idle,
+            compose_state_updated: Default::default(),
         }
     }
 }
@@ -51,7 +51,7 @@ impl RoomState {
         jid: &Jid,
         real_jid: Option<&BareJid>,
         name: Option<&str>,
-        affiliation: &Affiliation,
+        affiliation: &RoomAffiliation,
     ) {
         let occupant = self.occupants.entry(jid.clone()).or_default();
         occupant.jid = real_jid.cloned();
@@ -59,17 +59,17 @@ impl RoomState {
         occupant.affiliation = affiliation.clone();
     }
 
-    pub fn set_occupant_chat_state(
+    pub fn set_occupant_compose_state(
         &mut self,
         occupant_jid: &Jid,
         timestamp: &DateTime<Utc>,
-        chat_state: ChatState,
+        compose_state: ComposeState,
     ) {
         self.occupants
             .entry(occupant_jid.clone())
             .and_modify(|occupant| {
-                occupant.chat_state = chat_state;
-                occupant.chat_state_updated = timestamp.clone()
+                occupant.compose_state = compose_state;
+                occupant.compose_state_updated = timestamp.clone()
             });
     }
 
@@ -80,8 +80,8 @@ impl RoomState {
             .occupants
             .values()
             .filter_map(|occupant| {
-                if occupant.chat_state != ChatState::Composing
-                    || occupant.chat_state_updated <= started_after
+                if occupant.compose_state != ComposeState::Composing
+                    || occupant.compose_state_updated <= started_after
                     || occupant.jid.is_none()
                 {
                     return None;
@@ -90,7 +90,7 @@ impl RoomState {
             })
             .collect::<Vec<_>>();
 
-        composing_occupants.sort_by_key(|o| o.chat_state_updated);
+        composing_occupants.sort_by_key(|o| o.compose_state_updated);
 
         composing_occupants
             .into_iter()
@@ -128,23 +128,23 @@ mod tests {
             &jid!("room@prose.org/a"),
             Some(&bare!("a@prose.org")),
             None,
-            &Affiliation::Owner,
+            &RoomAffiliation::Owner,
         );
-        state.insert_occupant(&jid!("b@prose.org"), None, None, &Affiliation::Member);
+        state.insert_occupant(&jid!("b@prose.org"), None, None, &RoomAffiliation::Member);
 
         assert_eq!(state.occupants.len(), 2);
         assert_eq!(
             state.occupants.get(&jid!("room@prose.org/a")).unwrap(),
             &Occupant {
                 jid: Some(bare!("a@prose.org")),
-                affiliation: Affiliation::Owner,
+                affiliation: RoomAffiliation::Owner,
                 ..Default::default()
             }
         );
         assert_eq!(
             state.occupants.get(&jid!("b@prose.org")).unwrap(),
             &Occupant {
-                affiliation: Affiliation::Member,
+                affiliation: RoomAffiliation::Member,
                 ..Default::default()
             }
         );
@@ -158,13 +158,13 @@ mod tests {
             &jid!("room@prose.org/a"),
             Some(&bare!("a@prose.org")),
             None,
-            &Affiliation::Owner,
+            &RoomAffiliation::Owner,
         );
 
-        state.set_occupant_chat_state(
+        state.set_occupant_compose_state(
             &jid!("room@prose.org/a"),
             &Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 0).unwrap(),
-            ChatState::Composing,
+            ComposeState::Composing,
         );
 
         assert_eq!(
@@ -172,15 +172,15 @@ mod tests {
                 .occupants
                 .get(&jid!("room@prose.org/a"))
                 .unwrap()
-                .chat_state,
-            ChatState::Composing
+                .compose_state,
+            ComposeState::Composing
         );
         assert_eq!(
             state
                 .occupants
                 .get(&jid!("room@prose.org/a"))
                 .unwrap()
-                .chat_state_updated,
+                .compose_state_updated,
             Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 0).unwrap()
         );
     }
@@ -193,8 +193,8 @@ mod tests {
             jid!("room@prose.org/a"),
             Occupant {
                 jid: Some(bare!("a@prose.org")),
-                chat_state: ChatState::Composing,
-                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
+                compose_state: ComposeState::Composing,
+                compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
                 ..Default::default()
             },
         );
@@ -202,8 +202,8 @@ mod tests {
             jid!("room@prose.org/b"),
             Occupant {
                 jid: Some(bare!("b@prose.org")),
-                chat_state: ChatState::Active,
-                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
+                compose_state: ComposeState::Idle,
+                compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
                 ..Default::default()
             },
         );
@@ -212,8 +212,8 @@ mod tests {
             Occupant {
                 jid: Some(bare!("c@prose.org")),
                 name: Some("Jonathan Doe".to_string()),
-                chat_state: ChatState::Composing,
-                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 20).unwrap(),
+                compose_state: ComposeState::Composing,
+                compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 20).unwrap(),
                 ..Default::default()
             },
         );
@@ -221,8 +221,8 @@ mod tests {
             jid!("room@prose.org/d"),
             Occupant {
                 jid: Some(bare!("d@prose.org")),
-                chat_state: ChatState::Composing,
-                chat_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap(),
+                compose_state: ComposeState::Composing,
+                compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap(),
                 ..Default::default()
             },
         );

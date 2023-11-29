@@ -30,7 +30,7 @@ use crate::domain::shared::models::{RoomJid, RoomType};
 use crate::domain::shared::utils::build_contact_name;
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
-use crate::RoomEventType;
+use crate::ClientRoomEventType;
 
 use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
 
@@ -104,7 +104,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         room.set_name(name);
 
         self.client_event_dispatcher
-            .dispatch_room_event(room, RoomEventType::AttributesChanged);
+            .dispatch_room_event(room, ClientRoomEventType::AttributesChanged);
 
         Ok(())
     }

@@ -5,8 +5,10 @@
 
 pub use app::{dtos, services};
 pub use client::{Client, ClientDelegate};
-pub use client_event::{ClientEvent, ConnectionEvent, RoomEventType};
+pub use client_event::{ClientEvent, ClientRoomEventType, ConnectionEvent};
 pub use infra::platform_dependencies::open_store;
+#[cfg(feature = "test")]
+pub use infra::xmpp::type_conversions::event_parser::parse_xmpp_event;
 #[cfg(target_arch = "wasm32")]
 pub use prose_store::prelude::IndexedDBDriver;
 #[cfg(not(target_arch = "wasm32"))]

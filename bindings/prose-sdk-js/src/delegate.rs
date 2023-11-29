@@ -7,7 +7,7 @@ use tracing::warn;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::MessageId;
-use prose_core_client::{ClientDelegate, ClientEvent, ConnectionEvent, RoomEventType};
+use prose_core_client::{ClientDelegate, ClientEvent, ClientRoomEventType, ConnectionEvent};
 use prose_xmpp::ConnectionError;
 
 use crate::client::Client;
@@ -134,10 +134,12 @@ impl From<ConnectionError> for JSConnectionError {
                 code: "timed_out".to_string(),
                 message: None,
             },
-            ConnectionError::InvalidCredentials => JSConnectionError {
-                code: "invalid_credentials".to_string(),
-                message: None,
-            },
+            ConnectionError::InvalidCredentials => {
+                JSConnectionError {
+                    code: "invalid_credentials".to_string(),
+                    message: None,
+                }
+            }
             ConnectionError::Generic { msg } => JSConnectionError {
                 code: "generic".to_string(),
                 message: Some(msg),
@@ -203,25 +205,19 @@ impl Delegate {
             }
             ClientEvent::AvatarChanged { jid } => self.inner.avatar_changed(client, jid.into())?,
             ClientEvent::RoomChanged { room, r#type } => match r#type {
-                RoomEventType::MessagesAppended { message_ids } => self.inner.messages_appended(
-                    client,
-                    room.into_js_value(),
-                    message_ids.into_js_array(),
-                )?,
-                RoomEventType::MessagesUpdated { message_ids } => self.inner.messages_updated(
-                    client,
-                    room.into_js_value(),
-                    message_ids.into_js_array(),
-                )?,
-                RoomEventType::MessagesDeleted { message_ids } => self.inner.messages_deleted(
-                    client,
-                    room.into_js_value(),
-                    message_ids.into_js_array(),
-                )?,
-                RoomEventType::ComposingUsersChanged => self
+                ClientRoomEventType::MessagesAppended { message_ids } => self
+                    .inner
+                    .messages_appended(client, room.into_js_value(), message_ids.into_js_array())?,
+                ClientRoomEventType::MessagesUpdated { message_ids } => self
+                    .inner
+                    .messages_updated(client, room.into_js_value(), message_ids.into_js_array())?,
+                ClientRoomEventType::MessagesDeleted { message_ids } => self
+                    .inner
+                    .messages_deleted(client, room.into_js_value(), message_ids.into_js_array())?,
+                ClientRoomEventType::ComposingUsersChanged => self
                     .inner
                     .composing_users_changed(client, room.into_js_value())?,
-                RoomEventType::AttributesChanged => self
+                ClientRoomEventType::AttributesChanged => self
                     .inner
                     .room_attributes_changed(client, room.into_js_value())?,
             },

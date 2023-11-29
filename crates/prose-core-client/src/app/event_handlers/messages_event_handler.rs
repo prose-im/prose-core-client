@@ -23,7 +23,7 @@ use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::RoomJid;
-use crate::RoomEventType;
+use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
@@ -143,7 +143,7 @@ impl MessagesEventHandler {
 
         if let ReceivedMessage::Message(message) = &message {
             if let Some(subject) = &message.subject() {
-                room.set_topic((!subject.is_empty()).then_some(subject));
+                room.set_topic((!subject.is_empty()).then_some(subject.to_string()));
                 return Ok(());
             }
         }
@@ -152,10 +152,12 @@ impl MessagesEventHandler {
         let now = self.time_provider.now();
 
         let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
-                message,
-                timestamp: now.into(),
-            }),
+            ReceivedMessage::Message(message) => {
+                MessageLike::try_from(TimestampedMessage {
+                    message,
+                    timestamp: now.into(),
+                })
+            }
             ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
                 message: carbon,
                 timestamp: now.into(),
@@ -190,7 +192,7 @@ impl MessagesEventHandler {
         }
 
         self.client_event_dispatcher
-            .dispatch_room_event(room.clone(), RoomEventType::from(&message));
+            .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
 
         // Don't send delivery receipts for carbons or anything other than a regular message.
         if message_is_carbon || !message.payload.is_message() {
@@ -228,7 +230,7 @@ impl MessagesEventHandler {
         self.messages_repo.append(&to, &[&message]).await?;
 
         self.client_event_dispatcher
-            .dispatch_room_event(room, RoomEventType::from(&message));
+            .dispatch_room_event(room, ClientRoomEventType::from(&message));
 
         Ok(())
     }

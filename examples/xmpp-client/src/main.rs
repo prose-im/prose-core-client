@@ -21,9 +21,6 @@ async fn main() -> Result<()> {
 
     let client = Client::builder()
         .set_connector_provider(Connector::provider())
-        .add_mod(Chat::default())
-        .add_mod(Profile::default())
-        .add_mod(Status::default())
         .set_event_handler(|client, event| handle_event(client, event).map(|f| f.unwrap()))
         .build();
 
