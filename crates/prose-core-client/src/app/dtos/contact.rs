@@ -7,13 +7,13 @@ use jid::BareJid;
 
 use crate::domain::contacts::models::Group;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::UserActivity;
+use crate::domain::user_info::models::UserStatus;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Contact {
     pub jid: BareJid,
     pub name: String,
     pub availability: Availability,
-    pub activity: Option<UserActivity>,
+    pub activity: Option<UserStatus>,
     pub group: Group,
 }

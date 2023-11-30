@@ -10,7 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserActivity};
+use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -29,7 +29,7 @@ pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
         capabilities: &Capabilities,
         availability: &Availability,
     ) -> Result<()>;
-    async fn set_user_activity(&self, user_activity: Option<&UserActivity>) -> Result<()>;
+    async fn set_user_activity(&self, user_activity: Option<&UserStatus>) -> Result<()>;
 
     async fn set_profile(&self, profile: &UserProfile) -> Result<()>;
     async fn delete_profile(&self) -> Result<()>;

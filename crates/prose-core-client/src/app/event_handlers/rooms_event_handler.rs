@@ -27,7 +27,9 @@ use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::{ComposeState, RoomInternals};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomEventType, RoomId, ServerEvent};
+use crate::domain::shared::models::{
+    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, RoomId, ServerEvent,
+};
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
@@ -53,70 +55,15 @@ impl ServerEventHandler for RoomsEventHandler {
     }
 
     async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
-        let ServerEvent::Room(room_event) = event else {
-            return Ok(Some(event));
-        };
-
-        match room_event.r#type {
-            RoomEventType::UserAvailabilityOrMembershipChanged { .. } => {}
-            RoomEventType::UserWasDisconnectedByServer { .. } => {}
-
-            RoomEventType::UserWasPermanentlyRemoved { user } => {
-                //self.get_room(&room_event.room)?.remove_occupant(user.jid);
-
-                if user.is_self {
-                    self.sidebar_domain_service
-                        .handle_removal_from_room(&room_event.room_id, true)
-                        .await?;
-                }
+        match event {
+            ServerEvent::Occupant(event) => {
+                self.handle_occupant_event(event).await?;
             }
-
-            RoomEventType::UserComposeStateChanged { user_id, state } => {
-                todo!("Handle JID properly");
-                self.get_room(&room_event.room_id)?
-                    .set_occupant_compose_state(
-                        &Jid::Full(user_id),
-                        &self.time_provider.now(),
-                        state,
-                    );
+            ServerEvent::Room(event) => {
+                self.handle_room_event(event).await?;
             }
-
-            RoomEventType::RoomWasDestroyed { alternate_room } => {
-                info!(
-                    "Room {} was destroyed. Alternative is {:?}",
-                    room_event.room_id, alternate_room
-                );
-                self.sidebar_domain_service
-                    .handle_destroyed_room(&room_event.room_id, alternate_room)
-                    .await?;
-            }
-
-            RoomEventType::RoomConfigChanged => {
-                todo!("Reload config and validate if room is still configured as expected")
-            }
-
-            RoomEventType::RoomTopicChanged { new_topic } => {
-                info!(
-                    "Updating topic of room {} to '{:?}'",
-                    room_event.room_id, new_topic
-                );
-                self.get_room(&room_event.room_id)?.set_topic(new_topic)
-            }
-
-            RoomEventType::ReceivedInvite { password } => {
-                info!(
-                    "Joining room {} after receiving invite…",
-                    room_event.room_id
-                );
-                self.sidebar_domain_service
-                    .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                        room_jid: room_event.room_id,
-                        password,
-                    })
-                    .await?;
-            }
+            _ => return Ok(Some(event)),
         }
-
         Ok(None)
     }
 }
@@ -126,6 +73,69 @@ impl RoomsEventHandler {
         self.connected_rooms_repo
             .get(jid)
             .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))
+    }
+
+    async fn handle_occupant_event(&self, event: OccupantEvent) -> Result<()> {
+        // self.get_room(&room_event.room_id)?
+        //     .set_occupant_compose_state(
+        //         &Jid::Full(user_id),
+        //         &self.time_provider.now(),
+        //         state,
+        //     );
+
+        match event.r#type {
+            OccupantEventType::AffiliationChanged { .. } => {}
+            OccupantEventType::DisconnectedByServer => {}
+            OccupantEventType::PermanentlyRemoved => {
+                //self.get_room(&room_event.room)?.remove_occupant(user.jid);
+
+                if event.is_self {
+                    self.sidebar_domain_service
+                        .handle_removal_from_room(&event.occupant_id.room_id(), true)
+                        .await?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_room_event(&self, event: RoomEvent) -> Result<()> {
+        match event.r#type {
+            RoomEventType::Destroyed { replacement } => {
+                info!(
+                    "Room {} was destroyed. Alternative is {:?}",
+                    event.room_id, replacement
+                );
+                self.sidebar_domain_service
+                    .handle_destroyed_room(&event.room_id, replacement)
+                    .await?;
+            }
+            RoomEventType::RoomConfigChanged => {
+                todo!("Reload config and validate if room is still configured as expected")
+            }
+            RoomEventType::RoomTopicChanged { new_topic } => {
+                info!(
+                    "Updating topic of room {} to '{:?}'",
+                    event.room_id, new_topic
+                );
+                self.get_room(&event.room_id)?.set_topic(new_topic)
+            }
+            RoomEventType::ReceivedInvitation { sender, password } => {
+                info!(
+                    "Joining room {} after receiving invitation from {sender}…",
+                    event.room_id
+                );
+                self.sidebar_domain_service
+                    .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
+                        room_jid: event.room_id,
+                        password,
+                    })
+                    .await?;
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -310,7 +320,7 @@ impl RoomsEventHandler {
         Ok(())
     }
 
-    async fn handle_invite(&self, room_jid: BareJid, password: Option<String>) -> Result<()> {
+    async fn handle_invite(&self, _room_jid: BareJid, _password: Option<String>) -> Result<()> {
         Ok(())
     }
 

@@ -298,11 +298,7 @@ impl Display for OccupantEnvelope {
                 .map(|jid| jid.to_string())
                 .unwrap_or("<unknown real jid>".to_string())
                 .truncate_to(20),
-            self.0
-                .affiliation
-                .clone()
-                .into_attribute_value()
-                .unwrap_or("<no affiliation>".to_string()),
+            self.0.affiliation,
         )
     }
 }
@@ -980,10 +976,10 @@ async fn main() -> Result<()> {
 
                 match room {
                     RoomEnvelope::DirectMessage(_) => unreachable!(),
-                    RoomEnvelope::Group(room) => room.set_topic(Some(&subject)).await,
-                    RoomEnvelope::PrivateChannel(room) => room.set_topic(Some(&subject)).await,
-                    RoomEnvelope::PublicChannel(room) => room.set_topic(Some(&subject)).await,
-                    RoomEnvelope::Generic(room) => room.set_topic(Some(&subject)).await,
+                    RoomEnvelope::Group(room) => room.set_topic(Some(subject)).await,
+                    RoomEnvelope::PrivateChannel(room) => room.set_topic(Some(subject)).await,
+                    RoomEnvelope::PublicChannel(room) => room.set_topic(Some(subject)).await,
+                    RoomEnvelope::Generic(room) => room.set_topic(Some(subject)).await,
                 }?;
             }
             Selection::ListRoomOccupants => {

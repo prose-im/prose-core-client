@@ -40,6 +40,27 @@ macro_rules! room_id {
     };
 }
 
+#[macro_export]
+macro_rules! user_id {
+    ($jid:expr) => {
+        UserId::from($jid.parse::<jid::BareJid>().unwrap())
+    };
+}
+
+#[macro_export]
+macro_rules! user_resource_id {
+    ($jid:expr) => {
+        UserResourceId::from($jid.parse::<jid::FullJid>().unwrap())
+    };
+}
+
+#[macro_export]
+macro_rules! occupant_id {
+    ($jid:expr) => {
+        OccupantId::from($jid.parse::<jid::FullJid>().unwrap())
+    };
+}
+
 pub async fn parse_xml(xml: &str) -> Result<Vec<ServerEvent>> {
     let client = Client::connected_client().await?;
 

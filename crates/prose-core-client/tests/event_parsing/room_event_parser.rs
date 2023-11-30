@@ -7,16 +7,17 @@ use anyhow::Result;
 
 use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation};
 use prose_core_client::domain::shared::models::{
-    RoomEvent, RoomEventType, RoomUserInfo, ServerEvent,
+    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent, UserStatusEvent,
+    UserStatusEventType,
 };
-use prose_core_client::dtos::{Availability, RoomId};
-use prose_core_client::room_id;
+use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
+use prose_core_client::{occupant_id, room_id, user_resource_id};
 use prose_proc_macros::mt_test;
-use prose_xmpp::full;
 
 #[mt_test]
 async fn test_room_topic_changed() -> Result<()> {
+    // Room Subject (https://xmpp.org/extensions/xep-0045.html#enter-subject)
     let events = parse_xml(
         r#"
         <message xmlns='jabber:client' from='room@prose.org' type='groupchat'>
@@ -56,6 +57,7 @@ async fn test_room_topic_changed() -> Result<()> {
 
 #[mt_test]
 async fn test_room_destroyed() -> Result<()> {
+    // Destroying a Room (https://xmpp.org/extensions/xep-0045.html#destroyroom)
     let events =
         parse_xml(
             r#"
@@ -75,8 +77,8 @@ async fn test_room_destroyed() -> Result<()> {
         events,
         vec![ServerEvent::Room(RoomEvent {
             room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::RoomWasDestroyed {
-                alternate_room: Some(room_id!("new-room@prose.org"))
+            r#type: RoomEventType::Destroyed {
+                replacement: Some(room_id!("new-room@prose.org"))
             },
         })]
     );
@@ -86,6 +88,7 @@ async fn test_room_destroyed() -> Result<()> {
 
 #[mt_test]
 async fn test_room_config_changed() -> Result<()> {
+    // Notification of Configuration Changes (https://xmpp.org/extensions/xep-0045.html#roomconfig-notify)
     let events = parse_xml(
         r#"
         <message xmlns="jabber:client" from="room@prose.org" type="groupchat">
@@ -149,6 +152,7 @@ async fn test_room_config_changed() -> Result<()> {
 
 #[mt_test]
 async fn test_user_was_permanently_removed() -> Result<()> {
+    // Kicking an Occupant (https://xmpp.org/extensions/xep-0045.html#kick)
     let events = parse_xml(
         r#"
         <presence xmlns='jabber:client' from='room@prose.org/nick' type='unavailable'>
@@ -163,52 +167,20 @@ async fn test_user_was_permanently_removed() -> Result<()> {
 
     assert_eq!(
         events,
-        vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::UserWasPermanentlyRemoved {
-                user: RoomUserInfo {
-                    id: full!("room@prose.org/nick"),
-                    real_id: None,
-                    affiliation: RoomAffiliation::None,
-                    availability: Availability::Unavailable,
-                    is_self: false
-                }
-            },
-        })]
-    );
-
-    Ok(())
-}
-
-#[mt_test]
-async fn test_user_disconnected() -> Result<()> {
-    let events = parse_xml(
-        r#"
-        <presence xmlns="jabber:client" from="room@prose.org/nick" type="unavailable">
-            <status>Disconnected: closed</status>
-            <occupant-id xmlns="urn:xmpp:occupant-id:0" id="FvcD+GDkmT8LQAb55uozvL7cZCTBjz3VgQfAcSLtrkM=" />
-            <x xmlns="http://jabber.org/protocol/muc#user">
-                <item affiliation="member" jid="user@prose.org/res" role="none" />
-            </x>
-        </presence>
-      "#,
-    )
-    .await?;
-
-    assert_eq!(
-        events,
-        vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::UserAvailabilityOrMembershipChanged {
-                user: RoomUserInfo {
-                    id: full!("room@prose.org/nick"),
-                    real_id: Some(full!("user@prose.org/res")),
-                    affiliation: RoomAffiliation::Member,
-                    availability: Availability::Unavailable,
-                    is_self: false
-                }
-            },
-        })]
+        vec![
+            ServerEvent::UserStatus(UserStatusEvent {
+                user_id: occupant_id!("room@prose.org/nick").into(),
+                r#type: UserStatusEventType::AvailabilityChanged {
+                    availability: Availability::Unavailable
+                },
+            }),
+            ServerEvent::Occupant(OccupantEvent {
+                occupant_id: occupant_id!("room@prose.org/nick"),
+                real_id: None,
+                is_self: false,
+                r#type: OccupantEventType::PermanentlyRemoved
+            })
+        ]
     );
 
     Ok(())
@@ -216,6 +188,7 @@ async fn test_user_disconnected() -> Result<()> {
 
 #[mt_test]
 async fn test_user_was_disconnected_by_server() -> Result<()> {
+    // Service removes user because of service shut down (https://xmpp.org/extensions/xep-0045.html#service-shutdown-kick)
     let events = parse_xml(
         r#"
         <presence xmlns="jabber:client" from="room@prose.org/nick" type="unavailable">
@@ -231,25 +204,28 @@ async fn test_user_was_disconnected_by_server() -> Result<()> {
 
     assert_eq!(
         events,
-        vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::UserWasDisconnectedByServer {
-                user: RoomUserInfo {
-                    id: full!("room@prose.org/nick"),
-                    real_id: Some(full!("user@prose.org/res")),
-                    affiliation: RoomAffiliation::Member,
-                    availability: Availability::Unavailable,
-                    is_self: true
-                }
-            },
-        })]
+        vec![
+            ServerEvent::UserStatus(UserStatusEvent {
+                user_id: occupant_id!("room@prose.org/nick").into(),
+                r#type: UserStatusEventType::AvailabilityChanged {
+                    availability: Availability::Unavailable
+                },
+            }),
+            ServerEvent::Occupant(OccupantEvent {
+                occupant_id: occupant_id!("room@prose.org/nick"),
+                real_id: Some(user_resource_id!("user@prose.org/res")),
+                is_self: true,
+                r#type: OccupantEventType::DisconnectedByServer,
+            })
+        ]
     );
 
     Ok(())
 }
 
 #[mt_test]
-async fn test_user_connected() -> Result<()> {
+async fn test_user_entered_room() -> Result<()> {
+    // Entering a room (https://xmpp.org/extensions/xep-0045.html#example-21)
     let events = parse_xml(
         r#"
         <presence xmlns="jabber:client" from="room@prose.org/nick">
@@ -267,16 +243,49 @@ async fn test_user_connected() -> Result<()> {
 
     assert_eq!(
         events,
-        vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::UserAvailabilityOrMembershipChanged {
-                user: RoomUserInfo {
-                    id: full!("room@prose.org/nick"),
-                    real_id: Some(full!("user@prose.org/res")),
-                    affiliation: RoomAffiliation::None,
-                    availability: Availability::Available,
-                    is_self: false
-                }
+        vec![
+            ServerEvent::UserStatus(UserStatusEvent {
+                user_id: occupant_id!("room@prose.org/nick").into(),
+                r#type: UserStatusEventType::AvailabilityChanged {
+                    availability: Availability::Available
+                },
+            }),
+            ServerEvent::Occupant(OccupantEvent {
+                occupant_id: occupant_id!("room@prose.org/nick"),
+                real_id: Some(user_resource_id!("user@prose.org/res")),
+                is_self: false,
+                r#type: OccupantEventType::AffiliationChanged {
+                    affiliation: RoomAffiliation::None
+                },
+            }),
+        ]
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_user_exited_room() -> Result<()> {
+    // Exiting a Room (https://xmpp.org/extensions/xep-0045.html#exit)
+    let events = parse_xml(
+        r#"
+        <presence xmlns="jabber:client" from="room@prose.org/nick" type="unavailable">
+            <status>Disconnected: closed</status>
+            <occupant-id xmlns="urn:xmpp:occupant-id:0" id="FvcD+GDkmT8LQAb55uozvL7cZCTBjz3VgQfAcSLtrkM=" />
+            <x xmlns="http://jabber.org/protocol/muc#user">
+                <item affiliation="member" jid="user@prose.org/res" role="none" />
+            </x>
+        </presence>
+      "#,
+    )
+        .await?;
+
+    assert_eq!(
+        events,
+        vec![ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@prose.org/nick").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Unavailable
             },
         })]
     );
@@ -305,7 +314,8 @@ async fn test_received_invite() -> Result<()> {
         events,
         vec![ServerEvent::Room(RoomEvent {
             room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::ReceivedInvite {
+            r#type: RoomEventType::ReceivedInvitation {
+                sender: user_resource_id!("user@prose.org/res"),
                 password: Some("cauldronburn".to_string())
             },
         })]
@@ -329,7 +339,8 @@ async fn test_received_invite() -> Result<()> {
         events,
         vec![ServerEvent::Room(RoomEvent {
             room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::ReceivedInvite {
+            r#type: RoomEventType::ReceivedInvitation {
+                sender: user_resource_id!("user@prose.org/res"),
                 password: Some("cauldronburn".to_string())
             },
         })]
@@ -340,6 +351,7 @@ async fn test_received_invite() -> Result<()> {
 
 #[mt_test]
 async fn test_compose_state_changed() -> Result<()> {
+    // XEP-0085: Chat State Notifications (https://xmpp.org/extensions/xep-0085.html#top)
     let events = parse_xml(
         r#"
         <message xmlns="jabber:client" from="room@prose.org/user" type="groupchat">
@@ -352,10 +364,9 @@ async fn test_compose_state_changed() -> Result<()> {
 
     assert_eq!(
         events,
-        vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
-            r#type: RoomEventType::UserComposeStateChanged {
-                user_id: full!("room@prose.org/user"),
+        vec![ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@prose.org/user").into(),
+            r#type: UserStatusEventType::ComposeStateChanged {
                 state: ComposeState::Composing
             },
         })]
@@ -372,10 +383,9 @@ async fn test_compose_state_changed() -> Result<()> {
 
     assert_eq!(
         events,
-        vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("user@prose.org"),
-            r#type: RoomEventType::UserComposeStateChanged {
-                user_id: full!("user@prose.org/res"),
+        vec![ServerEvent::UserStatus(UserStatusEvent {
+            user_id: user_resource_id!("user@prose.org/res").into(),
+            r#type: UserStatusEventType::ComposeStateChanged {
                 state: ComposeState::Idle
             },
         })]
@@ -383,3 +393,17 @@ async fn test_compose_state_changed() -> Result<()> {
 
     Ok(())
 }
+
+// <presence xmlns="jabber:client" from="cram@prose.org/ojFExT2g" to="marc@prose.org" xml:lang="en">
+// <show>chat</show>
+// <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="ImujI7nqf7pn4YqcjefXE3o5P1k=" />
+// <x xmlns="vcard-temp:x:update">
+// <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+// </x>
+// </presence>
+
+// <presence xmlns="jabber:client" from="valerian@prose.org" to="marc@prose.org/RdcUie" type="unavailable" />
+
+//<presence xmlns="jabber:client" from="cram@prose.org/ojFExT2g" to="marc@prose.org" type="unavailable">
+//   <status>Disconnected: closed</status>
+// </presence>

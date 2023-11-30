@@ -9,9 +9,9 @@ use anyhow::Result;
 use prose_xmpp::stanza::user_activity::activity;
 use prose_xmpp::stanza::UserActivity as XMPPUserActivity;
 
-use crate::domain::user_info::models::UserActivity;
+use crate::domain::user_info::models::UserStatus;
 
-impl TryFrom<XMPPUserActivity> for UserActivity {
+impl TryFrom<XMPPUserActivity> for UserStatus {
     type Error = anyhow::Error;
 
     fn try_from(value: XMPPUserActivity) -> Result<Self> {
@@ -27,7 +27,7 @@ impl TryFrom<XMPPUserActivity> for UserActivity {
             bail!("Missing emoji in UserActivity")
         };
 
-        Ok(UserActivity {
+        Ok(UserStatus {
             emoji,
             status: value
                 .text
@@ -36,8 +36,8 @@ impl TryFrom<XMPPUserActivity> for UserActivity {
     }
 }
 
-impl From<UserActivity> for XMPPUserActivity {
-    fn from(value: UserActivity) -> Self {
+impl From<UserStatus> for XMPPUserActivity {
+    fn from(value: UserStatus) -> Self {
         // Notice: as we are using emoji-based icons in order to specify the \
         //   kind of activity, we do not map to a proper RPID there, but \
         //   rather use the 'undefined' unspecified activity general category, \

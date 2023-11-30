@@ -20,7 +20,7 @@ use crate::app::deps::{
 };
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::user_info::models::{
-    AvatarMetadata, Presence as DomainPresence, UserActivity as DomainUserActivity,
+    AvatarMetadata, Presence as DomainPresence, UserStatus as DomainUserActivity,
 };
 use crate::ClientEvent;
 

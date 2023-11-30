@@ -6,13 +6,13 @@
 pub use avatar_metadata::{AvatarImageId, AvatarInfo, AvatarMetadata};
 pub use platform_image::PlatformImage;
 pub use presence::Presence;
-pub use user_activity::UserActivity;
 pub use user_info::UserInfo;
 pub use user_metadata::{LastActivity, UserMetadata};
+pub use user_status::UserStatus;
 
 mod avatar_metadata;
 mod platform_image;
 mod presence;
-mod user_activity;
 mod user_info;
 mod user_metadata;
+mod user_status;

@@ -12,7 +12,7 @@ use prose_xmpp::stanza::VCard4;
 use crate::domain::account::services::UserAccountService;
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserActivity};
+use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
 use crate::infra::xmpp::XMPPClient;
 
@@ -58,7 +58,7 @@ impl UserAccountService for XMPPClient {
         )
     }
 
-    async fn set_user_activity(&self, user_activity: Option<&UserActivity>) -> Result<()> {
+    async fn set_user_activity(&self, user_activity: Option<&UserStatus>) -> Result<()> {
         let status_mod = self.client.get_mod::<mods::Status>();
         status_mod
             .publish_activity(user_activity.cloned().map(Into::into).unwrap_or_default())

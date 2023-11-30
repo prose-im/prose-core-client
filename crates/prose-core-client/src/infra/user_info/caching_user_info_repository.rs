@@ -11,7 +11,7 @@ use parking_lot::RwLock;
 use prose_store::prelude::*;
 
 use crate::app::deps::DynUserInfoService;
-use crate::domain::user_info::models::{AvatarMetadata, Presence, UserActivity, UserInfo};
+use crate::domain::user_info::models::{AvatarMetadata, Presence, UserInfo, UserStatus};
 use crate::domain::user_info::repos::UserInfoRepository;
 
 use super::PresenceMap;
@@ -115,7 +115,7 @@ impl UserInfoRepository for CachingUserInfoRepository {
     async fn set_user_activity(
         &self,
         jid: &BareJid,
-        user_activity: Option<&UserActivity>,
+        user_activity: Option<&UserStatus>,
     ) -> Result<()> {
         upsert!(
             UserInfoRecord,

@@ -7,6 +7,7 @@ use anyhow::{bail, Result};
 use jid::Jid;
 use minidom::Element;
 use tracing::info;
+use xmpp_parsers::message::MessageType;
 
 use message::parse_message;
 use prose_xmpp::{
@@ -16,8 +17,10 @@ use prose_xmpp::{
 
 use crate::app::event_handlers::XMPPEvent;
 use crate::domain::rooms::models::ComposeState;
-use crate::domain::shared::models::{RoomEvent, RoomEventType, ServerEvent};
-use crate::dtos::RoomId;
+use crate::domain::shared::models::{
+    RoomEvent, RoomEventType, ServerEvent, UserEndpointId, UserStatusEvent, UserStatusEventType,
+};
+use crate::dtos::{RoomId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
 
 mod message;
@@ -66,16 +69,20 @@ fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
         XMPPChatEvent::ChatStateChanged {
             from,
             chat_state,
-            message_type: _message_type,
+            message_type,
         } => {
             let Jid::Full(from) = from else {
                 bail!("Expected FullJid in ChatState")
             };
 
-            ctx.push_event(ServerEvent::Room(RoomEvent {
-                room_id: RoomId::from(from.to_bare()),
-                r#type: RoomEventType::UserComposeStateChanged {
-                    user_id: from.clone(),
+            let user_id = match message_type {
+                MessageType::Groupchat => UserEndpointId::Occupant(from.into()),
+                _ => UserEndpointId::UserResource(from.into()),
+            };
+
+            ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
+                user_id,
+                r#type: UserStatusEventType::ComposeStateChanged {
                     state: ComposeState::from(chat_state.clone()),
                 },
             }))
@@ -94,19 +101,36 @@ fn parse_status_event(ctx: &mut Context, event: XMPPStatusEvent) -> Result<()> {
 
 fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
     match event {
-        XMPPMUCEvent::DirectInvite {
-            from: _from,
-            invite,
-        } => ctx.push_event(ServerEvent::Room(RoomEvent {
-            room_id: RoomId::from(invite.jid),
-            r#type: RoomEventType::ReceivedInvite {
-                password: invite.password,
-            },
-        })),
-        XMPPMUCEvent::MediatedInvite { from, invite } => {
+        XMPPMUCEvent::DirectInvite { from, invite } => {
+            let Jid::Full(from) = from else {
+                bail!("Expected FullJid in direct invite")
+            };
+
             ctx.push_event(ServerEvent::Room(RoomEvent {
-                room_id: RoomId::from(from.to_bare()),
-                r#type: RoomEventType::ReceivedInvite {
+                room_id: RoomId::from(invite.jid),
+                r#type: RoomEventType::ReceivedInvitation {
+                    sender: UserResourceId::from(from),
+                    password: invite.password,
+                },
+            }))
+        }
+        XMPPMUCEvent::MediatedInvite { from, invite } => {
+            let Jid::Bare(from) = from else {
+                bail!("Expected BareJid for room in mediated invite")
+            };
+
+            let Some(embedded_invite) = invite.invites.first() else {
+                bail!("Expected MediatedInvite to contain at least one embedded invite.")
+            };
+
+            let Some(Jid::Full(sender_jid)) = &embedded_invite.from else {
+                bail!("Expected FullJid in embedded invite of MediatedInvite.")
+            };
+
+            ctx.push_event(ServerEvent::Room(RoomEvent {
+                room_id: RoomId::from(from),
+                r#type: RoomEventType::ReceivedInvitation {
+                    sender: UserResourceId::from(sender_jid.clone()),
                     password: invite.password,
                 },
             }))

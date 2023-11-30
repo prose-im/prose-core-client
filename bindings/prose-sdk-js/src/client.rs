@@ -7,7 +7,7 @@ use base64::{engine::general_purpose, Engine as _};
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::{RoomId, SoftwareVersion, UserActivity};
+use prose_core_client::dtos::{RoomId, SoftwareVersion, UserStatus};
 use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, StoreAvatarCache};
 
 use crate::connector::{Connector, ProseConnectionProvider};
@@ -264,14 +264,15 @@ impl Client {
         icon: Option<String>,
         text: Option<String>,
     ) -> Result<()> {
-        let user_activity = if let Some(icon) = &icon {
-            Some(UserActivity {
-                emoji: icon.clone(),
-                status: text.clone(),
-            })
-        } else {
-            None
-        };
+        let user_activity =
+            if let Some(icon) = &icon {
+                Some(UserStatus {
+                    emoji: icon.clone(),
+                    status: text.clone(),
+                })
+            } else {
+                None
+            };
 
         self.client
             .account

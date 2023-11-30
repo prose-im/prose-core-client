@@ -5,7 +5,7 @@
 
 use prose_core_client::dtos::{
     Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
-    UserActivity as CoreUserActivity,
+    UserStatus as CoreUserActivity,
 };
 use wasm_bindgen::prelude::*;
 

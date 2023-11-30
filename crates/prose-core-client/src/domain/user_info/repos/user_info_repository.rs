@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use jid::{BareJid, Jid};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::user_info::models::{AvatarMetadata, Presence, UserActivity, UserInfo};
+use crate::domain::user_info::models::{AvatarMetadata, Presence, UserInfo, UserStatus};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -24,7 +24,7 @@ pub trait UserInfoRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn set_user_activity(
         &self,
         jid: &BareJid,
-        user_activity: Option<&UserActivity>,
+        user_activity: Option<&UserStatus>,
     ) -> Result<()>;
     async fn set_user_presence(&self, jid: &Jid, presence: &Presence) -> Result<()>;
 

@@ -10,7 +10,7 @@ use jid::Jid;
 
 use prose_core_client::app::dtos::Availability;
 use prose_core_client::domain::user_info::models::{
-    AvatarInfo, AvatarMetadata, Presence, UserActivity, UserInfo,
+    AvatarInfo, AvatarMetadata, Presence, UserInfo, UserStatus,
 };
 use prose_core_client::domain::user_info::repos::UserInfoRepository;
 use prose_core_client::domain::user_info::services::mocks::MockUserInfoService;
@@ -21,14 +21,15 @@ use crate::tests::{async_test, store};
 
 #[async_test]
 async fn test_caches_loaded_avatar_metadata() -> Result<()> {
-    let metadata = AvatarMetadata {
-        bytes: 1001,
-        mime_type: "image/jpg".to_string(),
-        checksum: "my-checksum".into(),
-        width: None,
-        height: None,
-        url: None,
-    };
+    let metadata =
+        AvatarMetadata {
+            bytes: 1001,
+            mime_type: "image/jpg".to_string(),
+            checksum: "my-checksum".into(),
+            width: None,
+            height: None,
+            url: None,
+        };
 
     let service = {
         let metadata = metadata.clone();
@@ -65,14 +66,15 @@ async fn test_caches_loaded_avatar_metadata() -> Result<()> {
 
 #[async_test]
 async fn test_caches_received_avatar_metadata() -> Result<()> {
-    let metadata = AvatarMetadata {
-        bytes: 1001,
-        mime_type: "image/jpg".to_string(),
-        checksum: "my-checksum".into(),
-        width: None,
-        height: None,
-        url: None,
-    };
+    let metadata =
+        AvatarMetadata {
+            bytes: 1001,
+            mime_type: "image/jpg".to_string(),
+            checksum: "my-checksum".into(),
+            width: None,
+            height: None,
+            url: None,
+        };
 
     let repo = CachingUserInfoRepository::new(store().await?, Arc::new(MockUserInfoService::new()));
     repo.set_avatar_metadata(&bare!("a@prose.org"), &metadata)
@@ -97,16 +99,17 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
 
 #[async_test]
 async fn test_persists_metadata_and_user_activity() -> Result<()> {
-    let metadata = AvatarMetadata {
-        bytes: 1001,
-        mime_type: "image/jpg".to_string(),
-        checksum: "my-checksum".into(),
-        width: None,
-        height: None,
-        url: None,
-    };
+    let metadata =
+        AvatarMetadata {
+            bytes: 1001,
+            mime_type: "image/jpg".to_string(),
+            checksum: "my-checksum".into(),
+            width: None,
+            height: None,
+            url: None,
+        };
 
-    let activity = UserActivity {
+    let activity = UserStatus {
         emoji: "🍕".to_string(),
         status: Some("Eating pizza".to_string()),
     };

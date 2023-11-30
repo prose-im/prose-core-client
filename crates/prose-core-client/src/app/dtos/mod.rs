@@ -17,7 +17,7 @@ pub use crate::domain::{
     shared::models::{
         Availability, OccupantId, RoomId, UserBasicInfo, UserId, UserPresenceInfo, UserResourceId,
     },
-    user_info::models::{LastActivity, UserActivity, UserInfo, UserMetadata},
+    user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},
     user_profiles::models::{Address, UserProfile},
 };
 

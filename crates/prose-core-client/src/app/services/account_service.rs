@@ -11,7 +11,7 @@ use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::*;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarMetadata, UserActivity};
+use crate::domain::user_info::models::{AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
 
 #[derive(InjectDependencies)]
@@ -60,7 +60,7 @@ impl AccountService {
         Ok(())
     }
 
-    pub async fn set_user_activity(&self, user_activity: Option<UserActivity>) -> Result<()> {
+    pub async fn set_user_activity(&self, user_activity: Option<UserStatus>) -> Result<()> {
         self.user_account_service
             .set_user_activity(user_activity.as_ref())
             .await?;
@@ -84,14 +84,15 @@ impl AccountService {
         let image_data_len = image_data.as_ref().len();
         let image_data = AvatarData::Data(image_data.as_ref().to_vec());
 
-        let metadata = AvatarMetadata {
-            bytes: image_data_len,
-            mime_type: mime_type.as_ref().to_string(),
-            checksum: image_data.generate_sha1_checksum()?.as_ref().into(),
-            width,
-            height,
-            url: None,
-        };
+        let metadata =
+            AvatarMetadata {
+                bytes: image_data_len,
+                mime_type: mime_type.as_ref().to_string(),
+                checksum: image_data.generate_sha1_checksum()?.as_ref().into(),
+                width,
+                height,
+                url: None,
+            };
 
         debug!("Uploading avatar…");
         self.user_account_service

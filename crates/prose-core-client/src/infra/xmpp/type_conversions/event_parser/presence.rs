@@ -9,12 +9,12 @@ use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 
-use crate::domain::rooms::models::RoomAffiliation;
 use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::shared::models::{
-    OccupantId, RoomEvent, RoomEventType, RoomUserInfo, ServerEvent, UserResourceId,
+    OccupantEvent, OccupantEventType, OccupantId, RoomEvent, RoomEventType, ServerEvent,
+    UserEndpointId, UserResourceId, UserStatusEvent, UserStatusEventType,
 };
 use crate::dtos::{Availability, RoomId};
 use crate::infra::xmpp::type_conversions::event_parser::{
@@ -47,28 +47,32 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
 
     let is_self_presence = muc_user.status.contains(&Status::SelfPresence);
 
-    let user = RoomUserInfo {
-        id: OccupantId::from(from),
-        real_id: item.jid.clone().map(UserResourceId::from),
-        affiliation: RoomAffiliation::from(item.affiliation.clone()),
-        availability: Availability::from((
-            (presence.type_ != presence::Type::None).then_some(presence.type_),
-            presence.show,
-        )),
-        is_self: is_self_presence,
-    };
-
     if let Some(destroy) = muc_user.destroy.take() {
         ctx.push_event(ServerEvent::Room(RoomEvent {
             room_id: room,
-            r#type: RoomEventType::RoomWasDestroyed {
-                alternate_room: destroy.jid.map(RoomId::from),
+            r#type: RoomEventType::Destroyed {
+                replacement: destroy.jid.map(RoomId::from),
             },
         }));
         return Ok(());
     }
 
-    if user.availability == Availability::Unavailable {
+    let availability =
+        Availability::from((
+            (presence.type_ != presence::Type::None).then_some(presence.type_),
+            presence.show,
+        ));
+    let occupant_id = OccupantId::from(from);
+    let real_id = item.jid.clone().map(UserResourceId::from);
+
+    ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
+        user_id: UserEndpointId::Occupant(occupant_id.clone()),
+        r#type: UserStatusEventType::AvailabilityChanged {
+            availability: availability.clone(),
+        },
+    }));
+
+    if availability == Availability::Unavailable {
         if muc_user
             .status
             .iter()
@@ -81,9 +85,11 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
             })
             .is_some()
         {
-            ctx.push_event(ServerEvent::Room(RoomEvent {
-                room_id: room,
-                r#type: RoomEventType::UserWasPermanentlyRemoved { user },
+            ctx.push_event(ServerEvent::Occupant(OccupantEvent {
+                occupant_id,
+                real_id,
+                is_self: is_self_presence,
+                r#type: OccupantEventType::PermanentlyRemoved,
             }));
             return Ok(());
         }
@@ -97,17 +103,29 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
             })
             .is_some()
         {
-            ctx.push_event(ServerEvent::Room(RoomEvent {
-                room_id: room,
-                r#type: RoomEventType::UserWasDisconnectedByServer { user },
+            ctx.push_event(ServerEvent::Occupant(OccupantEvent {
+                occupant_id,
+                real_id,
+                is_self: is_self_presence,
+                r#type: OccupantEventType::DisconnectedByServer,
             }));
             return Ok(());
         }
     }
 
-    ctx.push_event(ServerEvent::Room(RoomEvent {
-        room_id: room,
-        r#type: RoomEventType::UserAvailabilityOrMembershipChanged { user },
+    // If the user is unavailable and was not banned/room destroyed/forcefully removed then there
+    // is no point in sending an AffiliationChanged event, since the affiliation did not change.
+    if availability == Availability::Unavailable {
+        return Ok(());
+    }
+
+    ctx.push_event(ServerEvent::Occupant(OccupantEvent {
+        occupant_id,
+        real_id,
+        r#type: OccupantEventType::AffiliationChanged {
+            affiliation: item.affiliation.clone().into(),
+        },
+        is_self: is_self_presence,
     }));
 
     Ok(())

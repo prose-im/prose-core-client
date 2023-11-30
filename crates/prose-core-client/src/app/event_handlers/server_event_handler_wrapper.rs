@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use crate::app::event_handlers::{ServerEventHandler, XMPPEvent, XMPPEventHandler};
-use crate::parse_xmpp_event;
+use crate::infra::xmpp::type_conversions::event_parser::parse_xmpp_event;
 
 /// A compatibility layer to help with migrating all event handlers to the new ServerEvent.
 pub struct ServerEventHandlerWrapper<T: ServerEventHandler> {
