@@ -291,10 +291,7 @@ macro_rules! muc_room_impl {
 
             #[wasm_bindgen(js_name = "setTopic")]
             pub async fn set_topic(&self, topic: Option<String>) -> Result<()> {
-                self.room
-                    .set_topic(topic.as_deref())
-                    .await
-                    .map_err(WasmError::from)?;
+                self.room.set_topic(topic).await.map_err(WasmError::from)?;
                 Ok(())
             }
         }
@@ -371,22 +368,28 @@ pub trait RoomEnvelopeExt {
 impl RoomEnvelopeExt for RoomEnvelope {
     fn into_js_value(self) -> JsValue {
         match self {
-            RoomEnvelope::DirectMessage(room) => JsValue::from(RoomDirectMessage {
-                kind: RoomType::DirectMessage,
-                room,
-            }),
+            RoomEnvelope::DirectMessage(room) => {
+                JsValue::from(RoomDirectMessage {
+                    kind: RoomType::DirectMessage,
+                    room,
+                })
+            }
             RoomEnvelope::Group(room) => JsValue::from(RoomGroup {
                 kind: RoomType::Group,
                 room,
             }),
-            RoomEnvelope::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
-                kind: RoomType::PrivateChannel,
-                room,
-            }),
-            RoomEnvelope::PublicChannel(room) => JsValue::from(RoomPublicChannel {
-                kind: RoomType::PublicChannel,
-                room,
-            }),
+            RoomEnvelope::PrivateChannel(room) => {
+                JsValue::from(RoomPrivateChannel {
+                    kind: RoomType::PrivateChannel,
+                    room,
+                })
+            }
+            RoomEnvelope::PublicChannel(room) => {
+                JsValue::from(RoomPublicChannel {
+                    kind: RoomType::PublicChannel,
+                    room,
+                })
+            }
             RoomEnvelope::Generic(room) => JsValue::from(RoomGeneric {
                 kind: RoomType::Generic,
                 room,

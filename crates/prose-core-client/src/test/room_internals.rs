@@ -34,7 +34,7 @@ impl RoomInternals {
 
     pub fn group(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
-            jid: jid.into(),
+            room_id: jid.into(),
             description: None,
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
             members: HashMap::new(),
@@ -44,7 +44,7 @@ impl RoomInternals {
 
     pub fn public_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
-            jid: jid.into(),
+            room_id: jid.into(),
             description: None,
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
             members: HashMap::new(),
@@ -54,7 +54,7 @@ impl RoomInternals {
 
     pub fn private_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
-            jid: jid.into(),
+            room_id: jid.into(),
             description: None,
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
             members: HashMap::new(),

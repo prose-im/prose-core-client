@@ -201,7 +201,7 @@ impl MessagesEventHandler {
 
         if let Some(message_id) = message.id.into_original_id() {
             self.messaging_service
-                .send_read_receipt(&room.jid, &room.r#type, &message_id)
+                .send_read_receipt(&room.room_id, &room.r#type, &message_id)
                 .await?;
         }
 

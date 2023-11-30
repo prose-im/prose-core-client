@@ -99,7 +99,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         }
 
         self.room_attributes_service
-            .set_name(&room.jid, name.as_ref())
+            .set_name(&room.room_id, name.as_ref())
             .await?;
         room.set_name(name);
 
@@ -159,9 +159,9 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 match self
                     .message_migration_domain_service
                     .copy_all_messages_from_room(
-                        &room.jid,
+                        &room.room_id,
                         &room.r#type,
-                        &new_room.jid,
+                        &new_room.room_id,
                         &new_room.r#type,
                     )
                     .await
@@ -172,7 +172,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                         _ = self.connected_rooms_repo.set(room);
                         _ = self
                             .room_management_service
-                            .destroy_room(&new_room.jid, None)
+                            .destroy_room(&new_room.room_id, None)
                             .await;
                         return Err(err.into());
                     }
@@ -190,14 +190,14 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
                     match self
                         .room_participation_service
-                        .grant_membership(&new_room.jid, member)
+                        .grant_membership(&new_room.room_id, member)
                         .await
                     {
                         Ok(_) => (),
                         Err(err) => {
                             error!(
                                 "Could not grant membership for new private channel {} to {}. Reason: {}",
-                                new_room.jid, member, err.to_string()
+                                new_room.room_id, member, err.to_string()
                             );
                         }
                     }
@@ -205,10 +205,10 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
                 // And finally destroy the original room. Since we pass in the JID to the new room
                 // we do not need to send invites to the members of the original group.
-                debug!("Destroying old room {}…", room.jid);
+                debug!("Destroying old room {}…", room.room_id);
                 match self
                     .room_management_service
-                    .destroy_room(room_jid, Some(new_room.jid.clone()))
+                    .destroy_room(room_jid, Some(new_room.room_id.clone()))
                     .await
                 {
                     Ok(_) => (),
@@ -581,7 +581,7 @@ impl RoomsDomainService {
         }
 
         let room_info = RoomInfo {
-            jid: info.room_jid.clone(),
+            room_id: info.room_jid.clone(),
             description: info.room_description,
             user_nickname: info.user_nickname,
             members,

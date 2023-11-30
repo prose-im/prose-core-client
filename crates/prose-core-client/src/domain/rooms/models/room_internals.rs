@@ -24,7 +24,7 @@ pub struct RoomInternals {
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoomInfo {
     /// The JID of the room.
-    pub jid: RoomId,
+    pub room_id: RoomId,
     /// The description of the room.
     pub description: Option<String>,
     /// The nickname with which our user is connected to the room.
@@ -117,7 +117,7 @@ impl RoomInternals {
     pub fn pending(room_jid: &RoomId, nickname: &str) -> Self {
         Self {
             info: RoomInfo {
-                jid: room_jid.clone(),
+                room_id: room_jid.clone(),
                 description: None,
                 user_nickname: nickname.to_string(),
                 members: HashMap::new(),
@@ -149,7 +149,7 @@ impl RoomInternals {
     pub fn for_direct_message(contact_jid: &BareJid, contact_name: &str) -> Self {
         Self {
             info: RoomInfo {
-                jid: contact_jid.clone().into(),
+                room_id: contact_jid.clone().into(),
                 description: None,
                 user_nickname: "no_nickname".to_string(),
                 members: HashMap::from([(
@@ -196,7 +196,7 @@ impl RoomInfo {
     /// Returns the full jid of the connected user by appending their nickname to the room's
     /// bare jid.
     pub fn user_full_jid(&self) -> FullJid {
-        self.jid.with_resource_str(&self.user_nickname)
+        self.room_id.with_resource_str(&self.user_nickname)
             .expect("The provided JID and user_nickname were invalid and could not be used to form a FullJid.")
     }
 }
@@ -227,7 +227,7 @@ mod tests {
             internals,
             RoomInternals {
                 info: RoomInfo {
-                    jid: bare!("contact@prose.org").into(),
+                    room_id: bare!("contact@prose.org").into(),
                     description: None,
                     user_nickname: "no_nickname".to_string(),
                     members: HashMap::from([(

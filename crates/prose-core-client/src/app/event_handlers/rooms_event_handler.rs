@@ -252,7 +252,7 @@ impl RoomsEventHandler {
             if let Some(destroy) = muc_user.destroy.take() {
                 info!(
                     "Room {} has been destroyed. Alternative is {}",
-                    room.jid,
+                    room.room_id,
                     destroy
                         .jid
                         .as_ref()
@@ -261,7 +261,7 @@ impl RoomsEventHandler {
                         .unwrap_or("<none>")
                 );
                 self.sidebar_domain_service
-                    .handle_destroyed_room(&room.jid, destroy.jid.map(RoomId::from))
+                    .handle_destroyed_room(&room.room_id, destroy.jid.map(RoomId::from))
                     .await?;
                 return Ok(());
             }
@@ -293,7 +293,7 @@ impl RoomsEventHandler {
                 if was_removed {
                     let is_permanent = muc_user.user_was_permanently_removed();
                     self.sidebar_domain_service
-                        .handle_removal_from_room(&room.jid, is_permanent)
+                        .handle_removal_from_room(&room.room_id, is_permanent)
                         .await?;
                 }
             }

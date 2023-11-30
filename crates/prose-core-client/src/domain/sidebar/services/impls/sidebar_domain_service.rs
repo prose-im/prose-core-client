@@ -314,11 +314,11 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
 
         info!(
             "Reconfiguration of room {} finished. Room Jid is now {}",
-            room_jid, room.jid
+            room_jid, room.room_id
         );
 
         // The returned room has a new JID, which implies that the old room has been deleted…
-        if room_jid != &room.jid {
+        if room_jid != &room.room_id {
             self.connected_rooms_repo.delete(room_jid);
             self.sidebar_repo.delete(room_jid);
 
@@ -613,7 +613,7 @@ impl SidebarDomainService {
         &self,
         room: Arc<RoomInternals>,
     ) -> Result<RoomId> {
-        let room_name = room.name().unwrap_or(room.jid.to_string());
+        let room_name = room.name().unwrap_or(room.room_id.to_string());
 
         let bookmark_type = match room.r#type {
             RoomType::Pending => {
@@ -630,13 +630,13 @@ impl SidebarDomainService {
 
         let mut new_sidebar_item = SidebarItem {
             name: room_name.clone(),
-            jid: room.jid.clone(),
+            jid: room.room_id.clone(),
             r#type: bookmark_type.clone(),
             is_favorite: false,
             error: None,
         };
 
-        if let Some(sidebar_item) = self.sidebar_repo.get(&room.jid) {
+        if let Some(sidebar_item) = self.sidebar_repo.get(&room.room_id) {
             if sidebar_item.name == new_sidebar_item.name
                 && sidebar_item.r#type == new_sidebar_item.r#type
             {
@@ -652,23 +652,26 @@ impl SidebarDomainService {
 
         info!(
             "Saving bookmark for room {} (type: {})",
-            room.jid, bookmark_type
+            room.room_id, bookmark_type
         );
-        let result = self
-            .bookmarks_service
-            .save_bookmark(&Bookmark {
-                name: room_name,
-                jid: room.jid.clone(),
-                r#type: bookmark_type.clone(),
-                is_favorite: false,
-                in_sidebar: true,
-            })
-            .await;
+        let result =
+            self.bookmarks_service
+                .save_bookmark(&Bookmark {
+                    name: room_name,
+                    jid: room.room_id.clone(),
+                    r#type: bookmark_type.clone(),
+                    is_favorite: false,
+                    in_sidebar: true,
+                })
+                .await;
 
         match result {
             Ok(_) => (),
             Err(error) => {
-                error!("Failed to save bookmark for room {}. {}", room.jid, error)
+                error!(
+                    "Failed to save bookmark for room {}. {}",
+                    room.room_id, error
+                )
             }
         }
 

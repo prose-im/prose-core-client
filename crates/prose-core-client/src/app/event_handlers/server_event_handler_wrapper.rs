@@ -20,6 +20,7 @@ impl<T: ServerEventHandler> ServerEventHandlerWrapper<T> {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl<T: ServerEventHandler> XMPPEventHandler for ServerEventHandlerWrapper<T> {
     fn name(&self) -> &'static str {

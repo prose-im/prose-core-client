@@ -99,7 +99,7 @@ impl<Kind> Deref for Room<Kind> {
 impl<Kind> Debug for Room<Kind> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Room")
-            .field("jid", &self.data.jid)
+            .field("jid", &self.data.room_id)
             .field("name", &self.data.name())
             .field("description", &self.data.description)
             .field("user_nickname", &self.data.user_nickname)
@@ -111,7 +111,7 @@ impl<Kind> Debug for Room<Kind> {
 
 impl<Kind> PartialEq for Room<Kind> {
     fn eq(&self, other: &Self) -> bool {
-        self.data.jid == other.data.jid
+        self.data.room_id == other.data.room_id
     }
 }
 
@@ -123,7 +123,7 @@ impl<Kind> Room<Kind> {
 
 impl<Kind> Room<Kind> {
     pub fn jid(&self) -> &RoomId {
-        &self.data.jid
+        &self.data.room_id
     }
 
     pub fn name(&self) -> Option<String> {
@@ -172,19 +172,19 @@ impl<Kind> Room<Kind> {
 impl<Kind> Room<Kind> {
     pub async fn send_message(&self, body: impl Into<String>) -> Result<()> {
         self.messaging_service
-            .send_message(&self.data.jid, &self.data.r#type, body.into())
+            .send_message(&self.data.room_id, &self.data.r#type, body.into())
             .await
     }
 
     pub async fn update_message(&self, id: MessageId, body: impl Into<String>) -> Result<()> {
         self.messaging_service
-            .update_message(&self.data.jid, &self.data.r#type, &id, body.into())
+            .update_message(&self.data.room_id, &self.data.r#type, &id, body.into())
             .await
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
         let user_jid = self.ctx.connected_jid()?.into_bare();
-        let messages = self.message_repo.get(&self.data.jid, &id).await?;
+        let messages = self.message_repo.get(&self.data.room_id, &id).await?;
 
         let mut message = Message::reducing_messages(messages)
             .pop()
@@ -198,7 +198,7 @@ impl<Kind> Room<Kind> {
 
         self.messaging_service
             .react_to_message(
-                &self.data.jid,
+                &self.data.room_id,
                 &self.data.r#type,
                 &id,
                 all_emojis.as_slice(),
@@ -208,18 +208,18 @@ impl<Kind> Room<Kind> {
 
     pub async fn retract_message(&self, id: MessageId) -> Result<()> {
         self.messaging_service
-            .retract_message(&self.data.jid, &self.data.r#type, &id)
+            .retract_message(&self.data.room_id, &self.data.r#type, &id)
             .await
     }
 
     pub async fn load_messages_with_ids(&self, ids: &[&MessageId]) -> Result<Vec<MessageDTO>> {
-        let messages = self.message_repo.get_all(&self.data.jid, ids).await?;
+        let messages = self.message_repo.get_all(&self.data.room_id, ids).await?;
         Ok(self.reduce_messages_and_add_sender(messages).await)
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
         self.messaging_service
-            .set_user_is_composing(&self.data.jid, &self.data.r#type, is_composing)
+            .set_user_is_composing(&self.data.room_id, &self.data.r#type, is_composing)
             .await
     }
 
@@ -231,11 +231,11 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
-        self.drafts_repo.set(&self.data.jid, text).await
+        self.drafts_repo.set(&self.data.room_id, text).await
     }
 
     pub async fn load_draft(&self) -> Result<Option<String>> {
-        self.drafts_repo.get(&self.data.jid).await
+        self.drafts_repo.get(&self.data.room_id).await
     }
 
     pub async fn load_latest_messages(&self) -> Result<Vec<MessageDTO>> {
@@ -243,7 +243,7 @@ impl<Kind> Room<Kind> {
 
         let result = self
             .message_archive_service
-            .load_messages(&self.data.jid, &self.data.r#type, None, None)
+            .load_messages(&self.data.room_id, &self.data.r#type, None, None)
             .await?;
 
         let messages = result
@@ -255,7 +255,7 @@ impl<Kind> Room<Kind> {
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo
             .append(
-                &self.data.jid,
+                &self.data.room_id,
                 messages.iter().collect::<Vec<_>>().as_slice(),
             )
             .await?;
@@ -342,14 +342,14 @@ impl Room<Group> {
 
         let member_jids = self.data.members.keys().cloned().collect::<Vec<_>>();
         self.participation_service
-            .invite_users_to_room(&self.data.jid, member_jids.as_slice())
+            .invite_users_to_room(&self.data.room_id, member_jids.as_slice())
             .await?;
         Ok(())
     }
 
     pub async fn convert_to_private_channel(&self, name: impl AsRef<str>) -> Result<()> {
         self.sidebar_domain_service
-            .reconfigure_item_with_spec(&self.data.jid, RoomSpec::PrivateChannel, name.as_ref())
+            .reconfigure_item_with_spec(&self.data.room_id, RoomSpec::PrivateChannel, name.as_ref())
             .await?;
         Ok(())
     }
@@ -359,7 +359,7 @@ impl Room<PrivateChannel> {
     pub async fn convert_to_public_channel(&self) -> Result<()> {
         self.sidebar_domain_service
             .reconfigure_item_with_spec(
-                &self.data.jid,
+                &self.data.room_id,
                 RoomSpec::PublicChannel,
                 self.data.name().as_deref().unwrap_or_default(),
             )
@@ -370,7 +370,7 @@ impl Room<PrivateChannel> {
     pub async fn invite_users(&self, users: impl IntoIterator<Item = &BareJid>) -> Result<()> {
         let user_jids = users.into_iter().cloned().collect::<Vec<_>>();
         self.participation_service
-            .invite_users_to_room(&self.data.jid, user_jids.as_slice())
+            .invite_users_to_room(&self.data.room_id, user_jids.as_slice())
             .await?;
         Ok(())
     }
@@ -380,7 +380,7 @@ impl Room<PublicChannel> {
     pub async fn convert_to_private_channel(&self) -> Result<()> {
         self.sidebar_domain_service
             .reconfigure_item_with_spec(
-                &self.data.jid,
+                &self.data.room_id,
                 RoomSpec::PrivateChannel,
                 self.data.name().as_deref().unwrap_or_default(),
             )
@@ -393,12 +393,12 @@ impl Room<PublicChannel> {
 
         for user in user_jids.iter() {
             self.participation_service
-                .grant_membership(&self.data.jid, user)
+                .grant_membership(&self.data.room_id, user)
                 .await?;
         }
 
         self.participation_service
-            .invite_users_to_room(&self.data.jid, user_jids.as_slice())
+            .invite_users_to_room(&self.data.room_id, user_jids.as_slice())
             .await?;
         Ok(())
     }
@@ -410,7 +410,7 @@ where
 {
     pub async fn set_topic(&self, topic: Option<String>) -> Result<()> {
         self.attributes_service
-            .set_topic(&self.data.jid, topic.as_deref())
+            .set_topic(&self.data.room_id, topic.as_deref())
             .await?;
         self.data.set_topic(topic);
 
@@ -427,7 +427,7 @@ where
 {
     pub async fn set_name(&self, name: impl AsRef<str>) -> Result<()> {
         self.sidebar_domain_service
-            .rename_item(&self.data.jid, name.as_ref())
+            .rename_item(&self.data.room_id, name.as_ref())
             .await?;
         Ok(())
     }
