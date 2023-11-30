@@ -18,17 +18,12 @@ impl RoomInternals {
     pub fn direct_message(jid: impl Into<BareJid>) -> Self {
         let jid = jid.into();
 
-        Self::for_direct_message(
-            &jid,
-            &mock_data::account_jid().into_bare(),
-            &jid.to_display_name(),
-        )
+        Self::for_direct_message(&jid, &jid.to_display_name())
     }
 
     pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
         Self::pending(
             &jid.into(),
-            &mock_data::account_jid().into_bare(),
             &format!(
                 "{}-{}",
                 mock_data::account_jid().node_str().unwrap(),
@@ -41,7 +36,6 @@ impl RoomInternals {
         Self::new(RoomInfo {
             jid: jid.into(),
             description: None,
-            user_jid: mock_data::account_jid().into_bare(),
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
             members: HashMap::new(),
             r#type: RoomType::Group,
@@ -52,7 +46,6 @@ impl RoomInternals {
         Self::new(RoomInfo {
             jid: jid.into(),
             description: None,
-            user_jid: mock_data::account_jid().into_bare(),
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
             members: HashMap::new(),
             r#type: RoomType::PublicChannel,
@@ -63,7 +56,6 @@ impl RoomInternals {
         Self::new(RoomInfo {
             jid: jid.into(),
             description: None,
-            user_jid: mock_data::account_jid().into_bare(),
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
             members: HashMap::new(),
             r#type: RoomType::PrivateChannel,

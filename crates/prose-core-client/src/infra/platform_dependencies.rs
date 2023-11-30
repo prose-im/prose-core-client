@@ -100,10 +100,9 @@ impl From<PlatformDependencies> for AppDependencies {
         let messages_repo = Arc::new(CachingMessageRepository::new(d.store.clone()));
         let sidebar_repo = Arc::new(InMemorySidebarRepository::new());
         let time_provider = d.time_provider;
-        let user_profile_repo = Arc::new(CachingUserProfileRepository::new(
-            d.store.clone(),
-            d.xmpp.clone(),
-        ));
+        let user_profile_repo = Arc::new(
+            CachingUserProfileRepository::new(d.store.clone(), d.xmpp.clone())
+        );
 
         let message_migration_domain_service_dependencies =
             MessageMigrationDomainServiceDependencies {
@@ -111,9 +110,9 @@ impl From<PlatformDependencies> for AppDependencies {
                 messaging_service: d.xmpp.clone(),
             };
 
-        let message_migration_domain_service = Arc::new(MessageMigrationDomainService::from(
-            message_migration_domain_service_dependencies,
-        ));
+        let message_migration_domain_service = Arc::new(
+            MessageMigrationDomainService::from(message_migration_domain_service_dependencies)
+        );
 
         let rooms_domain_service_dependencies = RoomsDomainServiceDependencies {
             client_event_dispatcher: client_event_dispatcher.clone(),
@@ -139,12 +138,12 @@ impl From<PlatformDependencies> for AppDependencies {
             sidebar_repo: sidebar_repo.clone(),
         };
 
-        let sidebar_domain_service = Arc::new(SidebarDomainService::from(
-            sidebar_domain_service_dependencies,
-        ));
+        let sidebar_domain_service =
+            Arc::new(SidebarDomainService::from(sidebar_domain_service_dependencies));
 
         let room_factory = {
             let client_event_dispatcher = client_event_dispatcher.clone();
+            let ctx = ctx.clone();
             let xmpp = d.xmpp.clone();
             let time_provider = time_provider.clone();
             let message_repo = messages_repo.clone();
@@ -155,6 +154,7 @@ impl From<PlatformDependencies> for AppDependencies {
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
+                    ctx: ctx.clone(),
                     time_provider: time_provider.clone(),
                     messaging_service: xmpp.clone(),
                     message_archive_service: xmpp.clone(),

@@ -27,8 +27,6 @@ pub struct RoomInfo {
     pub jid: RoomId,
     /// The description of the room.
     pub description: Option<String>,
-    /// The JID of our logged-in user.
-    pub user_jid: BareJid,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
     /// The list of members. Only available for DirectMessage and Group (member-only rooms).
@@ -116,12 +114,11 @@ impl RoomInternals {
 }
 
 impl RoomInternals {
-    pub fn pending(room_jid: &RoomId, user_jid: &BareJid, nickname: &str) -> Self {
+    pub fn pending(room_jid: &RoomId, nickname: &str) -> Self {
         Self {
             info: RoomInfo {
                 jid: room_jid.clone(),
                 description: None,
-                user_jid: user_jid.clone(),
                 user_nickname: nickname.to_string(),
                 members: HashMap::new(),
                 r#type: RoomType::Pending,
@@ -149,16 +146,11 @@ impl RoomInternals {
 }
 
 impl RoomInternals {
-    pub fn for_direct_message(
-        user_jid: &BareJid,
-        contact_jid: &BareJid,
-        contact_name: &str,
-    ) -> Self {
+    pub fn for_direct_message(contact_jid: &BareJid, contact_name: &str) -> Self {
         Self {
             info: RoomInfo {
                 jid: contact_jid.clone().into(),
                 description: None,
-                user_jid: user_jid.clone(),
                 user_nickname: "no_nickname".to_string(),
                 members: HashMap::from([(
                     contact_jid.clone(),
@@ -228,11 +220,8 @@ mod tests {
 
     #[test]
     fn test_room_internals_for_direct_message() {
-        let internals = RoomInternals::for_direct_message(
-            &bare!("logged-in-user@prose.org"),
-            &bare!("contact@prose.org"),
-            "Jane Doe",
-        );
+        let internals =
+            RoomInternals::for_direct_message(&bare!("logged-in-user@prose.org"), "Jane Doe");
 
         assert_eq!(
             internals,
@@ -240,7 +229,6 @@ mod tests {
                 info: RoomInfo {
                     jid: bare!("contact@prose.org").into(),
                     description: None,
-                    user_jid: bare!("logged-in-user@prose.org"),
                     user_nickname: "no_nickname".to_string(),
                     members: HashMap::from([(
                         bare!("contact@prose.org"),

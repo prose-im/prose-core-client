@@ -15,7 +15,7 @@ use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full};
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynBookmarksService, DynClientEventDispatcher,
+    AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
     DynDraftsRepository, DynIDProvider, DynMessageArchiveService, DynMessagesRepository,
     DynMessagingService, DynRoomAttributesService, DynRoomParticipationService,
     DynSidebarDomainService, DynSidebarReadOnlyRepository, DynTimeProvider,
@@ -142,6 +142,7 @@ impl From<MockAppDependencies> for AppDependencies {
         let user_profile_repo = Arc::new(mock.user_profile_repo);
 
         let room_factory = {
+            let ctx = ctx.clone();
             let client_event_dispatcher = client_event_dispatcher.clone();
             let drafts_repo = drafts_repo.clone();
             let message_archive_service = message_archive_service.clone();
@@ -156,6 +157,7 @@ impl From<MockAppDependencies> for AppDependencies {
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
+                    ctx: ctx.clone(),
                     time_provider: time_provider.clone(),
                     messaging_service: messaging_service.clone(),
                     message_archive_service: message_archive_service.clone(),
@@ -274,8 +276,10 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct MockRoomFactoryDependencies {
+    pub attributes_service: MockRoomAttributesService,
     pub bookmarks_service: MockBookmarksService,
     pub client_event_dispatcher: MockClientEventDispatcherTrait,
+    pub ctx: AppContext,
     pub drafts_repo: MockDraftsRepository,
     pub message_archive_service: MockMessageArchiveService,
     pub message_repo: MockMessagesRepository,
@@ -285,20 +289,20 @@ pub struct MockRoomFactoryDependencies {
     pub sidebar_repo: MockSidebarReadOnlyRepository,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
-    pub attributes_service: MockRoomAttributesService,
     pub user_profile_repo: MockUserProfileRepository,
 }
 
 pub struct MockSealedRoomFactoryDependencies {
     pub bookmarks_service: DynBookmarksService,
     pub client_event_dispatcher: DynClientEventDispatcher,
+    pub ctx: DynAppContext,
     pub drafts_repo: DynDraftsRepository,
     pub message_archive_service: DynMessageArchiveService,
     pub message_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
     pub participation_service: DynRoomParticipationService,
-    pub sidebar_repo: DynSidebarReadOnlyRepository,
     pub sidebar_domain_service: DynSidebarDomainService,
+    pub sidebar_repo: DynSidebarReadOnlyRepository,
     pub time_provider: DynTimeProvider,
     pub topic_service: DynRoomAttributesService,
     pub user_profile_repo: DynUserProfileRepository,
@@ -309,6 +313,7 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
         Self {
             bookmarks_service: Arc::new(value.bookmarks_service),
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
+            ctx: Arc::new(value.ctx),
             drafts_repo: Arc::new(value.drafts_repo),
             message_archive_service: Arc::new(value.message_archive_service),
             message_repo: Arc::new(value.message_repo),
@@ -328,6 +333,7 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
         RoomFactory::new(Arc::new(move |data| {
             RoomInner {
                 data: data.clone(),
+                ctx: value.ctx.clone(),
                 client_event_dispatcher: value.client_event_dispatcher.clone(),
                 drafts_repo: value.drafts_repo.clone(),
                 message_archive_service: value.message_archive_service.clone(),
@@ -352,8 +358,8 @@ impl From<MockRoomFactoryDependencies> for RoomFactory {
 
 impl RoomFactory {
     pub fn mock() -> Self {
-        RoomFactory::from(MockSealedRoomFactoryDependencies::from(
-            MockRoomFactoryDependencies::default(),
-        ))
+        RoomFactory::from(
+            MockSealedRoomFactoryDependencies::from(MockRoomFactoryDependencies::default())
+        )
     }
 }

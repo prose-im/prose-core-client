@@ -14,9 +14,10 @@ use jid::{BareJid, Jid};
 use tracing::{debug, info};
 
 use crate::app::deps::{
-    DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService, DynMessagesRepository,
-    DynMessagingService, DynRoomAttributesService, DynRoomParticipationService,
-    DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
+    DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
+    DynMessagesRepository, DynMessagingService, DynRoomAttributesService,
+    DynRoomParticipationService, DynSidebarDomainService, DynTimeProvider,
+    DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{RoomInternals, RoomSpec};
@@ -59,6 +60,7 @@ impl HasMutableName for Generic {}
 pub struct RoomInner {
     pub(crate) data: Arc<RoomInternals>,
 
+    pub(crate) ctx: DynAppContext,
     pub(crate) attributes_service: DynRoomAttributesService,
     pub(crate) client_event_dispatcher: DynClientEventDispatcher,
     pub(crate) drafts_repo: DynDraftsRepository,
@@ -100,7 +102,6 @@ impl<Kind> Debug for Room<Kind> {
             .field("jid", &self.data.jid)
             .field("name", &self.data.name())
             .field("description", &self.data.description)
-            .field("user_jid", &self.data.user_jid)
             .field("user_nickname", &self.data.user_nickname)
             .field("subject", &self.data.topic())
             .field("occupants", &self.data.occupants())
@@ -182,15 +183,16 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
+        let user_jid = self.ctx.connected_jid()?.into_bare();
         let messages = self.message_repo.get(&self.data.jid, &id).await?;
 
         let mut message = Message::reducing_messages(messages)
             .pop()
             .ok_or(format_err!("No message with id {}", id))?;
 
-        message.toggle_reaction(&self.data.user_jid, emoji);
+        message.toggle_reaction(&user_jid, emoji);
         let all_emojis = message
-            .reactions_from(&self.data.user_jid)
+            .reactions_from(&user_jid)
             .cloned()
             .collect::<Vec<_>>();
 

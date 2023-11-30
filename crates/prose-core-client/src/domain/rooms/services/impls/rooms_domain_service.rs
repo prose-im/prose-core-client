@@ -178,11 +178,13 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     }
                 }
 
+                let current_user = self.ctx.connected_jid()?.into_bare();
+
                 // Now grant the members of the original group access to the new channel…
                 debug!("Granting membership to members of new room {}…", new_name);
                 for member in room.members.keys() {
                     // Our user is already admin, no need to set them as a member…
-                    if member == &room.user_jid {
+                    if member == &current_user {
                         continue;
                     }
 
@@ -258,7 +260,7 @@ impl RoomsDomainService {
 
         // Insert pending room so that we don't miss any stanzas for this room while we're
         // connecting to it…
-        self.insert_pending_room(room_jid, &user_jid, &nickname)?;
+        self.insert_pending_room(room_jid, &nickname)?;
 
         let full_room_jid = room_jid.with_resource_str(&nickname)?;
 
@@ -283,7 +285,7 @@ impl RoomsDomainService {
             }
         }?;
 
-        self.finalize_pending_room(&user_jid, info).await
+        self.finalize_pending_room(info).await
     }
 
     async fn join_direct_message(
@@ -302,14 +304,9 @@ impl RoomsDomainService {
             .map(|maybe_profile| maybe_profile.unwrap_or_default())
             .unwrap_or_default();
 
-        let user_jid = self.ctx.connected_jid()?.into_bare();
         let contact_name = build_contact_name(&participant, &user_profile);
 
-        let room = Arc::new(RoomInternals::for_direct_message(
-            &user_jid,
-            &participant,
-            &contact_name,
-        ));
+        let room = Arc::new(RoomInternals::for_direct_message(&participant, &contact_name));
 
         match self.connected_rooms_repo.set(room.clone()) {
             Ok(()) => Ok(room),
@@ -389,7 +386,7 @@ impl RoomsDomainService {
             Err(error) => return Err(error),
         };
 
-        self.finalize_pending_room(&user_jid, info).await
+        self.finalize_pending_room(info).await
     }
 
     async fn create_or_join_group(
@@ -519,7 +516,7 @@ impl RoomsDomainService {
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
-            self.insert_pending_room(&room_jid, user_jid, &nickname)?;
+            self.insert_pending_room(&room_jid, &nickname)?;
 
             // Try to create or enter the room and configure it…
             let result = self
@@ -566,7 +563,6 @@ impl RoomsDomainService {
 
     async fn finalize_pending_room(
         &self,
-        user_jid: &BareJid,
         info: RoomSessionInfo,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
@@ -587,7 +583,6 @@ impl RoomsDomainService {
         let room_info = RoomInfo {
             jid: info.room_jid.clone(),
             description: info.room_description,
-            user_jid: user_jid.clone(),
             user_nickname: info.user_nickname,
             members,
             r#type: info.room_type,
@@ -629,14 +624,9 @@ impl RoomsDomainService {
         Ok(true)
     }
 
-    fn insert_pending_room(
-        &self,
-        room_jid: &RoomId,
-        user_jid: &BareJid,
-        nickname: &str,
-    ) -> Result<(), RoomError> {
+    fn insert_pending_room(&self, room_jid: &RoomId, nickname: &str) -> Result<(), RoomError> {
         self.connected_rooms_repo
-            .set(Arc::new(RoomInternals::pending(room_jid, user_jid, nickname)))
+            .set(Arc::new(RoomInternals::pending(room_jid, nickname)))
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
     }
 }
