@@ -6,6 +6,7 @@
 use prose_xmpp::ConnectionError;
 
 use crate::domain::shared::models::anon_occupant_id::AnonOccupantId;
+use crate::domain::shared::models::CapabilitiesId;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
     shared::models::{Availability, OccupantId, RoomId, UserEndpointId, UserId, UserResourceId},
@@ -18,6 +19,7 @@ pub enum ServerEvent {
     Connection(ConnectionEvent),
     UserStatus(UserStatusEvent),
     UserInfo(UserInfoEvent),
+    UserResource(UserResourceEvent),
     Room(RoomEvent),
     Occupant(OccupantEvent),
     Request(RequestEvent),
@@ -49,14 +51,26 @@ pub enum UserStatusEventType {
 // Events that affect the information about the user globally.
 pub struct UserInfoEvent {
     pub user_id: UserId,
-    pub r#type: UserDataEventType,
+    pub r#type: UserInfoEventType,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum UserDataEventType {
+pub enum UserInfoEventType {
     StatusChanged { status: UserStatus },
     ProfileChanged { profile: UserProfile },
     AvatarChanged { metadata: AvatarMetadata },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+// Events that affect a specific resource of a user.
+pub struct UserResourceEvent {
+    pub user_id: UserResourceId,
+    pub r#type: UserResourceEventType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UserResourceEventType {
+    CapabilitiesChanged { id: CapabilitiesId },
 }
 
 #[derive(Debug, Clone, PartialEq)]

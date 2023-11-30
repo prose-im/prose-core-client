@@ -76,11 +76,11 @@ pub async fn parse_xml(xml: &str) -> Result<Vec<ServerEvent>> {
         .receive_stanza(xml.trim().parse::<Element>()?)
         .await;
 
-    let event = client
+    let parsed_events = client
         .sent_events()
-        .first()
-        .expect("Client should have dispatched one event.")
-        .clone();
+        .into_iter()
+        .map(|e| parse_xmpp_event(e))
+        .collect::<Result<Vec<_>, _>>()?;
 
-    Ok(parse_xmpp_event(event)?)
+    Ok(parsed_events.into_iter().flatten().collect())
 }

@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use jid::Jid;
 use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::presence;
@@ -16,27 +16,52 @@ use crate::domain::shared::models::{
     AnonOccupantId, OccupantEvent, OccupantEventType, OccupantId, RoomEvent, RoomEventType,
     ServerEvent, UserEndpointId, UserStatusEvent, UserStatusEventType,
 };
-use crate::dtos::{Availability, RoomId, UserId};
+use crate::dtos::{Availability, RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::{
     missing_attribute, missing_element, Context,
 };
 
 pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
+    let Some(from) = presence.from.clone() else {
+        return missing_attribute(ctx, "from", presence);
+    };
+
+    let availability = Availability::from((
+        (presence.type_ != presence::Type::None).then_some(presence.type_.clone()),
+        presence.show.clone(),
+    ));
+
     if let Some(muc_user) = presence
         .payloads
         .iter()
         .find(|p| p.is("x", ns::MUC_USER))
         .cloned()
     {
-        return parse_muc_presence(ctx, presence, muc_user.try_into()?);
+        return parse_muc_presence(ctx, from, availability, presence, muc_user.try_into()?);
     }
+
+    let user_id = match from {
+        Jid::Bare(jid) => UserId::from(jid).into(),
+        Jid::Full(jid) => UserResourceId::from(jid).into(),
+    };
+
+    ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
+        user_id,
+        r#type: UserStatusEventType::AvailabilityChanged { availability },
+    }));
 
     Ok(())
 }
 
-fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUser) -> Result<()> {
-    let Some(Jid::Full(from)) = presence.from else {
-        return missing_attribute(ctx, "from", presence);
+fn parse_muc_presence(
+    ctx: &mut Context,
+    from: Jid,
+    availability: Availability,
+    presence: Presence,
+    mut muc_user: MucUser,
+) -> Result<()> {
+    let Jid::Full(from) = from else {
+        bail!("Expected FullJid in MUC presence.")
     };
 
     let room = RoomId::from(from.to_bare());
@@ -57,11 +82,6 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
         return Ok(());
     }
 
-    let availability =
-        Availability::from((
-            (presence.type_ != presence::Type::None).then_some(presence.type_),
-            presence.show,
-        ));
     let occupant_id = OccupantId::from(from);
     let anon_occupant_id = presence
         .payloads

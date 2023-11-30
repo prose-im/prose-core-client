@@ -11,14 +11,15 @@ use xmpp_parsers::message::MessageType;
 
 use message::parse_message;
 use prose_xmpp::{
-    mods::chat::Event as XMPPChatEvent, mods::muc::Event as XMPPMUCEvent,
-    mods::status::Event as XMPPStatusEvent, Event,
+    mods::caps::Event as XMPPCapsEvent, mods::chat::Event as XMPPChatEvent,
+    mods::muc::Event as XMPPMUCEvent, mods::status::Event as XMPPStatusEvent, Event,
 };
 
 use crate::app::event_handlers::XMPPEvent;
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{
-    RoomEvent, RoomEventType, ServerEvent, UserEndpointId, UserStatusEvent, UserStatusEventType,
+    CapabilitiesId, RoomEvent, RoomEventType, ServerEvent, UserEndpointId, UserResourceEvent,
+    UserResourceEventType, UserStatusEvent, UserStatusEventType,
 };
 use crate::dtos::{RoomId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
@@ -36,7 +37,7 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
         Event::Bookmark2(_) => {
             // TODO: Handle changed bookmarks?
         }
-        Event::Caps(_) => (),
+        Event::Caps(event) => parse_caps_event(&mut ctx, event)?,
         Event::Chat(event) => parse_chat_event(&mut ctx, event)?,
         Event::Client(_) => (),
         Event::MUC(event) => parse_muc_event(&mut ctx, event)?,
@@ -132,6 +133,26 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
                 r#type: RoomEventType::ReceivedInvitation {
                     sender: UserResourceId::from(sender_jid.clone()),
                     password: invite.password,
+                },
+            }))
+        }
+    }
+
+    Ok(())
+}
+
+fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
+    match event {
+        XMPPCapsEvent::DiscoInfoQuery { .. } => {}
+        XMPPCapsEvent::Caps { from, caps } => {
+            let Jid::Full(from) = from else {
+                bail!("Expected FullJid in caps element")
+            };
+
+            ctx.push_event(ServerEvent::UserResource(UserResourceEvent {
+                user_id: UserResourceId::from(from),
+                r#type: UserResourceEventType::CapabilitiesChanged {
+                    id: CapabilitiesId::from(format!("{}#{}", caps.node, caps.hash.to_base64())),
                 },
             }))
         }

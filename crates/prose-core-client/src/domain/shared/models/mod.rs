@@ -5,6 +5,7 @@
 
 pub use anon_occupant_id::AnonOccupantId;
 pub use availability::Availability;
+pub use capabilities_id::CapabilitiesId;
 pub use occupant_id::OccupantId;
 pub use room_id::RoomId;
 pub use room_type::RoomType;
@@ -16,6 +17,7 @@ pub use user_resource_id::UserResourceId;
 
 mod anon_occupant_id;
 mod availability;
+mod capabilities_id;
 mod occupant_id;
 mod room_id;
 mod room_type;

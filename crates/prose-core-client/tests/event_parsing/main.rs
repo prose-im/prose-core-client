@@ -4,3 +4,4 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 mod room_event_parser;
+mod user_event_parser;

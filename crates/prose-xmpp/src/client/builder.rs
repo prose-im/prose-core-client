@@ -45,6 +45,7 @@ impl ClientBuilder {
         // Order matters…
         .add_mod(mods::Bookmark2::default())
         .add_mod(mods::Bookmark::default())
+        .add_mod(mods::Status::default())
         .add_mod(mods::Caps::default())
         .add_mod(mods::MUC::default())
         .add_mod(mods::Chat::default())
@@ -52,7 +53,6 @@ impl ClientBuilder {
         .add_mod(mods::Profile::default())
         .add_mod(mods::PubSub::default())
         .add_mod(mods::Roster::default())
-        .add_mod(mods::Status::default())
     }
 
     pub fn set_connector_provider(self, connector_provider: ConnectorProvider) -> Self {

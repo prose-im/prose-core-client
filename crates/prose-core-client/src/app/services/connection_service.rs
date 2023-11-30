@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use jid::BareJid;
+use tracing::error;
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{ConnectionError, IDProvider};
@@ -78,6 +79,17 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
+
+        if let Err(err) = self
+            .connection_service
+            .set_message_carbons_enabled(true)
+            .await
+        {
+            error!(
+                "Failed to enable message carbons. Reason: {}",
+                err.to_string()
+            );
+        }
 
         let server_features = self
             .connection_service
