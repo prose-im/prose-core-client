@@ -13,10 +13,10 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::shared::models::{
-    OccupantEvent, OccupantEventType, OccupantId, RoomEvent, RoomEventType, ServerEvent,
-    UserEndpointId, UserResourceId, UserStatusEvent, UserStatusEventType,
+    AnonOccupantId, OccupantEvent, OccupantEventType, OccupantId, RoomEvent, RoomEventType,
+    ServerEvent, UserEndpointId, UserStatusEvent, UserStatusEventType,
 };
-use crate::dtos::{Availability, RoomId};
+use crate::dtos::{Availability, RoomId, UserId};
 use crate::infra::xmpp::type_conversions::event_parser::{
     missing_attribute, missing_element, Context,
 };
@@ -63,7 +63,13 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
             presence.show,
         ));
     let occupant_id = OccupantId::from(from);
-    let real_id = item.jid.clone().map(UserResourceId::from);
+    let anon_occupant_id = presence
+        .payloads
+        .iter()
+        .find(|p| p.is("occupant-id", ns::OCCUPANT_ID))
+        .and_then(|e| e.attr("id"))
+        .map(|id| AnonOccupantId::from(id.to_string()));
+    let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
 
     ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
         user_id: UserEndpointId::Occupant(occupant_id.clone()),
@@ -87,6 +93,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
         {
             ctx.push_event(ServerEvent::Occupant(OccupantEvent {
                 occupant_id,
+                anon_occupant_id,
                 real_id,
                 is_self: is_self_presence,
                 r#type: OccupantEventType::PermanentlyRemoved,
@@ -105,6 +112,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
         {
             ctx.push_event(ServerEvent::Occupant(OccupantEvent {
                 occupant_id,
+                anon_occupant_id,
                 real_id,
                 is_self: is_self_presence,
                 r#type: OccupantEventType::DisconnectedByServer,
@@ -121,6 +129,7 @@ fn parse_muc_presence(ctx: &mut Context, presence: Presence, mut muc_user: MucUs
 
     ctx.push_event(ServerEvent::Occupant(OccupantEvent {
         occupant_id,
+        anon_occupant_id,
         real_id,
         r#type: OccupantEventType::AffiliationChanged {
             affiliation: item.affiliation.clone().into(),

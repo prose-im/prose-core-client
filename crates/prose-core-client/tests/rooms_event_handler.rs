@@ -85,6 +85,74 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
     Ok(())
 }
 
+async fn test_user_entered_room_with_multiple_resources_and_same_nickname() -> Result<()> {
+    // <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram" to="marc@prose.org/prose-QAaMglCf" xml:lang="en">
+    //     <x xmlns='vcard-temp:x:update'>
+    //     <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+    //     </x><occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-GJFeX9yi" role="participant" />
+    //     </x>
+    //     </presence>
+    //
+    //     <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram" to="marc@prose.org/prose-QAaMglCf" xml:lang="en">
+    //     <x xmlns='vcard-temp:x:update'>
+    //     <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+    //     </x><occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-GJFeX9yi" role="participant" />
+    //     <item affiliation="none" jid="cram@prose.org/prose-rJF2R8AI" role="participant" />
+    //     </x>
+    //     </presence>
+    //
+    //     <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram" to="marc@prose.org/prose-QAaMglCf" type="unavailable">
+    //     <status>Disconnected: closed</status><occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-rJF2R8AI" role="none" />
+    //     </x>
+    //     </presence>
+    panic!("Implement me")
+}
+
+async fn test_user_entered_room_with_multiple_resources_and_different_nicknames() -> Result<()> {
+    // <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram-t7YjIEMF" to="marc@prose.org/prose-YJlWBFC2" xml:lang="en">
+    //     <x xmlns='vcard-temp:x:update'>
+    //     <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+    //     </x>
+    //     <occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-IVO5rzuB" role="participant" />
+    //     </x>
+    //     </presence>
+    //
+    //     <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram-t7YjIEMF" to="marc@prose.org/prose-YJlWBFC2" xml:lang="en">
+    //     <x xmlns='vcard-temp:x:update'>
+    //     <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+    //     </x>
+    //     <occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-IVO5rzuB" role="participant" />
+    //     </x>
+    //     </presence>
+    //
+    //     <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram-CnLZs8Id" to="marc@prose.org/prose-YJlWBFC2" type="unavailable">
+    //     <status>Disconnected: closed</status>
+    //     <occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-AJJuBKzn" role="none" />
+    //     </x>
+    //     </presence>
+    //
+    //     <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram-t7YjIEMF" to="marc@prose.org/prose-YJlWBFC2" type="unavailable">
+    //     <status>Disconnected: closed</status>
+    //     <occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+    //     <x xmlns='http://jabber.org/protocol/muc#user'>
+    // <item affiliation="none" jid="cram@prose.org/prose-IVO5rzuB" role="none" />
+    //     </x>
+    //     </presence>
+    panic!("Implement me")
+}
+
 #[tokio::test]
 async fn test_handles_disconnected_participant() -> Result<()> {
     panic!("Implement me")

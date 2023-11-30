@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+pub use anon_occupant_id::AnonOccupantId;
 pub use availability::Availability;
 pub use occupant_id::OccupantId;
 pub use room_id::RoomId;
@@ -13,6 +14,7 @@ pub use user_id::UserId;
 pub use user_info::{UserBasicInfo, UserPresenceInfo};
 pub use user_resource_id::UserResourceId;
 
+mod anon_occupant_id;
 mod availability;
 mod occupant_id;
 mod room_id;

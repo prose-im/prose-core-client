@@ -7,12 +7,12 @@ use anyhow::Result;
 
 use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation};
 use prose_core_client::domain::shared::models::{
-    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent, UserStatusEvent,
-    UserStatusEventType,
+    AnonOccupantId, OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent,
+    UserStatusEvent, UserStatusEventType,
 };
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
-use prose_core_client::{occupant_id, room_id, user_resource_id};
+use prose_core_client::{anon_occupant_id, occupant_id, room_id, user_id, user_resource_id};
 use prose_proc_macros::mt_test;
 
 #[mt_test]
@@ -176,6 +176,7 @@ async fn test_user_was_permanently_removed() -> Result<()> {
             }),
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
+                anon_occupant_id: None,
                 real_id: None,
                 is_self: false,
                 r#type: OccupantEventType::PermanentlyRemoved
@@ -213,7 +214,8 @@ async fn test_user_was_disconnected_by_server() -> Result<()> {
             }),
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
-                real_id: Some(user_resource_id!("user@prose.org/res")),
+                anon_occupant_id: None,
+                real_id: Some(user_id!("user@prose.org")),
                 is_self: true,
                 r#type: OccupantEventType::DisconnectedByServer,
             })
@@ -252,7 +254,62 @@ async fn test_user_entered_room() -> Result<()> {
             }),
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
-                real_id: Some(user_resource_id!("user@prose.org/res")),
+                anon_occupant_id: Some(
+                    anon_occupant_id!("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
+                ),
+                real_id: Some(user_id!("user@prose.org")),
+                is_self: false,
+                r#type: OccupantEventType::AffiliationChanged {
+                    affiliation: RoomAffiliation::None
+                },
+            }),
+        ]
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
+    // https://xmpp.org/extensions/xep-0045.html#enter-conflict
+
+    // If a user joins a room with the same nickname from multiple resources, the resources are
+    // merged into a single presence. If one resource goes offline again, we won't receive a
+    // "unavailable" presence but another affiliation change with the affected item removed.
+    // For our intents and purposes we'll assume that the affiliation, role and bare jid of all
+    // resources are identical and ignore all but the first one in the list.
+
+    let events = parse_xml(
+        r#"
+        <presence xmlns='jabber:client' from="room@prose.org/nick">
+            <x xmlns='vcard-temp:x:update'>
+                <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+            </x>
+            <occupant-id xmlns='urn:xmpp:occupant-id:0' id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
+            <x xmlns='http://jabber.org/protocol/muc#user'>
+                <item affiliation="none" jid="user@prose.org/res1" role="participant" />
+                <item affiliation="none" jid="user@prose.org/res2" role="participant" />
+            </x>
+        </presence>
+      "#,
+    )
+        .await?;
+
+    assert_eq!(
+        events,
+        vec![
+            ServerEvent::UserStatus(UserStatusEvent {
+                user_id: occupant_id!("room@prose.org/nick").into(),
+                r#type: UserStatusEventType::AvailabilityChanged {
+                    availability: Availability::Available
+                },
+            }),
+            ServerEvent::Occupant(OccupantEvent {
+                occupant_id: occupant_id!("room@prose.org/nick"),
+                anon_occupant_id: Some(
+                    anon_occupant_id!("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
+                ),
+                real_id: Some(user_id!("user@prose.org")),
                 is_self: false,
                 r#type: OccupantEventType::AffiliationChanged {
                     affiliation: RoomAffiliation::None

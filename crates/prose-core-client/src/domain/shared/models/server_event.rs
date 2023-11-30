@@ -5,6 +5,7 @@
 
 use prose_xmpp::ConnectionError;
 
+use crate::domain::shared::models::anon_occupant_id::AnonOccupantId;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
     shared::models::{Availability, OccupantId, RoomId, UserEndpointId, UserId, UserResourceId},
@@ -98,8 +99,10 @@ pub enum RoomEventType {
 pub struct OccupantEvent {
     /// The occupant's id within the room.
     pub occupant_id: OccupantId,
+    /// The occupant's anonymous id (https://xmpp.org/extensions/xep-0421.html)
+    pub anon_occupant_id: Option<AnonOccupantId>,
     /// The global id of the occupant on their server.
-    pub real_id: Option<UserResourceId>,
+    pub real_id: Option<UserId>,
     /// Is this the current (logged-in) user?
     pub is_self: bool,
     /// The type of this event.

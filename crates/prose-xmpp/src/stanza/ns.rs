@@ -51,3 +51,6 @@ pub const MUC_ROOMINFO: &str = "http://jabber.org/protocol/muc#roominfo";
 
 /// XEP-0249: Direct MUC Invitations
 pub const DIRECT_MUC_INVITATIONS: &str = "jabber:x:conference";
+
+/// XEP-0421: Anonymous unique occupant identifiers for MUCs
+pub const OCCUPANT_ID: &str = "urn:xmpp:occupant-id:0";
