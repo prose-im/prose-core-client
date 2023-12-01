@@ -61,13 +61,6 @@ macro_rules! occupant_id {
     };
 }
 
-#[macro_export]
-macro_rules! anon_occupant_id {
-    ($str:expr) => {
-        AnonOccupantId::from($str.to_string())
-    };
-}
-
 pub async fn parse_xml(xml: &str) -> Result<Vec<ServerEvent>> {
     let client = Client::connected_client().await?;
 

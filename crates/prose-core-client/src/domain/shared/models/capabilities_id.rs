@@ -10,9 +10,12 @@ use std::fmt::{Display, Formatter};
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CapabilitiesId(String);
 
-impl From<String> for CapabilitiesId {
-    fn from(value: String) -> Self {
-        CapabilitiesId(value)
+impl<T> From<T> for CapabilitiesId
+where
+    T: Into<String>,
+{
+    fn from(s: T) -> Self {
+        CapabilitiesId(s.into())
     }
 }
 

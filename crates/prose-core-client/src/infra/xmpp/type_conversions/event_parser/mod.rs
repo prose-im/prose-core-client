@@ -12,16 +12,18 @@ use xmpp_parsers::message::MessageType;
 use message::parse_message;
 use prose_xmpp::{
     mods::caps::Event as XMPPCapsEvent, mods::chat::Event as XMPPChatEvent,
-    mods::muc::Event as XMPPMUCEvent, mods::status::Event as XMPPStatusEvent, Event,
+    mods::muc::Event as XMPPMUCEvent, mods::profile::Event as XMPPProfileEvent,
+    mods::status::Event as XMPPStatusEvent, Event,
 };
 
 use crate::app::event_handlers::XMPPEvent;
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{
-    CapabilitiesId, RoomEvent, RoomEventType, ServerEvent, UserEndpointId, UserResourceEvent,
-    UserResourceEventType, UserStatusEvent, UserStatusEventType,
+    CapabilitiesId, RoomEvent, RoomEventType, ServerEvent, UserEndpointId, UserInfoEvent,
+    UserInfoEventType, UserResourceEvent, UserResourceEventType, UserStatusEvent,
+    UserStatusEventType,
 };
-use crate::dtos::{RoomId, UserResourceId};
+use crate::dtos::{RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
 
 mod message;
@@ -42,7 +44,7 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
         Event::Client(_) => (),
         Event::MUC(event) => parse_muc_event(&mut ctx, event)?,
         Event::Ping(_) => (),
-        Event::Profile(_) => (),
+        Event::Profile(event) => parse_profile_event(&mut ctx, event)?,
         Event::PubSub(_) => (),
         Event::Roster(_) => (),
         Event::Status(event) => parse_status_event(&mut ctx, event)?,
@@ -158,6 +160,35 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
         }
     }
 
+    Ok(())
+}
+
+fn parse_profile_event(ctx: &mut Context, event: XMPPProfileEvent) -> Result<()> {
+    match event {
+        XMPPProfileEvent::Vcard { from, vcard } => {
+            ctx.push_event(ServerEvent::UserInfo(UserInfoEvent {
+                user_id: UserId::from(from.into_bare()),
+                r#type: UserInfoEventType::ProfileChanged {
+                    profile: vcard.try_into()?,
+                },
+            }))
+        }
+        XMPPProfileEvent::AvatarMetadata { from, metadata } => {
+            let Some(info) = metadata.infos.first() else {
+                return missing_element(ctx, "info", metadata);
+            };
+
+            ctx.push_event(ServerEvent::UserInfo(UserInfoEvent {
+                user_id: UserId::from(from.into_bare()),
+                r#type: UserInfoEventType::AvatarChanged {
+                    metadata: info.clone().into(),
+                },
+            }))
+        }
+        XMPPProfileEvent::EntityTimeQuery { .. } => {}
+        XMPPProfileEvent::SoftwareVersionQuery { .. } => {}
+        XMPPProfileEvent::LastActivityQuery { .. } => {}
+    }
     Ok(())
 }
 

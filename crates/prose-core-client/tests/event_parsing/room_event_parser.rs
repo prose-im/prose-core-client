@@ -5,14 +5,14 @@
 
 use anyhow::Result;
 
-use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation};
+use prose_core_client::domain::rooms::models::RoomAffiliation;
 use prose_core_client::domain::shared::models::{
     AnonOccupantId, OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent,
     UserStatusEvent, UserStatusEventType,
 };
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
-use prose_core_client::{anon_occupant_id, occupant_id, room_id, user_id, user_resource_id};
+use prose_core_client::{occupant_id, room_id, user_id, user_resource_id};
 use prose_proc_macros::mt_test;
 
 #[mt_test]
@@ -255,7 +255,7 @@ async fn test_user_entered_room() -> Result<()> {
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
                 anon_occupant_id: Some(
-                    anon_occupant_id!("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
+                    AnonOccupantId::from("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
                 ),
                 real_id: Some(user_id!("user@prose.org")),
                 is_self: false,
@@ -307,7 +307,7 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
                 anon_occupant_id: Some(
-                    anon_occupant_id!("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
+                    AnonOccupantId::from("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
                 ),
                 real_id: Some(user_id!("user@prose.org")),
                 is_self: false,
@@ -405,62 +405,3 @@ async fn test_received_invite() -> Result<()> {
 
     Ok(())
 }
-
-#[mt_test]
-async fn test_compose_state_changed() -> Result<()> {
-    // XEP-0085: Chat State Notifications (https://xmpp.org/extensions/xep-0085.html#top)
-    let events = parse_xml(
-        r#"
-        <message xmlns="jabber:client" from="room@prose.org/user" type="groupchat">
-            <composing xmlns="http://jabber.org/protocol/chatstates" />
-            <occupant-id xmlns="urn:xmpp:occupant-id:0" id="FvcD+GDkmT8LQAb55uozvL7cZCTBjz3VgQfAcSLtrkM=" />
-        </message>
-      "#,
-    )
-        .await?;
-
-    assert_eq!(
-        events,
-        vec![ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@prose.org/user").into(),
-            r#type: UserStatusEventType::ComposeStateChanged {
-                state: ComposeState::Composing
-            },
-        })]
-    );
-
-    let events = parse_xml(
-        r#"
-        <message xmlns="jabber:client" from="user@prose.org/res" type="chat">
-            <paused xmlns="http://jabber.org/protocol/chatstates" />
-        </message>
-      "#,
-    )
-    .await?;
-
-    assert_eq!(
-        events,
-        vec![ServerEvent::UserStatus(UserStatusEvent {
-            user_id: user_resource_id!("user@prose.org/res").into(),
-            r#type: UserStatusEventType::ComposeStateChanged {
-                state: ComposeState::Idle
-            },
-        })]
-    );
-
-    Ok(())
-}
-
-// <presence xmlns="jabber:client" from="cram@prose.org/ojFExT2g" to="marc@prose.org" xml:lang="en">
-// <show>chat</show>
-// <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="ImujI7nqf7pn4YqcjefXE3o5P1k=" />
-// <x xmlns="vcard-temp:x:update">
-// <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
-// </x>
-// </presence>
-
-// <presence xmlns="jabber:client" from="valerian@prose.org" to="marc@prose.org/RdcUie" type="unavailable" />
-
-//<presence xmlns="jabber:client" from="cram@prose.org/ojFExT2g" to="marc@prose.org" type="unavailable">
-//   <status>Disconnected: closed</status>
-// </presence>

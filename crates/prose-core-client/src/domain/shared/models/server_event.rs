@@ -56,9 +56,9 @@ pub struct UserInfoEvent {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserInfoEventType {
-    StatusChanged { status: UserStatus },
-    ProfileChanged { profile: UserProfile },
     AvatarChanged { metadata: AvatarMetadata },
+    ProfileChanged { profile: UserProfile },
+    StatusChanged { status: UserStatus },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -82,10 +82,10 @@ pub struct RequestEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub enum RequestEventType {
     Ping,
-    Capabilities,
     LocalTime,
-    SoftwareVersion,
     LastActivity,
+    Capabilities,
+    SoftwareVersion,
 }
 
 #[derive(Debug, Clone, PartialEq)]

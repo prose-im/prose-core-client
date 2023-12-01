@@ -10,9 +10,12 @@ use std::fmt::{Display, Formatter};
 /// See: https://xmpp.org/extensions/xep-0421.html
 pub struct AnonOccupantId(String);
 
-impl From<String> for AnonOccupantId {
-    fn from(value: String) -> Self {
-        AnonOccupantId(value)
+impl<T> From<T> for AnonOccupantId
+where
+    T: Into<String>,
+{
+    fn from(s: T) -> Self {
+        AnonOccupantId(s.into())
     }
 }
 
