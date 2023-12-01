@@ -12,16 +12,16 @@ use xmpp_parsers::message::MessageType;
 use message::parse_message;
 use prose_xmpp::{
     mods::caps::Event as XMPPCapsEvent, mods::chat::Event as XMPPChatEvent,
-    mods::muc::Event as XMPPMUCEvent, mods::profile::Event as XMPPProfileEvent,
-    mods::status::Event as XMPPStatusEvent, Event,
+    mods::muc::Event as XMPPMUCEvent, mods::ping::Event as XMPPPingEvent,
+    mods::profile::Event as XMPPProfileEvent, mods::status::Event as XMPPStatusEvent, Event,
 };
 
 use crate::app::event_handlers::XMPPEvent;
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{
-    CapabilitiesId, RoomEvent, RoomEventType, ServerEvent, UserEndpointId, UserInfoEvent,
-    UserInfoEventType, UserResourceEvent, UserResourceEventType, UserStatusEvent,
-    UserStatusEventType,
+    CapabilitiesId, RequestEvent, RequestEventType, RequestId, RoomEvent, RoomEventType, SenderId,
+    ServerEvent, UserEndpointId, UserInfoEvent, UserInfoEventType, UserResourceEvent,
+    UserResourceEventType, UserStatusEvent, UserStatusEventType,
 };
 use crate::dtos::{RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
@@ -43,7 +43,7 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
         Event::Chat(event) => parse_chat_event(&mut ctx, event)?,
         Event::Client(_) => (),
         Event::MUC(event) => parse_muc_event(&mut ctx, event)?,
-        Event::Ping(_) => (),
+        Event::Ping(event) => parse_ping_event(&mut ctx, event)?,
         Event::Profile(event) => parse_profile_event(&mut ctx, event)?,
         Event::PubSub(_) => (),
         Event::Roster(_) => (),
@@ -155,7 +155,19 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
 
 fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
     match event {
-        XMPPCapsEvent::DiscoInfoQuery { .. } => {}
+        XMPPCapsEvent::DiscoInfoQuery { from, id, node } => {
+            let Some(node) = node else {
+                bail!("Missing node in disco info query")
+            };
+
+            ctx.push_event(ServerEvent::Request(RequestEvent {
+                sender_id: SenderId::from(from),
+                request_id: RequestId::from(id),
+                r#type: RequestEventType::Capabilities {
+                    id: CapabilitiesId::from(node),
+                },
+            }))
+        }
         XMPPCapsEvent::Caps { from, caps } => {
             let Jid::Full(from) = from else {
                 bail!("Expected FullJid in caps element")
@@ -195,9 +207,38 @@ fn parse_profile_event(ctx: &mut Context, event: XMPPProfileEvent) -> Result<()>
                 },
             }))
         }
-        XMPPProfileEvent::EntityTimeQuery { .. } => {}
-        XMPPProfileEvent::SoftwareVersionQuery { .. } => {}
-        XMPPProfileEvent::LastActivityQuery { .. } => {}
+        XMPPProfileEvent::EntityTimeQuery { from, id } => {
+            ctx.push_event(ServerEvent::Request(RequestEvent {
+                sender_id: SenderId::from(from),
+                request_id: RequestId::from(id),
+                r#type: RequestEventType::LocalTime,
+            }))
+        }
+        XMPPProfileEvent::SoftwareVersionQuery { from, id } => {
+            ctx.push_event(ServerEvent::Request(RequestEvent {
+                sender_id: SenderId::from(from),
+                request_id: RequestId::from(id),
+                r#type: RequestEventType::SoftwareVersion,
+            }))
+        }
+        XMPPProfileEvent::LastActivityQuery { from, id } => {
+            ctx.push_event(ServerEvent::Request(RequestEvent {
+                sender_id: SenderId::from(from),
+                request_id: RequestId::from(id),
+                r#type: RequestEventType::LastActivity,
+            }))
+        }
+    }
+    Ok(())
+}
+
+fn parse_ping_event(ctx: &mut Context, event: XMPPPingEvent) -> Result<()> {
+    match event {
+        XMPPPingEvent::Ping { from, id } => ctx.push_event(ServerEvent::Request(RequestEvent {
+            sender_id: SenderId::from(from),
+            request_id: RequestId::from(id),
+            r#type: RequestEventType::Ping,
+        })),
     }
     Ok(())
 }

@@ -6,7 +6,8 @@
 use prose_xmpp::ConnectionError;
 
 use crate::domain::shared::models::anon_occupant_id::AnonOccupantId;
-use crate::domain::shared::models::CapabilitiesId;
+use crate::domain::shared::models::sender_id::SenderId;
+use crate::domain::shared::models::{CapabilitiesId, RequestId};
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
     shared::models::{Availability, OccupantId, RoomId, UserEndpointId, UserId, UserResourceId},
@@ -16,6 +17,7 @@ use crate::domain::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerEvent {
+    // TODO…
     Connection(ConnectionEvent),
     UserStatus(UserStatusEvent),
     UserInfo(UserInfoEvent),
@@ -75,8 +77,11 @@ pub enum UserResourceEventType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RequestEvent {
-    pub request_id: String,
-    // TODO: From / which id type?
+    // Request could be sent either from a User resource (FullJid) or from the server (BareJid).
+    // It doesn't really matter though since we're simply responding to the request, nothing else.
+    pub sender_id: SenderId,
+    pub request_id: RequestId,
+    pub r#type: RequestEventType,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,7 +89,7 @@ pub enum RequestEventType {
     Ping,
     LocalTime,
     LastActivity,
-    Capabilities,
+    Capabilities { id: CapabilitiesId },
     SoftwareVersion,
 }
 

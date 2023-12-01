@@ -48,6 +48,13 @@ macro_rules! user_id {
 }
 
 #[macro_export]
+macro_rules! sender_id {
+    ($jid:expr) => {
+        SenderId::from($jid.parse::<jid::Jid>().unwrap())
+    };
+}
+
+#[macro_export]
 macro_rules! user_resource_id {
     ($jid:expr) => {
         UserResourceId::from($jid.parse::<jid::FullJid>().unwrap())
