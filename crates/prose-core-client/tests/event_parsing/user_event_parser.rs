@@ -193,7 +193,7 @@ async fn test_profile_changed() -> Result<()> {
         <message xmlns="jabber:client" from="user@prose.org" type="headline">
             <event xmlns="http://jabber.org/protocol/pubsub#event">
                 <items node="urn:ietf:params:xml:ns:vcard-4.0">
-                    <item id="valerian@prose.org" publisher="valerian@prose.org">
+                    <item id="user@prose.org" publisher="user@prose.org">
                         <vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
                             <adr>
                                 <country>DE</country>
@@ -237,6 +237,47 @@ async fn test_profile_changed() -> Result<()> {
         vec![ServerEvent::UserInfo(UserInfoEvent {
             user_id: user_id!("user@prose.org").into(),
             r#type: UserInfoEventType::ProfileChanged { profile },
+        })]
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_status_changed() -> Result<()> {
+    // XEP-0108: User Activity
+    // https://xmpp.org/extensions/xep-0108.html
+
+    let events = parse_xml(
+        r#"
+        <message xmlns="jabber:client" from="user@prose.org" type="headline">
+            <event xmlns="http://jabber.org/protocol/pubsub#event">
+                <items node="http://jabber.org/protocol/activity">
+                    <item id="user@prose.org" publisher="user@prose.org">
+                        <activity xmlns="http://jabber.org/protocol/activity">
+                            <undefined>
+                                <other>🍕</other>
+                            </undefined>
+                            <text>Eating pizza</text>
+                        </activity>
+                    </item>
+                </items>
+            </event>
+        </message>
+      "#,
+    )
+    .await?;
+
+    assert_eq!(
+        events,
+        vec![ServerEvent::UserInfo(UserInfoEvent {
+            user_id: user_id!("user@prose.org").into(),
+            r#type: UserInfoEventType::StatusChanged {
+                status: UserStatus {
+                    emoji: "🍕".to_string(),
+                    status: Some("Eating pizza".to_string())
+                }
+            },
         })]
     );
 

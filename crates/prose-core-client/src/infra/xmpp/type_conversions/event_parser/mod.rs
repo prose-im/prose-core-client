@@ -97,7 +97,17 @@ fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
 fn parse_status_event(ctx: &mut Context, event: XMPPStatusEvent) -> Result<()> {
     match event {
         XMPPStatusEvent::Presence(presence) => parse_presence(ctx, presence)?,
-        XMPPStatusEvent::UserActivity { .. } => (),
+        XMPPStatusEvent::UserActivity {
+            from,
+            user_activity,
+        } => {
+            ctx.push_event(ServerEvent::UserInfo(UserInfoEvent {
+                user_id: UserId::from(from.into_bare()),
+                r#type: UserInfoEventType::StatusChanged {
+                    status: user_activity.try_into()?,
+                },
+            }))
+        }
     };
     Ok(())
 }
