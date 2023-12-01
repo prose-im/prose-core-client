@@ -17,13 +17,18 @@ use crate::domain::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerEvent {
-    // TODO…
     Connection(ConnectionEvent),
+    /// Events that affect the status of a user within a conversation or globally.
     UserStatus(UserStatusEvent),
+    /// Events that affect the information about the user globally.
     UserInfo(UserInfoEvent),
+    /// Events that affect a specific resource of a user.
     UserResource(UserResourceEvent),
+    /// Events about changes to a MUC room.
     Room(RoomEvent),
+    /// Events about changes to an occupant of a MUC room.
     Occupant(OccupantEvent),
+    /// Events about requests that are directed at us.
     Request(RequestEvent),
     // TODO…
     Message(MessageEvent),
@@ -77,8 +82,6 @@ pub enum UserResourceEventType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RequestEvent {
-    // Request could be sent either from a User resource (FullJid) or from the server (BareJid).
-    // It doesn't really matter though since we're simply responding to the request, nothing else.
     pub sender_id: SenderId,
     pub request_id: RequestId,
     pub r#type: RequestEventType,

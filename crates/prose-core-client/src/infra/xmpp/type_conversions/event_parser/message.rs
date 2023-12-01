@@ -12,7 +12,7 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::stanza::Message;
 
-use crate::domain::shared::models::{RoomEvent, RoomEventType, ServerEvent};
+use crate::domain::shared::models::{RoomEvent, RoomEventType};
 use crate::dtos::RoomId;
 use crate::infra::xmpp::type_conversions::event_parser::{
     ignore_stanza, missing_attribute, Context,
@@ -52,20 +52,20 @@ fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> R
             })
             .is_some()
         {
-            ctx.push_event(ServerEvent::Room(RoomEvent {
+            ctx.push_event(RoomEvent {
                 room_id: from.clone(),
                 r#type: RoomEventType::RoomConfigChanged,
-            }))
+            })
         }
     }
 
     if let Some(subject) = message.subject() {
-        ctx.push_event(ServerEvent::Room(RoomEvent {
+        ctx.push_event(RoomEvent {
             room_id: from,
             r#type: RoomEventType::RoomTopicChanged {
                 new_topic: (!subject.is_empty()).then_some(subject.to_string()),
             },
-        }));
+        });
         return Ok(());
     }
 

@@ -14,7 +14,7 @@ use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::shared::models::{
     AnonOccupantId, OccupantEvent, OccupantEventType, OccupantId, RoomEvent, RoomEventType,
-    ServerEvent, UserEndpointId, UserStatusEvent, UserStatusEventType,
+    UserEndpointId, UserStatusEvent, UserStatusEventType,
 };
 use crate::dtos::{Availability, RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::{
@@ -45,10 +45,10 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
         Jid::Full(jid) => UserResourceId::from(jid).into(),
     };
 
-    ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
+    ctx.push_event(UserStatusEvent {
         user_id,
         r#type: UserStatusEventType::AvailabilityChanged { availability },
-    }));
+    });
 
     Ok(())
 }
@@ -73,12 +73,12 @@ fn parse_muc_presence(
     let is_self_presence = muc_user.status.contains(&Status::SelfPresence);
 
     if let Some(destroy) = muc_user.destroy.take() {
-        ctx.push_event(ServerEvent::Room(RoomEvent {
+        ctx.push_event(RoomEvent {
             room_id: room,
             r#type: RoomEventType::Destroyed {
                 replacement: destroy.jid.map(RoomId::from),
             },
-        }));
+        });
         return Ok(());
     }
 
@@ -91,12 +91,12 @@ fn parse_muc_presence(
         .map(|id| AnonOccupantId::from(id.to_string()));
     let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
 
-    ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
+    ctx.push_event(UserStatusEvent {
         user_id: UserEndpointId::Occupant(occupant_id.clone()),
         r#type: UserStatusEventType::AvailabilityChanged {
             availability: availability.clone(),
         },
-    }));
+    });
 
     if availability == Availability::Unavailable {
         if muc_user
@@ -111,13 +111,13 @@ fn parse_muc_presence(
             })
             .is_some()
         {
-            ctx.push_event(ServerEvent::Occupant(OccupantEvent {
+            ctx.push_event(OccupantEvent {
                 occupant_id,
                 anon_occupant_id,
                 real_id,
                 is_self: is_self_presence,
                 r#type: OccupantEventType::PermanentlyRemoved,
-            }));
+            });
             return Ok(());
         }
 
@@ -130,13 +130,13 @@ fn parse_muc_presence(
             })
             .is_some()
         {
-            ctx.push_event(ServerEvent::Occupant(OccupantEvent {
+            ctx.push_event(OccupantEvent {
                 occupant_id,
                 anon_occupant_id,
                 real_id,
                 is_self: is_self_presence,
                 r#type: OccupantEventType::DisconnectedByServer,
-            }));
+            });
             return Ok(());
         }
     }
@@ -147,7 +147,7 @@ fn parse_muc_presence(
         return Ok(());
     }
 
-    ctx.push_event(ServerEvent::Occupant(OccupantEvent {
+    ctx.push_event(OccupantEvent {
         occupant_id,
         anon_occupant_id,
         real_id,
@@ -155,7 +155,7 @@ fn parse_muc_presence(
             affiliation: item.affiliation.clone().into(),
         },
         is_self: is_self_presence,
-    }));
+    });
 
     Ok(())
 }

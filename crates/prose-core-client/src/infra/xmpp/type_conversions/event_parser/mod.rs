@@ -11,17 +11,19 @@ use xmpp_parsers::message::MessageType;
 
 use message::parse_message;
 use prose_xmpp::{
-    mods::caps::Event as XMPPCapsEvent, mods::chat::Event as XMPPChatEvent,
-    mods::muc::Event as XMPPMUCEvent, mods::ping::Event as XMPPPingEvent,
-    mods::profile::Event as XMPPProfileEvent, mods::status::Event as XMPPStatusEvent, Event,
+    client::Event as XMPPClientEvent, mods::caps::Event as XMPPCapsEvent,
+    mods::chat::Event as XMPPChatEvent, mods::muc::Event as XMPPMUCEvent,
+    mods::ping::Event as XMPPPingEvent, mods::profile::Event as XMPPProfileEvent,
+    mods::status::Event as XMPPStatusEvent, Event,
 };
 
 use crate::app::event_handlers::XMPPEvent;
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{
-    CapabilitiesId, RequestEvent, RequestEventType, RequestId, RoomEvent, RoomEventType, SenderId,
-    ServerEvent, UserEndpointId, UserInfoEvent, UserInfoEventType, UserResourceEvent,
-    UserResourceEventType, UserStatusEvent, UserStatusEventType,
+    CapabilitiesId, ConnectionEvent, MessageEvent, OccupantEvent, RequestEvent, RequestEventType,
+    RequestId, RoomEvent, RoomEventType, SenderId, ServerEvent, UserEndpointId, UserInfoEvent,
+    UserInfoEventType, UserResourceEvent, UserResourceEventType, UserStatusEvent,
+    UserStatusEventType,
 };
 use crate::dtos::{RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
@@ -41,7 +43,7 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
         }
         Event::Caps(event) => parse_caps_event(&mut ctx, event)?,
         Event::Chat(event) => parse_chat_event(&mut ctx, event)?,
-        Event::Client(_) => (),
+        Event::Client(event) => parse_client_event(&mut ctx, event)?,
         Event::MUC(event) => parse_muc_event(&mut ctx, event)?,
         Event::Ping(event) => parse_ping_event(&mut ctx, event)?,
         Event::Profile(event) => parse_profile_event(&mut ctx, event)?,
@@ -59,8 +61,8 @@ struct Context {
 }
 
 impl Context {
-    pub fn push_event(&mut self, event: ServerEvent) {
-        self.events.push(event)
+    pub fn push_event(&mut self, event: impl Into<ServerEvent>) {
+        self.events.push(event.into())
     }
 }
 
@@ -83,12 +85,12 @@ fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
                 _ => UserEndpointId::UserResource(from.into()),
             };
 
-            ctx.push_event(ServerEvent::UserStatus(UserStatusEvent {
+            ctx.push_event(UserStatusEvent {
                 user_id,
                 r#type: UserStatusEventType::ComposeStateChanged {
                     state: ComposeState::from(chat_state.clone()),
                 },
-            }))
+            })
         }
     };
     Ok(())
@@ -100,14 +102,12 @@ fn parse_status_event(ctx: &mut Context, event: XMPPStatusEvent) -> Result<()> {
         XMPPStatusEvent::UserActivity {
             from,
             user_activity,
-        } => {
-            ctx.push_event(ServerEvent::UserInfo(UserInfoEvent {
-                user_id: UserId::from(from.into_bare()),
-                r#type: UserInfoEventType::StatusChanged {
-                    status: user_activity.try_into()?,
-                },
-            }))
-        }
+        } => ctx.push_event(UserInfoEvent {
+            user_id: UserId::from(from.into_bare()),
+            r#type: UserInfoEventType::StatusChanged {
+                status: user_activity.try_into()?,
+            },
+        }),
     };
     Ok(())
 }
@@ -119,13 +119,13 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
                 bail!("Expected FullJid in direct invite")
             };
 
-            ctx.push_event(ServerEvent::Room(RoomEvent {
+            ctx.push_event(RoomEvent {
                 room_id: RoomId::from(invite.jid),
                 r#type: RoomEventType::ReceivedInvitation {
                     sender: UserResourceId::from(from),
                     password: invite.password,
                 },
-            }))
+            })
         }
         XMPPMUCEvent::MediatedInvite { from, invite } => {
             let Jid::Bare(from) = from else {
@@ -140,13 +140,13 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
                 bail!("Expected FullJid in embedded invite of MediatedInvite.")
             };
 
-            ctx.push_event(ServerEvent::Room(RoomEvent {
+            ctx.push_event(RoomEvent {
                 room_id: RoomId::from(from),
                 r#type: RoomEventType::ReceivedInvitation {
                     sender: UserResourceId::from(sender_jid.clone()),
                     password: invite.password,
                 },
-            }))
+            })
         }
     }
 
@@ -160,25 +160,25 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
                 bail!("Missing node in disco info query")
             };
 
-            ctx.push_event(ServerEvent::Request(RequestEvent {
+            ctx.push_event(RequestEvent {
                 sender_id: SenderId::from(from),
                 request_id: RequestId::from(id),
                 r#type: RequestEventType::Capabilities {
                     id: CapabilitiesId::from(node),
                 },
-            }))
+            })
         }
         XMPPCapsEvent::Caps { from, caps } => {
             let Jid::Full(from) = from else {
                 bail!("Expected FullJid in caps element")
             };
 
-            ctx.push_event(ServerEvent::UserResource(UserResourceEvent {
+            ctx.push_event(UserResourceEvent {
                 user_id: UserResourceId::from(from),
                 r#type: UserResourceEventType::CapabilitiesChanged {
                     id: CapabilitiesId::from(format!("{}#{}", caps.node, caps.hash.to_base64())),
                 },
-            }))
+            })
         }
     }
 
@@ -187,59 +187,64 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
 
 fn parse_profile_event(ctx: &mut Context, event: XMPPProfileEvent) -> Result<()> {
     match event {
-        XMPPProfileEvent::Vcard { from, vcard } => {
-            ctx.push_event(ServerEvent::UserInfo(UserInfoEvent {
-                user_id: UserId::from(from.into_bare()),
-                r#type: UserInfoEventType::ProfileChanged {
-                    profile: vcard.try_into()?,
-                },
-            }))
-        }
+        XMPPProfileEvent::Vcard { from, vcard } => ctx.push_event(UserInfoEvent {
+            user_id: UserId::from(from.into_bare()),
+            r#type: UserInfoEventType::ProfileChanged {
+                profile: vcard.try_into()?,
+            },
+        }),
         XMPPProfileEvent::AvatarMetadata { from, metadata } => {
             let Some(info) = metadata.infos.first() else {
                 return missing_element(ctx, "info", metadata);
             };
 
-            ctx.push_event(ServerEvent::UserInfo(UserInfoEvent {
+            ctx.push_event(UserInfoEvent {
                 user_id: UserId::from(from.into_bare()),
                 r#type: UserInfoEventType::AvatarChanged {
                     metadata: info.clone().into(),
                 },
-            }))
+            })
         }
-        XMPPProfileEvent::EntityTimeQuery { from, id } => {
-            ctx.push_event(ServerEvent::Request(RequestEvent {
-                sender_id: SenderId::from(from),
-                request_id: RequestId::from(id),
-                r#type: RequestEventType::LocalTime,
-            }))
-        }
-        XMPPProfileEvent::SoftwareVersionQuery { from, id } => {
-            ctx.push_event(ServerEvent::Request(RequestEvent {
-                sender_id: SenderId::from(from),
-                request_id: RequestId::from(id),
-                r#type: RequestEventType::SoftwareVersion,
-            }))
-        }
-        XMPPProfileEvent::LastActivityQuery { from, id } => {
-            ctx.push_event(ServerEvent::Request(RequestEvent {
-                sender_id: SenderId::from(from),
-                request_id: RequestId::from(id),
-                r#type: RequestEventType::LastActivity,
-            }))
-        }
+        XMPPProfileEvent::EntityTimeQuery { from, id } => ctx.push_event(RequestEvent {
+            sender_id: SenderId::from(from),
+            request_id: RequestId::from(id),
+            r#type: RequestEventType::LocalTime,
+        }),
+        XMPPProfileEvent::SoftwareVersionQuery { from, id } => ctx.push_event(RequestEvent {
+            sender_id: SenderId::from(from),
+            request_id: RequestId::from(id),
+            r#type: RequestEventType::SoftwareVersion,
+        }),
+        XMPPProfileEvent::LastActivityQuery { from, id } => ctx.push_event(RequestEvent {
+            sender_id: SenderId::from(from),
+            request_id: RequestId::from(id),
+            r#type: RequestEventType::LastActivity,
+        }),
     }
+
     Ok(())
 }
 
 fn parse_ping_event(ctx: &mut Context, event: XMPPPingEvent) -> Result<()> {
     match event {
-        XMPPPingEvent::Ping { from, id } => ctx.push_event(ServerEvent::Request(RequestEvent {
+        XMPPPingEvent::Ping { from, id } => ctx.push_event(RequestEvent {
             sender_id: SenderId::from(from),
             request_id: RequestId::from(id),
             r#type: RequestEventType::Ping,
-        })),
+        }),
     }
+
+    Ok(())
+}
+
+fn parse_client_event(ctx: &mut Context, event: XMPPClientEvent) -> Result<()> {
+    match event {
+        XMPPClientEvent::Connected => ctx.push_event(ConnectionEvent::Connected),
+        XMPPClientEvent::Disconnected { error } => {
+            ctx.push_event(ConnectionEvent::Disconnected { error })
+        }
+    }
+
     Ok(())
 }
 
@@ -274,4 +279,45 @@ fn missing_element(
         element.name(),
         String::from(&element)
     ))
+}
+
+impl From<ConnectionEvent> for ServerEvent {
+    fn from(value: ConnectionEvent) -> Self {
+        Self::Connection(value)
+    }
+}
+impl From<UserStatusEvent> for ServerEvent {
+    fn from(value: UserStatusEvent) -> Self {
+        Self::UserStatus(value)
+    }
+}
+impl From<UserInfoEvent> for ServerEvent {
+    fn from(value: UserInfoEvent) -> Self {
+        Self::UserInfo(value)
+    }
+}
+impl From<UserResourceEvent> for ServerEvent {
+    fn from(value: UserResourceEvent) -> Self {
+        Self::UserResource(value)
+    }
+}
+impl From<RoomEvent> for ServerEvent {
+    fn from(value: RoomEvent) -> Self {
+        Self::Room(value)
+    }
+}
+impl From<OccupantEvent> for ServerEvent {
+    fn from(value: OccupantEvent) -> Self {
+        Self::Occupant(value)
+    }
+}
+impl From<RequestEvent> for ServerEvent {
+    fn from(value: RequestEvent) -> Self {
+        Self::Request(value)
+    }
+}
+impl From<MessageEvent> for ServerEvent {
+    fn from(value: MessageEvent) -> Self {
+        Self::Message(value)
+    }
 }
