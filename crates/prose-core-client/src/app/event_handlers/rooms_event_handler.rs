@@ -22,14 +22,15 @@ use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
     DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
 };
+use crate::app::event_handlers::{
+    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent,
+};
 use crate::app::event_handlers::{ServerEventHandler, XMPPEvent, XMPPEventHandler};
 use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::{ComposeState, RoomInternals};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{
-    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, RoomId, ServerEvent,
-};
+use crate::domain::shared::models::RoomId;
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {

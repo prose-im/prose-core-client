@@ -5,9 +5,8 @@
 
 use anyhow::Result;
 
-use prose_core_client::domain::shared::models::{
-    CapabilitiesId, RequestEvent, RequestEventType, RequestId, SenderId, ServerEvent,
-};
+use prose_core_client::app::event_handlers::{RequestEvent, RequestEventType, ServerEvent};
+use prose_core_client::domain::shared::models::{CapabilitiesId, RequestId, SenderId};
 use prose_core_client::sender_id;
 use prose_core_client::test::parse_xml;
 use prose_proc_macros::mt_test;

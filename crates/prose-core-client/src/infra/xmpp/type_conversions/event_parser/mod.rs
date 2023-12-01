@@ -18,13 +18,13 @@ use prose_xmpp::{
 };
 
 use crate::app::event_handlers::XMPPEvent;
-use crate::domain::rooms::models::ComposeState;
-use crate::domain::shared::models::{
-    CapabilitiesId, ConnectionEvent, MessageEvent, OccupantEvent, RequestEvent, RequestEventType,
-    RequestId, RoomEvent, RoomEventType, SenderId, ServerEvent, UserEndpointId, UserInfoEvent,
-    UserInfoEventType, UserResourceEvent, UserResourceEventType, UserStatusEvent,
-    UserStatusEventType,
+use crate::app::event_handlers::{
+    ConnectionEvent, MessageEvent, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
+    RoomEventType, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
+    UserResourceEventType, UserStatusEvent, UserStatusEventType,
 };
+use crate::domain::rooms::models::ComposeState;
+use crate::domain::shared::models::{CapabilitiesId, RequestId, SenderId, UserEndpointId};
 use crate::dtos::{RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
 

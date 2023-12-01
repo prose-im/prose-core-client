@@ -12,7 +12,7 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::stanza::Message;
 
-use crate::domain::shared::models::{RoomEvent, RoomEventType};
+use crate::app::event_handlers::{RoomEvent, RoomEventType};
 use crate::dtos::RoomId;
 use crate::infra::xmpp::type_conversions::event_parser::{
     ignore_stanza, missing_attribute, Context,

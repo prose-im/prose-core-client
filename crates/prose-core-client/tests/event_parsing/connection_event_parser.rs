@@ -6,7 +6,7 @@
 use anyhow::Result;
 
 use prose_core_client::app::event_handlers::XMPPEvent;
-use prose_core_client::domain::shared::models::{ConnectionEvent, ServerEvent};
+use prose_core_client::app::event_handlers::{ConnectionEvent, ServerEvent};
 use prose_core_client::parse_xmpp_event;
 use prose_proc_macros::mt_test;
 use prose_xmpp::client::Event as XMPPClientEvent;

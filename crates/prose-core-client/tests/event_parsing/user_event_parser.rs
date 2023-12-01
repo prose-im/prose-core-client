@@ -5,11 +5,12 @@
 
 use anyhow::Result;
 
-use prose_core_client::domain::rooms::models::ComposeState;
-use prose_core_client::domain::shared::models::{
-    CapabilitiesId, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
-    UserResourceEventType, UserStatusEvent, UserStatusEventType,
+use prose_core_client::app::event_handlers::{
+    ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent, UserResourceEventType,
+    UserStatusEvent, UserStatusEventType,
 };
+use prose_core_client::domain::rooms::models::ComposeState;
+use prose_core_client::domain::shared::models::CapabilitiesId;
 use prose_core_client::domain::user_info::models::{AvatarImageId, AvatarMetadata};
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;

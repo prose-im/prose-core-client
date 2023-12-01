@@ -15,7 +15,7 @@ pub use mock_app_dependencies::{
 use prose_xmpp::test::ClientTestAdditions;
 use prose_xmpp::Client;
 
-use crate::domain::shared::models::ServerEvent;
+use crate::app::event_handlers::ServerEvent;
 use crate::parse_xmpp_event;
 
 mod bookmark;

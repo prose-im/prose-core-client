@@ -12,10 +12,11 @@ use xmpp_parsers::presence::Presence;
 use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
-use crate::domain::shared::models::{
-    AnonOccupantId, OccupantEvent, OccupantEventType, OccupantId, RoomEvent, RoomEventType,
-    UserEndpointId, UserStatusEvent, UserStatusEventType,
+use crate::app::event_handlers::{
+    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, UserStatusEvent,
+    UserStatusEventType,
 };
+use crate::domain::shared::models::{AnonOccupantId, OccupantId, UserEndpointId};
 use crate::dtos::{Availability, RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::{
     missing_attribute, missing_element, Context,

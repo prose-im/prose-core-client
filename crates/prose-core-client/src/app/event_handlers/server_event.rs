@@ -5,8 +5,8 @@
 
 use prose_xmpp::ConnectionError;
 
-use crate::domain::shared::models::anon_occupant_id::AnonOccupantId;
-use crate::domain::shared::models::sender_id::SenderId;
+use crate::domain::shared::models::AnonOccupantId;
+use crate::domain::shared::models::SenderId;
 use crate::domain::shared::models::{CapabilitiesId, RequestId};
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
