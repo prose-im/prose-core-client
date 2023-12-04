@@ -8,11 +8,11 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use derivative::Derivative;
-use jid::{BareJid, FullJid};
+use jid::BareJid;
 use parking_lot::RwLock;
 
+use prose_xmpp::bare;
 use prose_xmpp::test::IncrementingIDProvider;
-use prose_xmpp::{bare, full};
 
 use crate::app::deps::{
     AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
@@ -53,7 +53,9 @@ use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoR
 use crate::domain::user_info::services::mocks::MockUserInfoService;
 use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
 use crate::domain::user_profiles::services::mocks::MockUserProfileService;
+use crate::dtos::UserResourceId;
 use crate::test::ConstantTimeProvider;
+use crate::user_resource_id;
 
 pub fn mock_reference_date() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2021, 09, 06, 0, 0, 0).unwrap().into()
@@ -63,8 +65,8 @@ pub fn mock_muc_service() -> BareJid {
     bare!("conference.prose.org")
 }
 
-pub fn mock_account_jid() -> FullJid {
-    full!("jane.doe@prose.org/macOS")
+pub fn mock_account_jid() -> UserResourceId {
+    user_resource_id!("jane.doe@prose.org/macOS")
 }
 
 impl Default for AppContext {

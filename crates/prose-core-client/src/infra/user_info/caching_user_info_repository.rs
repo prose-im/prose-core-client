@@ -5,12 +5,12 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::{BareJid, Jid};
 use parking_lot::RwLock;
 
 use prose_store::prelude::*;
 
 use crate::app::deps::DynUserInfoService;
+use crate::domain::shared::models::{UserId, UserOrResourceId, UserResourceId};
 use crate::domain::user_info::models::{AvatarMetadata, Presence, UserInfo, UserStatus};
 use crate::domain::user_info::repos::UserInfoRepository;
 
@@ -18,7 +18,7 @@ use super::PresenceMap;
 
 #[entity]
 pub struct UserInfoRecord {
-    id: BareJid,
+    id: UserId,
     payload: UserInfo,
 }
 
@@ -41,20 +41,19 @@ impl CachingUserInfoRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserInfoRepository for CachingUserInfoRepository {
-    fn resolve_bare_jid_to_full(&self, jid: &BareJid) -> Jid {
+    fn resolve_user_id_to_user_resource_id(&self, jid: &UserId) -> Option<UserResourceId> {
         let presences = self.presences.read();
         let Some(resource) = presences
             .get_highest_presence(jid)
             .and_then(|entry| entry.resource.as_deref())
         else {
-            return Jid::Bare(jid.clone());
+            return None;
         };
-        jid.with_resource_str(resource)
-            .map(Jid::Full)
-            .unwrap_or(Jid::Bare(jid.clone()))
+
+        Some(jid.with_resource(resource).expect("Invalid resource"))
     }
 
-    async fn get_user_info(&self, jid: &BareJid) -> Result<Option<UserInfo>> {
+    async fn get_user_info(&self, jid: &UserId) -> Result<Option<UserInfo>> {
         let tx = self
             .store
             .transaction_for_reading(&[UserInfoRecord::collection()])
@@ -98,7 +97,7 @@ impl UserInfoRepository for CachingUserInfoRepository {
         Ok(Some(record.payload))
     }
 
-    async fn set_avatar_metadata(&self, jid: &BareJid, metadata: &AvatarMetadata) -> Result<()> {
+    async fn set_avatar_metadata(&self, jid: &UserId, metadata: &AvatarMetadata) -> Result<()> {
         upsert!(
             UserInfoRecord,
             store: self.store,
@@ -114,7 +113,7 @@ impl UserInfoRepository for CachingUserInfoRepository {
 
     async fn set_user_activity(
         &self,
-        jid: &BareJid,
+        jid: &UserId,
         user_activity: Option<&UserStatus>,
     ) -> Result<()> {
         upsert!(
@@ -130,7 +129,7 @@ impl UserInfoRepository for CachingUserInfoRepository {
         Ok(())
     }
 
-    async fn set_user_presence(&self, jid: &Jid, presence: &Presence) -> Result<()> {
+    async fn set_user_presence(&self, jid: &UserOrResourceId, presence: &Presence) -> Result<()> {
         let mut map = self.presences.write();
         map.update_presence(jid, presence.clone().into());
         Ok(())

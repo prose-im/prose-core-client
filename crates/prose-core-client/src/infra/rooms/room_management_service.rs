@@ -13,10 +13,9 @@ use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
 
-use crate::domain::rooms::models::{RoomError, RoomSessionInfo, RoomSpec};
+use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomSessionInfo, RoomSpec};
 use crate::domain::rooms::services::RoomManagementService;
-use crate::domain::shared::models::RoomType;
-use crate::dtos::{PublicRoomInfo, RoomId};
+use crate::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
 use crate::infra::xmpp::type_conversions::room_info::RoomInfo;
 use crate::infra::xmpp::XMPPClient;
 
@@ -42,32 +41,29 @@ impl RoomManagementService for XMPPClient {
 
     async fn create_or_join_room(
         &self,
-        room_jid: &FullJid,
+        occupant_id: &OccupantId,
         room_name: &str,
         spec: RoomSpec,
     ) -> Result<RoomSessionInfo, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
 
         // Create the room…
-        let occupancy =
-            muc_mod
-                .create_reserved_room(
-                    &room_jid,
-                    Box::new(|form| {
-                        let spec = spec.clone();
-                        let room_name = room_name.to_string();
+        let occupancy = muc_mod
+            .create_reserved_room(
+                occupant_id.as_ref(),
+                Box::new(|form| {
+                    let spec = spec.clone();
+                    let room_name = room_name.to_string();
 
-                        Box::pin(async move {
-                            Ok(RoomConfigResponse::Submit(
-                                spec.populate_form(&room_name, &form)?,
-                            ))
-                        })
-                    }),
-                )
-                .await?;
+                    Box::pin(async move {
+                        Ok(RoomConfigResponse::Submit(spec.populate_form(&room_name, &form)?))
+                    })
+                }),
+            )
+            .await?;
 
-        let user_nickname = room_jid.resource_str().to_string();
-        let room_jid = RoomId::from(room_jid.to_bare());
+        let user_nickname = occupant_id.nickname().to_string();
+        let room_jid = occupant_id.room_id();
 
         let room_has_been_created = occupancy.user.status.contains(&Status::RoomHasBeenCreated);
         let room_info = self.load_room_info(&room_jid).await?;
@@ -98,11 +94,11 @@ impl RoomManagementService for XMPPClient {
 
     async fn join_room(
         &self,
-        room_jid: &FullJid,
+        occupant_id: &OccupantId,
         password: Option<&str>,
     ) -> Result<RoomSessionInfo, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        let occupancy = muc_mod.enter_room(&room_jid, password).await?;
+        let occupancy = muc_mod.enter_room(occupant_id.as_ref(), password).await?;
 
         // If we accidentally created the room, we'll return an ItemNotFound error since our
         // actual intention was to join an existing room.
@@ -120,8 +116,8 @@ impl RoomManagementService for XMPPClient {
             .into());
         }
 
-        let user_nickname = room_jid.resource_str().to_string();
-        let room_jid = RoomId::from(room_jid.to_bare());
+        let user_nickname = occupant_id.nickname().to_string();
+        let room_jid = occupant_id.room_id();
         let room_info = self.load_room_info(&room_jid).await?;
 
         let room_type =
@@ -189,12 +185,12 @@ impl RoomManagementService for XMPPClient {
     async fn set_room_owners<'a, 'b, 'c>(
         &'a self,
         room_jid: &'b RoomId,
-        users: &'c [BareJid],
+        users: &'c [UserId],
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         let owners = users
             .iter()
-            .map(|user_jid| ((*user_jid).clone(), Affiliation::Owner))
+            .map(|user_jid| (user_jid.clone().into_inner(), Affiliation::Owner))
             .collect::<Vec<_>>();
         muc_mod.update_user_affiliations(room_jid, owners).await?;
         Ok(())
@@ -222,7 +218,7 @@ impl XMPPClient {
         )?)
     }
 
-    async fn load_room_owners(&self, jid: &RoomId) -> Result<Vec<BareJid>, RoomError> {
+    async fn load_room_owners(&self, jid: &RoomId) -> Result<Vec<UserId>, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         // When creating a group we change all "members" to "owners", so at least for Prose groups
         // this should work as expected. In case it fails we ignore the error, which can happen
@@ -232,7 +228,7 @@ impl XMPPClient {
             .await
             .unwrap_or(vec![])
             .into_iter()
-            .map(|user| user.jid.to_bare())
+            .map(|user| UserId::from(user.jid.to_bare()))
             .collect::<Vec<_>>())
     }
 }

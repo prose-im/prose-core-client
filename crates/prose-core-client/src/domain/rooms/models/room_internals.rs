@@ -7,12 +7,15 @@ use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
 use chrono::{DateTime, Utc};
-use jid::{BareJid, FullJid, Jid};
+use jid::FullJid;
 use parking_lot::RwLock;
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomState};
-use crate::domain::shared::models::{RoomId, RoomType};
-use crate::dtos::{Occupant, UserBasicInfo};
+use crate::domain::shared::models::{
+    Availability, ParticipantId, RoomId, RoomType, UserBasicInfo, UserId,
+};
+
+use super::Participant;
 
 /// Contains information about a connected room and its state.
 #[derive(Debug)]
@@ -29,8 +32,6 @@ pub struct RoomInfo {
     pub description: Option<String>,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
-    /// The list of members. Only available for DirectMessage and Group (member-only rooms).
-    pub members: HashMap<BareJid, Member>,
     /// The type of the room.
     pub r#type: RoomType,
 }
@@ -71,39 +72,67 @@ impl RoomInternals {
         self.state.write().topic = topic
     }
 
-    pub fn occupants(&self) -> Vec<Occupant> {
-        self.state.read().occupants.values().cloned().collect()
+    pub fn participants(&self) -> Vec<Participant> {
+        self.state.read().participants.values().cloned().collect()
     }
 
-    pub fn get_occupant(&self, jid: &Jid) -> Option<Occupant> {
-        self.state.read().occupants.get(&jid).cloned()
+    // TODO: Get naming in order (Member != Owner)
+    pub fn members(&self) -> Vec<(ParticipantId, Participant)> {
+        self.state
+            .read()
+            .participants
+            .iter()
+            .filter_map(|(id, p)| {
+                if p.affiliation != RoomAffiliation::Owner {
+                    return None;
+                }
+                Some((id.clone(), p.clone()))
+            })
+            .collect()
     }
 
-    pub fn insert_occupant(
+    pub fn get_participant(&self, id: &ParticipantId) -> Option<Participant> {
+        self.state.read().participants.get(&id).cloned()
+    }
+
+    pub fn insert_participant(
         &self,
-        jid: &Jid,
-        real_jid: Option<&BareJid>,
+        id: &ParticipantId,
+        real_id: Option<&UserId>,
         name: Option<&str>,
         affiliation: &RoomAffiliation,
+        availability: &Availability,
     ) {
         self.state
             .write()
-            .insert_occupant(jid, real_jid, name, affiliation)
+            .insert_participant(id, real_id, name, affiliation, availability)
     }
 
-    pub fn remove_occupant(&self, jid: &Jid) {
-        self.state.write().occupants.remove(jid);
+    pub fn remove_participant(&self, id: &ParticipantId) {
+        self.state.write().participants.remove(id);
     }
 
-    pub fn set_occupant_compose_state(
+    pub fn set_participant_compose_state(
         &self,
-        occupant_jid: &Jid,
+        id: &ParticipantId,
         timestamp: &DateTime<Utc>,
         compose_state: ComposeState,
     ) {
         self.state
             .write()
-            .set_occupant_compose_state(occupant_jid, timestamp, compose_state)
+            .set_participant_compose_state(id, timestamp, compose_state)
+    }
+
+    pub fn set_participant_availability(&self, id: &ParticipantId, availability: &Availability) {
+        self.state
+            .write()
+            .set_participant_availability(id, availability)
+    }
+
+    pub fn set_participant_affiliation(&self, id: &ParticipantId, affiliation: &RoomAffiliation) {
+        self.state
+            .write()
+            .set_participant_affiliation(id, affiliation)
     }
 
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
@@ -120,7 +149,6 @@ impl RoomInternals {
                 room_id: room_jid.clone(),
                 description: None,
                 user_nickname: nickname.to_string(),
-                members: HashMap::new(),
                 r#type: RoomType::Pending,
             },
             state: Default::default(),
@@ -146,29 +174,24 @@ impl RoomInternals {
 }
 
 impl RoomInternals {
-    pub fn for_direct_message(contact_jid: &BareJid, contact_name: &str) -> Self {
+    pub fn for_direct_message(contact_id: &UserId, contact_name: &str) -> Self {
         Self {
             info: RoomInfo {
-                room_id: contact_jid.clone().into(),
+                room_id: RoomId::from(contact_id.clone().into_inner()),
                 description: None,
                 user_nickname: "no_nickname".to_string(),
-                members: HashMap::from([(
-                    contact_jid.clone(),
-                    Member {
-                        name: contact_name.to_string(),
-                    },
-                )]),
                 r#type: RoomType::DirectMessage,
             },
             state: RwLock::new(RoomState {
                 name: Some(contact_name.to_string()),
                 topic: None,
-                occupants: HashMap::from([(
-                    Jid::Bare(contact_jid.clone()),
-                    Occupant {
-                        jid: Some(contact_jid.clone()),
+                participants: HashMap::from([(
+                    contact_id.clone().into(),
+                    Participant {
+                        id: Some(contact_id.clone()),
                         name: Some(contact_name.to_string()),
                         affiliation: RoomAffiliation::Owner,
+                        availability: Default::default(),
                         compose_state: ComposeState::Idle,
                         compose_state_updated: Default::default(),
                     },
@@ -180,8 +203,8 @@ impl RoomInternals {
 
 #[cfg(feature = "test")]
 impl RoomInternals {
-    pub fn set_occupants(&self, occupants: HashMap<Jid, Occupant>) {
-        self.state.write().occupants = occupants;
+    pub fn set_participants(&self, participants: HashMap<ParticipantId, Participant>) {
+        self.state.write().participants = participants;
     }
 
     pub fn new(info: RoomInfo) -> Self {
@@ -212,16 +235,17 @@ impl PartialEq for RoomInternals {
 mod tests {
     use std::collections::HashMap;
 
-    use prose_xmpp::{bare, jid};
+    use prose_xmpp::bare;
 
-    use crate::dtos::Occupant;
+    use crate::dtos::Participant;
+    use crate::user_id;
 
     use super::*;
 
     #[test]
     fn test_room_internals_for_direct_message() {
         let internals =
-            RoomInternals::for_direct_message(&bare!("logged-in-user@prose.org"), "Jane Doe");
+            RoomInternals::for_direct_message(&user_id!("logged-in-user@prose.org"), "Jane Doe");
 
         assert_eq!(
             internals,
@@ -230,23 +254,18 @@ mod tests {
                     room_id: bare!("contact@prose.org").into(),
                     description: None,
                     user_nickname: "no_nickname".to_string(),
-                    members: HashMap::from([(
-                        bare!("contact@prose.org"),
-                        Member {
-                            name: "Jane Doe".to_string()
-                        }
-                    )]),
                     r#type: RoomType::DirectMessage,
                 },
                 state: RwLock::new(RoomState {
                     name: Some("Jane Doe".to_string()),
                     topic: None,
-                    occupants: HashMap::from([(
-                        jid!("contact@prose.org"),
-                        Occupant {
-                            jid: Some(bare!("contact@prose.org")),
+                    participants: HashMap::from([(
+                        user_id!("contact@prose.org").into(),
+                        Participant {
+                            id: Some(user_id!("contact@prose.org")),
                             name: Some("Jane Doe".to_string()),
                             affiliation: RoomAffiliation::Owner,
+                            availability: Default::default(),
                             compose_state: ComposeState::Idle,
                             compose_state_updated: Default::default(),
                         }

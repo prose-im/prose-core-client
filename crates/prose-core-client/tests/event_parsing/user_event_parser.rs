@@ -274,11 +274,35 @@ async fn test_status_changed() -> Result<()> {
         vec![ServerEvent::UserInfo(UserInfoEvent {
             user_id: user_id!("user@prose.org").into(),
             r#type: UserInfoEventType::StatusChanged {
-                status: UserStatus {
+                status: Some(UserStatus {
                     emoji: "🍕".to_string(),
                     status: Some("Eating pizza".to_string())
-                }
+                })
             },
+        })]
+    );
+
+    let events =
+        parse_xml(
+            r#"
+        <message xmlns="jabber:client" from="user@prose.org" type="headline">
+            <event xmlns="http://jabber.org/protocol/pubsub#event">
+                <items node="http://jabber.org/protocol/activity">
+                    <item id="user@prose.org" publisher="user@prose.org">
+                        <activity xmlns="http://jabber.org/protocol/activity" />
+                    </item>
+                </items>
+            </event>
+        </message>
+      "#,
+        )
+        .await?;
+
+    assert_eq!(
+        events,
+        vec![ServerEvent::UserInfo(UserInfoEvent {
+            user_id: user_id!("user@prose.org").into(),
+            r#type: UserInfoEventType::StatusChanged { status: None },
         })]
     );
 

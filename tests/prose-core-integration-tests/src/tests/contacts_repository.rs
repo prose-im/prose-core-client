@@ -19,12 +19,12 @@ use crate::tests::async_test;
 async fn test_loads_and_caches_contacts() -> Result<()> {
     let contacts = vec![
         Contact {
-            jid: bare!("a@prose.org"),
+            id: bare!("a@prose.org"),
             name: None,
             group: Group::Favorite,
         },
         Contact {
-            jid: bare!("b@prose.org"),
+            id: bare!("b@prose.org"),
             name: None,
             group: Group::Team,
         },

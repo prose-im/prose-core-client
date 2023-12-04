@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 use tracing::{debug, error};
 use xmpp_parsers::message::MessageType;
 
@@ -22,7 +21,7 @@ use crate::app::deps::{
 use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::RoomId;
+use crate::domain::shared::models::{RoomId, UserId};
 use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
@@ -85,7 +84,7 @@ impl ReceivedMessage {
         }
     }
 
-    pub fn sender(&self) -> Option<BareJid> {
+    pub fn sender(&self) -> Option<UserId> {
         match &self {
             ReceivedMessage::Message(message) => message.from.as_ref().map(|jid| jid.to_bare()),
             ReceivedMessage::Carbon(Carbon::Received(message)) => message
@@ -99,6 +98,7 @@ impl ReceivedMessage {
                 .and_then(|message| message.to.as_ref())
                 .map(|jid| jid.to_bare()),
         }
+        .map(UserId::from)
     }
 
     pub fn r#type(&self) -> Option<MessageType> {
@@ -121,7 +121,7 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        let from = RoomId::from(from);
+        let from = RoomId::from(from.into_inner());
 
         let mut room = self.connected_rooms_repo.get(&from);
 
@@ -129,7 +129,7 @@ impl MessagesEventHandler {
             self.sidebar_domain_service
                 .insert_item_by_creating_or_joining_room(
                     CreateOrEnterRoomRequest::JoinDirectMessage {
-                        participant: from.clone().into_inner(),
+                        participant: UserId::from(from.clone().into_inner()),
                     },
                 )
                 .await?;

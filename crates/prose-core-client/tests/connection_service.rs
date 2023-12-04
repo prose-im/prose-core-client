@@ -80,7 +80,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
     let service = ConnectionService::from(&deps);
 
     *deps.ctx.connection_properties.write() = None;
-    assert!(deps.ctx.connected_jid().is_err());
+    assert!(deps.ctx.connected_id().is_err());
     assert!(deps.ctx.muc_service().is_err());
 
     service
@@ -88,7 +88,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .await?;
 
     assert_eq!(
-        deps.ctx.connected_jid()?,
+        deps.ctx.connected_id()?,
         full!("jane.doe@prose.org/resource-id")
     );
     assert_eq!(deps.ctx.muc_service()?, bare!("muc@prose.org"));
@@ -188,7 +188,7 @@ async fn test_connection_failure() -> Result<()> {
             .once()
             .return_once(move |_, _| {
                 assert_eq!(
-                    ctx.get().unwrap().connected_jid().ok(),
+                    ctx.get().unwrap().connected_id().ok(),
                     Some(full!("jane.doe@prose.org/resource-id"))
                 );
                 Box::pin(async {
@@ -205,7 +205,7 @@ async fn test_connection_failure() -> Result<()> {
     let service = ConnectionService::from(&deps);
 
     *deps.ctx.connection_properties.write() = None;
-    assert!(deps.ctx.connected_jid().is_err());
+    assert!(deps.ctx.connected_id().is_err());
     assert!(deps.ctx.muc_service().is_err());
 
     assert!(service
@@ -213,7 +213,7 @@ async fn test_connection_failure() -> Result<()> {
         .await
         .is_err());
 
-    assert!(deps.ctx.connected_jid().is_err());
+    assert!(deps.ctx.connected_id().is_err());
     assert!(deps.ctx.muc_service().is_err());
 
     Ok(())

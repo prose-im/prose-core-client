@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use anyhow::{format_err, Result};
 use chrono::Duration;
-use jid::{BareJid, Jid};
+use jid::Jid;
 use tracing::{debug, info};
 
 use crate::app::deps::{
@@ -21,11 +21,10 @@ use crate::app::deps::{
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{RoomInternals, RoomSpec};
-use crate::domain::shared::models::{RoomId, RoomType};
+use crate::domain::shared::models::{ParticipantId, RoomId};
 use crate::dtos::{
-    Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserPresenceInfo,
+    Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserId, UserPresenceInfo,
 };
-use crate::util::jid_ext::{BareJidExt, JidExt};
 use crate::ClientRoomEventType;
 
 pub struct Room<Kind> {
@@ -104,7 +103,7 @@ impl<Kind> Debug for Room<Kind> {
             .field("description", &self.data.description)
             .field("user_nickname", &self.data.user_nickname)
             .field("subject", &self.data.topic())
-            .field("occupants", &self.data.occupants())
+            .field("occupants", &self.data.participants())
             .finish_non_exhaustive()
     }
 }
@@ -144,26 +143,29 @@ impl<Kind> Room<Kind> {
 
     pub fn members(&self) -> Vec<UserPresenceInfo> {
         self.data
-            .members
-            .iter()
-            .map(|(jid, member)| UserPresenceInfo {
-                jid: jid.clone(),
-                name: member.name.clone(),
-                availability: Availability::Available,
+            .members()
+            .into_iter()
+            .filter_map(|(id, member)| {
+                let Some(id) = member.id else { return None };
+                Some(UserPresenceInfo {
+                    id,
+                    name: member.name.unwrap_or_else(|| id.formatted_username()),
+                    availability: Availability::Available,
+                })
             })
             .collect()
     }
 
     pub fn occupants(&self) -> Vec<UserBasicInfo> {
         self.data
-            .occupants()
+            .participants()
             .into_iter()
             .filter_map(|occupant| {
-                let Some(jid) = occupant.jid else {
+                let Some(jid) = occupant.id else {
                     return None;
                 };
-                let name = occupant.name.unwrap_or_else(|| jid.to_display_name());
-                Some(UserBasicInfo { jid, name })
+                let name = occupant.name.unwrap_or_else(|| jid.formatted_username());
+                Some(UserBasicInfo { id: jid, name })
             })
             .collect()
     }
@@ -183,7 +185,7 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
-        let user_jid = self.ctx.connected_jid()?.into_bare();
+        let user_jid = self.ctx.connected_id()?.to_user_id();
         let messages = self.message_repo.get(&self.data.room_id, &id).await?;
 
         let mut message = Message::reducing_messages(messages)
@@ -270,7 +272,11 @@ impl<Kind> Room<Kind> {
         let mut message_dtos = Vec::with_capacity(messages.len());
 
         for message in messages {
-            let name = self.resolve_user_name(&message.from).await;
+            let participant_id = match &message.from {
+                Jid::Bare(id) => ParticipantId::User(id.clone().into()),
+                Jid::Full(id) => ParticipantId::Occupant(id.clone().into()),
+            };
+            let name = self.resolve_user_name(&participant_id).await;
 
             let from = MessageSender {
                 jid: message.from.into_bare(),
@@ -293,46 +299,29 @@ impl<Kind> Room<Kind> {
         message_dtos
     }
 
-    async fn resolve_user_name(&self, jid: &Jid) -> String {
-        let name = {
-            match jid {
-                Jid::Bare(bare) => self
-                    .data
-                    .members
-                    .get(bare)
-                    .map(|member| member.name.clone())
-                    .or_else(|| self.data.get_occupant(jid).and_then(|o| o.name)),
-                Jid::Full(_) => self.data.get_occupant(jid).and_then(|o| o.name),
-            }
-        };
+    async fn resolve_user_name(&self, id: &ParticipantId) -> String {
+        let name = self.data.get_participant(id).and_then(|p| p.name);
 
         if let Some(name) = name {
             return name;
         };
 
-        if let Jid::Bare(bare) = &jid {
-            if let Some(name) = self
+        match id {
+            ParticipantId::User(id) => self
                 .user_profile_repo
-                .get_display_name(bare)
+                .get_display_name(id)
                 .await
                 .unwrap_or_default()
-            {
-                return name;
-            };
-        }
-
-        if self.data.r#type == RoomType::DirectMessage {
-            jid.node_to_display_name()
-        } else {
-            jid.resource_to_display_name()
+                .unwrap_or_else(|| id.formatted_username()),
+            ParticipantId::Occupant(id) => id.formatted_nickname(),
         }
     }
 }
 
 #[cfg(feature = "debug")]
 impl<Kind> Room<Kind> {
-    pub fn occupants_dbg(&self) -> Vec<crate::domain::rooms::models::Occupant> {
-        self.data.occupants()
+    pub fn occupants_dbg(&self) -> Vec<crate::domain::rooms::models::Participant> {
+        self.data.participants()
     }
 }
 
@@ -340,7 +329,12 @@ impl Room<Group> {
     pub async fn resend_invites_to_members(&self) -> Result<()> {
         info!("Sending invites to group members…");
 
-        let member_jids = self.data.members.keys().cloned().collect::<Vec<_>>();
+        let member_jids = self
+            .data
+            .members()
+            .into_iter()
+            .filter_map(|(_, p)| p.id)
+            .collect::<Vec<_>>();
         self.participation_service
             .invite_users_to_room(&self.data.room_id, member_jids.as_slice())
             .await?;
@@ -367,7 +361,7 @@ impl Room<PrivateChannel> {
         Ok(())
     }
 
-    pub async fn invite_users(&self, users: impl IntoIterator<Item = &BareJid>) -> Result<()> {
+    pub async fn invite_users(&self, users: impl IntoIterator<Item = &UserId>) -> Result<()> {
         let user_jids = users.into_iter().cloned().collect::<Vec<_>>();
         self.participation_service
             .invite_users_to_room(&self.data.room_id, user_jids.as_slice())
@@ -388,7 +382,7 @@ impl Room<PublicChannel> {
         Ok(())
     }
 
-    pub async fn invite_users(&self, users: impl IntoIterator<Item = &BareJid>) -> Result<()> {
+    pub async fn invite_users(&self, users: impl IntoIterator<Item = &UserId>) -> Result<()> {
         let user_jids = users.into_iter().cloned().collect::<Vec<_>>();
 
         for user in user_jids.iter() {

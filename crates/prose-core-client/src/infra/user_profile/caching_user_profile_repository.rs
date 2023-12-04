@@ -5,17 +5,17 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_store::prelude::*;
 
 use crate::app::deps::DynUserProfileService;
+use crate::domain::shared::models::UserId;
 use crate::domain::user_profiles::models::UserProfile;
 use crate::domain::user_profiles::repos::UserProfileRepository;
 
 #[entity]
 pub struct UserProfileRecord {
-    id: BareJid,
+    id: UserId,
     payload: UserProfile,
 }
 
@@ -36,7 +36,7 @@ impl CachingUserProfileRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserProfileRepository for CachingUserProfileRepository {
-    async fn get(&self, jid: &BareJid) -> Result<Option<UserProfile>> {
+    async fn get(&self, jid: &UserId) -> Result<Option<UserProfile>> {
         let tx = self
             .store
             .transaction_for_reading(&[UserProfileRecord::collection()])
@@ -56,7 +56,7 @@ impl UserProfileRepository for CachingUserProfileRepository {
         Ok(Some(profile))
     }
 
-    async fn set(&self, jid: &BareJid, profile: &UserProfile) -> Result<()> {
+    async fn set(&self, jid: &UserId, profile: &UserProfile) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[UserProfileRecord::collection()])
@@ -70,7 +70,7 @@ impl UserProfileRepository for CachingUserProfileRepository {
         Ok(())
     }
 
-    async fn delete(&self, jid: &BareJid) -> Result<()> {
+    async fn delete(&self, jid: &UserId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[UserProfileRecord::collection()])
@@ -81,7 +81,7 @@ impl UserProfileRepository for CachingUserProfileRepository {
         Ok(())
     }
 
-    async fn get_display_name(&self, jid: &BareJid) -> Result<Option<String>> {
+    async fn get_display_name(&self, jid: &UserId) -> Result<Option<String>> {
         // This is a bit heavy-handed right now to load the full contact. prose-store should
         // support multi-column indexes instead so that we can just pull out the required fields.
         Ok(self

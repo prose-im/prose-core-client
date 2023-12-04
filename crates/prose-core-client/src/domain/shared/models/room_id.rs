@@ -10,6 +10,8 @@ use std::str::FromStr;
 use jid::BareJid;
 use minidom::IntoAttributeValue;
 
+use super::OccupantId;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// A RoomJid while always a BareJid can either stand for a single contact or a MUC room.
 pub struct RoomId(BareJid);
@@ -17,6 +19,13 @@ pub struct RoomId(BareJid);
 impl RoomId {
     pub fn into_inner(self) -> BareJid {
         self.0
+    }
+
+    pub fn occupant_id_with_nickname(
+        &self,
+        nickname: impl AsRef<str>,
+    ) -> Result<OccupantId, jid::Error> {
+        Ok(OccupantId::from(self.0.with_resource_str(nickname.as_ref())?))
     }
 }
 

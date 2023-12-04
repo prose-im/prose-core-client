@@ -33,7 +33,7 @@ impl UserBasicInfo {
 impl From<SdkUserBasicInfo> for UserBasicInfo {
     fn from(value: SdkUserBasicInfo) -> Self {
         Self {
-            jid: value.jid.into(),
+            jid: value.id.into(),
             name: value.name,
         }
     }
@@ -67,7 +67,7 @@ impl UserPresenceInfo {
 impl From<SdkUserPresenceInfo> for UserPresenceInfo {
     fn from(value: SdkUserPresenceInfo) -> Self {
         Self {
-            jid: value.jid.into(),
+            jid: value.id.into(),
             name: value.name,
             availability: value.availability.into(),
         }

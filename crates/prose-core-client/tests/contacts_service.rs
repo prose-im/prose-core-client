@@ -21,17 +21,17 @@ async fn test_assembles_contact_dto() -> Result<()> {
         Box::pin(async {
             Ok(vec![
                 Contact {
-                    jid: bare!("a@prose.org"),
+                    id: bare!("a@prose.org"),
                     name: None,
                     group: Group::Favorite,
                 },
                 Contact {
-                    jid: bare!("b@prose.org"),
+                    id: bare!("b@prose.org"),
                     name: Some("Contact B".to_string()),
                     group: Group::Team,
                 },
                 Contact {
-                    jid: bare!("john.doe@prose.org"),
+                    id: bare!("john.doe@prose.org"),
                     name: None,
                     group: Group::Team,
                 },
@@ -89,21 +89,21 @@ async fn test_assembles_contact_dto() -> Result<()> {
         contacts,
         vec![
             ContactDTO {
-                jid: bare!("a@prose.org"),
+                id: bare!("a@prose.org"),
                 name: "First Last".to_string(),
                 availability: Availability::Available,
                 activity: None,
                 group: Group::Favorite,
             },
             ContactDTO {
-                jid: bare!("b@prose.org"),
+                id: bare!("b@prose.org"),
                 name: "Nickname".to_string(),
                 availability: Availability::Available,
                 activity: None,
                 group: Group::Team,
             },
             ContactDTO {
-                jid: bare!("john.doe@prose.org"),
+                id: bare!("john.doe@prose.org"),
                 name: "John Doe".to_string(),
                 availability: Availability::Unavailable,
                 activity: None,

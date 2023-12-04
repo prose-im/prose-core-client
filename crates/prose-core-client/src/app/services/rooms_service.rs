@@ -6,15 +6,14 @@
 use std::sync::atomic::Ordering;
 
 use anyhow::{bail, Result};
-use jid::BareJid;
 
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{DynAppContext, DynRoomManagementService, DynSidebarDomainService};
 use crate::domain::rooms::models::constants::MAX_PARTICIPANTS_PER_GROUP;
+use crate::domain::rooms::models::PublicRoomInfo;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
-use crate::domain::shared::models::RoomId;
-use crate::dtos::PublicRoomInfo;
+use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(InjectDependencies)]
 pub struct RoomsService {
@@ -45,7 +44,7 @@ impl RoomsService {
             .await?)
     }
 
-    pub async fn start_conversation(&self, participants: &[BareJid]) -> Result<RoomId> {
+    pub async fn start_conversation(&self, participants: &[UserId]) -> Result<RoomId> {
         if participants.is_empty() {
             bail!("You need at least one participant to start a conversation")
         }
@@ -67,10 +66,7 @@ impl RoomsService {
             .await
     }
 
-    pub async fn create_room_for_direct_message(
-        &self,
-        participant_jid: &BareJid,
-    ) -> Result<RoomId> {
+    pub async fn create_room_for_direct_message(&self, participant_jid: &UserId) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant: participant_jid.clone(),
@@ -78,7 +74,7 @@ impl RoomsService {
             .await
     }
 
-    pub async fn create_room_for_group(&self, participants: &[BareJid]) -> Result<RoomId> {
+    pub async fn create_room_for_group(&self, participants: &[UserId]) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::Create {
                 service: self.ctx.muc_service()?,

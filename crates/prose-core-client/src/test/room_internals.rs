@@ -10,15 +10,15 @@ use jid::{BareJid, Jid};
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInfo, RoomInternals};
 use crate::domain::shared::models::{RoomId, RoomType};
-use crate::dtos::{Member, Occupant};
+use crate::dtos::{Availability, Member, Participant, UserId};
 use crate::test::mock_data;
 use crate::util::jid_ext::BareJidExt;
 
 impl RoomInternals {
-    pub fn direct_message(jid: impl Into<BareJid>) -> Self {
+    pub fn direct_message(jid: UserId) -> Self {
         let jid = jid.into();
 
-        Self::for_direct_message(&jid, &jid.to_display_name())
+        Self::for_direct_message(&jid, &jid.formatted_username())
     }
 
     pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
@@ -37,7 +37,6 @@ impl RoomInternals {
             room_id: jid.into(),
             description: None,
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-            members: HashMap::new(),
             r#type: RoomType::Group,
         })
     }
@@ -47,7 +46,6 @@ impl RoomInternals {
             room_id: jid.into(),
             description: None,
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-            members: HashMap::new(),
             r#type: RoomType::PublicChannel,
         })
     }
@@ -57,7 +55,6 @@ impl RoomInternals {
             room_id: jid.into(),
             description: None,
             user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-            members: HashMap::new(),
             r#type: RoomType::PrivateChannel,
         })
     }
@@ -77,35 +74,37 @@ impl RoomInternals {
         self
     }
 
-    pub fn with_occupants(self, occupant: impl IntoIterator<Item = (Jid, Occupant)>) -> Self {
-        self.set_occupants(occupant.into_iter().collect());
+    pub fn with_occupants(self, occupant: impl IntoIterator<Item = (Jid, Participant)>) -> Self {
+        self.set_participants(occupant.into_iter().collect());
         self
     }
 }
 
-impl Occupant {
+impl Participant {
     pub fn owner() -> Self {
-        Occupant {
-            jid: None,
+        Participant {
+            id: None,
             name: None,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
             compose_state_updated: Default::default(),
+            availability: Availability::Unavailable,
         }
     }
 
     pub fn member() -> Self {
-        Occupant {
-            jid: None,
+        Participant {
+            id: None,
             name: None,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
             compose_state_updated: Default::default(),
+            availability: Availability::Unavailable,
         }
     }
 
-    pub fn set_real_jid(mut self, jid: &BareJid) -> Self {
-        self.jid = Some(jid.clone());
+    pub fn set_real_id(mut self, jid: &UserId) -> Self {
+        self.id = Some(jid.clone());
         self
     }
 

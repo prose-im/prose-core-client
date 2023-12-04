@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::BareJid;
 use tracing::error;
 
 use prose_proc_macros::InjectDependencies;
@@ -16,6 +15,7 @@ use crate::app::deps::{
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
 use crate::domain::shared::models::Availability;
+use crate::dtos::UserId;
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
@@ -37,7 +37,7 @@ pub struct ConnectionService {
 impl ConnectionService {
     pub async fn connect(
         &self,
-        jid: &BareJid,
+        jid: &UserId,
         password: impl AsRef<str>,
     ) -> Result<(), ConnectionError> {
         let settings =
@@ -53,7 +53,7 @@ impl ConnectionService {
         let availability = settings.availability.unwrap_or(Availability::Available);
 
         let full_jid = jid
-            .with_resource_str(&resource)
+            .with_resource(&resource)
             .expect("Failed to build FullJid with generated ID as resource.");
 
         self.ctx.set_connection_properties(ConnectionProperties {

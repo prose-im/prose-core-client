@@ -5,15 +5,13 @@
 
 use std::ops::Deref;
 
-use jid::BareJid;
-
 use crate::app::dtos::UserProfile;
-use crate::util::jid_ext::BareJidExt;
+use crate::dtos::UserId;
 
-pub(crate) fn build_contact_name(contact_jid: &BareJid, profile: &UserProfile) -> String {
+pub(crate) fn build_contact_name(contact_jid: &UserId, profile: &UserProfile) -> String {
     concatenate_names(&profile.first_name, &profile.last_name)
         .or_else(|| profile.nickname.clone())
-        .unwrap_or_else(|| contact_jid.to_display_name())
+        .unwrap_or_else(|| contact_jid.formatted_username())
 }
 
 pub(crate) fn concatenate_names(

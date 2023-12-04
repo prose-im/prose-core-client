@@ -3,11 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::BareJid;
-
 use crate::domain::rooms::models::RoomSessionInfo;
 use crate::domain::shared::models::RoomType;
-use crate::dtos::RoomId;
+use crate::dtos::{RoomId, UserId};
 use crate::test::mock_data;
 
 impl RoomSessionInfo {
@@ -23,7 +21,7 @@ impl RoomSessionInfo {
         }
     }
 
-    pub fn with_members(mut self, members: impl IntoIterator<Item = BareJid>) -> Self {
+    pub fn with_members(mut self, members: impl IntoIterator<Item = UserId>) -> Self {
         self.members = members.into_iter().collect();
         self
     }

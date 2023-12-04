@@ -30,26 +30,26 @@ impl ContactsService {
     pub async fn load_contacts(&self) -> Result<Vec<Contact>> {
         let domain_contacts = self
             .contacts_repo
-            .get_all(&self.ctx.connected_jid()?.into_bare())
+            .get_all(&self.ctx.connected_id()?.to_user_id())
             .await?;
         let mut contacts = vec![];
 
         for domain_contact in domain_contacts {
             let profile = self
                 .user_profile_repo
-                .get(&domain_contact.jid)
+                .get(&domain_contact.id)
                 .await?
                 .unwrap_or_default();
             let user_info = self
                 .user_info_repo
-                .get_user_info(&domain_contact.jid)
+                .get_user_info(&domain_contact.id)
                 .await?
                 .unwrap_or_default();
 
-            let name = build_contact_name(&domain_contact.jid, &profile);
+            let name = build_contact_name(&domain_contact.id, &profile);
 
             let contact = Contact {
-                jid: domain_contact.jid,
+                id: domain_contact.id,
                 name,
                 availability: user_info.availability,
                 activity: user_info.activity,

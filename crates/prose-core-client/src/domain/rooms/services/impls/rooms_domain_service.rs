@@ -26,7 +26,7 @@ use crate::domain::rooms::models::{
     Member, RoomError, RoomInfo, RoomInternals, RoomSessionInfo, RoomSpec,
 };
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomId, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType, UserId};
 use crate::domain::shared::utils::build_contact_name;
 use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
@@ -178,7 +178,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     }
                 }
 
-                let current_user = self.ctx.connected_jid()?.into_bare();
+                let current_user = self.ctx.connected_id()?.to_user_id();
 
                 // Now grant the members of the original group access to the new channel…
                 debug!("Granting membership to members of new room {}…", new_name);
@@ -250,19 +250,19 @@ impl RoomsDomainService {
         room_jid: &RoomId,
         password: Option<&str>,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        let user_jid = self.ctx.connected_jid()?.into_bare();
+        let user_jid = self.ctx.connected_id()?.to_user_id();
         // We generate a random suffix to prevent any nickname conflicts…
         let nickname = format!(
-            "{}-{}",
-            user_jid.node_str().unwrap_or("unknown-user"),
-            self.id_provider.new_id()
+            "{}",
+            user_jid.username().unwrap_or("unknown-user"),
+            // self.id_provider.new_id()
         );
 
         // Insert pending room so that we don't miss any stanzas for this room while we're
         // connecting to it…
         self.insert_pending_room(room_jid, &nickname)?;
 
-        let full_room_jid = room_jid.with_resource_str(&nickname)?;
+        let full_room_jid = room_jid.occupant_id_with_nickname(&nickname)?;
 
         info!(
             "Trying to join room {} with nickname {}…",
@@ -290,9 +290,11 @@ impl RoomsDomainService {
 
     async fn join_direct_message(
         &self,
-        participant: &BareJid,
+        participant: &UserId,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        if let Some(room) = self.connected_rooms_repo.get(&participant.clone().into()) {
+        let room_id = RoomId::from(participant.clone().into_inner());
+
+        if let Some(room) = self.connected_rooms_repo.get(&room_id) {
             return Ok(room);
         }
 
@@ -311,11 +313,10 @@ impl RoomsDomainService {
         match self.connected_rooms_repo.set(room.clone()) {
             Ok(()) => Ok(room),
             Err(_err) => {
-                let room_jid = RoomId::from(participant.clone());
-                if let Some(room) = self.connected_rooms_repo.get(&room_jid) {
+                if let Some(room) = self.connected_rooms_repo.get(&room_id) {
                     return Ok(room);
                 }
-                return Err(RoomError::RoomIsAlreadyConnected(room_jid));
+                return Err(RoomError::RoomIsAlreadyConnected(room_id));
             }
         }
     }
@@ -325,7 +326,7 @@ impl RoomsDomainService {
         service: &BareJid,
         request: CreateRoomType,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        let user_jid = self.ctx.connected_jid()?.into_bare();
+        let user_jid = self.ctx.connected_id()?.into_user_id();
 
         let result =
             match request {
@@ -392,8 +393,8 @@ impl RoomsDomainService {
     async fn create_or_join_group(
         &self,
         service: &BareJid,
-        user_jid: &BareJid,
-        participants: Vec<BareJid>,
+        user_jid: &UserId,
+        participants: Vec<UserId>,
     ) -> Result<RoomSessionInfo, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
@@ -413,7 +414,7 @@ impl RoomsDomainService {
                 .get(jid)
                 .await?
                 .and_then(|profile| profile.first_name.or(profile.nickname))
-                .or(jid.node_str().map(|node| node.to_uppercase_first_letter()))
+                .or(jid.username().map(|node| node.to_uppercase_first_letter()))
                 .unwrap_or(jid.to_string());
             participant_names.push(participant_name);
         }
@@ -485,7 +486,7 @@ impl RoomsDomainService {
     async fn create_or_join_room_with_spec<Fut: Future<Output = Result<()>> + 'static>(
         &self,
         service: &BareJid,
-        user_jid: &BareJid,
+        user_jid: &UserId,
         room_id: &str,
         room_name: &str,
         spec: RoomSpec,
@@ -494,7 +495,7 @@ impl RoomsDomainService {
         // We generate a random suffix to prevent any nickname conflicts…
         let nickname = format!(
             "{}-{}",
-            user_jid.node_str().unwrap_or("unknown-user"),
+            user_jid.username().unwrap_or("unknown-user"),
             self.id_provider.new_id()
         );
 
@@ -512,7 +513,7 @@ impl RoomsDomainService {
                 Some(&NodePart::new(&unique_room_id)?),
                 &service.domain(),
             ));
-            let full_room_jid = room_jid.with_resource_str(&nickname)?;
+            let full_room_jid = room_jid.occupant_id_with_nickname(&nickname)?;
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
@@ -576,7 +577,7 @@ impl RoomsDomainService {
                 .get_display_name(&jid)
                 .await
                 .unwrap_or_default()
-                .unwrap_or_else(|| jid.to_display_name());
+                .unwrap_or_else(|| jid.formatted_username());
             members.insert(jid, Member { name });
         }
 
@@ -635,7 +636,7 @@ trait ParticipantsVecExt {
     fn group_name_hash(&self) -> String;
 }
 
-impl ParticipantsVecExt for Vec<BareJid> {
+impl ParticipantsVecExt for Vec<UserId> {
     fn group_name_hash(&self) -> String {
         let mut sorted_participant_jids =
             self.iter().map(|jid| jid.to_string()).collect::<Vec<_>>();

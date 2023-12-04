@@ -9,7 +9,7 @@ use jid::{BareJid, FullJid};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomSessionInfo, RoomSpec};
-use crate::dtos::RoomId;
+use crate::domain::shared::models::{OccupantId, RoomId, UserId};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -22,14 +22,14 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn create_or_join_room(
         &self,
-        room_jid: &FullJid,
+        occupant_id: &OccupantId,
         room_name: &str,
         spec: RoomSpec,
     ) -> Result<RoomSessionInfo, RoomError>;
 
     async fn join_room(
         &self,
-        room_jid: &FullJid,
+        occupant_id: &OccupantId,
         password: Option<&str>,
     ) -> Result<RoomSessionInfo, RoomError>;
 
@@ -42,7 +42,7 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError>;
 
-    async fn set_room_owners(&self, room_jid: &RoomId, users: &[BareJid]) -> Result<(), RoomError>;
+    async fn set_room_owners(&self, room_jid: &RoomId, users: &[UserId]) -> Result<(), RoomError>;
 
     /// Destroys the room identified by `room_jid`. If specified sets `alternate_room` as
     /// replacement room, so that users will be redirected there.

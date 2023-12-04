@@ -5,17 +5,17 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_store::prelude::*;
 use prose_store::Database;
 
 use crate::domain::settings::models::AccountSettings;
 use crate::domain::settings::repos::AccountSettingsRepository as DomainAccountSettingsRepository;
+use crate::domain::shared::models::UserId;
 
 #[entity]
 pub struct AccountSettingsRecord {
-    id: BareJid,
+    id: UserId,
     payload: AccountSettings,
 }
 
@@ -32,27 +32,27 @@ impl AccountSettingsRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl DomainAccountSettingsRepository for AccountSettingsRepository {
-    async fn get(&self, jid: &BareJid) -> Result<AccountSettings> {
+    async fn get(&self, id: &UserId) -> Result<AccountSettings> {
         let tx = self
             .store
             .transaction_for_reading(&[AccountSettingsRecord::collection()])
             .await?;
         let collection = tx.readable_collection(AccountSettingsRecord::collection())?;
-        let settings = collection.get::<_, AccountSettingsRecord>(jid).await?;
+        let settings = collection.get::<_, AccountSettingsRecord>(id).await?;
         Ok(settings.map(|s| s.payload).unwrap_or_default())
     }
 
     async fn update(
         &self,
-        jid: &BareJid,
+        id: &UserId,
         block: Box<dyn for<'a> FnOnce(&'a mut AccountSettings) + Send>,
     ) -> Result<()> {
         upsert!(
             AccountSettingsRecord,
             store: self.store,
-            id: jid,
+            id: id,
             insert_if_needed: || AccountSettingsRecord {
-                id: jid.clone(),
+                id: id.clone(),
                 payload: Default::default()
             },
             update: |settings: &mut AccountSettingsRecord| block(&mut settings.payload)

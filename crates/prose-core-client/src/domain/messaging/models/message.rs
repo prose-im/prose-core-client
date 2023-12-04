@@ -5,10 +5,12 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use jid::{BareJid, Jid};
+use jid::Jid;
 use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
+
+use crate::domain::shared::models::UserId;
 
 use super::{MessageLike, MessageLikePayload};
 
@@ -19,7 +21,7 @@ id_string!(Emoji);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Reaction {
     pub emoji: Emoji,
-    pub from: Vec<BareJid>,
+    pub from: Vec<UserId>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn toggle_reaction(&mut self, user_id: &BareJid, emoji: Emoji) {
+    pub fn toggle_reaction(&mut self, user_id: &UserId, emoji: Emoji) {
         let Some(reaction) = self
             .reactions
             .iter_mut()
@@ -58,7 +60,7 @@ impl Message {
 
     pub fn reactions_from<'a, 'b: 'a>(
         &'a self,
-        user_id: &'b BareJid,
+        user_id: &'b UserId,
     ) -> impl Iterator<Item = &'a Emoji> {
         self.reactions
             .iter()
@@ -114,7 +116,7 @@ impl Message {
                 MessageLikePayload::ReadReceipt => message.is_read = true,
                 MessageLikePayload::Message { .. } => unreachable!(),
                 MessageLikePayload::Reaction { mut emojis } => {
-                    let modifier_from = modifier.from.to_bare();
+                    let modifier_from = UserId::from(modifier.from.to_bare());
 
                     // Iterate over all existing reactions
                     'outer: for reaction in &mut message.reactions {
@@ -251,16 +253,17 @@ mod tests {
     #[test]
     fn test_reactions_for_user() {
         let mut message = MessageBuilder::new_with_index(1).build_message();
-        message.reactions = vec![
-            Reaction {
-                emoji: "🎉".into(),
-                from: vec![bare!("a@prose.org"), bare!("b@prose.org")],
-            },
-            Reaction {
-                emoji: "✅".into(),
-                from: vec![bare!("b@prose.org")],
-            },
-        ];
+        message.reactions =
+            vec![
+                Reaction {
+                    emoji: "🎉".into(),
+                    from: vec![bare!("a@prose.org"), bare!("b@prose.org")],
+                },
+                Reaction {
+                    emoji: "✅".into(),
+                    from: vec![bare!("b@prose.org")],
+                },
+            ];
 
         assert_eq!(
             message

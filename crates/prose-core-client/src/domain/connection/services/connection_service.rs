@@ -5,19 +5,19 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::FullJid;
 use minidom::Element;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
 
 use crate::domain::connection::models::ServerFeatures;
+use crate::domain::shared::models::UserResourceId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ConnectionService: SendUnlessWasm + SyncUnlessWasm {
-    async fn connect(&self, jid: &FullJid, password: &str) -> Result<(), ConnectionError>;
+    async fn connect(&self, jid: &UserResourceId, password: &str) -> Result<(), ConnectionError>;
     async fn disconnect(&self);
 
     async fn set_message_carbons_enabled(&self, is_enabled: bool) -> Result<()>;

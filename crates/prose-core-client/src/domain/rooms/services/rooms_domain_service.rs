@@ -11,11 +11,11 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
-use crate::domain::shared::models::RoomId;
+use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreateRoomType {
-    Group { participants: Vec<BareJid> },
+    Group { participants: Vec<UserId> },
     PrivateChannel { name: String },
     PublicChannel { name: String },
 }
@@ -31,7 +31,7 @@ pub enum CreateOrEnterRoomRequest {
         password: Option<String>,
     },
     JoinDirectMessage {
-        participant: BareJid,
+        participant: UserId,
     },
 }
 

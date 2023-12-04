@@ -200,10 +200,12 @@ impl Delegate {
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
             ClientEvent::SidebarChanged => self.inner.sidebar_changed(client)?,
-            ClientEvent::ContactChanged { jid } => {
+            ClientEvent::ContactChanged { id: jid } => {
                 self.inner.contact_changed(client, jid.into())?
             }
-            ClientEvent::AvatarChanged { jid } => self.inner.avatar_changed(client, jid.into())?,
+            ClientEvent::AvatarChanged { id: jid } => {
+                self.inner.avatar_changed(client, jid.into())?
+            }
             ClientEvent::RoomChanged { room, r#type } => match r#type {
                 ClientRoomEventType::MessagesAppended { message_ids } => self
                     .inner

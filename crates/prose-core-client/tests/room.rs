@@ -15,7 +15,7 @@ use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::{Member, Occupant};
+use prose_core_client::dtos::{Member, Participant};
 use prose_core_client::room_id;
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_xmpp::stanza::message::MucUser;
@@ -34,7 +34,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
         )])
         .with_occupants([(
             jid!("room@conference.prose.org/b"),
-            Occupant::owner().set_name("Bernhard Doe"),
+            Participant::owner().set_name("Bernhard Doe"),
         )]);
 
     deps.user_profile_repo
@@ -112,7 +112,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         )])
         .with_occupants([(
             jid!("room@conference.prose.org/b"),
-            Occupant::owner().set_name("Bernhard Doe"),
+            Participant::owner().set_name("Bernhard Doe"),
         )]);
 
     deps.user_profile_repo

@@ -5,11 +5,11 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
+use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::AvatarImageId;
 use crate::domain::user_info::models::AvatarMetadata;
 
@@ -17,10 +17,10 @@ use crate::domain::user_info::models::AvatarMetadata;
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserInfoService: SendUnlessWasm + SyncUnlessWasm {
-    async fn load_latest_avatar_metadata(&self, from: &BareJid) -> Result<Option<AvatarMetadata>>;
+    async fn load_latest_avatar_metadata(&self, from: &UserId) -> Result<Option<AvatarMetadata>>;
     async fn load_avatar_image(
         &self,
-        from: &BareJid,
+        from: &UserId,
         image_id: &AvatarImageId,
     ) -> Result<Option<AvatarData>>;
 }

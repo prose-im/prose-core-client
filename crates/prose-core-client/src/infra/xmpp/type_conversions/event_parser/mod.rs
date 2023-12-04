@@ -102,12 +102,14 @@ fn parse_status_event(ctx: &mut Context, event: XMPPStatusEvent) -> Result<()> {
         XMPPStatusEvent::UserActivity {
             from,
             user_activity,
-        } => ctx.push_event(UserInfoEvent {
-            user_id: UserId::from(from.into_bare()),
-            r#type: UserInfoEventType::StatusChanged {
-                status: user_activity.try_into()?,
-            },
-        }),
+        } => {
+            ctx.push_event(UserInfoEvent {
+                user_id: UserId::from(from.into_bare()),
+                r#type: UserInfoEventType::StatusChanged {
+                    status: user_activity.map(TryInto::try_into).transpose()?,
+                },
+            })
+        }
     };
     Ok(())
 }

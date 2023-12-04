@@ -219,7 +219,7 @@ async fn test_uses_highest_presence() -> Result<()> {
     .await?;
 
     assert_eq!(
-        repo.resolve_bare_jid_to_full(&bare!("a@prose.org")),
+        repo.resolve_user_id_to_user_resource_id(&bare!("a@prose.org")),
         Jid::Full(full!("a@prose.org/b"))
     );
     assert_eq!(

@@ -6,83 +6,91 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use jid::{BareJid, Jid};
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation};
-use crate::domain::shared::models::UserBasicInfo;
-use crate::util::jid_ext::BareJidExt;
+use crate::domain::shared::models::{Availability, ParticipantId, UserBasicInfo, UserId};
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct RoomState {
     /// The name of the room.
     pub name: Option<String>,
-    /// The room's subject.
+    /// The room's topic.
     pub topic: Option<String>,
-    /// The occupants of the room. The key is either the user's FullJid in a MUC room or the user's
-    /// BareJid in direct message room.
-    pub occupants: HashMap<Jid, Occupant>,
+    /// The participants in the room.
+    pub participants: HashMap<ParticipantId, Participant>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Occupant {
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct Participant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.
-    pub jid: Option<BareJid>,
+    pub id: Option<UserId>,
     pub name: Option<String>,
     pub affiliation: RoomAffiliation,
+    pub availability: Availability,
     pub compose_state: ComposeState,
     pub compose_state_updated: DateTime<Utc>,
 }
 
-impl Default for Occupant {
-    fn default() -> Self {
-        Self {
-            jid: None,
-            name: None,
-            affiliation: Default::default(),
-            compose_state: ComposeState::Idle,
-            compose_state_updated: Default::default(),
-        }
-    }
-}
-
 impl RoomState {
-    pub fn insert_occupant(
+    pub fn insert_participant(
         &mut self,
-        jid: &Jid,
-        real_jid: Option<&BareJid>,
+        id: &ParticipantId,
+        real_id: Option<&UserId>,
         name: Option<&str>,
         affiliation: &RoomAffiliation,
+        availability: &Availability,
     ) {
-        let occupant = self.occupants.entry(jid.clone()).or_default();
-        occupant.jid = real_jid.cloned();
-        occupant.name = name.map(ToString::to_string);
-        occupant.affiliation = affiliation.clone();
+        let participant = self.participants.entry(id.clone()).or_default();
+        participant.id = real_id.cloned();
+        participant.name = name.map(ToString::to_string);
+        participant.affiliation = affiliation.clone();
+        participant.availability = availability.clone();
     }
 
-    pub fn set_occupant_compose_state(
+    pub fn set_participant_compose_state(
         &mut self,
-        occupant_jid: &Jid,
+        id: &ParticipantId,
         timestamp: &DateTime<Utc>,
         compose_state: ComposeState,
     ) {
-        self.occupants
-            .entry(occupant_jid.clone())
-            .and_modify(|occupant| {
-                occupant.compose_state = compose_state;
-                occupant.compose_state_updated = timestamp.clone()
+        self.participants
+            .entry(id.clone())
+            .and_modify(|participant| {
+                participant.compose_state = compose_state;
+                participant.compose_state_updated = timestamp.clone()
             });
+    }
+
+    pub fn set_participant_availability(
+        &mut self,
+        id: &ParticipantId,
+        availability: &Availability,
+    ) {
+        self.participants
+            .entry(id.clone())
+            .and_modify(|participant| participant.availability = availability.clone());
+    }
+
+    pub fn set_participant_affiliation(
+        &mut self,
+        id: &ParticipantId,
+        affiliation: &RoomAffiliation,
+    ) {
+        self.participants
+            .entry(id.clone())
+            .and_modify(|participant| participant.affiliation = affiliation.clone());
     }
 
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
     /// If we don't have a real JID for a composing user they are excluded from the list.
     pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<UserBasicInfo> {
         let mut composing_occupants = self
-            .occupants
+            .participants
             .values()
             .filter_map(|occupant| {
                 if occupant.compose_state != ComposeState::Composing
                     || occupant.compose_state_updated <= started_after
-                    || occupant.jid.is_none()
+                    || occupant.id.is_none()
                 {
                     return None;
                 }
@@ -95,7 +103,7 @@ impl RoomState {
         composing_occupants
             .into_iter()
             .filter_map(|occupant| {
-                let Some(jid) = &occupant.jid else {
+                let Some(jid) = &occupant.id else {
                     return None;
                 };
 
@@ -103,8 +111,8 @@ impl RoomState {
                     name: occupant
                         .name
                         .clone()
-                        .unwrap_or_else(|| jid.to_display_name()),
-                    jid: jid.clone(),
+                        .unwrap_or_else(|| jid.formatted_username()),
+                    id: jid.clone(),
                 })
             })
             .collect()
@@ -115,35 +123,48 @@ impl RoomState {
 mod tests {
     use chrono::TimeZone;
 
-    use prose_xmpp::{bare, jid};
+    use crate::{occupant_id, user_id};
 
     use super::*;
 
     #[test]
     fn test_insert_occupant() {
         let mut state = RoomState::default();
-        assert!(state.occupants.is_empty());
+        assert!(state.participants.is_empty());
 
-        state.insert_occupant(
-            &jid!("room@prose.org/a"),
-            Some(&bare!("a@prose.org")),
+        state.insert_participant(
+            &occupant_id!("room@prose.org/a").into(),
+            Some(&user_id!("a@prose.org")),
             None,
             &RoomAffiliation::Owner,
+            &Availability::Unavailable,
         );
-        state.insert_occupant(&jid!("b@prose.org"), None, None, &RoomAffiliation::Member);
+        state.insert_participant(
+            &user_id!("b@prose.org").into(),
+            None,
+            None,
+            &RoomAffiliation::Member,
+            &Availability::Unavailable,
+        );
 
-        assert_eq!(state.occupants.len(), 2);
+        assert_eq!(state.participants.len(), 2);
         assert_eq!(
-            state.occupants.get(&jid!("room@prose.org/a")).unwrap(),
-            &Occupant {
-                jid: Some(bare!("a@prose.org")),
+            state
+                .participants
+                .get(&occupant_id!("room@prose.org/a").into())
+                .unwrap(),
+            &Participant {
+                id: Some(user_id!("a@prose.org")),
                 affiliation: RoomAffiliation::Owner,
                 ..Default::default()
             }
         );
         assert_eq!(
-            state.occupants.get(&jid!("b@prose.org")).unwrap(),
-            &Occupant {
+            state
+                .participants
+                .get(&user_id!("b@prose.org").into())
+                .unwrap(),
+            &Participant {
                 affiliation: RoomAffiliation::Member,
                 ..Default::default()
             }
@@ -154,31 +175,31 @@ mod tests {
     fn test_set_occupant_chat_state() {
         let mut state = RoomState::default();
 
-        state.insert_occupant(
-            &jid!("room@prose.org/a"),
-            Some(&bare!("a@prose.org")),
+        state.insert_participant(
+            &occupant_id!("room@prose.org/a").into(),
+            Some(&user_id!("a@prose.org")),
             None,
             &RoomAffiliation::Owner,
         );
 
-        state.set_occupant_compose_state(
-            &jid!("room@prose.org/a"),
+        state.set_participant_compose_state(
+            &occupant_id!("room@prose.org/a").into(),
             &Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 0).unwrap(),
             ComposeState::Composing,
         );
 
         assert_eq!(
             state
-                .occupants
-                .get(&jid!("room@prose.org/a"))
+                .participants
+                .get(&occupant_id!("room@prose.org/a").into())
                 .unwrap()
                 .compose_state,
             ComposeState::Composing
         );
         assert_eq!(
             state
-                .occupants
-                .get(&jid!("room@prose.org/a"))
+                .participants
+                .get(&occupant_id!("room@prose.org/a").into())
                 .unwrap()
                 .compose_state_updated,
             Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 0).unwrap()
@@ -189,38 +210,38 @@ mod tests {
     fn test_composing_users() {
         let mut state = RoomState::default();
 
-        state.occupants.insert(
-            jid!("room@prose.org/a"),
-            Occupant {
-                jid: Some(bare!("a@prose.org")),
+        state.participants.insert(
+            occupant_id!("room@prose.org/a").into(),
+            Participant {
+                id: Some(user_id!("a@prose.org")),
                 compose_state: ComposeState::Composing,
                 compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
                 ..Default::default()
             },
         );
-        state.occupants.insert(
-            jid!("room@prose.org/b"),
-            Occupant {
-                jid: Some(bare!("b@prose.org")),
+        state.participants.insert(
+            occupant_id!("room@prose.org/b").into(),
+            Participant {
+                id: Some(user_id!("b@prose.org")),
                 compose_state: ComposeState::Idle,
                 compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 30).unwrap(),
                 ..Default::default()
             },
         );
-        state.occupants.insert(
-            jid!("room@prose.org/c"),
-            Occupant {
-                jid: Some(bare!("c@prose.org")),
+        state.participants.insert(
+            occupant_id!("room@prose.org/c").into(),
+            Participant {
+                id: Some(user_id!("c@prose.org")),
                 name: Some("Jonathan Doe".to_string()),
                 compose_state: ComposeState::Composing,
                 compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 20).unwrap(),
                 ..Default::default()
             },
         );
-        state.occupants.insert(
-            jid!("room@prose.org/d"),
-            Occupant {
-                jid: Some(bare!("d@prose.org")),
+        state.participants.insert(
+            occupant_id!("room@prose.org/d").into(),
+            Participant {
+                id: Some(user_id!("d@prose.org")),
                 compose_state: ComposeState::Composing,
                 compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap(),
                 ..Default::default()
@@ -232,11 +253,11 @@ mod tests {
             vec![
                 UserBasicInfo {
                     name: "Jonathan Doe".to_string(),
-                    jid: bare!("c@prose.org")
+                    id: user_id!("c@prose.org")
                 },
                 UserBasicInfo {
                     name: "A".to_string(),
-                    jid: bare!("a@prose.org")
+                    id: user_id!("a@prose.org")
                 },
             ]
         );

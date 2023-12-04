@@ -36,7 +36,7 @@ async fn test_handles_presence() -> Result<()> {
         .expect_dispatch_event()
         .once()
         .with(predicate::eq(ClientEvent::ContactChanged {
-            jid: bare!("sender@prose.org"),
+            id: bare!("sender@prose.org"),
         }))
         .return_once(|_| ());
 
@@ -77,9 +77,9 @@ async fn test_swallows_self_presence() -> Result<()> {
 
     let event_handler = UserStateEventHandler::from(&deps.into_deps());
     assert!(event_handler
-        .handle_event(XMPPEvent::Status(mods::status::Event::Presence(
-            Presence::available().with_from(jid!("hello@prose.org")),
-        )))
+        .handle_event(XMPPEvent::Status(
+            mods::status::Event::Presence(Presence::available().with_from(jid!("hello@prose.org")),)
+        ))
         .await?
         .is_none());
 

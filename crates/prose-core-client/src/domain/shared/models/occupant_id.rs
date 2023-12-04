@@ -9,6 +9,7 @@ use jid::FullJid;
 use minidom::IntoAttributeValue;
 
 use crate::dtos::RoomId;
+use crate::util::StringExt;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 /// Represents the identifier of a user within a Multi-User Chat (MUC) room, combining the
@@ -18,6 +19,10 @@ pub struct OccupantId(FullJid);
 impl OccupantId {
     pub fn nickname(&self) -> &str {
         self.0.resource_str()
+    }
+
+    pub fn formatted_nickname(&self) -> String {
+        self.0.resource_str().capitalized_display_name()
     }
 
     pub fn room_id(&self) -> RoomId {
@@ -44,5 +49,11 @@ impl Display for OccupantId {
 impl IntoAttributeValue for OccupantId {
     fn into_attribute_value(self) -> Option<String> {
         self.0.into_attribute_value()
+    }
+}
+
+impl AsRef<FullJid> for OccupantId {
+    fn as_ref(&self) -> &FullJid {
+        &self.0
     }
 }

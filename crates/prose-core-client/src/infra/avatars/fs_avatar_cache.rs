@@ -10,11 +10,11 @@ use anyhow::Result;
 use async_trait::async_trait;
 use base64::DecodeError;
 use image::{guess_format, ImageError, ImageFormat, ImageOutputFormat};
-use jid::BareJid;
 use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
 
+use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
 use crate::infra::avatars::{AvatarCache, MAX_IMAGE_DIMENSIONS};
 
@@ -51,7 +51,7 @@ pub enum FsAvatarCacheError {
 impl AvatarCache for FsAvatarCache {
     async fn cache_avatar_image(
         &self,
-        jid: &BareJid,
+        jid: &UserId,
         image_data: &AvatarData,
         info: &AvatarInfo,
     ) -> Result<()> {
@@ -75,7 +75,7 @@ impl AvatarCache for FsAvatarCache {
 
     async fn has_cached_avatar_image(
         &self,
-        jid: &BareJid,
+        jid: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<bool> {
         let path = self.filename_for(jid, image_checksum);
@@ -84,7 +84,7 @@ impl AvatarCache for FsAvatarCache {
 
     async fn cached_avatar_image(
         &self,
-        jid: &BareJid,
+        jid: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<Option<PlatformImage>> {
         let path = self.filename_for(jid, image_checksum);
@@ -112,11 +112,12 @@ impl AvatarCache for FsAvatarCache {
 }
 
 impl FsAvatarCache {
-    fn filename_for(&self, jid: &BareJid, image_checksum: &AvatarImageId) -> PathBuf {
-        self.path.join(format!(
-            "{}-{}.jpg",
-            jid.to_string(),
-            image_checksum.as_ref()
-        ))
+    fn filename_for(&self, jid: &UserId, image_checksum: &AvatarImageId) -> PathBuf {
+        self.path
+            .join(format!(
+                "{}-{}.jpg",
+                jid.to_string(),
+                image_checksum.as_ref()
+            ))
     }
 }

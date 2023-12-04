@@ -55,6 +55,7 @@ impl UserAccountService for XMPPClient {
             Some(availability.clone().try_into()?),
             None,
             Some(capabilities.into()),
+            None,
         )
     }
 

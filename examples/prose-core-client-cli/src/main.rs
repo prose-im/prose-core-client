@@ -22,7 +22,7 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, RoomId, SidebarItem,
+    Address, Bookmark, Contact, Message, Participant, PublicRoomInfo, RoomId, SidebarItem,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
@@ -238,7 +238,7 @@ impl From<PublicRoomInfo> for JidWithName {
 impl From<Contact> for JidWithName {
     fn from(value: Contact) -> Self {
         Self {
-            jid: value.jid,
+            jid: value.id,
             name: value.name,
         }
     }
@@ -285,7 +285,7 @@ impl Display for ConnectedRoomEnvelope {
     }
 }
 
-struct OccupantEnvelope(Occupant);
+struct OccupantEnvelope(Participant);
 
 impl Display for OccupantEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -293,7 +293,7 @@ impl Display for OccupantEnvelope {
             f,
             "{:<20} {:<10}",
             self.0
-                .jid
+                .id
                 .as_ref()
                 .map(|jid| jid.to_string())
                 .unwrap_or("<unknown real jid>".to_string())
@@ -308,7 +308,7 @@ async fn select_contact(client: &Client) -> Result<BareJid> {
     let contacts = client.contacts.load_contacts().await?.into_iter();
     Ok(
         select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
-            .jid
+            .id
             .clone(),
     )
 }
@@ -520,7 +520,7 @@ async fn load_contacts(client: &Client) -> Result<()> {
     Availability: {:?}
     Group: {:?}
     "#,
-            contact.jid, contact.name, contact.availability, contact.group,
+            contact.id, contact.name, contact.availability, contact.group,
         );
     }
 
@@ -1031,7 +1031,7 @@ async fn main() -> Result<()> {
                     .to_generic_room()
                     .members()
                     .iter()
-                    .map(|info| info.jid.to_string())
+                    .map(|info| info.id.to_string())
                     .collect::<Vec<_>>();
                 println!("{}", members.join("\n"))
             }

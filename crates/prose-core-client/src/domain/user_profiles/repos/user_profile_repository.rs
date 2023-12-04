@@ -5,22 +5,23 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
+
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::user_profiles::models::UserProfile;
+use crate::dtos::UserId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get(&self, jid: &BareJid) -> Result<Option<UserProfile>>;
-    async fn set(&self, jid: &BareJid, profile: &UserProfile) -> Result<()>;
-    async fn delete(&self, jid: &BareJid) -> Result<()>;
+    async fn get(&self, jid: &UserId) -> Result<Option<UserProfile>>;
+    async fn set(&self, jid: &UserId, profile: &UserProfile) -> Result<()>;
+    async fn delete(&self, jid: &UserId) -> Result<()>;
 
     /// Returns the display name for `jid`. Display name is a cascade of first_name, last_name
     /// and nickname;
-    async fn get_display_name(&self, jid: &BareJid) -> Result<Option<String>>;
+    async fn get_display_name(&self, jid: &UserId) -> Result<Option<String>>;
 
     async fn clear_cache(&self) -> Result<()>;
 }

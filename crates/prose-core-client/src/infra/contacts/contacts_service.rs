@@ -43,14 +43,15 @@ impl From<(&BareJid, Item)> for Contact {
     fn from((account_jid, roster_item): (&BareJid, Item)) -> Self {
         let favorites = Group("Favorite".to_string());
 
-        let group = match roster_item.groups {
-            _ if roster_item.groups.contains(&favorites) => DomainGroup::Favorite,
-            _ if roster_item.jid.domain() == account_jid.domain() => DomainGroup::Team,
-            _ => DomainGroup::Other,
-        };
+        let group =
+            match roster_item.groups {
+                _ if roster_item.groups.contains(&favorites) => DomainGroup::Favorite,
+                _ if roster_item.jid.domain() == account_jid.domain() => DomainGroup::Team,
+                _ => DomainGroup::Other,
+            };
 
         Contact {
-            jid: roster_item.jid,
+            id: roster_item.jid.into(),
             name: roster_item.name,
             group,
         }

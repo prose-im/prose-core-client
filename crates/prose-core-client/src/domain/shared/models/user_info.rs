@@ -3,19 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::BareJid;
-
-use crate::dtos::Availability;
+use super::{Availability, UserId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBasicInfo {
-    pub jid: BareJid,
+    pub id: UserId,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserPresenceInfo {
-    pub jid: BareJid,
+    pub id: UserId,
     pub name: String,
     pub availability: Availability,
 }

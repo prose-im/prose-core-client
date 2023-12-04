@@ -5,16 +5,16 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::contacts::models::Contact;
+use crate::domain::shared::models::UserId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ContactsRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get_all(&self, account_jid: &BareJid) -> Result<Vec<Contact>>;
+    async fn get_all(&self, account_jid: &UserId) -> Result<Vec<Contact>>;
     async fn clear_cache(&self) -> Result<()>;
 }

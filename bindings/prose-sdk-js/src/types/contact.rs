@@ -54,7 +54,7 @@ pub struct UserActivity(CoreUserActivity);
 impl Contact {
     #[wasm_bindgen(getter)]
     pub fn jid(&self) -> BareJid {
-        self.0.jid.clone().into()
+        self.0.id.clone().into()
     }
 
     #[wasm_bindgen(getter)]

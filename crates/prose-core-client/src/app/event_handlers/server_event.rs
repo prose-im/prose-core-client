@@ -50,8 +50,13 @@ pub struct UserStatusEvent {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserStatusEventType {
-    AvailabilityChanged { availability: Availability }, // TODO: Room/Full/Bare at initial presence
-    ComposeStateChanged { state: ComposeState },        // TODO: Room/Full
+    AvailabilityChanged {
+        availability: Availability,
+        priority: i8,
+    },
+    ComposeStateChanged {
+        state: ComposeState,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,7 +70,7 @@ pub struct UserInfoEvent {
 pub enum UserInfoEventType {
     AvatarChanged { metadata: AvatarMetadata },
     ProfileChanged { profile: UserProfile },
-    StatusChanged { status: UserStatus },
+    StatusChanged { status: Option<UserStatus> },
 }
 
 #[derive(Debug, Clone, PartialEq)]

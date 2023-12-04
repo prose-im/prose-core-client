@@ -6,11 +6,12 @@
 use std::sync::atomic::AtomicBool;
 
 use anyhow::Result;
-use jid::{BareJid, FullJid};
+use jid::BareJid;
 use parking_lot::RwLock;
 
 use crate::domain::connection::models::ConnectionProperties;
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
+use crate::dtos::UserResourceId;
 
 pub struct AppContext {
     pub connection_properties: RwLock<Option<ConnectionProperties>>,
@@ -31,14 +32,14 @@ impl AppContext {
 }
 
 impl AppContext {
-    pub fn connected_jid(&self) -> Result<FullJid> {
+    pub fn connected_id(&self) -> Result<UserResourceId> {
         self.connection_properties
             .read()
             .as_ref()
             .map(|p| p.connected_jid.clone())
-            .ok_or(anyhow::anyhow!(
-                "Failed to read the user's JID since the client is not connected."
-            ))
+            .ok_or(
+                anyhow::anyhow!("Failed to read the user's JID since the client is not connected.")
+            )
     }
 
     pub fn muc_service(&self) -> Result<BareJid> {

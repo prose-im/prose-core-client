@@ -27,7 +27,7 @@ pub struct Contact {
 impl From<CoreContact> for Contact {
     fn from(value: CoreContact) -> Self {
         Contact {
-            jid: value.jid.into(),
+            jid: value.id.into(),
             name: value.name,
             availability: value.availability,
             activity: value.activity,

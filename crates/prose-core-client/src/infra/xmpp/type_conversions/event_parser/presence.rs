@@ -48,7 +48,10 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
 
     ctx.push_event(UserStatusEvent {
         user_id,
-        r#type: UserStatusEventType::AvailabilityChanged { availability },
+        r#type: UserStatusEventType::AvailabilityChanged {
+            availability,
+            priority: presence.priority,
+        },
     });
 
     Ok(())
@@ -96,6 +99,7 @@ fn parse_muc_presence(
         user_id: UserEndpointId::Occupant(occupant_id.clone()),
         r#type: UserStatusEventType::AvailabilityChanged {
             availability: availability.clone(),
+            priority: presence.priority,
         },
     });
 

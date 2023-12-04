@@ -25,13 +25,13 @@ impl BareJidExt for BareJid {
         let Some(node) = self.node_str() else {
             return self.to_string().to_uppercase_first_letter();
         };
-        str_to_display_name(node)
+        node.capitalized_display_name()
     }
 }
 
 impl FullJidExt for FullJid {
     fn resource_to_display_name(&self) -> String {
-        str_to_display_name(self.resource_str())
+        self.resource_str().capitalized_display_name()
     }
 }
 
@@ -40,22 +40,15 @@ impl JidExt for Jid {
         let Some(node) = self.node_str() else {
             return self.to_string().to_uppercase_first_letter();
         };
-        str_to_display_name(node)
+        node.capitalized_display_name()
     }
 
     fn resource_to_display_name(&self) -> String {
         let Some(resource) = self.resource_str() else {
             return self.to_string().to_uppercase_first_letter();
         };
-        str_to_display_name(resource)
+        resource.capitalized_display_name()
     }
-}
-
-fn str_to_display_name(text: &str) -> String {
-    text.split_terminator(&['.', '_', '-'][..])
-        .map(|s| s.to_uppercase_first_letter())
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 #[cfg(test)]

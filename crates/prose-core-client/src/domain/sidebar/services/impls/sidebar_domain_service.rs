@@ -22,7 +22,7 @@ use crate::app::deps::{
 };
 use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomId, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::ClientEvent;
 
@@ -570,39 +570,44 @@ impl SidebarDomainService {
         &self,
         bookmark: &Bookmark,
     ) -> Result<Option<Arc<RoomInternals>>, RoomError> {
-        let room = match bookmark.r#type {
-            BookmarkType::DirectMessage if !bookmark.in_sidebar => None,
+        let room =
+            match bookmark.r#type {
+                BookmarkType::DirectMessage if !bookmark.in_sidebar => None,
 
-            // For channels, we're only participating in them if they're in the sidebar.
-            BookmarkType::PublicChannel | BookmarkType::PrivateChannel if !bookmark.in_sidebar => {
-                None
-            }
+                // For channels, we're only participating in them if they're in the sidebar.
+                BookmarkType::PublicChannel | BookmarkType::PrivateChannel
+                    if !bookmark.in_sidebar =>
+                {
+                    None
+                }
 
-            // Since direct messages are not MUC rooms we don't need to connect to them. But we'll
-            // insert the placeholder room instead.
-            BookmarkType::DirectMessage => Some(
-                self.rooms_domain_service
-                    .create_or_join_room(CreateOrEnterRoomRequest::JoinDirectMessage {
-                        participant: bookmark.jid.clone().into_inner(),
-                    })
-                    .await?,
-            ),
+                // Since direct messages are not MUC rooms we don't need to connect to them. But we'll
+                // insert the placeholder room instead.
+                BookmarkType::DirectMessage => {
+                    Some(
+                        self.rooms_domain_service
+                            .create_or_join_room(CreateOrEnterRoomRequest::JoinDirectMessage {
+                                participant: UserId::from(bookmark.jid.clone().into_inner()),
+                            })
+                            .await?,
+                    )
+                }
 
-            // While our user can remove a Group from their sidebar they should always receive
-            // messages from it. In these cases the Group will automatically reappear in the
-            // sidebar. We want our users to think about Groups as if they were a
-            // Direct Message.
-            BookmarkType::Group | BookmarkType::PublicChannel | BookmarkType::PrivateChannel => {
-                Some(
+                // While our user can remove a Group from their sidebar they should always receive
+                // messages from it. In these cases the Group will automatically reappear in the
+                // sidebar. We want our users to think about Groups as if they were a
+                // Direct Message.
+                BookmarkType::Group
+                | BookmarkType::PublicChannel
+                | BookmarkType::PrivateChannel => Some(
                     self.rooms_domain_service
                         .create_or_join_room(CreateOrEnterRoomRequest::JoinRoom {
                             room_jid: bookmark.jid.clone(),
                             password: None,
                         })
                         .await?,
-                )
-            }
-        };
+                ),
+            };
 
         Ok(room)
     }

@@ -86,8 +86,8 @@ async fn test_creates_group() -> Result<()> {
                 let account_node = account_node.clone();
 
                 Box::pin(async move {
-                    let first_name = match jid.node_str() {
-                        _ if jid.node_str() == Some(&account_node) => "Jane",
+                    let first_name = match jid.username() {
+                        _ if jid.username() == Some(&account_node) => "Jane",
                         Some("a") => "Tick",
                         Some("b") => "Trick",
                         Some("c") => "Track",
@@ -154,8 +154,8 @@ async fn test_creates_group() -> Result<()> {
             let account_node = account_node.clone();
 
             Box::pin(async move {
-                let first_name = match jid.node_str() {
-                    _ if jid.node_str() == Some(&account_node) => "Jane",
+                let first_name = match jid.username() {
+                    _ if jid.username() == Some(&account_node) => "Jane",
                     Some("a") => "Tick",
                     Some("b") => "Trick",
                     Some("c") => "Track",

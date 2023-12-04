@@ -34,7 +34,7 @@ impl AccountService {
     pub async fn set_profile(&self, user_profile: &UserProfile) -> Result<()> {
         self.user_account_service.set_profile(&user_profile).await?;
         self.user_profile_repo
-            .set(&self.ctx.connected_jid()?.into_bare(), user_profile)
+            .set(&self.ctx.connected_id()?.to_user_id(), user_profile)
             .await?;
         Ok(())
     }
@@ -42,7 +42,7 @@ impl AccountService {
     pub async fn delete_profile(&self) -> Result<()> {
         self.user_account_service.delete_profile().await?;
         self.user_profile_repo
-            .delete(&self.ctx.connected_jid()?.into_bare())
+            .delete(&self.ctx.connected_id()?.to_user_id())
             .await?;
         Ok(())
     }
@@ -53,7 +53,7 @@ impl AccountService {
             .await?;
         self.account_settings_repo
             .update(
-                &self.ctx.connected_jid()?.into_bare(),
+                &self.ctx.connected_id()?.to_user_id(),
                 Box::new(|settings| settings.availability = Some(availability)),
             )
             .await?;
@@ -66,7 +66,7 @@ impl AccountService {
             .await?;
         self.user_info_repo
             .set_user_activity(
-                &self.ctx.connected_jid()?.into_bare(),
+                &self.ctx.connected_id()?.to_user_id(),
                 user_activity.as_ref(),
             )
             .await?;
@@ -80,7 +80,7 @@ impl AccountService {
         height: Option<u32>,
         mime_type: impl AsRef<str>,
     ) -> Result<()> {
-        let jid = self.ctx.connected_jid()?.into_bare();
+        let jid = self.ctx.connected_id()?.to_user_id();
         let image_data_len = image_data.as_ref().len();
         let image_data = AvatarData::Data(image_data.as_ref().to_vec());
 
