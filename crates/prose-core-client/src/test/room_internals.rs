@@ -3,16 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
-
 use chrono::{DateTime, Utc};
-use jid::{BareJid, Jid};
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInfo, RoomInternals};
-use crate::domain::shared::models::{RoomId, RoomType};
-use crate::dtos::{Availability, Member, Participant, UserId};
+use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
+use crate::dtos::{Availability, Participant, UserId};
 use crate::test::mock_data;
-use crate::util::jid_ext::BareJidExt;
 
 impl RoomInternals {
     pub fn direct_message(jid: UserId) -> Self {
@@ -69,13 +65,11 @@ impl RoomInternals {
         self
     }
 
-    pub fn with_members(mut self, members: impl IntoIterator<Item = (BareJid, Member)>) -> Self {
-        self.members = members.into_iter().collect();
-        self
-    }
-
-    pub fn with_occupants(self, occupant: impl IntoIterator<Item = (Jid, Participant)>) -> Self {
-        self.set_participants(occupant.into_iter().collect());
+    pub fn with_participants<Id: Into<ParticipantId>>(
+        self,
+        occupant: impl IntoIterator<Item = (Id, Participant)>,
+    ) -> Self {
+        self.set_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect());
         self
     }
 }

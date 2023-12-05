@@ -142,16 +142,15 @@ impl<Kind> Room<Kind> {
     }
 
     pub fn members(&self) -> Vec<UserPresenceInfo> {
+        // TODO: Use availability from participants
+
         self.data
             .members()
             .into_iter()
-            .filter_map(|(id, member)| {
-                let Some(id) = member.id else { return None };
-                Some(UserPresenceInfo {
-                    id,
-                    name: member.name.unwrap_or_else(|| id.formatted_username()),
-                    availability: Availability::Available,
-                })
+            .map(|(id, member)| UserPresenceInfo {
+                id,
+                name: member.name,
+                availability: Availability::Available,
             })
             .collect()
     }
@@ -333,7 +332,7 @@ impl Room<Group> {
             .data
             .members()
             .into_iter()
-            .filter_map(|(_, p)| p.id)
+            .map(|(id, _)| id)
             .collect::<Vec<_>>();
         self.participation_service
             .invite_users_to_room(&self.data.room_id, member_jids.as_slice())

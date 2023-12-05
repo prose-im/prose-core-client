@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::domain::shared::models::{Availability, UserId, UserOrResourceId};
+use crate::domain::shared::models::{Availability, UserId, UserOrResourceId, UserResourceId};
 use crate::domain::user_info::models::Presence;
 
 #[derive(Default)]
@@ -85,7 +85,7 @@ mod tests {
 
     #[test]
     fn test_update_with_eq_priority() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_update_with_lower_priority() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn test_update_with_higher_priority() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_update_with_unavailable() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_update_with_bare_jid() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -192,7 +192,7 @@ mod tests {
 
     #[test]
     fn test_full_jid_replaces_bare_jid() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn test_update_with_unavailable_bare_jid() {
-        let user = user_id!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
@@ -230,8 +230,8 @@ mod tests {
 
     #[test]
     fn test_multiple_users() {
-        let user1 = user_id!("a@prose.org").into_bare();
-        let user2 = user_id!("b@prose.org").into_bare();
+        let user1 = user_id!("a@prose.org");
+        let user2 = user_id!("b@prose.org");
 
         let mut map = PresenceMap::new();
 

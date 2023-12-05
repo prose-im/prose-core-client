@@ -7,12 +7,14 @@ use anyhow::Result;
 use mockall::predicate;
 use xmpp_parsers::presence::Presence;
 
-use prose_core_client::app::event_handlers::{UserStateEventHandler, XMPPEvent, XMPPEventHandler};
+use prose_core_client::app::event_handlers::{
+    ServerEventHandler, UserStateEventHandler, XMPPEvent, XMPPEventHandler,
+};
 use prose_core_client::domain::connection::models::ConnectionProperties;
+use prose_core_client::domain::shared::models::{Availability, UserId, UserResourceId};
 use prose_core_client::domain::user_info::models::Presence as DomainPresence;
-use prose_core_client::dtos::Availability;
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::ClientEvent;
+use prose_core_client::{user_id, user_resource_id, ClientEvent};
 use prose_xmpp::{bare, full, jid, mods};
 
 #[tokio::test]
@@ -23,7 +25,7 @@ async fn test_handles_presence() -> Result<()> {
         .expect_set_user_presence()
         .once()
         .with(
-            predicate::eq(jid!("sender@prose.org/resource")),
+            predicate::eq(user_resource_id!("sender@prose.org/resource")),
             predicate::eq(DomainPresence {
                 priority: 1,
                 availability: Availability::Available,
@@ -36,11 +38,12 @@ async fn test_handles_presence() -> Result<()> {
         .expect_dispatch_event()
         .once()
         .with(predicate::eq(ClientEvent::ContactChanged {
-            id: bare!("sender@prose.org"),
+            id: user_id!("sender@prose.org"),
         }))
         .return_once(|_| ());
 
     let event_handler = UserStateEventHandler::from(&deps.into_deps());
+
     event_handler
         .handle_event(XMPPEvent::Status(mods::status::Event::Presence(
             Presence::available()

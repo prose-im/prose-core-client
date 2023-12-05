@@ -8,7 +8,9 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation};
-use crate::domain::shared::models::{Availability, ParticipantId, UserBasicInfo, UserId};
+use crate::domain::shared::models::{
+    Availability, OccupantId, ParticipantId, UserBasicInfo, UserId,
+};
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct RoomState {
@@ -16,8 +18,16 @@ pub struct RoomState {
     pub name: Option<String>,
     /// The room's topic.
     pub topic: Option<String>,
+    /// The list of members. Only available for DirectMessage and Group (member-only rooms).
+    pub members: HashMap<UserId, RoomMember>,
     /// The participants in the room.
     pub participants: HashMap<ParticipantId, Participant>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RoomMember {
+    pub name: String,
+    pub affiliation: RoomAffiliation,
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -180,6 +190,7 @@ mod tests {
             Some(&user_id!("a@prose.org")),
             None,
             &RoomAffiliation::Owner,
+            &Availability::Unavailable,
         );
 
         state.set_participant_compose_state(

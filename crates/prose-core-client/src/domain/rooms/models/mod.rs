@@ -7,10 +7,10 @@ pub use compose_state::ComposeState;
 pub use public_room_info::PublicRoomInfo;
 pub use room_affiliation::RoomAffiliation;
 pub use room_error::RoomError;
-pub use room_internals::{Member, RoomInfo, RoomInternals};
-pub use room_session_info::RoomSessionInfo;
+pub use room_internals::{RoomInfo, RoomInternals};
+pub use room_session_info::{RoomSessionInfo, RoomSessionMember};
 pub use room_spec::RoomSpec;
-pub use room_state::{Participant, RoomState};
+pub use room_state::{Participant, RoomMember, RoomState};
 
 mod compose_state;
 pub mod constants;

@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use jid::FullJid;
 use parking_lot::RwLock;
 
-use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomState};
+use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomMember, RoomState};
 use crate::domain::shared::models::{
     Availability, ParticipantId, RoomId, RoomType, UserBasicInfo, UserId,
 };
@@ -34,11 +34,6 @@ pub struct RoomInfo {
     pub user_nickname: String,
     /// The type of the room.
     pub r#type: RoomType,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Member {
-    pub name: String,
 }
 
 impl Deref for RoomInternals {
@@ -76,18 +71,12 @@ impl RoomInternals {
         self.state.read().participants.values().cloned().collect()
     }
 
-    // TODO: Get naming in order (Member != Owner)
-    pub fn members(&self) -> Vec<(ParticipantId, Participant)> {
+    pub fn members(&self) -> Vec<(UserId, RoomMember)> {
         self.state
             .read()
-            .participants
+            .members
             .iter()
-            .filter_map(|(id, p)| {
-                if p.affiliation != RoomAffiliation::Owner {
-                    return None;
-                }
-                Some((id.clone(), p.clone()))
-            })
+            .map(|(id, member)| (id.clone(), member.clone()))
             .collect()
     }
 
@@ -160,11 +149,18 @@ impl RoomInternals {
     }
 
     // Resolves a pending room.
-    pub fn by_resolving_with_info(&self, name: Option<String>, info: RoomInfo) -> Self {
+    pub fn by_resolving_with_info(
+        &self,
+        name: Option<String>,
+        info: RoomInfo,
+        members: HashMap<UserId, RoomMember>,
+    ) -> Self {
         assert!(self.is_pending(), "Cannot promote a non-pending room");
 
         let mut state = self.state.read().clone();
         state.name = name;
+
+        // TODO: Merge members
 
         Self {
             info,
@@ -185,6 +181,13 @@ impl RoomInternals {
             state: RwLock::new(RoomState {
                 name: Some(contact_name.to_string()),
                 topic: None,
+                members: HashMap::from([(
+                    contact_id.clone(),
+                    RoomMember {
+                        name: contact_name.to_string(),
+                        affiliation: RoomAffiliation::Owner,
+                    },
+                )]),
                 participants: HashMap::from([(
                     contact_id.clone().into(),
                     Participant {
@@ -259,6 +262,13 @@ mod tests {
                 state: RwLock::new(RoomState {
                     name: Some("Jane Doe".to_string()),
                     topic: None,
+                    members: HashMap::from([(
+                        user_id!("contact@prose.org"),
+                        RoomMember {
+                            name: "Jane Doe".to_string(),
+                            affiliation: RoomAffiliation::Owner,
+                        }
+                    )]),
                     participants: HashMap::from([(
                         user_id!("contact@prose.org").into(),
                         Participant {

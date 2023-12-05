@@ -32,7 +32,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
                 name: "Aron Doe".to_string(),
             },
         )])
-        .with_occupants([(
+        .with_participants([(
             jid!("room@conference.prose.org/b"),
             Participant::owner().set_name("Bernhard Doe"),
         )]);
@@ -110,7 +110,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                 name: "Aron Doe".to_string(),
             },
         )])
-        .with_occupants([(
+        .with_participants([(
             jid!("room@conference.prose.org/b"),
             Participant::owner().set_name("Bernhard Doe"),
         )]);

@@ -13,7 +13,7 @@ pub use crate::domain::{
     contacts::models::Group,
     general::models::SoftwareVersion,
     messaging::models::{Emoji, MessageId, Reaction, StanzaId},
-    rooms::models::{Member, Participant, PublicRoomInfo},
+    rooms::models::{Participant, PublicRoomInfo},
     shared::models::{
         Availability, OccupantId, RoomId, UserBasicInfo, UserId, UserPresenceInfo, UserResourceId,
     },

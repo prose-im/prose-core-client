@@ -23,7 +23,8 @@ use crate::app::deps::{
     DynRoomParticipationService, DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
-    Member, RoomError, RoomInfo, RoomInternals, RoomSessionInfo, RoomSpec,
+    RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomMember, RoomSessionInfo,
+    RoomSessionMember, RoomSpec,
 };
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
@@ -182,15 +183,15 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
                 // Now grant the members of the original group access to the new channel…
                 debug!("Granting membership to members of new room {}…", new_name);
-                for member in room.members.keys() {
+                for member in room.members().into_iter().map(|(id, _)| id) {
                     // Our user is already admin, no need to set them as a member…
-                    if member == &current_user {
+                    if member == current_user {
                         continue;
                     }
 
                     match self
                         .room_participation_service
-                        .grant_membership(&new_room.room_id, member)
+                        .grant_membership(&new_room.room_id, &member)
                         .await
                     {
                         Ok(_) => (),
@@ -453,8 +454,12 @@ impl RoomsDomainService {
                     let service = self.room_management_service.clone();
 
                     for participant in &participants {
-                        if !info.members.contains(participant) {
-                            info.members.push(participant.clone())
+                        if info.members.iter().find(|m| &m.id == participant).is_none() {
+                            info.members.push(RoomSessionMember {
+                                id: participant.clone(),
+                                affiliation: RoomAffiliation::Owner,
+                                nick: None,
+                            });
                         }
                     }
 
@@ -571,21 +576,27 @@ impl RoomsDomainService {
         let room_name = info.room_name;
 
         let mut members = HashMap::with_capacity(info.members.len());
-        for jid in info.members {
+        for member in info.members {
             let name = self
                 .user_profile_repo
-                .get_display_name(&jid)
+                .get_display_name(&member.id)
                 .await
                 .unwrap_or_default()
-                .unwrap_or_else(|| jid.formatted_username());
-            members.insert(jid, Member { name });
+                .unwrap_or_else(|| member.id.formatted_username());
+
+            members.insert(
+                member.id,
+                RoomMember {
+                    name,
+                    affiliation: member.affiliation,
+                },
+            );
         }
 
         let room_info = RoomInfo {
             room_id: info.room_jid.clone(),
             description: info.room_description,
             user_nickname: info.user_nickname,
-            members,
             r#type: info.room_type,
         };
 
@@ -593,7 +604,7 @@ impl RoomsDomainService {
             let room_name = room_name;
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
-                room.by_resolving_with_info(room_name, room_info)
+                room.by_resolving_with_info(room_name, room_info, members)
             })
         }) else {
             return Err(RequestError::Generic {
@@ -650,7 +661,7 @@ impl ParticipantsVecExt for Vec<UserId> {
 
 #[cfg(test)]
 mod tests {
-    use prose_xmpp::bare;
+    use crate::user_id;
 
     use super::*;
 
@@ -658,9 +669,9 @@ mod tests {
     fn test_group_name_for_participants() {
         assert_eq!(
             vec![
-                bare!("a@prose.org"),
-                bare!("b@prose.org"),
-                bare!("c@prose.org")
+                user_id!("a@prose.org"),
+                user_id!("b@prose.org"),
+                user_id!("c@prose.org")
             ]
             .group_name_hash(),
             "org.prose.group.7c138d7281db96e0d42fe026a4195c85a7dc2cae".to_string()
@@ -668,15 +679,15 @@ mod tests {
 
         assert_eq!(
             vec![
-                bare!("a@prose.org"),
-                bare!("b@prose.org"),
-                bare!("c@prose.org")
+                user_id!("a@prose.org"),
+                user_id!("b@prose.org"),
+                user_id!("c@prose.org")
             ]
             .group_name_hash(),
             vec![
-                bare!("c@prose.org"),
-                bare!("a@prose.org"),
-                bare!("b@prose.org")
+                user_id!("c@prose.org"),
+                user_id!("a@prose.org"),
+                user_id!("b@prose.org")
             ]
             .group_name_hash()
         )

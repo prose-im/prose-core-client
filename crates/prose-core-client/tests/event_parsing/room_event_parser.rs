@@ -172,7 +172,8 @@ async fn test_user_was_permanently_removed() -> Result<()> {
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
                 r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Unavailable
+                    availability: Availability::Unavailable,
+                    priority: 0
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -210,7 +211,8 @@ async fn test_user_was_disconnected_by_server() -> Result<()> {
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
                 r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Unavailable
+                    availability: Availability::Unavailable,
+                    priority: 0
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -250,7 +252,8 @@ async fn test_user_entered_room() -> Result<()> {
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
                 r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Available
+                    availability: Availability::Available,
+                    priority: 0
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -302,7 +305,8 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
                 r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Available
+                    availability: Availability::Available,
+                    priority: 0
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -343,7 +347,8 @@ async fn test_user_exited_room() -> Result<()> {
         vec![ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@prose.org/nick").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable
+                availability: Availability::Unavailable,
+                priority: 0
             },
         })]
     );

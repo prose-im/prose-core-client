@@ -34,6 +34,7 @@ pub struct Destroy {
 pub struct User {
     pub jid: Jid,
     pub affiliation: muc::user::Affiliation,
+    pub nick: Option<String>,
 }
 
 impl Query {
@@ -167,6 +168,7 @@ impl TryFrom<Element> for User {
                     msg: err.to_string(),
                 },
             )?,
+            nick: root.attr("nick").map(ToString::to_string),
         })
     }
 }

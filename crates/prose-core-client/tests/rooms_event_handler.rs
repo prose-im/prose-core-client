@@ -218,7 +218,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room = Arc::new(
-        RoomInternals::group(room_id!("room@conference.prose.org")).with_occupants([(
+        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
             jid!("room@conference.prose.org/nickname"),
             Participant::owner()
                 .set_real_id(&bare!("nickname@prose.org"))

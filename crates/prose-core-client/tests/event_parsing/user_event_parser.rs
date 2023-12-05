@@ -32,7 +32,8 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
         vec![ServerEvent::UserStatus(UserStatusEvent {
             user_id: user_id!("user@prose.org").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable
+                availability: Availability::Unavailable,
+                priority: 0
             },
         })]
     );
@@ -42,12 +43,13 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
     let events = parse_xml(
     r#"
         <presence xmlns="jabber:client" from="user@prose.org/res">
-          <show>chat</show>
-          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="ImujI7nqf7pn4YqcjefXE3o5P1k=" />
-          <x xmlns="vcard-temp:x:update">
-            <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
-          </x>
-          <delay xmlns="urn:xmpp:delay" from="prose.org" stamp="2023-11-30T20:11:37Z" />
+            <priority>5</priority>
+            <show>chat</show>
+            <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="ImujI7nqf7pn4YqcjefXE3o5P1k=" />
+            <x xmlns="vcard-temp:x:update">
+                <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
+            </x>
+            <delay xmlns="urn:xmpp:delay" from="prose.org" stamp="2023-11-30T20:11:37Z" />
         </presence>
         "#,
   )
@@ -59,7 +61,8 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: user_resource_id!("user@prose.org/res").into(),
                 r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Available
+                    availability: Availability::Available,
+                    priority: 5
                 },
             }),
             ServerEvent::UserResource(UserResourceEvent {
@@ -89,7 +92,8 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
         vec![ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@prose.org/nick").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable
+                availability: Availability::Unavailable,
+                priority: 0
             },
         })]
     );

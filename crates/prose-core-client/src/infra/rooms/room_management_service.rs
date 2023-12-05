@@ -13,7 +13,9 @@ use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
 
-use crate::domain::rooms::models::{PublicRoomInfo, RoomError, RoomSessionInfo, RoomSpec};
+use crate::domain::rooms::models::{
+    PublicRoomInfo, RoomAffiliation, RoomError, RoomSessionInfo, RoomSessionMember, RoomSpec,
+};
 use crate::domain::rooms::services::RoomManagementService;
 use crate::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
 use crate::infra::xmpp::type_conversions::room_info::RoomInfo;
@@ -79,7 +81,7 @@ impl RoomManagementService for XMPPClient {
             return Err(RoomError::RoomValidationError(error.to_string()));
         }
 
-        let members = self.load_room_owners(&room_jid).await?;
+        let members = self.load_room_members(&room_jid).await?;
 
         Ok(RoomSessionInfo {
             room_jid,
@@ -130,7 +132,7 @@ impl RoomManagementService for XMPPClient {
                 RoomType::Generic
             };
 
-        let members = self.load_room_owners(&room_jid).await?;
+        let members = self.load_room_members(&room_jid).await?;
 
         Ok(RoomSessionInfo {
             room_jid,
@@ -218,17 +220,42 @@ impl XMPPClient {
         )?)
     }
 
-    async fn load_room_owners(&self, jid: &RoomId) -> Result<Vec<UserId>, RoomError> {
+    async fn load_room_members(&self, jid: &RoomId) -> Result<Vec<RoomSessionMember>, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        // When creating a group we change all "members" to "owners", so at least for Prose groups
-        // this should work as expected. In case it fails we ignore the error, which can happen
-        // for channels.
-        Ok(muc_mod
+
+        let owners = muc_mod
             .request_users(jid, Affiliation::Owner)
             .await
             .unwrap_or(vec![])
             .into_iter()
-            .map(|user| UserId::from(user.jid.to_bare()))
-            .collect::<Vec<_>>())
+            .map(|user| RoomSessionMember {
+                id: UserId::from(user.jid.to_bare()),
+                affiliation: RoomAffiliation::Owner,
+                nick: user.nick,
+            });
+
+        let members = muc_mod
+            .request_users(jid, Affiliation::Member)
+            .await
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(|user| RoomSessionMember {
+                id: UserId::from(user.jid.to_bare()),
+                affiliation: RoomAffiliation::Member,
+                nick: user.nick,
+            });
+
+        let admins = muc_mod
+            .request_users(jid, Affiliation::Admin)
+            .await
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(|user| RoomSessionMember {
+                id: UserId::from(user.jid.to_bare()),
+                affiliation: RoomAffiliation::Admin,
+                nick: user.nick,
+            });
+
+        Ok(owners.chain(members).chain(admins).collect())
     }
 }
