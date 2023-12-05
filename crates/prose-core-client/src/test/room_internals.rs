@@ -5,7 +5,9 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInfo, RoomInternals};
+use crate::domain::rooms::models::{
+    ComposeState, RoomAffiliation, RoomInfo, RoomInternals, RoomMember,
+};
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
 use crate::dtos::{Availability, Participant, UserId};
 use crate::test::mock_data;
@@ -62,6 +64,11 @@ impl RoomInternals {
 
     pub fn with_name(self, name: impl AsRef<str>) -> Self {
         self.set_name(name.as_ref());
+        self
+    }
+
+    pub fn with_members(mut self, members: impl IntoIterator<Item = (UserId, RoomMember)>) -> Self {
+        todo!("Fixme");
         self
     }
 

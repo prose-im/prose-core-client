@@ -10,16 +10,16 @@ use anyhow::Result;
 use mockall::{predicate, Sequence};
 
 use prose_core_client::domain::rooms::models::{
-    RoomError, RoomInternals, RoomSessionInfo, RoomSpec,
+    RoomAffiliation, RoomError, RoomInternals, RoomMember, RoomSessionInfo, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
 };
 use prose_core_client::domain::shared::models::{RoomId, RoomType};
-use prose_core_client::dtos::{Member, PublicRoomInfo, UserProfile};
-use prose_core_client::room_id;
+use prose_core_client::dtos::{PublicRoomInfo, UserId, UserProfile};
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
+use prose_core_client::{room_id, user_id};
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full};
 
@@ -125,7 +125,7 @@ async fn test_creates_group() -> Result<()> {
             .return_once(|_, _, _| {
                 Box::pin(async {
                     Ok(RoomSessionInfo::new_room(group_jid, RoomType::Group)
-                        .with_members(vec![mock_data::account_jid().into_bare()]))
+                        .with_members(vec![mock_data::account_jid().into_user_id()]))
                 })
             });
     }
@@ -140,7 +140,7 @@ async fn test_creates_group() -> Result<()> {
                 bare!("a@prose.org"),
                 bare!("b@prose.org"),
                 bare!("c@prose.org"),
-                mock_data::account_jid().into_bare(),
+                mock_data::account_jid().into_user_id(),
             ]),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
@@ -182,30 +182,34 @@ async fn test_creates_group() -> Result<()> {
                 let room = handler(room.clone());
 
                 assert_eq!(
-                    room.members,
+                    room.members(),
                     HashMap::from([
                         (
                             bare!("jane.doe@prose.org"),
-                            Member {
-                                name: "Jane".to_string()
+                            RoomMember {
+                                name: "Jane".to_string(),
+                                affiliation: RoomAffiliation::Owner,
                             }
                         ),
                         (
                             bare!("a@prose.org"),
-                            Member {
-                                name: "Tick".to_string()
+                            RoomMember {
+                                name: "Tick".to_string(),
+                                affiliation: RoomAffiliation::Owner,
                             }
                         ),
                         (
                             bare!("b@prose.org"),
-                            Member {
-                                name: "Trick".to_string()
+                            RoomMember {
+                                name: "Trick".to_string(),
+                                affiliation: RoomAffiliation::Owner,
                             }
                         ),
                         (
                             bare!("c@prose.org"),
-                            Member {
-                                name: "Track".to_string()
+                            RoomMember {
+                                name: "Track".to_string(),
+                                affiliation: RoomAffiliation::Owner,
                             }
                         )
                     ])
@@ -221,9 +225,9 @@ async fn test_creates_group() -> Result<()> {
         .with(
             predicate::eq(group_jid.clone()),
             predicate::eq(vec![
-                bare!("a@prose.org"),
-                bare!("b@prose.org"),
-                bare!("c@prose.org"),
+                user_id!("a@prose.org"),
+                user_id!("b@prose.org"),
+                user_id!("c@prose.org"),
             ]),
         )
         .returning(|_, _| Box::pin(async { Ok(()) }));
@@ -234,9 +238,9 @@ async fn test_creates_group() -> Result<()> {
             service: mock_data::muc_service(),
             room_type: CreateRoomType::Group {
                 participants: vec![
-                    bare!("a@prose.org"),
-                    bare!("b@prose.org"),
-                    bare!("c@prose.org"),
+                    user_id!("a@prose.org"),
+                    user_id!("b@prose.org"),
+                    user_id!("c@prose.org"),
                 ],
             },
         })
@@ -338,20 +342,23 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                 RoomInternals::group(room_id!("group@conf.prose.org")).with_members(vec![
                     (
                         mock_data::account_jid().into_bare(),
-                        Member {
+                        RoomMember {
                             name: "Jane Doe".to_string(),
+                            affiliation: RoomAffiliation::Owner,
                         },
                     ),
                     (
                         bare!("a@prose.org"),
-                        Member {
+                        RoomMember {
                             name: "Member A".to_string(),
+                            affiliation: RoomAffiliation::Owner,
                         },
                     ),
                     (
                         bare!("b@prose.org"),
-                        Member {
+                        RoomMember {
                             name: "Member B".to_string(),
+                            affiliation: RoomAffiliation::Owner,
                         },
                     ),
                 ]),

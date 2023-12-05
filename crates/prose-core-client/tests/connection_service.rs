@@ -12,9 +12,9 @@ use prose_core_client::app::deps::DynAppContext;
 use prose_core_client::app::services::ConnectionService;
 use prose_core_client::domain::connection::models::ServerFeatures;
 use prose_core_client::domain::settings::models::AccountSettings;
-use prose_core_client::dtos::Availability;
+use prose_core_client::domain::shared::models::{Availability, UserId, UserResourceId};
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::{ClientEvent, ConnectionEvent};
+use prose_core_client::{user_id, user_resource_id, ClientEvent, ConnectionEvent};
 use prose_xmpp::test::ConstantIDProvider;
 use prose_xmpp::{bare, full, ConnectionError};
 
@@ -32,7 +32,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .expect_connect()
         .once()
         .with(
-            predicate::eq(full!("jane.doe@prose.org/resource-id")),
+            predicate::eq(user_resource_id!("jane.doe@prose.org/resource-id")),
             predicate::eq("my-password"),
         )
         .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
@@ -55,7 +55,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(bare!("jane.doe@prose.org")),
+            predicate::eq(user_id!("jane.doe@prose.org")),
             predicate::always(),
         )
         .return_once(|_, f| {

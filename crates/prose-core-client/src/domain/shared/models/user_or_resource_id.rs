@@ -5,6 +5,7 @@
 
 use crate::domain::shared::models::{UserId, UserResourceId};
 
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum UserOrResourceId {
     User(UserId),
     UserResource(UserResourceId),

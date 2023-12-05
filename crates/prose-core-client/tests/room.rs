@@ -11,13 +11,12 @@ use xmpp_parsers::mam::Fin;
 use xmpp_parsers::rsm::SetResult;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
-use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomMember};
 use prose_core_client::domain::rooms::services::RoomFactory;
-use prose_core_client::domain::shared::models::RoomId;
-use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::{Member, Participant};
-use prose_core_client::room_id;
+use prose_core_client::domain::shared::models::{RoomId, RoomType, UserId};
+use prose_core_client::dtos::Participant;
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
+use prose_core_client::{room_id, user_id};
 use prose_xmpp::stanza::message::MucUser;
 use prose_xmpp::{bare, jid};
 
@@ -27,9 +26,10 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 
     let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
         .with_members([(
-            bare!("a@prose.org"),
-            Member {
+            user_id!("a@prose.org"),
+            RoomMember {
                 name: "Aron Doe".to_string(),
+                affiliation: RoomAffiliation::Owner,
             },
         )])
         .with_participants([(
@@ -40,7 +40,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
-        .with(predicate::eq(bare!("c@prose.org")))
+        .with(predicate::eq(user_id!("c@prose.org")))
         .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_repo
@@ -106,8 +106,9 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
         .with_members([(
             bare!("a@prose.org"),
-            Member {
+            RoomMember {
                 name: "Aron Doe".to_string(),
+                affiliation: RoomAffiliation::Owner,
             },
         )])
         .with_participants([(
@@ -118,7 +119,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
-        .with(predicate::eq(bare!("c@prose.org")))
+        .with(predicate::eq(user_id!("c@prose.org")))
         .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_archive_service

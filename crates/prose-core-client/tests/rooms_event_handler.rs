@@ -18,12 +18,12 @@ use xmpp_parsers::presence::Presence;
 use prose_core_client::app::event_handlers::{RoomsEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInternals};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, RoomFactory};
-use prose_core_client::domain::shared::models::RoomId;
-use prose_core_client::dtos::{Participant, UserBasicInfo};
+use prose_core_client::domain::shared::models::{OccupantId, RoomId, UserId};
+use prose_core_client::dtos::{Availability, Participant, UserBasicInfo};
 use prose_core_client::test::{
     mock_data, ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
-use prose_core_client::{room_id, ClientRoomEventType};
+use prose_core_client::{occupant_id, room_id, user_id, ClientRoomEventType};
 use prose_xmpp::mods::muc;
 use prose_xmpp::stanza::muc::{MediatedInvite, MucUser};
 use prose_xmpp::{bare, full, jid, mods};
@@ -67,16 +67,17 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
     assert_eq!(room.participants().len(), 1);
 
     let occupant = room
-        .get_participant(&jid!("room@conference.prose.org/nick"))
+        .get_participant(&occupant_id!("room@conference.prose.org/nick").into())
         .unwrap()
         .clone();
 
     assert_eq!(
         occupant,
         Participant {
-            id: Some(bare!("real-jid@prose.org")),
+            id: Some(user_id!("real-jid@prose.org")),
             name: Some("George Washington".to_string()),
             affiliation: RoomAffiliation::Member,
+            availability: Availability::Available,
             compose_state: ComposeState::Idle,
             compose_state_updated: Default::default(),
         }
@@ -221,7 +222,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
             jid!("room@conference.prose.org/nickname"),
             Participant::owner()
-                .set_real_id(&bare!("nickname@prose.org"))
+                .set_real_id(&user_id!("nickname@prose.org"))
                 .set_name("Janice Doe"),
         )]),
     );
@@ -255,7 +256,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         .await?;
 
     let occupant = room
-        .get_participant(&jid!("room@conference.prose.org/nickname"))
+        .get_participant(&user_id!("room@conference.prose.org/nickname"))
         .unwrap()
         .clone();
 
@@ -276,7 +277,7 @@ async fn test_handles_chat_state_for_muc_room() -> Result<()> {
         room.load_composing_users().await?,
         vec![UserBasicInfo {
             name: "Janice Doe".to_string(),
-            id: bare!("nickname@prose.org")
+            id: user_id!("nickname@prose.org")
         }]
     );
 
@@ -325,7 +326,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
         .await?;
 
     let occupant = room
-        .get_participant(&jid!("contact@prose.org"))
+        .get_participant(&user_id!("contact@prose.org"))
         .unwrap()
         .clone();
 
@@ -346,7 +347,7 @@ async fn test_handles_chat_state_for_direct_message_room() -> Result<()> {
         room.load_composing_users().await?,
         vec![UserBasicInfo {
             name: "Janice Doe".to_string(),
-            id: bare!("contact@prose.org")
+            id: user_id!("contact@prose.org")
         }]
     );
 

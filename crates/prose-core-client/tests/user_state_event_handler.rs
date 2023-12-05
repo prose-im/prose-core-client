@@ -25,7 +25,7 @@ async fn test_handles_presence() -> Result<()> {
         .expect_set_user_presence()
         .once()
         .with(
-            predicate::eq(user_resource_id!("sender@prose.org/resource")),
+            predicate::eq(user_resource_id!("sender@prose.org/resource").into()),
             predicate::eq(DomainPresence {
                 priority: 1,
                 availability: Availability::Available,
