@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{write, Debug, Display, Formatter};
 use std::ops::Deref;
 use std::str::FromStr;
 
@@ -12,7 +12,7 @@ use minidom::IntoAttributeValue;
 
 use super::OccupantId;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 /// A RoomJid while always a BareJid can either stand for a single contact or a MUC room.
 pub struct RoomId(BareJid);
 
@@ -40,6 +40,12 @@ impl Deref for RoomId {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Debug for RoomId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "RoomId({})", self.0)
     }
 }
 

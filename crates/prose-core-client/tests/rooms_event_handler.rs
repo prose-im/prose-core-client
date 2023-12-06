@@ -13,14 +13,20 @@ use prose_core_client::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, RoomsEventHandler, ServerEvent,
     ServerEventHandler, UserStatusEvent, UserStatusEventType,
 };
+use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInternals};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, RoomFactory};
-use prose_core_client::domain::shared::models::{OccupantId, RoomId, UserId, UserResourceId};
+use prose_core_client::domain::shared::models::{
+    OccupantId, RoomId, UserId, UserOrResourceId, UserResourceId,
+};
+use prose_core_client::domain::user_info::models::Presence;
 use prose_core_client::dtos::{Availability, Participant, UserBasicInfo};
 use prose_core_client::test::{
     ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
-use prose_core_client::{occupant_id, room_id, user_id, user_resource_id, ClientRoomEventType};
+use prose_core_client::{
+    occupant_id, room_id, user_id, user_resource_id, ClientEvent, ClientRoomEventType,
+};
 
 #[tokio::test]
 async fn test_handles_presence_for_muc_room() -> Result<()> {
@@ -372,6 +378,108 @@ async fn test_handles_invite() -> Result<()> {
             },
         }))
         .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_handles_presence() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    let room = Arc::new(RoomInternals::for_direct_message(
+        &user_id!("sender@prose.org"),
+        "Janice Doe",
+    ));
+
+    let room = room.clone();
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("sender@prose.org")))
+        .return_once(move |_| Some(room.clone()));
+
+    deps.user_info_repo
+        .expect_set_user_presence()
+        .once()
+        .with(
+            predicate::eq(UserOrResourceId::from(user_resource_id!("sender@prose.org/resource"))),
+            predicate::eq(Presence {
+                priority: 1,
+                availability: Availability::Available,
+                status: None,
+            }),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::ContactChanged {
+            id: user_id!("sender@prose.org"),
+        }))
+        .return_once(|_| ());
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    event_handler
+        .handle_event(ServerEvent::UserStatus(UserStatusEvent {
+            user_id: user_resource_id!("sender@prose.org/resource").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 1,
+            },
+        }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+/// Test that UserStateEventHandler does not send an event when a self-presence is received and
+/// that the event is consumed, i.e. cannot be forwarded to other handlers.
+async fn test_swallows_self_presence() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.ctx.set_connection_properties(ConnectionProperties {
+        connected_jid: user_resource_id!("hello@prose.org/res"),
+        server_features: Default::default(),
+    });
+
+    let room = Arc::new(RoomInternals::for_direct_message(
+        &user_id!("hello@prose.org"),
+        "Janice Doe",
+    ));
+
+    let room = room.clone();
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("hello@prose.org")))
+        .return_once(move |_| Some(room.clone()));
+
+    deps.user_info_repo
+        .expect_set_user_presence()
+        .once()
+        .with(
+            predicate::eq(UserOrResourceId::from(user_id!("hello@prose.org"))),
+            predicate::eq(Presence {
+                availability: Availability::Available,
+                ..Default::default()
+            }),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+    assert!(event_handler
+        .handle_event(ServerEvent::UserStatus(UserStatusEvent {
+            user_id: user_id!("hello@prose.org").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 0
+            }
+        }))
+        .await?
+        .is_none());
 
     Ok(())
 }

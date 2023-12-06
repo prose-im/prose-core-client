@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
 use jid::BareJid;
@@ -16,7 +16,7 @@ use crate::util::StringExt;
 
 use super::UserResourceId;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 /// Represents a unique XMPP user identifier without resource specification.
 pub struct UserId(BareJid);
 
@@ -44,6 +44,12 @@ impl UserId {
 impl From<BareJid> for UserId {
     fn from(value: BareJid) -> Self {
         UserId(value)
+    }
+}
+
+impl Debug for UserId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "UserId({})", self.0)
     }
 }
 

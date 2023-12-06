@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 
 use jid::FullJid;
 use minidom::IntoAttributeValue;
@@ -11,7 +11,7 @@ use minidom::IntoAttributeValue;
 use crate::dtos::RoomId;
 use crate::util::StringExt;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 /// Represents the identifier of a user within a Multi-User Chat (MUC) room, combining the
 /// room's JID with the user's unique nickname in that room.
 pub struct OccupantId(FullJid);
@@ -37,6 +37,12 @@ impl OccupantId {
 impl From<FullJid> for OccupantId {
     fn from(value: FullJid) -> Self {
         OccupantId(value)
+    }
+}
+
+impl Debug for OccupantId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OccupantId({})", self.0)
     }
 }
 
