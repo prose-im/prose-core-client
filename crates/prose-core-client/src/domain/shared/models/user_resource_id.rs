@@ -5,7 +5,7 @@
 
 use std::fmt::{Display, Formatter};
 
-use jid::FullJid;
+use jid::{FullJid, Jid};
 use minidom::IntoAttributeValue;
 
 use super::UserId;
@@ -57,5 +57,11 @@ impl IntoAttributeValue for UserResourceId {
 impl AsRef<FullJid> for UserResourceId {
     fn as_ref(&self) -> &FullJid {
         &self.0
+    }
+}
+
+impl From<UserResourceId> for Jid {
+    fn from(value: UserResourceId) -> Self {
+        Jid::Full(value.0)
     }
 }

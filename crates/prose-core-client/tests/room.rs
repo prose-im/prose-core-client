@@ -13,10 +13,10 @@ use xmpp_parsers::rsm::SetResult;
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomMember};
 use prose_core_client::domain::rooms::services::RoomFactory;
-use prose_core_client::domain::shared::models::{RoomId, RoomType, UserId};
+use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
 use prose_core_client::dtos::Participant;
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
-use prose_core_client::{room_id, user_id};
+use prose_core_client::{occupant_id, room_id, user_id};
 use prose_xmpp::stanza::message::MucUser;
 use prose_xmpp::{bare, jid};
 
@@ -33,7 +33,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
             },
         )])
         .with_participants([(
-            jid!("room@conference.prose.org/b"),
+            occupant_id!("room@conference.prose.org/b"),
             Participant::owner().set_name("Bernhard Doe"),
         )]);
 
@@ -105,14 +105,14 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
 
     let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
         .with_members([(
-            bare!("a@prose.org"),
+            user_id!("a@prose.org"),
             RoomMember {
                 name: "Aron Doe".to_string(),
                 affiliation: RoomAffiliation::Owner,
             },
         )])
         .with_participants([(
-            jid!("room@conference.prose.org/b"),
+            occupant_id!("room@conference.prose.org/b"),
             Participant::owner().set_name("Bernhard Doe"),
         )]);
 

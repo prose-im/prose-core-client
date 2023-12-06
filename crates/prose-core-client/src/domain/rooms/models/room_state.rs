@@ -78,7 +78,15 @@ impl RoomState {
     ) {
         self.participants
             .entry(id.clone())
-            .and_modify(|participant| participant.availability = availability.clone());
+            .and_modify(|participant| participant.availability = availability.clone())
+            .or_insert_with(|| Participant {
+                id: None,
+                name: None,
+                affiliation: RoomAffiliation::None,
+                availability: availability.clone(),
+                compose_state: ComposeState::Idle,
+                compose_state_updated: DateTime::default(),
+            });
     }
 
     pub fn set_participant_affiliation(
@@ -89,6 +97,20 @@ impl RoomState {
         self.participants
             .entry(id.clone())
             .and_modify(|participant| participant.affiliation = affiliation.clone());
+    }
+
+    pub fn set_participant_real_id_and_name(
+        &mut self,
+        id: &ParticipantId,
+        real_id: Option<&UserId>,
+        name: Option<&str>,
+    ) {
+        self.participants
+            .entry(id.clone())
+            .and_modify(|participant| {
+                participant.id = real_id.cloned();
+                participant.name = name.map(ToString::to_string)
+            });
     }
 
     /// Returns the real JIDs of all composing users that started composing after `started_after`.

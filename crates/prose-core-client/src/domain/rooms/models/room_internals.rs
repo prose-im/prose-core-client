@@ -124,6 +124,17 @@ impl RoomInternals {
             .set_participant_affiliation(id, affiliation)
     }
 
+    pub fn set_participant_real_id_and_name(
+        &self,
+        id: &ParticipantId,
+        real_id: Option<&UserId>,
+        name: Option<&str>,
+    ) {
+        self.state
+            .write()
+            .set_participant_real_id_and_name(id, real_id, name)
+    }
+
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
     /// If we don't have a real JID for a composing user they are excluded from the list.
     pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<UserBasicInfo> {
@@ -194,7 +205,7 @@ impl RoomInternals {
                         id: Some(contact_id.clone()),
                         name: Some(contact_name.to_string()),
                         affiliation: RoomAffiliation::Owner,
-                        availability: Default::default(),
+                        availability: Availability::Unavailable,
                         compose_state: ComposeState::Idle,
                         compose_state_updated: Default::default(),
                     },

@@ -63,6 +63,7 @@ impl ServerEventHandler for RoomsEventHandler {
             ServerEvent::Room(event) => {
                 self.handle_room_event(event).await?;
             }
+            ServerEvent::UserStatus(event) => self.handle_user_status_event(event).await?,
             _ => return Ok(Some(event)),
         }
         Ok(None)
@@ -82,7 +83,27 @@ impl RoomsEventHandler {
 
         match event.r#type {
             OccupantEventType::AffiliationChanged { affiliation } => {
-                room.set_participant_affiliation(&participant_id, &affiliation)
+                room.set_participant_affiliation(&participant_id, &affiliation);
+
+                // Let's see if we knew the real id of the participant already, if not let's
+                // look up their name…
+                let (Some(real_id), Some(participant)) =
+                    (event.real_id, room.get_participant(&participant_id))
+                else {
+                    return Ok(());
+                };
+
+                if participant.id.is_some() {
+                    // Real id was known already…
+                    return Ok(());
+                }
+
+                let name = self.user_profile_repo.get_display_name(&real_id).await?;
+                room.set_participant_real_id_and_name(
+                    &participant_id,
+                    Some(&real_id),
+                    name.as_deref(),
+                );
             }
             OccupantEventType::DisconnectedByServer => {
                 room.set_participant_availability(&participant_id, &Availability::Unavailable);
@@ -150,26 +171,6 @@ impl RoomsEventHandler {
                 priority,
             } => {
                 room.set_participant_availability(&participant_id, &availability);
-
-                // TODO: Insert participant when they come online
-
-                // // Let's try to pull out the real jid of our user…
-                // let (real_jid, name) = {
-                //     if let Some(jid) = &item.jid {
-                //         let bare_jid = jid.to_bare();
-                //         let name = self.user_profile_repo.get_display_name(&bare_jid).await?;
-                //         (Some(bare_jid), name)
-                //     } else {
-                //         (None, None)
-                //     }
-                // };
-                //
-                // room.insert_participant(
-                //     &from,
-                //     real_jid.as_ref(),
-                //     name.as_deref(),
-                //     &(item.affiliation.clone().into()),
-                // );
 
                 let Some(id) = event.user_id.to_user_or_resource_id() else {
                     return Ok(());
