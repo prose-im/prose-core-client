@@ -172,6 +172,7 @@ impl RoomInternals {
         state.name = name;
 
         // TODO: Merge members
+        todo!("Merge members");
 
         Self {
             info,
@@ -221,6 +222,10 @@ impl RoomInternals {
         self.state.write().participants = participants;
     }
 
+    pub fn set_members(&self, members: HashMap<UserId, RoomMember>) {
+        self.state.write().members = members;
+    }
+
     pub fn new(info: RoomInfo) -> Self {
         Self {
             info,
@@ -259,7 +264,7 @@ mod tests {
     #[test]
     fn test_room_internals_for_direct_message() {
         let internals =
-            RoomInternals::for_direct_message(&user_id!("logged-in-user@prose.org"), "Jane Doe");
+            RoomInternals::for_direct_message(&user_id!("contact@prose.org"), "Jane Doe");
 
         assert_eq!(
             internals,

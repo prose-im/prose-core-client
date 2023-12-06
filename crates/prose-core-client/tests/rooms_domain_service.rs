@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -20,9 +19,8 @@ use prose_core_client::domain::rooms::services::{
 use prose_core_client::domain::shared::models::{RoomId, RoomType};
 use prose_core_client::dtos::{PublicRoomInfo, UserId, UserProfile};
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
-use prose_core_client::{occupant_id, room_id, user_id};
+use prose_core_client::{room_id, user_id};
 use prose_xmpp::test::IncrementingIDProvider;
-use prose_xmpp::{bare, full};
 
 #[tokio::test]
 async fn test_throws_conflict_error_if_room_exists() -> Result<()> {

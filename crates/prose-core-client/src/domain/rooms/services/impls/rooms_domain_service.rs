@@ -29,7 +29,6 @@ use crate::domain::rooms::models::{
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
 use crate::domain::shared::utils::build_contact_name;
-use crate::util::jid_ext::BareJidExt;
 use crate::util::StringExt;
 use crate::ClientRoomEventType;
 

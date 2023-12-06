@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use crate::domain::shared::models::{Availability, UserId, UserOrResourceId, UserResourceId};
+use crate::domain::shared::models::{Availability, UserId, UserOrResourceId};
 use crate::domain::user_info::models::Presence;
 
 #[derive(Default)]
@@ -79,6 +79,7 @@ pub struct PresenceEntry {
 
 #[cfg(test)]
 mod tests {
+    use crate::domain::shared::models::UserResourceId;
     use crate::{user_id, user_resource_id};
 
     use super::*;
@@ -176,14 +177,14 @@ mod tests {
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&user_resource_id!("a@prose.org").into(), p(1));
+        map.update_presence(&user_id!("a@prose.org").into(), p(1));
         assert_eq!(map.get_highest_presence(&user).unwrap().resource, None);
         assert_eq!(
             map.get_highest_presence(&user).unwrap().presence.priority,
             1
         );
 
-        map.update_presence(&user_resource_id!("a@prose.org").into(), p(2));
+        map.update_presence(&user_id!("a@prose.org").into(), p(2));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().presence.priority,
             2
@@ -196,7 +197,7 @@ mod tests {
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&user_resource_id!("a@prose.org").into(), p(1));
+        map.update_presence(&user_id!("a@prose.org").into(), p(1));
         map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(2));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
@@ -224,7 +225,7 @@ mod tests {
             Some("r2".to_string())
         );
 
-        map.update_presence(&user_resource_id!("a@prose.org").into(), p(2));
+        map.update_presence(&user_id!("a@prose.org").into(), p(2));
         assert_eq!(map.get_highest_presence(&user).unwrap().resource, None);
     }
 

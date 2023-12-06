@@ -63,8 +63,8 @@ impl RoomInternals {
         self
     }
 
-    pub fn with_members(mut self, members: impl IntoIterator<Item = (UserId, RoomMember)>) -> Self {
-        todo!("Fixme");
+    pub fn with_members(self, members: impl IntoIterator<Item = (UserId, RoomMember)>) -> Self {
+        self.set_members(members.into_iter().collect());
         self
     }
 

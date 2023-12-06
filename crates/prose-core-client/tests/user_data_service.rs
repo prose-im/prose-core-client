@@ -13,7 +13,6 @@ use prose_core_client::domain::shared::models::{UserId, UserResourceId};
 use prose_core_client::services::UserDataService;
 use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
 use prose_core_client::{user_id, user_resource_id};
-use prose_xmpp::{bare, full, jid};
 
 #[tokio::test]
 async fn test_load_user_metadata_resolves_full_jid() -> Result<()> {

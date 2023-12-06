@@ -169,10 +169,7 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use chrono::{TimeZone, Utc};
-    use jid::BareJid;
 
     use prose_xmpp::{bare, jid};
 

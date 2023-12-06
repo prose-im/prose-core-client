@@ -9,8 +9,7 @@ use async_trait::async_trait;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAppContext, DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository,
-    DynUserProfileRepository,
+    DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::app::event_handlers::{
     ServerEvent, ServerEventHandler, UserInfoEvent, UserInfoEventType,
@@ -19,8 +18,6 @@ use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct UserStateEventHandler {
-    #[inject]
-    ctx: DynAppContext,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
     #[inject]

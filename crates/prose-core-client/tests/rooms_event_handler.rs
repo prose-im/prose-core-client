@@ -94,6 +94,7 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
     Ok(())
 }
 
+#[tokio::test]
 async fn test_user_entered_room_with_multiple_resources_and_same_nickname() -> Result<()> {
     // <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram" to="marc@prose.org/prose-QAaMglCf" xml:lang="en">
     //     <x xmlns='vcard-temp:x:update'>
@@ -123,6 +124,7 @@ async fn test_user_entered_room_with_multiple_resources_and_same_nickname() -> R
     panic!("Implement me")
 }
 
+#[tokio::test]
 async fn test_user_entered_room_with_multiple_resources_and_different_nicknames() -> Result<()> {
     // <presence xmlns='jabber:client' from="org.prose.public-channel.dev-core#1@groups.prose.org/cram-t7YjIEMF" to="marc@prose.org/prose-YJlWBFC2" xml:lang="en">
     //     <x xmlns='vcard-temp:x:update'>

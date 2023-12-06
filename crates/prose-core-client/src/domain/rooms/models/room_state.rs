@@ -8,9 +8,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 use crate::domain::rooms::models::{ComposeState, RoomAffiliation};
-use crate::domain::shared::models::{
-    Availability, OccupantId, ParticipantId, UserBasicInfo, UserId,
-};
+use crate::domain::shared::models::{Availability, ParticipantId, UserBasicInfo, UserId};
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct RoomState {
@@ -155,6 +153,7 @@ impl RoomState {
 mod tests {
     use chrono::TimeZone;
 
+    use crate::domain::shared::models::OccupantId;
     use crate::{occupant_id, user_id};
 
     use super::*;

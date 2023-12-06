@@ -16,7 +16,7 @@ use prose_core_client::domain::shared::models::{Availability, UserId, UserResour
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::{user_id, user_resource_id, ClientEvent, ConnectionEvent};
 use prose_xmpp::test::ConstantIDProvider;
-use prose_xmpp::{bare, full, ConnectionError};
+use prose_xmpp::{bare, ConnectionError};
 
 #[tokio::test]
 async fn test_starts_available_and_generates_resource() -> Result<()> {
