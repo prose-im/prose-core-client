@@ -12,12 +12,12 @@ use xmpp_parsers::message::MessageType;
 use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
-use prose_core_client::domain::shared::models::RoomId;
+use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::{room_id, ClientRoomEventType};
+use prose_core_client::{room_id, user_id, ClientRoomEventType};
+use prose_xmpp::jid;
 use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
-use prose_xmpp::{bare, jid};
 
 #[tokio::test]
 async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
@@ -80,7 +80,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
 async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::direct_message(bare!("jane.doe@prose.org")));
+    let room = Arc::new(RoomInternals::direct_message(user_id!("jane.doe@prose.org")));
 
     deps.connected_rooms_repo
         .expect_get()
@@ -92,7 +92,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
         .expect_insert_item_by_creating_or_joining_room()
         .once()
         .with(predicate::eq(CreateOrEnterRoomRequest::JoinDirectMessage {
-            participant: bare!("jane.doe@prose.org"),
+            participant: user_id!("jane.doe@prose.org"),
         }))
         .return_once(|_| Box::pin(async { Ok(room_id!("jane.doe@prose.org")) }));
 

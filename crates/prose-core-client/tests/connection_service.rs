@@ -36,6 +36,10 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
             predicate::eq("my-password"),
         )
         .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
+    deps.connection_service
+        .expect_set_message_carbons_enabled()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(()) }));
     deps.user_account_service
         .expect_set_availability()
         .once()
@@ -84,12 +88,12 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
     assert!(deps.ctx.muc_service().is_err());
 
     service
-        .connect(&bare!("jane.doe@prose.org"), "my-password")
+        .connect(&user_id!("jane.doe@prose.org"), "my-password")
         .await?;
 
     assert_eq!(
         deps.ctx.connected_id()?,
-        full!("jane.doe@prose.org/resource-id")
+        user_resource_id!("jane.doe@prose.org/resource-id")
     );
     assert_eq!(deps.ctx.muc_service()?, bare!("muc@prose.org"));
 
@@ -115,10 +119,14 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .expect_connect()
         .once()
         .with(
-            predicate::eq(full!("jane.doe@prose.org/restored-res")),
+            predicate::eq(user_resource_id!("jane.doe@prose.org/restored-res")),
             predicate::always(),
         )
         .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
+    deps.connection_service
+        .expect_set_message_carbons_enabled()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(()) }));
     deps.user_account_service
         .expect_set_availability()
         .once()
@@ -135,7 +143,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(bare!("jane.doe@prose.org")),
+            predicate::eq(user_id!("jane.doe@prose.org")),
             predicate::always(),
         )
         .return_once(|_, f| {
@@ -160,7 +168,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
     let service = ConnectionService::from(&deps);
 
     service
-        .connect(&bare!("jane.doe@prose.org"), "my-password")
+        .connect(&user_id!("jane.doe@prose.org"), "my-password")
         .await?;
 
     Ok(())
@@ -189,7 +197,7 @@ async fn test_connection_failure() -> Result<()> {
             .return_once(move |_, _| {
                 assert_eq!(
                     ctx.get().unwrap().connected_id().ok(),
-                    Some(full!("jane.doe@prose.org/resource-id"))
+                    Some(user_resource_id!("jane.doe@prose.org/resource-id"))
                 );
                 Box::pin(async {
                     Err(ConnectionError::Generic {
@@ -209,7 +217,7 @@ async fn test_connection_failure() -> Result<()> {
     assert!(deps.ctx.muc_service().is_err());
 
     assert!(service
-        .connect(&bare!("jane.doe@prose.org"), "my-password")
+        .connect(&user_id!("jane.doe@prose.org"), "my-password")
         .await
         .is_err());
 

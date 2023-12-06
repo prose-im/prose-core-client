@@ -36,4 +36,7 @@ pub(crate) mod domain;
 
 pub mod infra;
 
+#[cfg(feature = "test")]
+pub mod util;
+#[cfg(not(feature = "test"))]
 pub(crate) mod util;

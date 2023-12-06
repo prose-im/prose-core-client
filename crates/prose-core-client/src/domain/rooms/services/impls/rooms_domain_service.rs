@@ -255,7 +255,7 @@ impl RoomsDomainService {
         // We generate a random suffix to prevent any nickname conflicts…
         let nickname = format!(
             "{}",
-            user_jid.username().unwrap_or("unknown-user"),
+            user_jid.username(),
             // self.id_provider.new_id()
         );
 
@@ -415,8 +415,7 @@ impl RoomsDomainService {
                 .get(jid)
                 .await?
                 .and_then(|profile| profile.first_name.or(profile.nickname))
-                .or(jid.username().map(|node| node.to_uppercase_first_letter()))
-                .unwrap_or(jid.to_string());
+                .unwrap_or_else(|| jid.username().to_uppercase_first_letter());
             participant_names.push(participant_name);
         }
         participant_names.sort();
@@ -498,11 +497,7 @@ impl RoomsDomainService {
         perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
         // We generate a random suffix to prevent any nickname conflicts…
-        let nickname = format!(
-            "{}-{}",
-            user_jid.username().unwrap_or("unknown-user"),
-            self.id_provider.new_id()
-        );
+        let nickname = format!("{}-{}", user_jid.username(), self.id_provider.new_id());
 
         let mut attempt = 0;
 

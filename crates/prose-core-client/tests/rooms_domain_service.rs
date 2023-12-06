@@ -10,7 +10,8 @@ use anyhow::Result;
 use mockall::{predicate, Sequence};
 
 use prose_core_client::domain::rooms::models::{
-    RoomAffiliation, RoomError, RoomInternals, RoomMember, RoomSessionInfo, RoomSpec,
+    RoomAffiliation, RoomError, RoomInternals, RoomMember, RoomSessionInfo, RoomSessionMember,
+    RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
@@ -19,7 +20,7 @@ use prose_core_client::domain::rooms::services::{
 use prose_core_client::domain::shared::models::{RoomId, RoomType};
 use prose_core_client::dtos::{PublicRoomInfo, UserId, UserProfile};
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
-use prose_core_client::{room_id, user_id};
+use prose_core_client::{occupant_id, room_id, user_id};
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full};
 
@@ -67,13 +68,11 @@ async fn test_creates_group() -> Result<()> {
     // jane.doe@prose.org + a@prose.org + b@prose.org + c@prose.org
     let group_jid =
         room_id!("org.prose.group.b41be06eda5bac6e7fc5ad069d6cd863c4f329eb@conference.prose.org");
-    let group_full_jid = full!(format!("{}/jane.doe-hash-1", group_jid));
+    let occupant_id = group_jid
+        .occupant_id_with_nickname("jane.doe-hash-1")
+        .unwrap();
 
-    let account_node = mock_data::account_jid()
-        .into_bare()
-        .node_str()
-        .unwrap()
-        .to_string();
+    let account_node = mock_data::account_jid().to_user_id().username().to_string();
 
     {
         let account_node = account_node.clone();
@@ -87,10 +86,10 @@ async fn test_creates_group() -> Result<()> {
 
                 Box::pin(async move {
                     let first_name = match jid.username() {
-                        _ if jid.username() == Some(&account_node) => "Jane",
-                        Some("a") => "Tick",
-                        Some("b") => "Trick",
-                        Some("c") => "Track",
+                        _ if jid.username() == &account_node => "Jane",
+                        "a" => "Tick",
+                        "b" => "Trick",
+                        "c" => "Track",
                         _ => panic!("Unexpected JID"),
                     };
 
@@ -118,14 +117,21 @@ async fn test_creates_group() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
-                predicate::eq(group_full_jid.clone()),
+                predicate::eq(occupant_id),
                 predicate::eq("Jane, Tick, Track, Trick"),
                 predicate::eq(RoomSpec::Group),
             )
             .return_once(|_, _, _| {
                 Box::pin(async {
-                    Ok(RoomSessionInfo::new_room(group_jid, RoomType::Group)
-                        .with_members(vec![mock_data::account_jid().into_user_id()]))
+                    Ok(
+                        RoomSessionInfo::new_room(group_jid, RoomType::Group).with_members(vec![
+                            RoomSessionMember {
+                                id: mock_data::account_jid().into_user_id(),
+                                affiliation: RoomAffiliation::Owner,
+                                nick: None,
+                            },
+                        ]),
+                    )
                 })
             });
     }
@@ -137,9 +143,9 @@ async fn test_creates_group() -> Result<()> {
         .with(
             predicate::eq(group_jid.clone()),
             predicate::eq(vec![
-                bare!("a@prose.org"),
-                bare!("b@prose.org"),
-                bare!("c@prose.org"),
+                user_id!("a@prose.org"),
+                user_id!("b@prose.org"),
+                user_id!("c@prose.org"),
                 mock_data::account_jid().into_user_id(),
             ]),
         )
@@ -155,10 +161,10 @@ async fn test_creates_group() -> Result<()> {
 
             Box::pin(async move {
                 let first_name = match jid.username() {
-                    _ if jid.username() == Some(&account_node) => "Jane",
-                    Some("a") => "Tick",
-                    Some("b") => "Trick",
-                    Some("c") => "Track",
+                    _ if jid.username() == &account_node => "Jane",
+                    "a" => "Tick",
+                    "b" => "Trick",
+                    "c" => "Track",
                     _ => panic!("Unexpected JID"),
                 };
 
@@ -183,36 +189,36 @@ async fn test_creates_group() -> Result<()> {
 
                 assert_eq!(
                     room.members(),
-                    HashMap::from([
+                    vec![
                         (
-                            bare!("jane.doe@prose.org"),
+                            user_id!("jane.doe@prose.org"),
                             RoomMember {
                                 name: "Jane".to_string(),
                                 affiliation: RoomAffiliation::Owner,
                             }
                         ),
                         (
-                            bare!("a@prose.org"),
+                            user_id!("a@prose.org"),
                             RoomMember {
                                 name: "Tick".to_string(),
                                 affiliation: RoomAffiliation::Owner,
                             }
                         ),
                         (
-                            bare!("b@prose.org"),
+                            user_id!("b@prose.org"),
                             RoomMember {
                                 name: "Trick".to_string(),
                                 affiliation: RoomAffiliation::Owner,
                             }
                         ),
                         (
-                            bare!("c@prose.org"),
+                            user_id!("c@prose.org"),
                             RoomMember {
                                 name: "Track".to_string(),
                                 affiliation: RoomAffiliation::Owner,
                             }
                         )
-                    ])
+                    ]
                 );
 
                 Some(Arc::new(room))
@@ -323,10 +329,8 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
 
     let channel_jid = room_id!("org.prose.private-channel.hash-1@conf.prose.org");
-    let full_jid = channel_jid
-        .clone()
-        .into_inner()
-        .with_resource_str(&format!("{}-hash-2", mock_data::account_jid().node_str().unwrap(),))
+    let occupant_id = channel_jid
+        .occupant_id_with_nickname(&format!("{}-hash-2", mock_data::account_jid().username()))
         .unwrap();
 
     // Make sure that the method calls are in the exact order…
@@ -341,21 +345,21 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             Some(Arc::new(
                 RoomInternals::group(room_id!("group@conf.prose.org")).with_members(vec![
                     (
-                        mock_data::account_jid().into_bare(),
+                        mock_data::account_jid().into_user_id(),
                         RoomMember {
                             name: "Jane Doe".to_string(),
                             affiliation: RoomAffiliation::Owner,
                         },
                     ),
                     (
-                        bare!("a@prose.org"),
+                        user_id!("a@prose.org"),
                         RoomMember {
                             name: "Member A".to_string(),
                             affiliation: RoomAffiliation::Owner,
                         },
                     ),
                     (
-                        bare!("b@prose.org"),
+                        user_id!("b@prose.org"),
                         RoomMember {
                             name: "Member B".to_string(),
                             affiliation: RoomAffiliation::Owner,
@@ -389,7 +393,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
-                predicate::eq(full_jid),
+                predicate::eq(occupant_id),
                 predicate::eq("Private Channel"),
                 predicate::eq(RoomSpec::PrivateChannel),
             )
@@ -433,7 +437,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .in_sequence(&mut seq)
         .with(
             predicate::eq(channel_jid.clone()),
-            predicate::in_iter(vec![bare!("a@prose.org"), bare!("b@prose.org")]),
+            predicate::in_iter(vec![user_id!("a@prose.org"), user_id!("b@prose.org")]),
         )
         .returning(|_, _| Box::pin(async { Ok(()) }));
 

@@ -47,7 +47,7 @@ impl PresenceMap {
             }
             UserOrResourceId::UserResource(id) => {
                 if let Some(entries) = self.map.get_mut(&id.to_user_id()) {
-                    entries.retain(|p| p.resource.as_deref() != Some(id.resource_str()))
+                    entries.retain(|p| p.resource.as_deref() != Some(id.resource()))
                 }
             }
         }

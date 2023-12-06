@@ -41,7 +41,7 @@ impl RoomSessionInfo {
             room_name: None,
             room_description: None,
             room_type,
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             members: vec![],
             room_has_been_created: true,
         }

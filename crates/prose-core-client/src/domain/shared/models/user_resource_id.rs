@@ -27,17 +27,18 @@ impl UserResourceId {
         UserId::from(self.0.into_bare())
     }
 
-    pub fn resource_str(&self) -> &str {
+    pub fn resource(&self) -> &str {
         &self.0.resource_str()
     }
 
-    pub fn node_str(&self) -> Option<&str> {
-        self.0.node_str()
+    pub fn username(&self) -> &str {
+        self.0.node_str().expect("Missing node in UserId")
     }
 }
 
 impl From<FullJid> for UserResourceId {
     fn from(value: FullJid) -> Self {
+        assert!(value.node_str().is_some(), "Missing node in UserResourceId");
         UserResourceId(value)
     }
 }

@@ -17,6 +17,8 @@ pub trait StringExt {
     /// Basic usage:
     ///
     /// ```
+    /// use prose_core_client::util::StringExt;
+    ///
     /// let jid_username = "john_doe";
     /// assert_eq!(jid_username.capitalized_display_name(), "John Doe");
     ///

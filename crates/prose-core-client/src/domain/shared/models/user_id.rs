@@ -29,8 +29,8 @@ impl UserId {
         Ok(UserResourceId::from(self.0.with_resource_str(res.as_ref())?))
     }
 
-    pub fn username(&self) -> Option<&str> {
-        self.0.node_str()
+    pub fn username(&self) -> &str {
+        self.0.node_str().expect("Missing node in UserId")
     }
 
     pub fn formatted_username(&self) -> String {
@@ -43,6 +43,7 @@ impl UserId {
 
 impl From<BareJid> for UserId {
     fn from(value: BareJid) -> Self {
+        assert!(value.node_str().is_some(), "Missing node in UserId");
         UserId(value)
     }
 }

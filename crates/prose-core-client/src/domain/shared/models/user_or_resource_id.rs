@@ -22,7 +22,7 @@ impl UserOrResourceId {
     pub fn resource_str(&self) -> Option<&str> {
         match self {
             UserOrResourceId::User(_) => None,
-            UserOrResourceId::UserResource(id) => Some(id.resource_str()),
+            UserOrResourceId::UserResource(id) => Some(id.resource()),
         }
     }
 }

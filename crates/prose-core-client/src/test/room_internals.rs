@@ -22,11 +22,7 @@ impl RoomInternals {
     pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
         Self::pending(
             &jid.into(),
-            &format!(
-                "{}-{}",
-                mock_data::account_jid().node_str().unwrap(),
-                next_hash
-            ),
+            &format!("{}-{}", mock_data::account_jid().username(), next_hash),
         )
     }
 
@@ -34,7 +30,7 @@ impl RoomInternals {
         Self::new(RoomInfo {
             room_id: jid.into(),
             description: None,
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::Group,
         })
     }
@@ -43,7 +39,7 @@ impl RoomInternals {
         Self::new(RoomInfo {
             room_id: jid.into(),
             description: None,
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PublicChannel,
         })
     }
@@ -52,7 +48,7 @@ impl RoomInternals {
         Self::new(RoomInfo {
             room_id: jid.into(),
             description: None,
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PrivateChannel,
         })
     }
