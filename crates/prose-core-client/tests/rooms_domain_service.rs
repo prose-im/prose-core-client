@@ -184,17 +184,12 @@ async fn test_creates_group() -> Result<()> {
                 ));
 
                 let room = handler(room.clone());
+                let mut members = room.members();
+                members.sort_by_key(|(id, _)| id.clone());
 
                 assert_eq!(
-                    room.members(),
+                    members,
                     vec![
-                        (
-                            user_id!("jane.doe@prose.org"),
-                            RoomMember {
-                                name: "Jane".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            }
-                        ),
                         (
                             user_id!("a@prose.org"),
                             RoomMember {
@@ -215,7 +210,14 @@ async fn test_creates_group() -> Result<()> {
                                 name: "Track".to_string(),
                                 affiliation: RoomAffiliation::Owner,
                             }
-                        )
+                        ),
+                        (
+                            user_id!("jane.doe@prose.org"),
+                            RoomMember {
+                                name: "Jane".to_string(),
+                                affiliation: RoomAffiliation::Owner,
+                            }
+                        ),
                     ]
                 );
 

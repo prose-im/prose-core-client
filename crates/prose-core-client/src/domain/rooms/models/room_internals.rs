@@ -84,6 +84,10 @@ impl RoomInternals {
         self.state.read().participants.get(&id).cloned()
     }
 
+    pub fn get_member(&self, id: &UserId) -> Option<RoomMember> {
+        self.state.read().members.get(&id).cloned()
+    }
+
     pub fn insert_participant(
         &self,
         id: &ParticipantId,
@@ -170,9 +174,7 @@ impl RoomInternals {
 
         let mut state = self.state.read().clone();
         state.name = name;
-
-        // TODO: Merge members
-        todo!("Merge members");
+        state.members.extend(members);
 
         Self {
             info,

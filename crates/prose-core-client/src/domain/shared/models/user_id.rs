@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
@@ -95,5 +96,21 @@ impl KeyType for UserId {
 impl KeyType for &UserId {
     fn to_raw_key(&self) -> RawKey {
         RawKey::Text(self.0.to_string())
+    }
+}
+
+impl PartialOrd for UserId {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for UserId {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let ord = self.username().cmp(other.username());
+        if ord != Ordering::Equal {
+            return ord;
+        }
+        self.0.domain_str().cmp(other.0.domain_str())
     }
 }

@@ -299,11 +299,22 @@ impl<Kind> Room<Kind> {
     }
 
     async fn resolve_user_name(&self, id: &ParticipantId) -> String {
-        let name = self.data.get_participant(id).and_then(|p| p.name);
+        let name = self.data.get_participant(id).and_then(|p| {
+            p.name.or_else(|| {
+                p.id.and_then(|id| self.data.get_member(&id))
+                    .map(|m| m.name)
+            })
+        });
 
         if let Some(name) = name {
             return name;
         };
+
+        if let ParticipantId::User(user_id) = id {
+            if let Some(name) = self.data.get_member(user_id).map(|m| m.name) {
+                return name;
+            }
+        }
 
         match id {
             ParticipantId::User(id) => self
