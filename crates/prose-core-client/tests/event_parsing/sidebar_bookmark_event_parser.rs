@@ -6,8 +6,8 @@
 use anyhow::Result;
 
 use prose_core_client::app::event_handlers::{ServerEvent, SidebarBookmarkEvent};
-use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::dtos::{Bookmark, RoomId};
+use prose_core_client::domain::shared::models::RoomId;
+use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType};
 use prose_core_client::room_id;
 use prose_core_client::test::parse_xml;
 use prose_proc_macros::mt_test;

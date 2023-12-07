@@ -407,7 +407,7 @@ async fn test_handles_removed_direct_message() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .handle_removed_items(&[&room_id!("contact@prose.org")])
+        .handle_removed_items(&[room_id!("contact@prose.org")])
         .await?;
 
     Ok(())

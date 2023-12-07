@@ -101,6 +101,7 @@ pub enum RequestEventType {
     LastActivity,
     Capabilities { id: CapabilitiesId },
     SoftwareVersion,
+    PresenceSubscription,
 }
 
 #[derive(Debug, Clone, PartialEq)]

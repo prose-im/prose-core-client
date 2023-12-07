@@ -15,15 +15,14 @@ use prose_proc_macros::mt_test;
 async fn test_ping() -> Result<()> {
     // XEP-0199: XMPP Ping
     // https://xmpp.org/extensions/xep-0199.html
-    let events =
-        parse_xml(
-            r#"
+    let events = parse_xml(
+        r#"
         <iq xmlns="jabber:client" from="prose.org" id="req-id" type="get">
           <ping xmlns='urn:xmpp:ping'/>
         </iq>
         "#,
-        )
-        .await?;
+    )
+    .await?;
 
     assert_eq!(
         events,
@@ -42,15 +41,14 @@ async fn test_local_time() -> Result<()> {
     // XEP-0202: Entity Time
     // https://xmpp.org/extensions/xep-0202.html
 
-    let events =
-        parse_xml(
-            r#"
+    let events = parse_xml(
+        r#"
         <iq xmlns="jabber:client" from="user@prose.org/res" id="req-id" type="get">
           <time xmlns="urn:xmpp:time" />
         </iq>
         "#,
-        )
-        .await?;
+    )
+    .await?;
 
     assert_eq!(
         events,
@@ -138,6 +136,29 @@ async fn test_software_version() -> Result<()> {
             request_id: RequestId::from("req-id"),
             sender_id: sender_id!("user@prose.org/res"),
             r#type: RequestEventType::SoftwareVersion,
+        })]
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_presence_subscription() -> Result<()> {
+    // https://xmpp.org/rfcs/rfc6121.html#sub-request
+
+    let events = parse_xml(
+        r#"
+        <presence xmlns="jabber:client" from="user@prose.org" type="subscribe" />
+        "#,
+    )
+    .await?;
+
+    assert_eq!(
+        events,
+        vec![ServerEvent::Request(RequestEvent {
+            request_id: RequestId::from(""),
+            sender_id: sender_id!("user@prose.org"),
+            r#type: RequestEventType::PresenceSubscription,
         })]
     );
 

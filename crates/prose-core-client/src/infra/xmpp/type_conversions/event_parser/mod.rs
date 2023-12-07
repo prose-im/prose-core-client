@@ -14,7 +14,7 @@ use prose_xmpp::{
     client::Event as XMPPClientEvent, mods::caps::Event as XMPPCapsEvent,
     mods::chat::Event as XMPPChatEvent, mods::muc::Event as XMPPMUCEvent,
     mods::ping::Event as XMPPPingEvent, mods::profile::Event as XMPPProfileEvent,
-    mods::status::Event as XMPPStatusEvent, Event,
+    mods::roster::Event as XMPPRosterEvent, mods::status::Event as XMPPStatusEvent, Event,
 };
 
 use crate::app::event_handlers::{
@@ -50,8 +50,7 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
         Event::Ping(event) => parse_ping_event(&mut ctx, event)?,
         Event::Profile(event) => parse_profile_event(&mut ctx, event)?,
         Event::PubSub(event) => parse_pubsub_event(&mut ctx, event)?,
-        // TODO: Handle presence subscription request
-        Event::Roster(_) => (),
+        Event::Roster(event) => parse_roster_event(&mut ctx, event)?,
         Event::Status(event) => parse_status_event(&mut ctx, event)?,
     };
 
@@ -246,6 +245,18 @@ fn parse_client_event(ctx: &mut Context, event: XMPPClientEvent) -> Result<()> {
         XMPPClientEvent::Disconnected { error } => {
             ctx.push_event(ConnectionEvent::Disconnected { error })
         }
+    }
+
+    Ok(())
+}
+
+fn parse_roster_event(ctx: &mut Context, event: XMPPRosterEvent) -> Result<()> {
+    match event {
+        XMPPRosterEvent::PresenceSubscriptionRequest { from } => ctx.push_event(RequestEvent {
+            sender_id: SenderId::from(Jid::Bare(from)),
+            request_id: RequestId::from("".to_string()),
+            r#type: RequestEventType::PresenceSubscription,
+        }),
     }
 
     Ok(())

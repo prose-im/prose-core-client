@@ -6,7 +6,7 @@
 use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::iq::Iq;
-use xmpp_parsers::presence::Presence;
+use xmpp_parsers::presence::{Presence, Type};
 use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
 use xmpp_parsers::{presence, pubsub};
 
@@ -35,6 +35,16 @@ impl Module for Status {
     }
 
     fn handle_presence_stanza(&self, stanza: &Presence) -> Result<()> {
+        match stanza.type_ {
+            Type::Error
+            | Type::Probe
+            | Type::Subscribe
+            | Type::Subscribed
+            | Type::Unsubscribe
+            | Type::Unsubscribed => return Ok(()),
+            Type::None | Type::Unavailable => {}
+        }
+
         self.ctx
             .schedule_event(ClientEvent::Status(Event::Presence(stanza.clone())));
         Ok(())
