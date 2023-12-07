@@ -287,7 +287,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_set()
         .once()
         .with(predicate::eq(Arc::new(RoomInternals::mock_pending_room(
-            room_id!("org.prose.public-channel.hash-1@conference.prose.org"),
+            room_id!("org.prose.channel.hash-1@conference.prose.org"),
             "hash-2",
         ))))
         .return_once(|_| Ok(()));
@@ -298,7 +298,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(RoomSessionInfo::new_room(
-                    room_id!("org.prose.public-channel.hash-1@conference.prose.org"),
+                    room_id!("org.prose.channel.hash-1@conference.prose.org"),
                     RoomType::PublicChannel,
                 ))
             })
@@ -308,14 +308,12 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(room_id!(
-                "org.prose.public-channel.hash-1@conference.prose.org"
-            )),
+            predicate::eq(room_id!("org.prose.channel.hash-1@conference.prose.org")),
             predicate::always(),
         )
         .return_once(|_, _| {
             Some(Arc::new(RoomInternals::public_channel(room_id!(
-                "org.prose.public-channel.hash-1@conference.prose.org"
+                "org.prose.channel.hash-1@conference.prose.org"
             ))))
         });
 
@@ -338,7 +336,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
 
-    let channel_jid = room_id!("org.prose.private-channel.hash-1@conf.prose.org");
+    let channel_jid = room_id!("org.prose.channel.hash-1@conf.prose.org");
     let occupant_id = channel_jid
         .occupant_id_with_nickname(&format!("{}-hash-2", mock_data::account_jid().username()))
         .unwrap();

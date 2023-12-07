@@ -34,8 +34,7 @@ use crate::ClientRoomEventType;
 use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
 
 const GROUP_PREFIX: &str = "org.prose.group";
-const PRIVATE_CHANNEL_PREFIX: &str = "org.prose.private-channel";
-const PUBLIC_CHANNEL_PREFIX: &str = "org.prose.public-channel";
+const CHANNEL_PREFIX: &str = "org.prose.channel";
 
 #[derive(DependenciesStruct)]
 pub struct RoomsDomainService {
@@ -366,7 +365,7 @@ impl RoomsDomainService {
                 self.create_or_join_room_with_spec(
                     &service,
                     &user_jid,
-                    &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
+                    &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
                     RoomSpec::PrivateChannel,
                     |_| async { Ok(()) },
@@ -389,7 +388,7 @@ impl RoomsDomainService {
                 self.create_or_join_room_with_spec(
                     &service,
                     &user_jid,
-                    &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
+                    &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
                     RoomSpec::PublicChannel,
                     |_| async { Ok(()) },
