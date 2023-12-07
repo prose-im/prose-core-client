@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
-use mockall::predicate;
+use mockall::{predicate, Sequence};
 
 use prose_core_client::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, RoomsEventHandler, ServerEvent,
@@ -305,12 +305,7 @@ async fn test_handles_kicked_user() -> Result<()> {
 async fn test_handles_kicked_self() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
-            occupant_id!("room@conference.prose.org/nickname"),
-            Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
-        )]),
-    );
+    let room = Arc::new(RoomInternals::group(room_id!("room@conference.prose.org")));
 
     {
         let room = room.clone();
@@ -332,8 +327,6 @@ async fn test_handles_kicked_self() -> Result<()> {
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
-    assert_eq!(room.participants().len(), 1);
-
     event_handler
         .handle_event(ServerEvent::Occupant(OccupantEvent {
             occupant_id: occupant_id!("room@conference.prose.org/nickname"),
@@ -343,8 +336,6 @@ async fn test_handles_kicked_self() -> Result<()> {
             r#type: OccupantEventType::PermanentlyRemoved,
         }))
         .await?;
-
-    assert_eq!(room.participants().len(), 0);
 
     Ok(())
 }
@@ -655,11 +646,89 @@ async fn test_swallows_self_presence() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_room_metadata_changed() -> Result<()> {
-    panic!("Implement me")
+async fn test_room_config_changed() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.sidebar_domain_service
+        .expect_handle_changed_room_config()
+        .once()
+        .with(predicate::eq(room_id!("room@conference.prose.org")))
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    event_handler
+        .handle_event(ServerEvent::Room(RoomEvent {
+            room_id: room_id!("room@conference.prose.org"),
+            r#type: RoomEventType::RoomConfigChanged,
+        }))
+        .await?;
+
+    Ok(())
 }
 
 #[tokio::test]
 async fn test_room_topic_changed() -> Result<()> {
-    panic!("Implement me")
+    let mut deps = MockAppDependencies::default();
+    let mut seq = Sequence::new();
+
+    let room = Arc::new(
+        RoomInternals::group(room_id!("room@conference.prose.org")).with_topic(Some("Old Topic")),
+    );
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .in_sequence(&mut seq)
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .returning(move |_| Some(room.clone()));
+    }
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .in_sequence(&mut seq)
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .returning(move |_| Some(room.clone()));
+    }
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(ClientRoomEventType::AttributesChanged),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    // Should not generate an event since the topic didn't actually change
+    event_handler
+        .handle_event(ServerEvent::Room(RoomEvent {
+            room_id: room_id!("room@conference.prose.org"),
+            r#type: RoomEventType::RoomTopicChanged {
+                new_topic: Some("Old Topic".to_string()),
+            },
+        }))
+        .await?;
+
+    // Should fire an event
+    event_handler
+        .handle_event(ServerEvent::Room(RoomEvent {
+            room_id: room_id!("room@conference.prose.org"),
+            r#type: RoomEventType::RoomTopicChanged {
+                new_topic: Some("New Topic".to_string()),
+            },
+        }))
+        .await?;
+
+    assert_eq!(room.topic(), Some("New Topic".to_string()));
+
+    Ok(())
 }

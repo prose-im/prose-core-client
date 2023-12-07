@@ -601,3 +601,8 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
 
     Ok(())
 }
+
+#[tokio::test]
+async fn test_handles_changed_room_config() -> Result<()> {
+    panic!("Implement me")
+}

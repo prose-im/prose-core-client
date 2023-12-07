@@ -63,6 +63,11 @@ impl RoomInternals {
         self
     }
 
+    pub fn with_topic(self, topic: Option<&str>) -> Self {
+        self.set_topic(topic.map(ToString::to_string));
+        self
+    }
+
     pub fn with_members(self, members: impl IntoIterator<Item = RegisteredMember>) -> Self {
         self.participants_mut().set_registered_members(members);
         self

@@ -160,14 +160,22 @@ impl RoomsEventHandler {
                     .await?;
             }
             RoomEventType::RoomConfigChanged => {
-                todo!("Reload config and validate if room is still configured as expected")
+                self.sidebar_domain_service
+                    .handle_changed_room_config(&event.room_id)
+                    .await?;
             }
             RoomEventType::RoomTopicChanged { new_topic } => {
                 info!(
                     "Updating topic of room {} to '{:?}'",
                     event.room_id, new_topic
                 );
-                self.get_room(&event.room_id)?.set_topic(new_topic)
+
+                let room = self.get_room(&event.room_id)?;
+                if room.topic() != new_topic {
+                    room.set_topic(new_topic);
+                    self.client_event_dispatcher
+                        .dispatch_room_event(room, ClientRoomEventType::AttributesChanged)
+                }
             }
             RoomEventType::ReceivedInvitation { sender, password } => {
                 info!(
