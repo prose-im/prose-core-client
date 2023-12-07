@@ -465,6 +465,135 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_converts_private_to_public_channel() -> Result<()> {
-    panic!("Implement me")
+async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Result<()> {
+    let mut deps = MockRoomsDomainServiceDependencies::default();
+
+    // Make sure that the method calls are in the exact order…
+    let mut seq = Sequence::new();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room_id!("channel@conf.prose.org")))
+        .return_once(|_| {
+            Some(Arc::new(
+                RoomInternals::private_channel(room_id!("channel@conf.prose.org")).with_members(
+                    vec![
+                        (
+                            mock_data::account_jid().into_user_id(),
+                            RoomMember {
+                                name: "Jane Doe".to_string(),
+                                affiliation: RoomAffiliation::Owner,
+                            },
+                        ),
+                        (
+                            user_id!("a@prose.org"),
+                            RoomMember {
+                                name: "Member A".to_string(),
+                                affiliation: RoomAffiliation::Owner,
+                            },
+                        ),
+                    ],
+                ),
+            ))
+        });
+
+    deps.room_management_service
+        .expect_load_public_rooms()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(vec![]) }));
+
+    deps.room_management_service
+        .expect_reconfigure_room()
+        .with(
+            predicate::eq(room_id!("channel@conf.prose.org")),
+            predicate::eq(RoomSpec::PublicChannel),
+            predicate::eq("Public Channel"),
+        )
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+
+    let service = RoomsDomainService::from(deps.into_deps());
+
+    service
+        .reconfigure_room_with_spec(
+            &room_id!("channel@conf.prose.org"),
+            RoomSpec::PublicChannel,
+            "Public Channel",
+        )
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
+    let mut deps = MockRoomsDomainServiceDependencies::default();
+
+    // Make sure that the method calls are in the exact order…
+    let mut seq = Sequence::new();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room_id!("channel@conf.prose.org")))
+        .return_once(|_| {
+            Some(Arc::new(
+                RoomInternals::private_channel(room_id!("channel@conf.prose.org")).with_members(
+                    vec![
+                        (
+                            mock_data::account_jid().into_user_id(),
+                            RoomMember {
+                                name: "Jane Doe".to_string(),
+                                affiliation: RoomAffiliation::Owner,
+                            },
+                        ),
+                        (
+                            user_id!("a@prose.org"),
+                            RoomMember {
+                                name: "Member A".to_string(),
+                                affiliation: RoomAffiliation::Owner,
+                            },
+                        ),
+                    ],
+                ),
+            ))
+        });
+
+    deps.room_management_service
+        .expect_load_public_rooms()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(vec![PublicRoomInfo {
+                    jid: room_id!("room@conference.prose.org"),
+                    name: Some("new channel".to_string()),
+                }])
+            })
+        });
+
+    let service = RoomsDomainService::from(deps.into_deps());
+
+    let result =
+        service
+            .reconfigure_room_with_spec(
+                &room_id!("channel@conf.prose.org"),
+                RoomSpec::PublicChannel,
+                "New Channel",
+            )
+            .await;
+
+    let Err(RoomError::PublicChannelNameConflict) = result else {
+        panic!(
+            "Expected RoomError::PublicChannelNameConflict. Got {:?}",
+            result
+        )
+    };
+
+    Ok(())
 }

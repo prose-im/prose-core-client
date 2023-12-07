@@ -220,8 +220,19 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
                 Ok(new_room)
             }
-            (RoomType::PrivateChannel, RoomType::PublicChannel)
-            | (RoomType::PublicChannel, RoomType::PrivateChannel) => {
+            (RoomType::PrivateChannel, RoomType::PublicChannel) => {
+                // Ensure that the new name doesn't exist already.
+                if !self.is_public_channel_name_unique(new_name).await? {
+                    return Err(RoomError::PublicChannelNameConflict);
+                }
+
+                self.room_management_service
+                    .reconfigure_room(room_jid, spec, new_name)
+                    .await?;
+
+                Ok(room)
+            }
+            (RoomType::PublicChannel, RoomType::PrivateChannel) => {
                 self.room_management_service
                     .reconfigure_room(room_jid, spec, new_name)
                     .await?;
