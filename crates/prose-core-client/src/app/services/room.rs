@@ -252,14 +252,13 @@ impl<Kind> Room<Kind> {
     async fn reduce_messages_and_add_sender(&self, messages: Vec<MessageLike>) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
         let mut message_dtos = Vec::with_capacity(messages.len());
-        let participants = self.data.participants();
 
         for message in messages {
             let participant_id = match &message.from {
                 Jid::Bare(id) => ParticipantId::User(id.clone().into()),
                 Jid::Full(id) => ParticipantId::Occupant(id.clone().into()),
             };
-            let name = self.resolve_user_name(&participant_id, &participants).await;
+            let name = self.resolve_user_name(&participant_id).await;
 
             let from = MessageSender {
                 jid: message.from.into_bare(),
@@ -282,20 +281,18 @@ impl<Kind> Room<Kind> {
         message_dtos
     }
 
-    async fn resolve_user_name(
-        &self,
-        id: &ParticipantId,
-        participants: &ParticipantList,
-    ) -> String {
-        let participant = participants.get(id);
+    async fn resolve_user_name(&self, id: &ParticipantId) -> String {
+        let participant = self
+            .data
+            .participants()
+            .get(id)
+            .map(|p| (p.name.clone(), p.real_id.clone()));
 
-        if let Some(name) = participant.and_then(|p| p.name.clone()) {
+        if let Some(name) = participant.as_ref().and_then(|p| p.0.clone()) {
             return name;
         }
 
-        let real_id = participant
-            .and_then(|p| p.real_id.clone())
-            .or_else(|| id.to_user_id());
+        let real_id = participant.and_then(|p| p.1).or_else(|| id.to_user_id());
 
         if let Some(real_id) = real_id {
             if let Some(name) = self

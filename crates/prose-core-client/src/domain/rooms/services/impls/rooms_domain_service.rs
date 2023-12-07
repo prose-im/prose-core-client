@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use base64::{engine::general_purpose, DecodeError, Engine as _};
 use jid::{BareJid, NodePart};
 use sha1::{Digest, Sha1};
 use tracing::{debug, error, info, warn};
@@ -288,11 +289,12 @@ impl RoomsDomainService {
         password: Option<&str>,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let user_jid = self.ctx.connected_id()?.to_user_id();
-        // We generate a random suffix to prevent any nickname conflicts…
+        // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
+        // identical between multiple sessions so that these would be displayed as one user.
         let nickname = format!(
-            "{}",
+            "{}#{}",
             user_jid.username(),
-            // self.id_provider.new_id()
+            general_purpose::STANDARD.encode(user_jid.to_string())
         );
 
         // Insert pending room so that we don't miss any stanzas for this room while we're

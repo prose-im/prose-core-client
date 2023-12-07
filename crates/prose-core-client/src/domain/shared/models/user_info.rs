@@ -19,6 +19,7 @@ pub struct UserPresenceInfo {
     pub availability: Availability,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct ParticipantInfo {
     pub id: Option<UserId>,
     pub name: String,
