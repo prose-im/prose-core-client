@@ -20,7 +20,7 @@ use crate::app::deps::{
     DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
-use crate::domain::rooms::models::{ParticipantList, RoomAffiliation, RoomInternals, RoomSpec};
+use crate::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomSpec};
 use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{Message as MessageDTO, MessageSender, UserBasicInfo, UserId};
 use crate::ClientRoomEventType;

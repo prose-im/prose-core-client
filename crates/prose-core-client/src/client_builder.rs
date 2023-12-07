@@ -190,7 +190,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             //Box::new(UserStateEventHandler::from(&dependencies)),
             Box::new(MessagesEventHandler::from(&dependencies)),
             //Box::new(RoomsEventHandler::from(&dependencies)),
-            Box::new(BookmarksEventHandler::from(&dependencies)),
+            //Box::new(BookmarksEventHandler::from(&dependencies)),
         ]);
 
         let client_inner = Arc::new(ClientInner {

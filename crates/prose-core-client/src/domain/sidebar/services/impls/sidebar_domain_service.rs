@@ -362,12 +362,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// - Disconnects channels and updates the repository state for each provided JID.
     /// - Bookmarks remain untouched.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_removed_items(&self, room_jids: &[&RoomId]) -> Result<()> {
-        for jid in room_jids {
-            let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
+    async fn handle_removed_items(&self, room_ids: &[RoomId]) -> Result<()> {
+        for id in room_ids {
+            let Some(sidebar_item) = self.sidebar_repo.get(id) else {
                 continue;
             };
-            self.sidebar_repo.delete(&jid);
+            self.sidebar_repo.delete(&id);
             self.disconnect_room_for_removed_sidebar_item_if_needed(&sidebar_item)
                 .await?;
         }

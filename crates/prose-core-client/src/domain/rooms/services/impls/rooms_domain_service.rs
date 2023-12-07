@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use base64::{engine::general_purpose, DecodeError, Engine as _};
+use base64::{engine::general_purpose, Engine as _};
 use jid::{BareJid, NodePart};
 use sha1::{Digest, Sha1};
 use tracing::{debug, error, info, warn};

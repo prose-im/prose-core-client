@@ -102,7 +102,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// - Disconnects channels and updates the repository state for each provided JID.
     /// - Bookmarks remain untouched.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_removed_items(&self, room_ids: &[&RoomId]) -> Result<()>;
+    async fn handle_removed_items(&self, room_ids: &[RoomId]) -> Result<()>;
 
     /// Disconnects *all* rooms and deletes all sidebar items. Dispatches
     /// a `ClientEvent::SidebarChanged` event after processing.

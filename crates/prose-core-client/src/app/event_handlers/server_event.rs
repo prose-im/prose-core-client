@@ -5,12 +5,13 @@
 
 use prose_xmpp::ConnectionError;
 
-use crate::domain::shared::models::AnonOccupantId;
-use crate::domain::shared::models::SenderId;
-use crate::domain::shared::models::{CapabilitiesId, RequestId};
+use crate::domain::sidebar::models::Bookmark;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
-    shared::models::{Availability, OccupantId, RoomId, UserEndpointId, UserId, UserResourceId},
+    shared::models::{
+        AnonOccupantId, Availability, CapabilitiesId, OccupantId, RequestId, RoomId, SenderId,
+        UserEndpointId, UserId, UserResourceId,
+    },
     user_info::models::{AvatarMetadata, UserStatus},
     user_profiles::models::UserProfile,
 };
@@ -32,7 +33,8 @@ pub enum ServerEvent {
     Request(RequestEvent),
     // TODO…
     Message(MessageEvent),
-    // TODO: Bookmarks (PubSub!)
+    /// Events about changes to the sidebar.
+    SidebarBookmark(SidebarBookmarkEvent),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -155,4 +157,11 @@ pub struct MessageEvent {
 pub enum MessageEventType {
     Received, // Regular messages
     Sync,     // Carbons
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum SidebarBookmarkEvent {
+    AddedOrUpdated { bookmarks: Vec<Bookmark> },
+    Deleted { ids: Vec<RoomId> },
+    Purged,
 }

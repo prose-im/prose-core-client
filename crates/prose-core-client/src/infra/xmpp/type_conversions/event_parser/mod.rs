@@ -17,19 +17,21 @@ use prose_xmpp::{
     mods::status::Event as XMPPStatusEvent, Event,
 };
 
-use crate::app::event_handlers::XMPPEvent;
 use crate::app::event_handlers::{
     ConnectionEvent, MessageEvent, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
     RoomEventType, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
     UserResourceEventType, UserStatusEvent, UserStatusEventType,
 };
+use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{CapabilitiesId, RequestId, SenderId, UserEndpointId};
 use crate::dtos::{RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
+use crate::infra::xmpp::type_conversions::event_parser::pubsub::parse_pubsub_event;
 
 mod message;
 mod presence;
+mod pubsub;
 
 pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
     let mut ctx = Context::default();
@@ -47,7 +49,8 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
         Event::MUC(event) => parse_muc_event(&mut ctx, event)?,
         Event::Ping(event) => parse_ping_event(&mut ctx, event)?,
         Event::Profile(event) => parse_profile_event(&mut ctx, event)?,
-        Event::PubSub(_) => (),
+        Event::PubSub(event) => parse_pubsub_event(&mut ctx, event)?,
+        // TODO: Handle presence subscription request
         Event::Roster(_) => (),
         Event::Status(event) => parse_status_event(&mut ctx, event)?,
     };
@@ -102,14 +105,12 @@ fn parse_status_event(ctx: &mut Context, event: XMPPStatusEvent) -> Result<()> {
         XMPPStatusEvent::UserActivity {
             from,
             user_activity,
-        } => {
-            ctx.push_event(UserInfoEvent {
-                user_id: UserId::from(from.into_bare()),
-                r#type: UserInfoEventType::StatusChanged {
-                    status: user_activity.map(TryInto::try_into).transpose()?,
-                },
-            })
-        }
+        } => ctx.push_event(UserInfoEvent {
+            user_id: UserId::from(from.into_bare()),
+            r#type: UserInfoEventType::StatusChanged {
+                status: user_activity.map(TryInto::try_into).transpose()?,
+            },
+        }),
     };
     Ok(())
 }
@@ -321,5 +322,10 @@ impl From<RequestEvent> for ServerEvent {
 impl From<MessageEvent> for ServerEvent {
     fn from(value: MessageEvent) -> Self {
         Self::Message(value)
+    }
+}
+impl From<SidebarBookmarkEvent> for ServerEvent {
+    fn from(value: SidebarBookmarkEvent) -> Self {
+        Self::SidebarBookmark(value)
     }
 }
