@@ -81,10 +81,19 @@ impl RoomsEventHandler {
         let room = self.get_room(&event.occupant_id.room_id())?;
         let participant_id = ParticipantId::Occupant(event.occupant_id.clone());
 
-        match event.r#type {
-            OccupantEventType::AffiliationChanged { affiliation } => {
-                room.participants_mut()
-                    .set_affiliation(&participant_id, &affiliation);
+        let participants_changed = match event.r#type {
+            OccupantEventType::AffiliationChanged { affiliation } => 'outer: {
+                let mut participants_changed = false;
+
+                {
+                    let mut participants = room.participants_mut();
+                    if participants.get(&participant_id).map(|p| &p.affiliation)
+                        != Some(&affiliation)
+                    {
+                        participants_changed = true;
+                        participants.set_affiliation(&participant_id, &affiliation);
+                    }
+                }
 
                 // Let's see if we knew the real id of the participant already, if not let's
                 // look up their name…
@@ -92,12 +101,12 @@ impl RoomsEventHandler {
                     event.real_id,
                     room.participants().get(&participant_id).cloned(),
                 ) else {
-                    return Ok(());
+                    break 'outer participants_changed;
                 };
 
                 if participant.real_id.is_some() {
                     // Real id was known already…
-                    return Ok(());
+                    break 'outer participants_changed;
                 }
 
                 let name = self.user_profile_repo.get_display_name(&real_id).await?;
@@ -107,11 +116,14 @@ impl RoomsEventHandler {
                     event.anon_occupant_id.as_ref(),
                     name.as_deref(),
                 );
+
+                true
             }
             OccupantEventType::DisconnectedByServer => {
                 room.participants_mut()
                     .set_availability(&participant_id, &Availability::Unavailable);
                 // TODO: If this affects us we should keep the connected room around, but add an error message to it.
+                true
             }
             OccupantEventType::PermanentlyRemoved => {
                 room.participants_mut().remove(&participant_id);
@@ -121,7 +133,14 @@ impl RoomsEventHandler {
                         .handle_removal_from_room(&event.occupant_id.room_id(), true)
                         .await?;
                 }
+
+                true
             }
+        };
+
+        if participants_changed {
+            self.client_event_dispatcher
+                .dispatch_room_event(room, ClientRoomEventType::ParticipantsChanged);
         }
 
         Ok(())

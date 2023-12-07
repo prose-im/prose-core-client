@@ -29,7 +29,7 @@ use prose_core_client::{
 };
 
 #[tokio::test]
-async fn test_handles_presence_for_muc_room() -> Result<()> {
+async fn test_adds_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room = Arc::new(RoomInternals::group(room_id!("room@conference.prose.org")));
@@ -48,6 +48,15 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
         .once()
         .with(predicate::eq(user_id!("real-jid@prose.org")))
         .return_once(|_| Box::pin(async { Ok(Some("George Washington".to_string())) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(ClientRoomEventType::ParticipantsChanged),
+        )
+        .return_once(|_, _| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
@@ -168,18 +177,21 @@ async fn test_user_entered_room_with_multiple_resources_and_different_nicknames(
 
 #[tokio::test]
 async fn test_handles_disconnected_participant() -> Result<()> {
-    panic!("Implement me")
-}
-
-#[tokio::test]
-async fn test_handles_added_member() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room = Arc::new(
         RoomInternals::private_channel(room_id!("room@conference.prose.org")).with_participants(
             vec![(
                 occupant_id!("room@conference.prose.org/a"),
-                Participant::owner(),
+                Participant {
+                    real_id: None,
+                    anon_occupant_id: None,
+                    name: None,
+                    affiliation: RoomAffiliation::Admin,
+                    availability: Availability::Available,
+                    compose_state: ComposeState::Composing,
+                    compose_state_updated: Default::default(),
+                },
             )],
         ),
     );
@@ -193,28 +205,31 @@ async fn test_handles_added_member() -> Result<()> {
             .returning(move |_| Some(room.clone()));
     }
 
-    deps.user_profile_repo
-        .expect_get_display_name()
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
         .once()
-        .with(predicate::eq(user_id!("b@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Mike Doe".to_string())) }));
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(ClientRoomEventType::ParticipantsChanged),
+        )
+        .return_once(|_, _| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
     event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@conference.prose.org/b").into(),
+            user_id: occupant_id!("room@conference.prose.org/a").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
+                availability: Availability::Unavailable,
                 priority: 0,
             },
         }))
         .await?;
     event_handler
         .handle_event(ServerEvent::Occupant(OccupantEvent {
-            occupant_id: occupant_id!("room@conference.prose.org/b"),
+            occupant_id: occupant_id!("room@conference.prose.org/a"),
             anon_occupant_id: None,
-            real_id: Some(user_id!("b@prose.org")),
+            real_id: None,
             is_self: false,
             r#type: OccupantEventType::AffiliationChanged {
                 affiliation: RoomAffiliation::Member,
@@ -222,21 +237,17 @@ async fn test_handles_added_member() -> Result<()> {
         }))
         .await?;
 
-    let added_participant = room
-        .participants()
-        .get(&occupant_id!("room@conference.prose.org/b").into())
-        .cloned();
     assert_eq!(
-        added_participant,
-        Some(Participant {
-            real_id: Some(user_id!("b@prose.org")),
+        room.participants().iter().cloned().collect::<Vec<_>>(),
+        vec![Participant {
+            real_id: None,
             anon_occupant_id: None,
-            name: Some("Mike Doe".to_string()),
+            name: None,
             affiliation: RoomAffiliation::Member,
-            availability: Availability::Available,
-            compose_state: Default::default(),
+            availability: Availability::Unavailable,
+            compose_state: ComposeState::Idle,
             compose_state_updated: Default::default(),
-        })
+        }]
     );
 
     Ok(())
@@ -244,11 +255,54 @@ async fn test_handles_added_member() -> Result<()> {
 
 #[tokio::test]
 async fn test_handles_kicked_user() -> Result<()> {
-    panic!("Implement me")
+    let mut deps = MockAppDependencies::default();
+
+    let room = Arc::new(
+        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
+            occupant_id!("room@conference.prose.org/nickname"),
+            Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
+        )]),
+    );
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .returning(move |_| Some(room.clone()));
+    }
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(ClientRoomEventType::ParticipantsChanged),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    assert_eq!(room.participants().len(), 1);
+
+    event_handler
+        .handle_event(ServerEvent::Occupant(OccupantEvent {
+            occupant_id: occupant_id!("room@conference.prose.org/nickname"),
+            anon_occupant_id: None,
+            real_id: None,
+            is_self: false,
+            r#type: OccupantEventType::PermanentlyRemoved,
+        }))
+        .await?;
+
+    assert_eq!(room.participants().len(), 0);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_handles_disconnected_user() -> Result<()> {
+async fn test_handles_kicked_self() -> Result<()> {
     panic!("Implement me")
 }
 
@@ -555,4 +609,14 @@ async fn test_swallows_self_presence() -> Result<()> {
         .is_none());
 
     Ok(())
+}
+
+#[tokio::test]
+async fn test_room_metadata_changed() -> Result<()> {
+    panic!("Implement me")
+}
+
+#[tokio::test]
+async fn test_room_topic_changed() -> Result<()> {
+    panic!("Implement me")
 }

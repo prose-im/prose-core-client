@@ -43,6 +43,9 @@ pub enum ClientRoomEventType {
     /// Attributes changed like name or topic.
     AttributesChanged,
 
+    /// The list of participants has changed.
+    ParticipantsChanged,
+
     /// A user in `conversation` started or stopped typing.
     ComposingUsersChanged,
 }

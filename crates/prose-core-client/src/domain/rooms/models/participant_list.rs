@@ -63,7 +63,12 @@ impl ParticipantList {
     pub fn set_availability(&mut self, id: &ParticipantId, availability: &Availability) {
         self.participants_map
             .entry(id.clone())
-            .and_modify(|participant| participant.availability = availability.clone())
+            .and_modify(|participant| {
+                participant.availability = availability.clone();
+                if availability == &Availability::Unavailable {
+                    participant.compose_state = ComposeState::Idle;
+                }
+            })
             .or_insert_with(|| Participant {
                 real_id: None,
                 anon_occupant_id: None,
