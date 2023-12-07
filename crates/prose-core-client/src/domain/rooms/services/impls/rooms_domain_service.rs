@@ -238,12 +238,30 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .reconfigure_room(room_jid, spec, new_name)
                     .await?;
 
+                let Some(room) = self.connected_rooms_repo.update(room_jid, {
+                    Box::new(|room| room.by_changing_type(RoomType::PublicChannel))
+                }) else {
+                    return Err(RequestError::Generic {
+                        msg: "Room was modified during reconfiguration".to_string(),
+                    }
+                    .into());
+                };
+
                 Ok(room)
             }
             (RoomType::PublicChannel, RoomType::PrivateChannel) => {
                 self.room_management_service
                     .reconfigure_room(room_jid, spec, new_name)
                     .await?;
+
+                let Some(room) = self.connected_rooms_repo.update(room_jid, {
+                    Box::new(|room| room.by_changing_type(RoomType::PrivateChannel))
+                }) else {
+                    return Err(RequestError::Generic {
+                        msg: "Room was modified during reconfiguration".to_string(),
+                    }
+                    .into());
+                };
 
                 Ok(room)
             }

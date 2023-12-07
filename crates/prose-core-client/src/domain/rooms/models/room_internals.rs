@@ -117,6 +117,18 @@ impl RoomInternals {
             state: RwLock::new(state),
         }
     }
+
+    pub fn by_changing_type(&self, new_type: RoomType) -> Self {
+        Self {
+            info: RoomInfo {
+                room_id: self.room_id.clone(),
+                description: self.description.clone(),
+                user_nickname: self.user_nickname.clone(),
+                r#type: new_type,
+            },
+            state: RwLock::new(self.state.read().clone()),
+        }
+    }
 }
 
 impl RoomInternals {

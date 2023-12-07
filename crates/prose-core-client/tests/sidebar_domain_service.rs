@@ -36,14 +36,17 @@ async fn test_extends_sidebar() -> Result<()> {
             room_jid: room_id!("group@prose.org"),
             password: None,
         }))
-        .return_once(
-            |_| Box::pin(async { Ok(Arc::new(RoomInternals::group(room_id!("group@prose.org")))) })
-        );
+        .return_once(|_| {
+            Box::pin(async { Ok(Arc::new(RoomInternals::group(room_id!("group@prose.org")))) })
+        });
 
     deps.sidebar_repo
         .expect_put()
         .once()
-        .with(predicate::eq(SidebarItem::group(room_id!("group@prose.org"), "Group")))
+        .with(predicate::eq(SidebarItem::group(
+            room_id!("group@prose.org"),
+            "Group",
+        )))
         .return_once(|_| ());
 
     deps.client_event_dispatcher
@@ -54,8 +57,9 @@ async fn test_extends_sidebar() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![Bookmark::group(room_id!("group@prose.org"), "Group")
-            .set_in_sidebar(true)])
+        .extend_items_from_bookmarks(vec![
+            Bookmark::group(room_id!("group@prose.org"), "Group").set_in_sidebar(true)
+        ])
         .await?;
 
     Ok(())
@@ -145,7 +149,9 @@ async fn test_extends_sidebar_and_follows_new_locations() -> Result<()> {
         }))
         .return_once(|_| {
             Box::pin(async {
-                Ok(Arc::new(RoomInternals::group(room_id!("a2@prose.org")).with_name("Group")))
+                Ok(Arc::new(
+                    RoomInternals::group(room_id!("a2@prose.org")).with_name("Group"),
+                ))
             })
         });
 
@@ -217,8 +223,9 @@ async fn test_handles_removed_item() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![Bookmark::group(room_id!("group@prose.org"), "Group")
-            .set_in_sidebar(false)])
+        .extend_items_from_bookmarks(vec![
+            Bookmark::group(room_id!("group@prose.org"), "Group").set_in_sidebar(false)
+        ])
         .await?;
 
     Ok(())
@@ -236,8 +243,9 @@ async fn test_does_not_add_removed_item() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![Bookmark::group(room_id!("group@prose.org"), "Group")
-            .set_in_sidebar(false)])
+        .extend_items_from_bookmarks(vec![
+            Bookmark::group(room_id!("group@prose.org"), "Group").set_in_sidebar(false)
+        ])
         .await?;
 
     Ok(())
@@ -320,7 +328,9 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.room_management_service
         .expect_exit_room()
         .once()
-        .with(predicate::eq(full!("channel@conference.prose.org/jane.doe")))
+        .with(predicate::eq(full!(
+            "channel@conference.prose.org/jane.doe"
+        )))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
@@ -505,7 +515,9 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
     deps.room_management_service
         .expect_exit_room()
         .once()
-        .with(predicate::eq(full!("channel@conference.prose.org/jane.doe")))
+        .with(predicate::eq(full!(
+            "channel@conference.prose.org/jane.doe"
+        )))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     // Unlike public channels, private channels should never be deleted. Otherwise we cannot
@@ -733,14 +745,12 @@ async fn test_convert_group_to_private_channel() -> Result<()> {
                 // the RoomsEventHandler but the room will be removed from the
                 // ConnectedRoomsRepository already, so this will not be forwarded to
                 // the SidebarDomainService.
-                Ok(
-                    Arc::new(
-                        RoomInternals::private_channel(
-                            room_id!("private-channel@conference.prose.org")
-                        )
-                        .with_name("My Private Channel"),
-                    ),
-                )
+                Ok(Arc::new(
+                    RoomInternals::private_channel(room_id!(
+                        "private-channel@conference.prose.org"
+                    ))
+                    .with_name("My Private Channel"),
+                ))
             })
         });
 
@@ -767,7 +777,9 @@ async fn test_convert_group_to_private_channel() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(room_id!("private-channel@conference.prose.org")))
+        .with(predicate::eq(room_id!(
+            "private-channel@conference.prose.org"
+        )))
         .return_once(|_| None);
     deps.sidebar_repo
         .expect_put()
@@ -919,4 +931,9 @@ async fn test_handle_temporary_removal_from_room() -> Result<()> {
 #[tokio::test]
 async fn test_handle_permanent_removal_from_room() -> Result<()> {
     panic!("Implement me!")
+}
+
+#[tokio::test]
+async fn test_handles_changed_room_config() -> Result<()> {
+    panic!("Implement me")
 }
