@@ -303,7 +303,50 @@ async fn test_handles_kicked_user() -> Result<()> {
 
 #[tokio::test]
 async fn test_handles_kicked_self() -> Result<()> {
-    panic!("Implement me")
+    let mut deps = MockAppDependencies::default();
+
+    let room = Arc::new(
+        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
+            occupant_id!("room@conference.prose.org/nickname"),
+            Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
+        )]),
+    );
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .returning(move |_| Some(room.clone()));
+    }
+
+    deps.sidebar_domain_service
+        .expect_handle_removal_from_room()
+        .once()
+        .with(
+            predicate::eq(room_id!("room@conference.prose.org")),
+            predicate::eq(true),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    assert_eq!(room.participants().len(), 1);
+
+    event_handler
+        .handle_event(ServerEvent::Occupant(OccupantEvent {
+            occupant_id: occupant_id!("room@conference.prose.org/nickname"),
+            anon_occupant_id: None,
+            real_id: None,
+            is_self: true,
+            r#type: OccupantEventType::PermanentlyRemoved,
+        }))
+        .await?;
+
+    assert_eq!(room.participants().len(), 0);
+
+    Ok(())
 }
 
 #[tokio::test]

@@ -125,13 +125,15 @@ impl RoomsEventHandler {
                 // TODO: If this affects us we should keep the connected room around, but add an error message to it.
                 true
             }
-            OccupantEventType::PermanentlyRemoved => {
+            OccupantEventType::PermanentlyRemoved => 'outer: {
                 room.participants_mut().remove(&participant_id);
 
                 if event.is_self {
                     self.sidebar_domain_service
                         .handle_removal_from_room(&event.occupant_id.room_id(), true)
                         .await?;
+                    // A SidebarChanged event will be sent instead
+                    break 'outer false;
                 }
 
                 true
