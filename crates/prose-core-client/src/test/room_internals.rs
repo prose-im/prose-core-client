@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::rooms::models::{
-    ComposeState, RoomAffiliation, RoomInfo, RoomInternals, RoomMember,
+    ComposeState, RegisteredMember, RoomAffiliation, RoomInfo, RoomInternals,
 };
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
 use crate::dtos::{Availability, Participant, UserId};
@@ -63,8 +63,8 @@ impl RoomInternals {
         self
     }
 
-    pub fn with_members(self, members: impl IntoIterator<Item = (UserId, RoomMember)>) -> Self {
-        self.set_members(members.into_iter().collect());
+    pub fn with_members(self, members: impl IntoIterator<Item = RegisteredMember>) -> Self {
+        self.participants_mut().set_registered_members(members);
         self
     }
 
@@ -72,7 +72,8 @@ impl RoomInternals {
         self,
         occupant: impl IntoIterator<Item = (Id, Participant)>,
     ) -> Self {
-        self.set_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect());
+        self.participants_mut()
+            .extend_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect());
         self
     }
 }
@@ -80,18 +81,20 @@ impl RoomInternals {
 impl Participant {
     pub fn owner() -> Self {
         Participant {
-            id: None,
+            real_id: None,
             name: None,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
             compose_state_updated: Default::default(),
             availability: Availability::Unavailable,
+            anon_occupant_id: None,
         }
     }
 
     pub fn member() -> Self {
         Participant {
-            id: None,
+            real_id: None,
+            anon_occupant_id: None,
             name: None,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
@@ -100,8 +103,8 @@ impl Participant {
         }
     }
 
-    pub fn set_real_id(mut self, jid: &UserId) -> Self {
-        self.id = Some(jid.clone());
+    pub fn set_real_id(mut self, id: &UserId) -> Self {
+        self.real_id = Some(id.clone());
         self
     }
 

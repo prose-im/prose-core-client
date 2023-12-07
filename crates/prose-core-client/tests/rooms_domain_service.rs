@@ -9,15 +9,15 @@ use anyhow::Result;
 use mockall::{predicate, Sequence};
 
 use prose_core_client::domain::rooms::models::{
-    RoomAffiliation, RoomError, RoomInternals, RoomMember, RoomSessionInfo, RoomSessionMember,
-    RoomSpec,
+    RegisteredMember, RoomAffiliation, RoomError, RoomInternals, RoomSessionInfo,
+    RoomSessionMember, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
 };
 use prose_core_client::domain::shared::models::{RoomId, RoomType};
-use prose_core_client::dtos::{PublicRoomInfo, UserId, UserProfile};
+use prose_core_client::dtos::{Participant, PublicRoomInfo, UserId, UserProfile};
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
 use prose_core_client::{room_id, user_id};
 use prose_xmpp::test::IncrementingIDProvider;
@@ -184,40 +184,48 @@ async fn test_creates_group() -> Result<()> {
                 ));
 
                 let room = handler(room.clone());
-                let mut members = room.members();
-                members.sort_by_key(|(id, _)| id.clone());
+                let mut members = room.participants().iter().cloned().collect::<Vec<_>>();
+                members.sort_by_key(|p| p.real_id.as_ref().unwrap().clone());
 
                 assert_eq!(
                     members,
                     vec![
-                        (
-                            user_id!("a@prose.org"),
-                            RoomMember {
-                                name: "Tick".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            }
-                        ),
-                        (
-                            user_id!("b@prose.org"),
-                            RoomMember {
-                                name: "Trick".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            }
-                        ),
-                        (
-                            user_id!("c@prose.org"),
-                            RoomMember {
-                                name: "Track".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            }
-                        ),
-                        (
-                            user_id!("jane.doe@prose.org"),
-                            RoomMember {
-                                name: "Jane".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            }
-                        ),
+                        Participant {
+                            real_id: Some(user_id!("a@prose.org")),
+                            anon_occupant_id: None,
+                            name: Some("Tick".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            availability: Default::default(),
+                            compose_state: Default::default(),
+                            compose_state_updated: Default::default(),
+                        },
+                        Participant {
+                            real_id: Some(user_id!("b@prose.org")),
+                            anon_occupant_id: None,
+                            name: Some("Trick".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            availability: Default::default(),
+                            compose_state: Default::default(),
+                            compose_state_updated: Default::default(),
+                        },
+                        Participant {
+                            real_id: Some(user_id!("c@prose.org")),
+                            anon_occupant_id: None,
+                            name: Some("Track".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            availability: Default::default(),
+                            compose_state: Default::default(),
+                            compose_state_updated: Default::default(),
+                        },
+                        Participant {
+                            real_id: Some(user_id!("jane.doe@prose.org")),
+                            anon_occupant_id: None,
+                            name: Some("Jane".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            availability: Default::default(),
+                            compose_state: Default::default(),
+                            compose_state_updated: Default::default(),
+                        }
                     ]
                 );
 
@@ -300,13 +308,15 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(room_id!("org.prose.public-channel.hash-1@conference.prose.org")),
+            predicate::eq(room_id!(
+                "org.prose.public-channel.hash-1@conference.prose.org"
+            )),
             predicate::always(),
         )
         .return_once(|_, _| {
-            Some(Arc::new(RoomInternals::public_channel(
-                room_id!("org.prose.public-channel.hash-1@conference.prose.org")
-            )))
+            Some(Arc::new(RoomInternals::public_channel(room_id!(
+                "org.prose.public-channel.hash-1@conference.prose.org"
+            ))))
         });
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -344,27 +354,24 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .return_once(|_| {
             Some(Arc::new(
                 RoomInternals::group(room_id!("group@conf.prose.org")).with_members(vec![
-                    (
-                        mock_data::account_jid().into_user_id(),
-                        RoomMember {
-                            name: "Jane Doe".to_string(),
-                            affiliation: RoomAffiliation::Owner,
-                        },
-                    ),
-                    (
-                        user_id!("a@prose.org"),
-                        RoomMember {
-                            name: "Member A".to_string(),
-                            affiliation: RoomAffiliation::Owner,
-                        },
-                    ),
-                    (
-                        user_id!("b@prose.org"),
-                        RoomMember {
-                            name: "Member B".to_string(),
-                            affiliation: RoomAffiliation::Owner,
-                        },
-                    ),
+                    RegisteredMember {
+                        user_id: mock_data::account_jid().into_user_id(),
+                        name: Some("Jane Doe".to_string()),
+                        affiliation: RoomAffiliation::Owner,
+                        occupant_id: None,
+                    },
+                    RegisteredMember {
+                        user_id: user_id!("a@prose.org"),
+                        name: Some("Member A".to_string()),
+                        affiliation: RoomAffiliation::Owner,
+                        occupant_id: None,
+                    },
+                    RegisteredMember {
+                        user_id: user_id!("b@prose.org"),
+                        name: Some("Member B".to_string()),
+                        affiliation: RoomAffiliation::Owner,
+                        occupant_id: None,
+                    },
                 ]),
             ))
         });
@@ -414,9 +421,11 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(predicate::eq(channel_jid.clone()), predicate::always())
-            .return_once(
-                move |_, _| Some(Arc::new(RoomInternals::private_channel(channel_jid.clone())))
-            );
+            .return_once(move |_, _| {
+                Some(Arc::new(RoomInternals::private_channel(
+                    channel_jid.clone(),
+                )))
+            });
     }
 
     deps.message_migration_domain_service
@@ -480,20 +489,18 @@ async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Resul
             Some(Arc::new(
                 RoomInternals::private_channel(room_id!("channel@conf.prose.org")).with_members(
                     vec![
-                        (
-                            mock_data::account_jid().into_user_id(),
-                            RoomMember {
-                                name: "Jane Doe".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            },
-                        ),
-                        (
-                            user_id!("a@prose.org"),
-                            RoomMember {
-                                name: "Member A".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            },
-                        ),
+                        RegisteredMember {
+                            user_id: mock_data::account_jid().into_user_id(),
+                            name: Some("Jane Doe".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            occupant_id: None,
+                        },
+                        RegisteredMember {
+                            user_id: user_id!("a@prose.org"),
+                            name: Some("Member A".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            occupant_id: None,
+                        },
                     ],
                 ),
             ))
@@ -545,20 +552,18 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
             Some(Arc::new(
                 RoomInternals::private_channel(room_id!("channel@conf.prose.org")).with_members(
                     vec![
-                        (
-                            mock_data::account_jid().into_user_id(),
-                            RoomMember {
-                                name: "Jane Doe".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            },
-                        ),
-                        (
-                            user_id!("a@prose.org"),
-                            RoomMember {
-                                name: "Member A".to_string(),
-                                affiliation: RoomAffiliation::Owner,
-                            },
-                        ),
+                        RegisteredMember {
+                            user_id: mock_data::account_jid().into_user_id(),
+                            name: Some("Jane Doe".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            occupant_id: None,
+                        },
+                        RegisteredMember {
+                            user_id: user_id!("a@prose.org"),
+                            name: Some("Member A".to_string()),
+                            affiliation: RoomAffiliation::Owner,
+                            occupant_id: None,
+                        },
                     ],
                 ),
             ))
@@ -579,14 +584,13 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
 
     let service = RoomsDomainService::from(deps.into_deps());
 
-    let result =
-        service
-            .reconfigure_room_with_spec(
-                &room_id!("channel@conf.prose.org"),
-                RoomSpec::PublicChannel,
-                "New Channel",
-            )
-            .await;
+    let result = service
+        .reconfigure_room_with_spec(
+            &room_id!("channel@conf.prose.org"),
+            RoomSpec::PublicChannel,
+            "New Channel",
+        )
+        .await;
 
     let Err(RoomError::PublicChannelNameConflict) = result else {
         panic!(

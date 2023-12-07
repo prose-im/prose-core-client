@@ -83,34 +83,38 @@ impl RoomsEventHandler {
 
         match event.r#type {
             OccupantEventType::AffiliationChanged { affiliation } => {
-                room.set_participant_affiliation(&participant_id, &affiliation);
+                room.participants_mut()
+                    .set_affiliation(&participant_id, &affiliation);
 
                 // Let's see if we knew the real id of the participant already, if not let's
                 // look up their name…
-                let (Some(real_id), Some(participant)) =
-                    (event.real_id, room.get_participant(&participant_id))
-                else {
+                let (Some(real_id), Some(participant)) = (
+                    event.real_id,
+                    room.participants().get(&participant_id).cloned(),
+                ) else {
                     return Ok(());
                 };
 
-                if participant.id.is_some() {
+                if participant.real_id.is_some() {
                     // Real id was known already…
                     return Ok(());
                 }
 
                 let name = self.user_profile_repo.get_display_name(&real_id).await?;
-                room.set_participant_real_id_and_name(
+                room.participants_mut().set_ids_and_name(
                     &participant_id,
                     Some(&real_id),
+                    event.anon_occupant_id.as_ref(),
                     name.as_deref(),
                 );
             }
             OccupantEventType::DisconnectedByServer => {
-                room.set_participant_availability(&participant_id, &Availability::Unavailable);
+                room.participants_mut()
+                    .set_availability(&participant_id, &Availability::Unavailable);
                 // TODO: If this affects us we should keep the connected room around, but add an error message to it.
             }
             OccupantEventType::PermanentlyRemoved => {
-                room.remove_participant(&participant_id);
+                room.participants_mut().remove(&participant_id);
 
                 if event.is_self {
                     self.sidebar_domain_service
@@ -170,7 +174,8 @@ impl RoomsEventHandler {
                 availability,
                 priority,
             } => {
-                room.set_participant_availability(&participant_id, &availability);
+                room.participants_mut()
+                    .set_availability(&participant_id, &availability);
 
                 let Some(id) = event.user_id.to_user_or_resource_id() else {
                     return Ok(());
@@ -198,7 +203,7 @@ impl RoomsEventHandler {
                     .dispatch_event(ClientEvent::ContactChanged { id: user_id });
             }
             UserStatusEventType::ComposeStateChanged { state } => {
-                room.set_participant_compose_state(
+                room.participants_mut().set_compose_state(
                     &participant_id,
                     &self.time_provider.now(),
                     state,

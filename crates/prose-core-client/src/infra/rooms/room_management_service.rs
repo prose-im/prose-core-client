@@ -58,7 +58,9 @@ impl RoomManagementService for XMPPClient {
                     let room_name = room_name.to_string();
 
                     Box::pin(async move {
-                        Ok(RoomConfigResponse::Submit(spec.populate_form(&room_name, &form)?))
+                        Ok(RoomConfigResponse::Submit(
+                            spec.populate_form(&room_name, &form)?,
+                        ))
                     })
                 }),
             )
@@ -84,7 +86,7 @@ impl RoomManagementService for XMPPClient {
         let members = self.load_room_members(&room_jid).await?;
 
         Ok(RoomSessionInfo {
-            room_jid,
+            room_id: room_jid,
             room_name: room_info.name,
             room_description: room_info.description,
             room_type: spec.room_type(),
@@ -122,20 +124,19 @@ impl RoomManagementService for XMPPClient {
         let room_jid = occupant_id.room_id();
         let room_info = self.load_room_info(&room_jid).await?;
 
-        let room_type =
-            'room_type: {
-                for room_spec in RoomSpec::iter() {
-                    if room_spec.is_satisfied_by(&room_info) {
-                        break 'room_type room_spec.room_type();
-                    }
+        let room_type = 'room_type: {
+            for room_spec in RoomSpec::iter() {
+                if room_spec.is_satisfied_by(&room_info) {
+                    break 'room_type room_spec.room_type();
                 }
-                RoomType::Generic
-            };
+            }
+            RoomType::Generic
+        };
 
         let members = self.load_room_members(&room_jid).await?;
 
         Ok(RoomSessionInfo {
-            room_jid,
+            room_id: room_jid,
             room_name: room_info.name,
             room_description: room_info.description,
             room_type,
@@ -162,7 +163,9 @@ impl RoomManagementService for XMPPClient {
                     let room_name = new_name.to_string();
 
                     Box::pin(async move {
-                        Ok(RoomConfigResponse::Submit(spec.populate_form(&room_name, &form)?))
+                        Ok(RoomConfigResponse::Submit(
+                            spec.populate_form(&room_name, &form)?,
+                        ))
                     })
                 }),
             )

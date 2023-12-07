@@ -14,7 +14,7 @@ pub use room_type::RoomType;
 pub use sender_id::SenderId;
 pub use user_endpoint_id::UserEndpointId;
 pub use user_id::UserId;
-pub use user_info::{UserBasicInfo, UserPresenceInfo};
+pub use user_info::{ParticipantInfo, UserBasicInfo, UserPresenceInfo};
 pub use user_or_resource_id::UserOrResourceId;
 pub use user_resource_id::UserResourceId;
 

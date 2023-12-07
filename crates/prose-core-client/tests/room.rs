@@ -11,7 +11,7 @@ use xmpp_parsers::mam::Fin;
 use xmpp_parsers::rsm::SetResult;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
-use prose_core_client::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomMember};
+use prose_core_client::domain::rooms::models::{RegisteredMember, RoomAffiliation, RoomInternals};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
 use prose_core_client::dtos::Participant;
@@ -25,13 +25,12 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
     let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
-        .with_members([(
-            user_id!("a@prose.org"),
-            RoomMember {
-                name: "Aron Doe".to_string(),
-                affiliation: RoomAffiliation::Owner,
-            },
-        )])
+        .with_members([RegisteredMember {
+            user_id: user_id!("a@prose.org"),
+            name: Some("Aron Doe".to_string()),
+            affiliation: RoomAffiliation::Owner,
+            occupant_id: None,
+        }])
         .with_participants([(
             occupant_id!("room@conference.prose.org/b"),
             Participant::owner().set_name("Bernhard Doe"),
@@ -104,13 +103,12 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
     let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
-        .with_members([(
-            user_id!("a@prose.org"),
-            RoomMember {
-                name: "Aron Doe".to_string(),
-                affiliation: RoomAffiliation::Owner,
-            },
-        )])
+        .with_members([RegisteredMember {
+            user_id: user_id!("a@prose.org"),
+            name: Some("Aron Doe".to_string()),
+            affiliation: RoomAffiliation::Owner,
+            occupant_id: None,
+        }])
         .with_participants([(
             occupant_id!("room@conference.prose.org/b"),
             Participant::owner().set_name("Bernhard Doe"),

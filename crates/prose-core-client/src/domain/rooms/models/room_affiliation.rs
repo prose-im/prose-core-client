@@ -5,26 +5,22 @@
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq, Clone, Default)]
+#[derive(Debug, PartialEq, Clone, Default, PartialOrd, Eq, Ord)]
 pub enum RoomAffiliation {
-    /// The user who created the room, or who got appointed by its creator
-    /// to be their equal.
-    Owner,
-
-    /// A user who has been empowered by an owner to do administrative
-    /// operations.
-    Admin,
-
-    /// A user who is whitelisted to speak in moderated rooms, or to join a
-    /// member-only room.
-    Member,
-
     /// A user who has been banned from this room.
     Outcast,
-
     /// A normal participant.
     #[default]
     None,
+    /// A user who is whitelisted to speak in moderated rooms, or to join a
+    /// member-only room.
+    Member,
+    /// A user who has been empowered by an owner to do administrative
+    /// operations.
+    Admin,
+    /// The user who created the room, or who got appointed by its creator
+    /// to be their equal.
+    Owner,
 }
 
 impl Display for RoomAffiliation {
@@ -36,5 +32,18 @@ impl Display for RoomAffiliation {
             RoomAffiliation::Outcast => write!(f, "outcast"),
             RoomAffiliation::None => write!(f, "none"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ord() {
+        assert!(RoomAffiliation::Owner > RoomAffiliation::Admin);
+        assert!(RoomAffiliation::Admin > RoomAffiliation::Member);
+        assert!(RoomAffiliation::Member > RoomAffiliation::None);
+        assert!(RoomAffiliation::None > RoomAffiliation::Outcast);
     }
 }

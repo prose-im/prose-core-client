@@ -3,19 +3,15 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 
-use chrono::{DateTime, Utc};
 use jid::FullJid;
-use parking_lot::RwLock;
-
-use crate::domain::rooms::models::{ComposeState, RoomAffiliation, RoomMember, RoomState};
-use crate::domain::shared::models::{
-    Availability, ParticipantId, RoomId, RoomType, UserBasicInfo, UserId,
+use parking_lot::{
+    MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
 
-use super::Participant;
+use crate::domain::rooms::models::{ParticipantList, RegisteredMember};
+use crate::domain::shared::models::{RoomId, RoomType, UserId};
 
 /// Contains information about a connected room and its state.
 #[derive(Debug)]
@@ -34,6 +30,16 @@ pub struct RoomInfo {
     pub user_nickname: String,
     /// The type of the room.
     pub r#type: RoomType,
+}
+
+#[derive(Clone, Default, Debug, PartialEq)]
+pub struct RoomState {
+    /// The name of the room.
+    pub name: Option<String>,
+    /// The room's topic.
+    pub topic: Option<String>,
+    /// The participants in the room.
+    pub participants: ParticipantList,
 }
 
 impl Deref for RoomInternals {
@@ -67,90 +73,20 @@ impl RoomInternals {
         self.state.write().topic = topic
     }
 
-    pub fn participants(&self) -> Vec<Participant> {
-        self.state.read().participants.values().cloned().collect()
+    pub fn participants(&self) -> MappedRwLockReadGuard<ParticipantList> {
+        RwLockReadGuard::map(self.state.read(), |s| &s.participants)
     }
 
-    pub fn members(&self) -> Vec<(UserId, RoomMember)> {
-        self.state
-            .read()
-            .members
-            .iter()
-            .map(|(id, member)| (id.clone(), member.clone()))
-            .collect()
-    }
-
-    pub fn get_participant(&self, id: &ParticipantId) -> Option<Participant> {
-        self.state.read().participants.get(&id).cloned()
-    }
-
-    pub fn get_member(&self, id: &UserId) -> Option<RoomMember> {
-        self.state.read().members.get(&id).cloned()
-    }
-
-    pub fn insert_participant(
-        &self,
-        id: &ParticipantId,
-        real_id: Option<&UserId>,
-        name: Option<&str>,
-        affiliation: &RoomAffiliation,
-        availability: &Availability,
-    ) {
-        self.state
-            .write()
-            .insert_participant(id, real_id, name, affiliation, availability)
-    }
-
-    pub fn remove_participant(&self, id: &ParticipantId) {
-        self.state.write().participants.remove(id);
-    }
-
-    pub fn set_participant_compose_state(
-        &self,
-        id: &ParticipantId,
-        timestamp: &DateTime<Utc>,
-        compose_state: ComposeState,
-    ) {
-        self.state
-            .write()
-            .set_participant_compose_state(id, timestamp, compose_state)
-    }
-
-    pub fn set_participant_availability(&self, id: &ParticipantId, availability: &Availability) {
-        self.state
-            .write()
-            .set_participant_availability(id, availability)
-    }
-
-    pub fn set_participant_affiliation(&self, id: &ParticipantId, affiliation: &RoomAffiliation) {
-        self.state
-            .write()
-            .set_participant_affiliation(id, affiliation)
-    }
-
-    pub fn set_participant_real_id_and_name(
-        &self,
-        id: &ParticipantId,
-        real_id: Option<&UserId>,
-        name: Option<&str>,
-    ) {
-        self.state
-            .write()
-            .set_participant_real_id_and_name(id, real_id, name)
-    }
-
-    /// Returns the real JIDs of all composing users that started composing after `started_after`.
-    /// If we don't have a real JID for a composing user they are excluded from the list.
-    pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<UserBasicInfo> {
-        self.state.read().composing_users(started_after)
+    pub fn participants_mut(&self) -> MappedRwLockWriteGuard<ParticipantList> {
+        RwLockWriteGuard::map(self.state.write(), |s| &mut s.participants)
     }
 }
 
 impl RoomInternals {
-    pub fn pending(room_jid: &RoomId, nickname: &str) -> Self {
+    pub fn pending(room_id: &RoomId, nickname: &str) -> Self {
         Self {
             info: RoomInfo {
-                room_id: room_jid.clone(),
+                room_id: room_id.clone(),
                 description: None,
                 user_nickname: nickname.to_string(),
                 r#type: RoomType::Pending,
@@ -168,13 +104,13 @@ impl RoomInternals {
         &self,
         name: Option<String>,
         info: RoomInfo,
-        members: HashMap<UserId, RoomMember>,
+        members: Vec<RegisteredMember>,
     ) -> Self {
         assert!(self.is_pending(), "Cannot promote a non-pending room");
 
         let mut state = self.state.read().clone();
         state.name = name;
-        state.members.extend(members);
+        state.participants.set_registered_members(members);
 
         Self {
             info,
@@ -195,24 +131,7 @@ impl RoomInternals {
             state: RwLock::new(RoomState {
                 name: Some(contact_name.to_string()),
                 topic: None,
-                members: HashMap::from([(
-                    contact_id.clone(),
-                    RoomMember {
-                        name: contact_name.to_string(),
-                        affiliation: RoomAffiliation::Owner,
-                    },
-                )]),
-                participants: HashMap::from([(
-                    contact_id.clone().into(),
-                    Participant {
-                        id: Some(contact_id.clone()),
-                        name: Some(contact_name.to_string()),
-                        affiliation: RoomAffiliation::Owner,
-                        availability: Availability::Unavailable,
-                        compose_state: ComposeState::Idle,
-                        compose_state_updated: Default::default(),
-                    },
-                )]),
+                participants: ParticipantList::for_direct_message(contact_id, contact_name),
             }),
         }
     }
@@ -220,14 +139,6 @@ impl RoomInternals {
 
 #[cfg(feature = "test")]
 impl RoomInternals {
-    pub fn set_participants(&self, participants: HashMap<ParticipantId, Participant>) {
-        self.state.write().participants = participants;
-    }
-
-    pub fn set_members(&self, members: HashMap<UserId, RoomMember>) {
-        self.state.write().members = members;
-    }
-
     pub fn new(info: RoomInfo) -> Self {
         Self {
             info,
@@ -254,12 +165,7 @@ impl PartialEq for RoomInternals {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use prose_xmpp::bare;
-
-    use crate::dtos::Participant;
-    use crate::user_id;
+    use crate::{room_id, user_id};
 
     use super::*;
 
@@ -272,7 +178,7 @@ mod tests {
             internals,
             RoomInternals {
                 info: RoomInfo {
-                    room_id: bare!("contact@prose.org").into(),
+                    room_id: room_id!("contact@prose.org"),
                     description: None,
                     user_nickname: "no_nickname".to_string(),
                     r#type: RoomType::DirectMessage,
@@ -280,24 +186,10 @@ mod tests {
                 state: RwLock::new(RoomState {
                     name: Some("Jane Doe".to_string()),
                     topic: None,
-                    members: HashMap::from([(
-                        user_id!("contact@prose.org"),
-                        RoomMember {
-                            name: "Jane Doe".to_string(),
-                            affiliation: RoomAffiliation::Owner,
-                        }
-                    )]),
-                    participants: HashMap::from([(
-                        user_id!("contact@prose.org").into(),
-                        Participant {
-                            id: Some(user_id!("contact@prose.org")),
-                            name: Some("Jane Doe".to_string()),
-                            affiliation: RoomAffiliation::Owner,
-                            availability: Default::default(),
-                            compose_state: ComposeState::Idle,
-                            compose_state_updated: Default::default(),
-                        }
-                    )])
+                    participants: ParticipantList::for_direct_message(
+                        &user_id!("contact@prose.org"),
+                        "Jane Doe"
+                    )
                 })
             }
         )

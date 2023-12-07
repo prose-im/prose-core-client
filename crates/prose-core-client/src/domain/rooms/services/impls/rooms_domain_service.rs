@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
 use std::future::Future;
 use std::iter;
 use std::sync::Arc;
@@ -23,7 +22,7 @@ use crate::app::deps::{
     DynRoomParticipationService, DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
-    RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomMember, RoomSessionInfo,
+    RegisteredMember, RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomSessionInfo,
     RoomSessionMember, RoomSpec,
 };
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
@@ -179,10 +178,20 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 }
 
                 let current_user = self.ctx.connected_id()?.to_user_id();
+                let member_ids = room
+                    .participants()
+                    .iter()
+                    .filter_map(|p| {
+                        if p.affiliation >= RoomAffiliation::Member {
+                            return p.real_id.clone();
+                        }
+                        None
+                    })
+                    .collect::<Vec<_>>();
 
                 // Now grant the members of the original group access to the new channel…
                 debug!("Granting membership to members of new room {}…", new_name);
-                for member in room.members().into_iter().map(|(id, _)| id) {
+                for member in member_ids {
                     // Our user is already admin, no need to set them as a member…
                     if member == current_user {
                         continue;
@@ -319,7 +328,10 @@ impl RoomsDomainService {
 
         let contact_name = build_contact_name(&participant, &user_profile);
 
-        let room = Arc::new(RoomInternals::for_direct_message(&participant, &contact_name));
+        let room = Arc::new(RoomInternals::for_direct_message(
+            &participant,
+            &contact_name,
+        ));
 
         match self.connected_rooms_repo.set(room.clone()) {
             Ok(()) => Ok(room),
@@ -339,53 +351,52 @@ impl RoomsDomainService {
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let user_jid = self.ctx.connected_id()?.into_user_id();
 
-        let result =
-            match request {
-                CreateRoomType::Group { participants } => {
-                    self.create_or_join_group(&service, &user_jid, participants)
-                        .await
-                }
-                CreateRoomType::PrivateChannel { name } => {
-                    // We'll use a random ID for the jid of the private channel. This way
-                    // different people can create private channels with the same name without
-                    // creating a conflict. A conflict might also potentially be a security
-                    // issue if jid would contain sensitive information.
-                    let channel_id = self.id_provider.new_id();
-
-                    self.create_or_join_room_with_spec(
-                        &service,
-                        &user_jid,
-                        &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
-                        &name,
-                        RoomSpec::PrivateChannel,
-                        |_| async { Ok(()) },
-                    )
+        let result = match request {
+            CreateRoomType::Group { participants } => {
+                self.create_or_join_group(&service, &user_jid, participants)
                     .await
-                }
-                CreateRoomType::PublicChannel { name } => {
-                    // Prevent channels with duplicate names from being created…
-                    if !self.is_public_channel_name_unique(&name).await? {
-                        return Err(RoomError::PublicChannelNameConflict);
-                    }
+            }
+            CreateRoomType::PrivateChannel { name } => {
+                // We'll use a random ID for the jid of the private channel. This way
+                // different people can create private channels with the same name without
+                // creating a conflict. A conflict might also potentially be a security
+                // issue if jid would contain sensitive information.
+                let channel_id = self.id_provider.new_id();
 
-                    // While it would be ideal to have channel names conflict, this could only
-                    // happen via its JID since this is the only thing that is unique. We do
-                    // have the requirement however that users should be able to rename their
-                    // channels, which is why they shouldn't conflict since the JIDs cannot be
-                    // changed after the fact. So we'll use a unique ID here as well.
-                    let channel_id = self.id_provider.new_id();
-
-                    self.create_or_join_room_with_spec(
-                        &service,
-                        &user_jid,
-                        &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
-                        &name,
-                        RoomSpec::PublicChannel,
-                        |_| async { Ok(()) },
-                    )
-                    .await
+                self.create_or_join_room_with_spec(
+                    &service,
+                    &user_jid,
+                    &format!("{}.{}", PRIVATE_CHANNEL_PREFIX, channel_id),
+                    &name,
+                    RoomSpec::PrivateChannel,
+                    |_| async { Ok(()) },
+                )
+                .await
+            }
+            CreateRoomType::PublicChannel { name } => {
+                // Prevent channels with duplicate names from being created…
+                if !self.is_public_channel_name_unique(&name).await? {
+                    return Err(RoomError::PublicChannelNameConflict);
                 }
-            };
+
+                // While it would be ideal to have channel names conflict, this could only
+                // happen via its JID since this is the only thing that is unique. We do
+                // have the requirement however that users should be able to rename their
+                // channels, which is why they shouldn't conflict since the JIDs cannot be
+                // changed after the fact. So we'll use a unique ID here as well.
+                let channel_id = self.id_provider.new_id();
+
+                self.create_or_join_room_with_spec(
+                    &service,
+                    &user_jid,
+                    &format!("{}.{}", PUBLIC_CHANNEL_PREFIX, channel_id),
+                    &name,
+                    RoomSpec::PublicChannel,
+                    |_| async { Ok(()) },
+                )
+                .await
+            }
+        };
 
         let info = match result {
             Ok(metadata) => metadata,
@@ -458,7 +469,7 @@ impl RoomsDomainService {
                 |info| {
                     // Try to promote all participants to owners…
                     info!("Update participant affiliations…");
-                    let room_jid = info.room_jid.clone();
+                    let room_jid = info.room_id.clone();
                     let room_has_been_created = info.room_has_been_created;
                     let service = self.room_management_service.clone();
 
@@ -490,7 +501,7 @@ impl RoomsDomainService {
         if info.room_has_been_created {
             info!("Sending invites for created group…");
             self.room_participation_service
-                .invite_users_to_room(&info.room_jid, participants.as_slice())
+                .invite_users_to_room(&info.room_id, participants.as_slice())
                 .await?;
         }
 
@@ -580,32 +591,32 @@ impl RoomsDomainService {
         // taken already.
         let room_name = info.room_name;
 
-        let mut members = HashMap::with_capacity(info.members.len());
+        let mut members = Vec::with_capacity(info.members.len());
         for member in info.members {
             let name = self
                 .user_profile_repo
                 .get_display_name(&member.id)
                 .await
-                .unwrap_or_default()
-                .unwrap_or_else(|| member.id.formatted_username());
+                .unwrap_or_default();
 
-            members.insert(
-                member.id,
-                RoomMember {
-                    name,
-                    affiliation: member.affiliation,
-                },
-            );
+            members.push(RegisteredMember {
+                user_id: member.id,
+                name,
+                affiliation: member.affiliation,
+                occupant_id: member
+                    .nick
+                    .and_then(|nick| info.room_id.occupant_id_with_nickname(nick).ok()),
+            });
         }
 
         let room_info = RoomInfo {
-            room_id: info.room_jid.clone(),
+            room_id: info.room_id.clone(),
             description: info.room_description,
             user_nickname: info.user_nickname,
             r#type: info.room_type,
         };
 
-        let Some(room) = self.connected_rooms_repo.update(&info.room_jid, {
+        let Some(room) = self.connected_rooms_repo.update(&info.room_id, {
             let room_name = room_name;
             Box::new(move |room| {
                 // Convert the temporary room to its final form…

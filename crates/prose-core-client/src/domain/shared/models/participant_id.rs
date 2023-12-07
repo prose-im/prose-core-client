@@ -14,6 +14,22 @@ pub enum ParticipantId {
     Occupant(OccupantId),
 }
 
+impl ParticipantId {
+    pub fn to_user_id(&self) -> Option<UserId> {
+        let ParticipantId::User(id) = &self else {
+            return None;
+        };
+        Some(id.clone())
+    }
+
+    pub fn to_occupant_id(&self) -> Option<OccupantId> {
+        let ParticipantId::Occupant(id) = &self else {
+            return None;
+        };
+        Some(id.clone())
+    }
+}
+
 impl From<UserId> for ParticipantId {
     fn from(value: UserId) -> Self {
         ParticipantId::User(value)

@@ -20,11 +20,9 @@ use crate::app::deps::{
     DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
-use crate::domain::rooms::models::{RoomInternals, RoomSpec};
-use crate::domain::shared::models::{ParticipantId, RoomId};
-use crate::dtos::{
-    Availability, Message as MessageDTO, MessageSender, UserBasicInfo, UserId, UserPresenceInfo,
-};
+use crate::domain::rooms::models::{ParticipantList, RoomAffiliation, RoomInternals, RoomSpec};
+use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
+use crate::dtos::{Message as MessageDTO, MessageSender, UserBasicInfo, UserId};
 use crate::ClientRoomEventType;
 
 pub struct Room<Kind> {
@@ -141,30 +139,15 @@ impl<Kind> Room<Kind> {
         self.data.topic()
     }
 
-    pub fn members(&self) -> Vec<UserPresenceInfo> {
-        // TODO: Use availability from participants
-
-        self.data
-            .members()
-            .into_iter()
-            .map(|(id, member)| UserPresenceInfo {
-                id,
-                name: member.name,
-                availability: Availability::Available,
-            })
-            .collect()
-    }
-
-    pub fn occupants(&self) -> Vec<UserBasicInfo> {
+    pub fn participants(&self) -> Vec<ParticipantInfo> {
         self.data
             .participants()
-            .into_iter()
-            .filter_map(|occupant| {
-                let Some(jid) = occupant.id else {
-                    return None;
-                };
-                let name = occupant.name.unwrap_or_else(|| jid.formatted_username());
-                Some(UserBasicInfo { id: jid, name })
+            .iter()
+            .map(|p| ParticipantInfo {
+                id: p.real_id.clone(),
+                name: p.name.as_deref().unwrap_or("<anonymous>").to_string(),
+                availability: p.availability.clone(),
+                affiliation: p.affiliation.clone(),
             })
             .collect()
     }
@@ -228,7 +211,7 @@ impl<Kind> Room<Kind> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
         let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
-        Ok(self.data.composing_users(thirty_secs_ago))
+        Ok(self.data.participants().composing_users(thirty_secs_ago))
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
@@ -269,13 +252,14 @@ impl<Kind> Room<Kind> {
     async fn reduce_messages_and_add_sender(&self, messages: Vec<MessageLike>) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
         let mut message_dtos = Vec::with_capacity(messages.len());
+        let participants = self.data.participants();
 
         for message in messages {
             let participant_id = match &message.from {
                 Jid::Bare(id) => ParticipantId::User(id.clone().into()),
                 Jid::Full(id) => ParticipantId::Occupant(id.clone().into()),
             };
-            let name = self.resolve_user_name(&participant_id).await;
+            let name = self.resolve_user_name(&participant_id, &participants).await;
 
             let from = MessageSender {
                 jid: message.from.into_bare(),
@@ -298,40 +282,36 @@ impl<Kind> Room<Kind> {
         message_dtos
     }
 
-    async fn resolve_user_name(&self, id: &ParticipantId) -> String {
-        let name = self.data.get_participant(id).and_then(|p| {
-            p.name.or_else(|| {
-                p.id.and_then(|id| self.data.get_member(&id))
-                    .map(|m| m.name)
-            })
-        });
+    async fn resolve_user_name(
+        &self,
+        id: &ParticipantId,
+        participants: &ParticipantList,
+    ) -> String {
+        let participant = participants.get(id);
 
-        if let Some(name) = name {
+        if let Some(name) = participant.and_then(|p| p.name.clone()) {
             return name;
-        };
+        }
 
-        if let ParticipantId::User(user_id) = id {
-            if let Some(name) = self.data.get_member(user_id).map(|m| m.name) {
+        let real_id = participant
+            .and_then(|p| p.real_id.clone())
+            .or_else(|| id.to_user_id());
+
+        if let Some(real_id) = real_id {
+            if let Some(name) = self
+                .user_profile_repo
+                .get_display_name(&real_id)
+                .await
+                .unwrap_or_default()
+            {
                 return name;
             }
         }
 
         match id {
-            ParticipantId::User(id) => self
-                .user_profile_repo
-                .get_display_name(id)
-                .await
-                .unwrap_or_default()
-                .unwrap_or_else(|| id.formatted_username()),
+            ParticipantId::User(id) => id.formatted_username(),
             ParticipantId::Occupant(id) => id.formatted_nickname(),
         }
-    }
-}
-
-#[cfg(feature = "debug")]
-impl<Kind> Room<Kind> {
-    pub fn occupants_dbg(&self) -> Vec<crate::domain::rooms::models::Participant> {
-        self.data.participants()
     }
 }
 
@@ -341,10 +321,17 @@ impl Room<Group> {
 
         let member_jids = self
             .data
-            .members()
-            .into_iter()
-            .map(|(id, _)| id)
+            .participants()
+            .iter()
+            .filter_map(|p| {
+                if p.affiliation >= RoomAffiliation::Member {
+                    p.real_id.clone()
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
+
         self.participation_service
             .invite_users_to_room(&self.data.room_id, member_jids.as_slice())
             .await?;

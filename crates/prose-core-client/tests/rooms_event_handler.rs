@@ -75,19 +75,21 @@ async fn test_handles_presence_for_muc_room() -> Result<()> {
     assert_eq!(room.participants().len(), 1);
 
     let occupant = room
-        .get_participant(&occupant_id!("room@conference.prose.org/nick").into())
+        .participants()
+        .get(&occupant_id!("room@conference.prose.org/nick").into())
         .unwrap()
         .clone();
 
     assert_eq!(
         occupant,
         Participant {
-            id: Some(user_id!("real-jid@prose.org")),
+            real_id: Some(user_id!("real-jid@prose.org")),
             name: Some("George Washington".to_string()),
             affiliation: RoomAffiliation::Member,
             availability: Availability::Available,
             compose_state: ComposeState::Idle,
             compose_state_updated: Default::default(),
+            anon_occupant_id: None,
         }
     );
 
@@ -171,7 +173,73 @@ async fn test_handles_disconnected_participant() -> Result<()> {
 
 #[tokio::test]
 async fn test_handles_added_member() -> Result<()> {
-    panic!("Implement me")
+    let mut deps = MockAppDependencies::default();
+
+    let room = Arc::new(
+        RoomInternals::private_channel(room_id!("room@conference.prose.org")).with_participants(
+            vec![(
+                occupant_id!("room@conference.prose.org/a"),
+                Participant::owner(),
+            )],
+        ),
+    );
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .times(2)
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .returning(move |_| Some(room.clone()));
+    }
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(user_id!("b@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Mike Doe".to_string())) }));
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    event_handler
+        .handle_event(ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@conference.prose.org/b").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 0,
+            },
+        }))
+        .await?;
+    event_handler
+        .handle_event(ServerEvent::Occupant(OccupantEvent {
+            occupant_id: occupant_id!("room@conference.prose.org/b"),
+            anon_occupant_id: None,
+            real_id: Some(user_id!("b@prose.org")),
+            is_self: false,
+            r#type: OccupantEventType::AffiliationChanged {
+                affiliation: RoomAffiliation::Member,
+            },
+        }))
+        .await?;
+
+    let added_participant = room
+        .participants()
+        .get(&occupant_id!("room@conference.prose.org/b").into())
+        .cloned();
+    assert_eq!(
+        added_participant,
+        Some(Participant {
+            real_id: Some(user_id!("b@prose.org")),
+            anon_occupant_id: None,
+            name: Some("Mike Doe".to_string()),
+            affiliation: RoomAffiliation::Member,
+            availability: Availability::Available,
+            compose_state: Default::default(),
+            compose_state_updated: Default::default(),
+        })
+    );
+
+    Ok(())
 }
 
 #[tokio::test]
@@ -215,15 +283,14 @@ async fn test_handles_destroyed_room() -> Result<()> {
 async fn test_handles_compose_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room =
-        Arc::new(
-            RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
-                occupant_id!("room@conference.prose.org/nickname"),
-                Participant::owner()
-                    .set_real_id(&user_id!("nickname@prose.org"))
-                    .set_name("Janice Doe"),
-            )]),
-        );
+    let room = Arc::new(
+        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
+            occupant_id!("room@conference.prose.org/nickname"),
+            Participant::owner()
+                .set_real_id(&user_id!("nickname@prose.org"))
+                .set_name("Janice Doe"),
+        )]),
+    );
 
     {
         let room = room.clone();
@@ -255,7 +322,8 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
         .await?;
 
     let occupant = room
-        .get_participant(&occupant_id!("room@conference.prose.org/nickname").into())
+        .participants()
+        .get(&occupant_id!("room@conference.prose.org/nickname").into())
         .unwrap()
         .clone();
 
@@ -325,7 +393,8 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         .await?;
 
     let occupant = room
-        .get_participant(&user_id!("contact@prose.org").into())
+        .participants()
+        .get(&user_id!("contact@prose.org").into())
         .unwrap()
         .clone();
 
@@ -404,7 +473,9 @@ async fn test_handles_presence() -> Result<()> {
         .expect_set_user_presence()
         .once()
         .with(
-            predicate::eq(UserOrResourceId::from(user_resource_id!("sender@prose.org/resource"))),
+            predicate::eq(UserOrResourceId::from(user_resource_id!(
+                "sender@prose.org/resource"
+            ))),
             predicate::eq(Presence {
                 priority: 1,
                 availability: Availability::Available,

@@ -37,7 +37,7 @@ impl RoomSessionMember {
 impl RoomSessionInfo {
     pub fn new_room(room_jid: impl Into<RoomId>, room_type: RoomType) -> Self {
         Self {
-            room_jid: room_jid.into(),
+            room_id: room_jid.into(),
             room_name: None,
             room_description: None,
             room_type,
