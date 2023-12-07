@@ -23,3 +23,9 @@ impl Display for RequestId {
         write!(f, "{}", self.0)
     }
 }
+
+impl AsRef<str> for RequestId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}

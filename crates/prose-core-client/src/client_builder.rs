@@ -186,7 +186,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
 
         handler_queue.set_handlers(vec![
             //Box::new(ConnectionEventHandler::from(&dependencies)),
-            Box::new(RequestsEventHandler::from(&dependencies)),
+            //Box::new(RequestsEventHandler::from(&dependencies)),
             //Box::new(UserStateEventHandler::from(&dependencies)),
             Box::new(MessagesEventHandler::from(&dependencies)),
             //Box::new(RoomsEventHandler::from(&dependencies)),

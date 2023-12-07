@@ -8,11 +8,9 @@ use async_trait::async_trait;
 use tracing::info;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::mods::{caps, ping, profile, roster};
-use prose_xmpp::Event;
 
 use crate::app::deps::{DynAppContext, DynRequestHandlingService, DynTimeProvider};
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
+use crate::app::event_handlers::{RequestEvent, RequestEventType, ServerEvent, ServerEventHandler};
 use crate::domain::general::services::SubscriptionResponse;
 
 /// Handles various server requests.
@@ -28,68 +26,75 @@ pub struct RequestsEventHandler {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl XMPPEventHandler for RequestsEventHandler {
+impl ServerEventHandler for RequestsEventHandler {
     fn name(&self) -> &'static str {
         "requests"
     }
 
-    async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>> {
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
-            Event::Caps(event) => match event {
-                caps::Event::DiscoInfoQuery {
-                    from,
-                    id,
-                    node: _node,
-                } => {
-                    self.request_handling_service
-                        .respond_to_disco_info_query(&from, &id, &self.ctx.capabilities)
-                        .await?;
-                    Ok(None)
-                }
-                _ => Ok(Some(Event::Caps(event))),
-            },
-            Event::Ping(event) => match event {
-                ping::Event::Ping { from, id } => {
-                    self.request_handling_service
-                        .respond_to_ping(&from, &id)
-                        .await?;
-                    Ok(None)
-                }
-            },
-            Event::Profile(event) => match event {
-                profile::Event::EntityTimeQuery { from, id } => {
-                    self.request_handling_service
-                        .respond_to_entity_time_request(&from, &id, &self.time_provider.now())
-                        .await?;
-                    Ok(None)
-                }
-                profile::Event::SoftwareVersionQuery { from, id } => {
-                    self.request_handling_service
-                        .respond_to_software_version_request(&from, &id, &self.ctx.software_version)
-                        .await?;
-                    Ok(None)
-                }
-                profile::Event::LastActivityQuery { from, id } => {
-                    self.request_handling_service
-                        .respond_to_last_activity_request(&from, &id, 0)
-                        .await?;
-                    Ok(None)
-                }
-                _ => Ok(Some(Event::Profile(event))),
-            },
-            Event::Roster(event) => match event {
-                roster::Event::PresenceSubscriptionRequest { from } => {
-                    info!("Approving presence subscription request from {}…", from);
-                    self.request_handling_service
-                        .respond_to_presence_subscription_request(
-                            &from,
-                            SubscriptionResponse::Approve,
-                        )
-                        .await?;
-                    Ok(None)
-                }
-            },
-            _ => Ok(Some(event)),
+            ServerEvent::Request(event) => {
+                self.handle_request_event(event).await?;
+            }
+            _ => return Ok(Some(event)),
         }
+        Ok(None)
+    }
+}
+
+impl RequestsEventHandler {
+    async fn handle_request_event(&self, event: RequestEvent) -> Result<()> {
+        match event.r#type {
+            RequestEventType::Ping => {
+                self.request_handling_service
+                    .respond_to_ping(&event.sender_id, &event.request_id)
+                    .await?;
+            }
+            RequestEventType::LocalTime => {
+                self.request_handling_service
+                    .respond_to_entity_time_request(
+                        &event.sender_id,
+                        &event.request_id,
+                        &self.time_provider.now(),
+                    )
+                    .await?;
+            }
+            RequestEventType::LastActivity => {
+                self.request_handling_service
+                    .respond_to_last_activity_request(&event.sender_id, &event.request_id, 0)
+                    .await?;
+            }
+            RequestEventType::Capabilities { id: _id } => {
+                self.request_handling_service
+                    .respond_to_disco_info_query(
+                        &event.sender_id,
+                        &event.request_id,
+                        &self.ctx.capabilities,
+                    )
+                    .await?;
+            }
+            RequestEventType::SoftwareVersion => {
+                self.request_handling_service
+                    .respond_to_software_version_request(
+                        &event.sender_id,
+                        &event.request_id,
+                        &self.ctx.software_version,
+                    )
+                    .await?;
+            }
+            RequestEventType::PresenceSubscription => {
+                info!(
+                    "Approving presence subscription request from {}…",
+                    event.sender_id
+                );
+                self.request_handling_service
+                    .respond_to_presence_subscription_request(
+                        &event.sender_id,
+                        SubscriptionResponse::Approve,
+                    )
+                    .await?;
+            }
+        }
+        Ok(())
     }
 }
