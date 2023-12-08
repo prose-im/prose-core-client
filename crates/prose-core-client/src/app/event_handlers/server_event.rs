@@ -31,7 +31,7 @@ pub enum ServerEvent {
     Occupant(OccupantEvent),
     /// Events about requests that are directed at us.
     Request(RequestEvent),
-    // TODO…
+    /// Events about received messages.
     Message(MessageEvent),
     /// Events about changes to the sidebar.
     SidebarBookmark(SidebarBookmarkEvent),
@@ -156,8 +156,9 @@ pub struct MessageEvent {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MessageEventType {
-    Received, // Regular messages
-    Sync,     // Carbons
+    Received(prose_xmpp::stanza::Message),
+    Sync(prose_xmpp::mods::chat::Carbon),
+    Sent(prose_xmpp::stanza::Message),
 }
 
 #[derive(Debug, Clone, PartialEq)]

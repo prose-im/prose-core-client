@@ -18,9 +18,7 @@ use crate::app::event_handlers::{
 };
 use crate::domain::shared::models::{AnonOccupantId, OccupantId, UserEndpointId};
 use crate::dtos::{Availability, RoomId, UserId, UserResourceId};
-use crate::infra::xmpp::type_conversions::event_parser::{
-    missing_attribute, missing_element, Context,
-};
+use crate::infra::xmpp::event_parser::{missing_attribute, missing_element, Context};
 
 pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
     let Some(from) = presence.from.clone() else {

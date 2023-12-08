@@ -9,6 +9,7 @@ use crate::app::deps::DynRoomFactory;
 use crate::app::event_handlers::ClientEventDispatcherTrait;
 use crate::client::ClientInner;
 use crate::domain::rooms::models::RoomInternals;
+use crate::domain::shared::models::RoomType;
 use crate::{ClientDelegate, ClientEvent, ClientRoomEventType};
 
 pub struct ClientEventDispatcher {
@@ -60,6 +61,11 @@ impl ClientEventDispatcherTrait for ClientEventDispatcher {
     }
 
     fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: ClientRoomEventType) {
+        // We're not sending events for rooms that are still pending…
+        if room.r#type == RoomType::Pending {
+            return;
+        }
+
         let Some(ref delegate) = self.delegate else {
             return;
         };

@@ -14,8 +14,8 @@ use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
 use crate::app::event_handlers::SidebarBookmarkEvent;
 use crate::domain::shared::models::RoomId;
 use crate::domain::sidebar::models::Bookmark;
+use crate::infra::xmpp::event_parser::Context;
 use crate::infra::xmpp::type_conversions::bookmark::ns;
-use crate::infra::xmpp::type_conversions::event_parser::Context;
 
 pub fn parse_pubsub_event(ctx: &mut Context, event: XMPPPubSubEvent) -> Result<()> {
     match event {

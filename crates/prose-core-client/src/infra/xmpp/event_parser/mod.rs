@@ -18,16 +18,16 @@ use prose_xmpp::{
 };
 
 use crate::app::event_handlers::{
-    ConnectionEvent, MessageEvent, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
-    RoomEventType, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
+    ConnectionEvent, MessageEvent, MessageEventType, OccupantEvent, RequestEvent, RequestEventType,
+    RoomEvent, RoomEventType, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
     UserResourceEventType, UserStatusEvent, UserStatusEventType,
 };
 use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{CapabilitiesId, RequestId, SenderId, UserEndpointId};
 use crate::dtos::{RoomId, UserId, UserResourceId};
-use crate::infra::xmpp::type_conversions::event_parser::presence::parse_presence;
-use crate::infra::xmpp::type_conversions::event_parser::pubsub::parse_pubsub_event;
+use crate::infra::xmpp::event_parser::presence::parse_presence;
+use crate::infra::xmpp::event_parser::pubsub::parse_pubsub_event;
 
 mod message;
 mod presence;
@@ -71,8 +71,12 @@ impl Context {
 fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
     match event {
         XMPPChatEvent::Message(message) => parse_message(ctx, message)?,
-        XMPPChatEvent::Carbon(_) => (),
-        XMPPChatEvent::Sent(_) => (),
+        XMPPChatEvent::Carbon(carbon) => ctx.push_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Sync(carbon),
+        })),
+        XMPPChatEvent::Sent(message) => ctx.push_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Sent(message),
+        })),
         XMPPChatEvent::ChatStateChanged {
             from,
             chat_state,

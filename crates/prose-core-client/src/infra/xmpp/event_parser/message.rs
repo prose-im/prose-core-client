@@ -12,16 +12,26 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::stanza::Message;
 
-use crate::app::event_handlers::{RoomEvent, RoomEventType};
+use crate::app::event_handlers::{MessageEvent, MessageEventType, RoomEvent, RoomEventType};
 use crate::dtos::RoomId;
-use crate::infra::xmpp::type_conversions::event_parser::{
-    ignore_stanza, missing_attribute, Context,
-};
+use crate::infra::xmpp::event_parser::{ignore_stanza, missing_attribute, Context};
 
 pub fn parse_message(ctx: &mut Context, message: Message) -> Result<()> {
     let Some(from) = message.from.clone() else {
         return missing_attribute(ctx, "from", message);
     };
+
+    // Ignore messages that contain invites…
+    // TODO: Handle this in the XMPP lib
+    if message.direct_invite().is_some() || message.mediated_invite().is_some() {
+        return Ok(());
+    }
+
+    // Ignore messages that contain a chat state but no body…
+    // TODO: Handle this in the XMPP lib
+    if message.chat_state().is_some() && message.body().is_none() {
+        return Ok(());
+    }
 
     match message.type_ {
         MessageType::Groupchat => parse_group_chat_message(ctx, from, message)?,
@@ -55,7 +65,8 @@ fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> R
             ctx.push_event(RoomEvent {
                 room_id: from.clone(),
                 r#type: RoomEventType::RoomConfigChanged,
-            })
+            });
+            return Ok(());
         }
     }
 
@@ -69,9 +80,16 @@ fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> R
         return Ok(());
     }
 
+    ctx.push_event(MessageEvent {
+        r#type: MessageEventType::Received(message),
+    });
+
     Ok(())
 }
 
-fn parse_chat_message(_ctx: &mut Context, _from: Jid, _message: Message) -> Result<()> {
+fn parse_chat_message(ctx: &mut Context, _from: Jid, message: Message) -> Result<()> {
+    ctx.push_event(MessageEvent {
+        r#type: MessageEventType::Received(message),
+    });
     Ok(())
 }

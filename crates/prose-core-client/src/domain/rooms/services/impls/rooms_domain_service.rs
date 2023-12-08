@@ -255,6 +255,8 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .reconfigure_room(room_jid, spec, new_name)
                     .await?;
 
+                // TODO: Make public channels also members-only so that the member list translates to the private channel
+
                 let Some(room) = self.connected_rooms_repo.update(room_jid, {
                     Box::new(|room| room.by_changing_type(RoomType::PrivateChannel))
                 }) else {

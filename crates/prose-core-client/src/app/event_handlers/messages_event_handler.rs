@@ -9,16 +9,14 @@ use tracing::{debug, error};
 use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::mods::chat;
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::Message;
-use prose_xmpp::Event;
 
 use crate::app::deps::{
     DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository, DynMessagesRepository,
     DynMessagingService, DynSidebarDomainService, DynTimeProvider,
 };
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
+use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomId, UserId};
@@ -42,32 +40,19 @@ pub struct MessagesEventHandler {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl XMPPEventHandler for MessagesEventHandler {
+impl ServerEventHandler for MessagesEventHandler {
     fn name(&self) -> &'static str {
         "messages"
     }
 
-    async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>> {
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
-            Event::Chat(event) => match event {
-                chat::Event::Message(message) => {
-                    self.handle_received_message(ReceivedMessage::Message(message))
-                        .await?;
-                    Ok(None)
-                }
-                chat::Event::Carbon(carbon) => {
-                    self.handle_received_message(ReceivedMessage::Carbon(carbon))
-                        .await?;
-                    Ok(None)
-                }
-                chat::Event::Sent(message) => {
-                    self.handle_sent_message(message).await?;
-                    Ok(None)
-                }
-                _ => Ok(Some(Event::Chat(event))),
-            },
-            _ => Ok(Some(event)),
+            ServerEvent::Message(event) => {
+                self.handle_message_event(event).await?;
+            }
+            _ => return Ok(Some(event)),
         }
+        Ok(None)
     }
 }
 
@@ -115,6 +100,21 @@ impl ReceivedMessage {
 }
 
 impl MessagesEventHandler {
+    async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
+        match event.r#type {
+            MessageEventType::Received(message) => {
+                self.handle_received_message(ReceivedMessage::Message(message))
+                    .await?
+            }
+            MessageEventType::Sync(carbon) => {
+                self.handle_received_message(ReceivedMessage::Carbon(carbon))
+                    .await?
+            }
+            MessageEventType::Sent(message) => self.handle_sent_message(message).await?,
+        }
+        Ok(())
+    }
+
     async fn handle_received_message(&self, message: ReceivedMessage) -> Result<()> {
         let Some(from) = message.sender() else {
             error!("Received message from unknown sender.");
@@ -152,12 +152,10 @@ impl MessagesEventHandler {
         let now = self.time_provider.now();
 
         let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => {
-                MessageLike::try_from(TimestampedMessage {
-                    message,
-                    timestamp: now.into(),
-                })
-            }
+            ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
+                message,
+                timestamp: now.into(),
+            }),
             ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
                 message: carbon,
                 timestamp: now.into(),
