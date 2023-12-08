@@ -5,7 +5,7 @@
 
 use prose_core_client::dtos::{
     Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
-    UserStatus as CoreUserActivity,
+    UserStatus as CoreUserStatus,
 };
 use wasm_bindgen::prelude::*;
 
@@ -48,13 +48,13 @@ impl From<Availability> for CoreAvailability {
 }
 
 #[wasm_bindgen]
-pub struct UserActivity(CoreUserActivity);
+pub struct UserStatus(CoreUserStatus);
 
 #[wasm_bindgen]
 impl Contact {
     #[wasm_bindgen(getter)]
     pub fn jid(&self) -> BareJid {
-        self.0.id.clone().into()
+        self.0.id.clone().into_inner().into()
     }
 
     #[wasm_bindgen(getter)]
@@ -68,11 +68,11 @@ impl Contact {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn activity(&self) -> Option<UserActivity> {
+    pub fn status(&self) -> Option<UserStatus> {
         self.0
-            .activity
+            .status
             .as_ref()
-            .map(|activity| UserActivity(activity.clone()))
+            .map(|activity| UserStatus(activity.clone()))
     }
 
     #[wasm_bindgen(getter)]
@@ -84,10 +84,10 @@ impl Contact {
 }
 
 #[wasm_bindgen]
-impl UserActivity {
+impl UserStatus {
     #[wasm_bindgen(constructor)]
     pub fn new(icon: &str, status: Option<String>) -> Self {
-        UserActivity(CoreUserActivity {
+        UserStatus(CoreUserStatus {
             emoji: icon.to_string(),
             status: status.clone(),
         })

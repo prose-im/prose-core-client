@@ -62,7 +62,7 @@ impl Client {
 
     pub async fn connect(&self, password: String) -> Result<(), ConnectionError> {
         self.client
-            .connect(&self.jid.to_bare().unwrap(), password)
+            .connect(&self.jid.to_bare().unwrap().into(), password)
             .await?;
         Ok(())
     }
@@ -81,7 +81,7 @@ impl Client {
         let profile = self
             .client
             .user_data
-            .load_user_profile(&from.to_bare().unwrap())
+            .load_user_profile(&from.to_bare().unwrap().into())
             .await?;
         Ok(profile)
     }
@@ -100,7 +100,7 @@ impl Client {
         let path = self
             .client
             .user_data
-            .load_avatar(&from.to_bare().unwrap())
+            .load_avatar(&from.to_bare().unwrap().into())
             .await?;
         Ok(path)
     }

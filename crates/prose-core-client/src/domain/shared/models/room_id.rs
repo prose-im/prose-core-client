@@ -25,7 +25,9 @@ impl RoomId {
         &self,
         nickname: impl AsRef<str>,
     ) -> Result<OccupantId, jid::Error> {
-        Ok(OccupantId::from(self.0.with_resource_str(nickname.as_ref())?))
+        Ok(OccupantId::from(
+            self.0.with_resource_str(nickname.as_ref())?,
+        ))
     }
 }
 
@@ -86,6 +88,18 @@ impl RoomId {
             iri = &iri[..idx];
         }
         Ok(Self::from_str(iri)?)
+    }
+}
+
+#[cfg(feature = "test")]
+impl RoomId {
+    pub fn to_display_name(&self) -> String {
+        use crate::util::StringExt;
+
+        let Some(node) = self.node_str() else {
+            return self.to_string().to_uppercase_first_letter();
+        };
+        node.capitalized_display_name()
     }
 }
 

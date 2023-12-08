@@ -50,7 +50,11 @@ impl From<ProseReaction> for Reaction {
     fn from(value: ProseReaction) -> Self {
         Reaction {
             emoji: value.emoji,
-            from: value.from.into_iter().map(Into::into).collect(),
+            from: value
+                .from
+                .into_iter()
+                .map(|id| id.into_inner().into())
+                .collect(),
         }
     }
 }

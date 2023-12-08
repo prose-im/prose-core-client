@@ -10,5 +10,4 @@ pub use string_ext::StringExt;
 pub mod account_bookmarks_client;
 
 pub mod form_config;
-pub mod jid_ext;
 pub mod string_ext;

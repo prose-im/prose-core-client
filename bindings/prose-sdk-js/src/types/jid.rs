@@ -6,8 +6,9 @@
 use core::fmt::{Debug, Display, Formatter};
 use core::str::FromStr;
 
-use prose_core_client::dtos::RoomId;
 use wasm_bindgen::prelude::*;
+
+use prose_core_client::dtos::{RoomId, UserId};
 
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "JID")]
@@ -93,5 +94,17 @@ impl Display for BareJid {
 impl From<BareJid> for RoomId {
     fn from(value: BareJid) -> Self {
         RoomId::from(value.0)
+    }
+}
+
+impl From<BareJid> for UserId {
+    fn from(value: BareJid) -> Self {
+        UserId::from(value.0)
+    }
+}
+
+impl From<&BareJid> for UserId {
+    fn from(value: &BareJid) -> Self {
+        UserId::from(value.0.clone())
     }
 }

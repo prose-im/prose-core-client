@@ -258,9 +258,9 @@ async fn test_user_entered_room() -> Result<()> {
             }),
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
-                anon_occupant_id: Some(
-                    AnonOccupantId::from("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
-                ),
+                anon_occupant_id: Some(AnonOccupantId::from(
+                    "gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw="
+                )),
                 real_id: Some(user_id!("user@prose.org")),
                 is_self: false,
                 r#type: OccupantEventType::AffiliationChanged {
@@ -311,9 +311,9 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
             }),
             ServerEvent::Occupant(OccupantEvent {
                 occupant_id: occupant_id!("room@prose.org/nick"),
-                anon_occupant_id: Some(
-                    AnonOccupantId::from("gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=")
-                ),
+                anon_occupant_id: Some(AnonOccupantId::from(
+                    "gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw="
+                )),
                 real_id: Some(user_id!("user@prose.org")),
                 is_self: false,
                 r#type: OccupantEventType::AffiliationChanged {

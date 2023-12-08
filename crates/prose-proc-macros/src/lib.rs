@@ -123,18 +123,17 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
     let name = &input.ident;
     let dependencies_struct_name = format_ident!("{}Dependencies", name);
 
-    let struct_fields =
-        fields
-            .named
-            .iter()
-            .filter_map(|field| {
-                let Some(ref ident) = field.ident else {
-                    return None;
-                };
-                let field_type = &field.ty;
-                Some(quote! { pub #ident: #field_type })
-            })
-            .collect::<Vec<_>>();
+    let struct_fields = fields
+        .named
+        .iter()
+        .filter_map(|field| {
+            let Some(ref ident) = field.ident else {
+                return None;
+            };
+            let field_type = &field.ty;
+            Some(quote! { pub #ident: #field_type })
+        })
+        .collect::<Vec<_>>();
 
     let field_initialization = fields
         .named

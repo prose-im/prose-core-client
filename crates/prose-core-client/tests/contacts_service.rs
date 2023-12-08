@@ -92,21 +92,21 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 id: user_id!("a@prose.org"),
                 name: "First Last".to_string(),
                 availability: Availability::Available,
-                activity: None,
+                status: None,
                 group: Group::Favorite,
             },
             ContactDTO {
                 id: user_id!("b@prose.org"),
                 name: "Nickname".to_string(),
                 availability: Availability::Available,
-                activity: None,
+                status: None,
                 group: Group::Team,
             },
             ContactDTO {
                 id: user_id!("john.doe@prose.org"),
                 name: "John Doe".to_string(),
                 availability: Availability::Unavailable,
-                activity: None,
+                status: None,
                 group: Group::Team,
             }
         ]

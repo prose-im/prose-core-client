@@ -15,8 +15,8 @@ use prose_core_client::services::{
 
 use crate::client::WasmError;
 use crate::types::{
-    try_jid_vec_from_string_array, MessagesArray, StringArray, UserBasicInfo, UserBasicInfoArray,
-    UserPresenceInfo, UserPresenceInfoArray,
+    try_user_id_vec_from_string_array, MessagesArray, ParticipantInfo, ParticipantInfoArray,
+    StringArray, UserBasicInfo, UserBasicInfoArray,
 };
 
 use super::IntoJSArray;
@@ -31,10 +31,7 @@ export interface RoomBase {
     readonly type: RoomType;
     readonly id: RoomID;
     readonly name: string;
-    /// The members of a room. Only available for DirectMessage and Group (member-only rooms)
-    readonly members: UserPresenceInfo[];
-    /// The occupants of a room.
-    readonly occupants: UserBasicInfo[];
+    readonly participants: ParticipantInfo[];
 
     sendMessage(body: string): Promise<void>;
     updateMessage(messageID: string, body: string): Promise<void>;
@@ -157,21 +154,12 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(getter)]
-            pub fn members(&self) -> UserPresenceInfoArray {
+            pub fn members(&self) -> ParticipantInfoArray {
                 self.room
-                    .members()
+                    .participants()
                     .into_iter()
-                    .map(UserPresenceInfo::from)
-                    .collect_into_js_array::<UserPresenceInfoArray>()
-            }
-
-            #[wasm_bindgen(getter)]
-            pub fn occupants(&self) -> UserBasicInfoArray {
-                self.room
-                    .occupants()
-                    .into_iter()
-                    .map(UserBasicInfo::from)
-                    .collect_into_js_array::<UserBasicInfoArray>()
+                    .map(ParticipantInfo::from)
+                    .collect_into_js_array::<ParticipantInfoArray>()
             }
 
             #[wasm_bindgen(js_name = "sendMessage")]
@@ -320,7 +308,7 @@ macro_rules! channel_room_impl {
         impl $t {
             #[wasm_bindgen(js_name = "inviteUsers")]
             pub async fn invite_users(&self, users: Array) -> Result<()> {
-                let users = try_jid_vec_from_string_array(users)?;
+                let users = try_user_id_vec_from_string_array(users)?;
                 self.room
                     .invite_users(users.as_slice())
                     .await
@@ -368,28 +356,22 @@ pub trait RoomEnvelopeExt {
 impl RoomEnvelopeExt for RoomEnvelope {
     fn into_js_value(self) -> JsValue {
         match self {
-            RoomEnvelope::DirectMessage(room) => {
-                JsValue::from(RoomDirectMessage {
-                    kind: RoomType::DirectMessage,
-                    room,
-                })
-            }
+            RoomEnvelope::DirectMessage(room) => JsValue::from(RoomDirectMessage {
+                kind: RoomType::DirectMessage,
+                room,
+            }),
             RoomEnvelope::Group(room) => JsValue::from(RoomGroup {
                 kind: RoomType::Group,
                 room,
             }),
-            RoomEnvelope::PrivateChannel(room) => {
-                JsValue::from(RoomPrivateChannel {
-                    kind: RoomType::PrivateChannel,
-                    room,
-                })
-            }
-            RoomEnvelope::PublicChannel(room) => {
-                JsValue::from(RoomPublicChannel {
-                    kind: RoomType::PublicChannel,
-                    room,
-                })
-            }
+            RoomEnvelope::PrivateChannel(room) => JsValue::from(RoomPrivateChannel {
+                kind: RoomType::PrivateChannel,
+                room,
+            }),
+            RoomEnvelope::PublicChannel(room) => JsValue::from(RoomPublicChannel {
+                kind: RoomType::PublicChannel,
+                room,
+            }),
             RoomEnvelope::Generic(room) => JsValue::from(RoomGeneric {
                 kind: RoomType::Generic,
                 room,

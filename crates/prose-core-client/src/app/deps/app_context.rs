@@ -37,9 +37,9 @@ impl AppContext {
             .read()
             .as_ref()
             .map(|p| p.connected_jid.clone())
-            .ok_or(
-                anyhow::anyhow!("Failed to read the user's JID since the client is not connected.")
-            )
+            .ok_or(anyhow::anyhow!(
+                "Failed to read the user's JID since the client is not connected."
+            ))
     }
 
     pub fn muc_service(&self) -> Result<BareJid> {

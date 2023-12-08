@@ -251,17 +251,16 @@ mod tests {
     #[test]
     fn test_reactions_for_user() {
         let mut message = MessageBuilder::new_with_index(1).build_message();
-        message.reactions =
-            vec![
-                Reaction {
-                    emoji: "🎉".into(),
-                    from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")],
-                },
-                Reaction {
-                    emoji: "✅".into(),
-                    from: vec![user_id!("b@prose.org")],
-                },
-            ];
+        message.reactions = vec![
+            Reaction {
+                emoji: "🎉".into(),
+                from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")],
+            },
+            Reaction {
+                emoji: "✅".into(),
+                from: vec![user_id!("b@prose.org")],
+            },
+        ];
 
         assert_eq!(
             message

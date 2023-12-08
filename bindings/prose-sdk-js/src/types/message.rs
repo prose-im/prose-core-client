@@ -133,7 +133,11 @@ impl From<dtos::Reaction> for Reaction {
     fn from(value: dtos::Reaction) -> Self {
         Reaction {
             emoji: value.emoji.into_inner(),
-            from: value.from.into_iter().map(Into::into).collect(),
+            from: value
+                .from
+                .into_iter()
+                .map(|id| id.into_inner().into())
+                .collect(),
         }
     }
 }

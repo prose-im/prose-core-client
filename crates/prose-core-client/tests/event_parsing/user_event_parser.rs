@@ -75,17 +75,16 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
     );
 
     // Exiting a Room (https://xmpp.org/extensions/xep-0045.html#exit)
-    let events =
-        parse_xml(
-            r#"
+    let events = parse_xml(
+        r#"
         <presence xmlns="jabber:client" from="room@prose.org/nick" type="unavailable">
             <x xmlns="http://jabber.org/protocol/muc#user">
                 <item affiliation="member" jid="user@prose.org/res" role="none" />
             </x>
         </presence>
       "#,
-        )
-        .await?;
+    )
+    .await?;
 
     assert_eq!(
         events,
@@ -286,9 +285,8 @@ async fn test_status_changed() -> Result<()> {
         })]
     );
 
-    let events =
-        parse_xml(
-            r#"
+    let events = parse_xml(
+        r#"
         <message xmlns="jabber:client" from="user@prose.org" type="headline">
             <event xmlns="http://jabber.org/protocol/pubsub#event">
                 <items node="http://jabber.org/protocol/activity">
@@ -299,8 +297,8 @@ async fn test_status_changed() -> Result<()> {
             </event>
         </message>
       "#,
-        )
-        .await?;
+    )
+    .await?;
 
     assert_eq!(
         events,

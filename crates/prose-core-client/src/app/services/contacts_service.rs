@@ -52,7 +52,7 @@ impl ContactsService {
                 id: domain_contact.id,
                 name,
                 availability: user_info.availability,
-                activity: user_info.activity,
+                status: user_info.activity,
                 group: domain_contact.group,
             };
             contacts.push(contact)

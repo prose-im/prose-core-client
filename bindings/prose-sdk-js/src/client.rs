@@ -13,7 +13,7 @@ use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, Stor
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
+    try_user_id_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
     ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray, UserMetadata, UserProfile,
 };
 
@@ -187,7 +187,7 @@ impl Client {
     /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "startConversation")]
     pub async fn start_conversation(&self, participants: Array) -> Result<BareJid> {
-        let participants = try_jid_vec_from_string_array(participants)?;
+        let participants = try_user_id_vec_from_string_array(participants)?;
 
         Ok(self
             .client
@@ -204,7 +204,7 @@ impl Client {
     /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "createGroup")]
     pub async fn create_group(&self, participants: Array) -> Result<BareJid> {
-        let participants = try_jid_vec_from_string_array(participants)?;
+        let participants = try_user_id_vec_from_string_array(participants)?;
 
         Ok(self
             .client
@@ -264,15 +264,14 @@ impl Client {
         icon: Option<String>,
         text: Option<String>,
     ) -> Result<()> {
-        let user_activity =
-            if let Some(icon) = &icon {
-                Some(UserStatus {
-                    emoji: icon.clone(),
-                    status: text.clone(),
-                })
-            } else {
-                None
-            };
+        let user_activity = if let Some(icon) = &icon {
+            Some(UserStatus {
+                emoji: icon.clone(),
+                status: text.clone(),
+            })
+        } else {
+            None
+        };
 
         self.client
             .account

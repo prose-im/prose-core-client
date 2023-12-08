@@ -20,17 +20,17 @@ pub struct Contact {
     pub jid: JID,
     pub name: String,
     pub availability: Availability,
-    pub activity: Option<UserStatus>,
+    pub status: Option<UserStatus>,
     pub group: Group,
 }
 
 impl From<CoreContact> for Contact {
     fn from(value: CoreContact) -> Self {
         Contact {
-            jid: value.id.into(),
+            jid: value.id.into_inner().into(),
             name: value.name,
             availability: value.availability,
-            activity: value.activity,
+            status: value.status,
             group: value.group.into(),
         }
     }

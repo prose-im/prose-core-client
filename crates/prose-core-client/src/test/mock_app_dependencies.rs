@@ -360,8 +360,8 @@ impl From<MockRoomFactoryDependencies> for RoomFactory {
 
 impl RoomFactory {
     pub fn mock() -> Self {
-        RoomFactory::from(
-            MockSealedRoomFactoryDependencies::from(MockRoomFactoryDependencies::default())
-        )
+        RoomFactory::from(MockSealedRoomFactoryDependencies::from(
+            MockRoomFactoryDependencies::default(),
+        ))
     }
 }

@@ -75,11 +75,10 @@ pub fn load_credentials() -> (FullJid, String) {
         );
     }
 
-    let path =
-        env::current_dir()
-            .expect("Cannot determine current directory")
-            .join("examples")
-            .join(".env");
+    let path = env::current_dir()
+        .expect("Cannot determine current directory")
+        .join("examples")
+        .join(".env");
 
     dotenvy::from_path(&path).expect(&format!("Missing .env file at {:?}.", path));
 

@@ -119,6 +119,13 @@ extern "C" {
         client: Client,
         room: JsValue,
     ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "roomParticipantsChanged")]
+    fn room_participants_changed(
+        this: &JSDelegate,
+        client: Client,
+        room: JsValue,
+    ) -> Result<(), JsValue>;
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -134,12 +141,10 @@ impl From<ConnectionError> for JSConnectionError {
                 code: "timed_out".to_string(),
                 message: None,
             },
-            ConnectionError::InvalidCredentials => {
-                JSConnectionError {
-                    code: "invalid_credentials".to_string(),
-                    message: None,
-                }
-            }
+            ConnectionError::InvalidCredentials => JSConnectionError {
+                code: "invalid_credentials".to_string(),
+                message: None,
+            },
             ConnectionError::Generic { msg } => JSConnectionError {
                 code: "generic".to_string(),
                 message: Some(msg),
@@ -200,11 +205,11 @@ impl Delegate {
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
             ClientEvent::SidebarChanged => self.inner.sidebar_changed(client)?,
-            ClientEvent::ContactChanged { id: jid } => {
-                self.inner.contact_changed(client, jid.into())?
-            }
+            ClientEvent::ContactChanged { id: jid } => self
+                .inner
+                .contact_changed(client, jid.into_inner().into())?,
             ClientEvent::AvatarChanged { id: jid } => {
-                self.inner.avatar_changed(client, jid.into())?
+                self.inner.avatar_changed(client, jid.into_inner().into())?
             }
             ClientEvent::RoomChanged { room, r#type } => match r#type {
                 ClientRoomEventType::MessagesAppended { message_ids } => self
@@ -222,6 +227,9 @@ impl Delegate {
                 ClientRoomEventType::AttributesChanged => self
                     .inner
                     .room_attributes_changed(client, room.into_js_value())?,
+                ClientRoomEventType::ParticipantsChanged => self
+                    .inner
+                    .room_participants_changed(client, room.into_js_value())?,
             },
         }
         Ok(())

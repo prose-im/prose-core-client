@@ -15,15 +15,14 @@ use prose_proc_macros::mt_test;
 async fn test_ping() -> Result<()> {
     // XEP-0199: XMPP Ping
     // https://xmpp.org/extensions/xep-0199.html
-    let events =
-        parse_xml(
-            r#"
+    let events = parse_xml(
+        r#"
         <iq xmlns="jabber:client" from="prose.org" id="req-id" type="get">
           <ping xmlns='urn:xmpp:ping'/>
         </iq>
         "#,
-        )
-        .await?;
+    )
+    .await?;
 
     assert_eq!(
         events,

@@ -6,30 +6,29 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use jid::Jid;
 
 use prose_core_client::app::dtos::Availability;
+use prose_core_client::domain::shared::models::{UserId, UserResourceId};
 use prose_core_client::domain::user_info::models::{
     AvatarInfo, AvatarMetadata, Presence, UserInfo, UserStatus,
 };
 use prose_core_client::domain::user_info::repos::UserInfoRepository;
 use prose_core_client::domain::user_info::services::mocks::MockUserInfoService;
 use prose_core_client::infra::user_info::CachingUserInfoRepository;
-use prose_xmpp::{bare, full};
+use prose_core_client::{user_id, user_resource_id};
 
 use crate::tests::{async_test, store};
 
 #[async_test]
 async fn test_caches_loaded_avatar_metadata() -> Result<()> {
-    let metadata =
-        AvatarMetadata {
-            bytes: 1001,
-            mime_type: "image/jpg".to_string(),
-            checksum: "my-checksum".into(),
-            width: None,
-            height: None,
-            url: None,
-        };
+    let metadata = AvatarMetadata {
+        bytes: 1001,
+        mime_type: "image/jpg".to_string(),
+        checksum: "my-checksum".into(),
+        width: None,
+        height: None,
+        url: None,
+    };
 
     let service = {
         let metadata = metadata.clone();
@@ -53,11 +52,11 @@ async fn test_caches_loaded_avatar_metadata() -> Result<()> {
     };
 
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
 
@@ -66,18 +65,17 @@ async fn test_caches_loaded_avatar_metadata() -> Result<()> {
 
 #[async_test]
 async fn test_caches_received_avatar_metadata() -> Result<()> {
-    let metadata =
-        AvatarMetadata {
-            bytes: 1001,
-            mime_type: "image/jpg".to_string(),
-            checksum: "my-checksum".into(),
-            width: None,
-            height: None,
-            url: None,
-        };
+    let metadata = AvatarMetadata {
+        bytes: 1001,
+        mime_type: "image/jpg".to_string(),
+        checksum: "my-checksum".into(),
+        width: None,
+        height: None,
+        url: None,
+    };
 
     let repo = CachingUserInfoRepository::new(store().await?, Arc::new(MockUserInfoService::new()));
-    repo.set_avatar_metadata(&bare!("a@prose.org"), &metadata)
+    repo.set_avatar_metadata(&user_id!("a@prose.org"), &metadata)
         .await?;
 
     let expected_user_info = UserInfo {
@@ -90,7 +88,7 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
     };
 
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
 
@@ -99,15 +97,14 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
 
 #[async_test]
 async fn test_persists_metadata_and_user_activity() -> Result<()> {
-    let metadata =
-        AvatarMetadata {
-            bytes: 1001,
-            mime_type: "image/jpg".to_string(),
-            checksum: "my-checksum".into(),
-            width: None,
-            height: None,
-            url: None,
-        };
+    let metadata = AvatarMetadata {
+        bytes: 1001,
+        mime_type: "image/jpg".to_string(),
+        checksum: "my-checksum".into(),
+        width: None,
+        height: None,
+        url: None,
+    };
 
     let activity = UserStatus {
         emoji: "🍕".to_string(),
@@ -117,9 +114,9 @@ async fn test_persists_metadata_and_user_activity() -> Result<()> {
     let store = store().await?;
 
     let repo = CachingUserInfoRepository::new(store.clone(), Arc::new(MockUserInfoService::new()));
-    repo.set_avatar_metadata(&bare!("a@prose.org"), &metadata)
+    repo.set_avatar_metadata(&user_id!("a@prose.org"), &metadata)
         .await?;
-    repo.set_user_activity(&bare!("a@prose.org"), Some(&activity))
+    repo.set_user_activity(&user_id!("a@prose.org"), Some(&activity))
         .await?;
 
     let expected_user_info = UserInfo {
@@ -132,13 +129,13 @@ async fn test_persists_metadata_and_user_activity() -> Result<()> {
     };
 
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
 
     let repo = CachingUserInfoRepository::new(store, Arc::new(MockUserInfoService::new()));
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
 
@@ -158,7 +155,7 @@ async fn test_does_not_persist_availability() -> Result<()> {
 
     let repo = CachingUserInfoRepository::new(store.clone(), service.clone());
     repo.set_user_presence(
-        &full!("a@prose.org/a").into(),
+        &user_resource_id!("a@prose.org/a").into(),
         &Presence {
             priority: 1,
             availability: Availability::Available,
@@ -174,7 +171,7 @@ async fn test_does_not_persist_availability() -> Result<()> {
     };
 
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
 
@@ -182,7 +179,7 @@ async fn test_does_not_persist_availability() -> Result<()> {
 
     expected_user_info.availability = Availability::Unavailable;
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&expected_user_info)
     );
 
@@ -199,7 +196,7 @@ async fn test_uses_highest_presence() -> Result<()> {
     let repo = CachingUserInfoRepository::new(store().await?, Arc::new(service));
 
     repo.set_user_presence(
-        &full!("a@prose.org/b").into(),
+        &user_resource_id!("a@prose.org/b").into(),
         &Presence {
             priority: 2,
             availability: Availability::Away,
@@ -209,7 +206,7 @@ async fn test_uses_highest_presence() -> Result<()> {
     .await?;
 
     repo.set_user_presence(
-        &full!("a@prose.org/a").into(),
+        &user_resource_id!("a@prose.org/a").into(),
         &Presence {
             priority: 1,
             availability: Availability::Available,
@@ -219,11 +216,11 @@ async fn test_uses_highest_presence() -> Result<()> {
     .await?;
 
     assert_eq!(
-        repo.resolve_user_id_to_user_resource_id(&bare!("a@prose.org")),
-        Jid::Full(full!("a@prose.org/b"))
+        repo.resolve_user_id_to_user_resource_id(&user_id!("a@prose.org")),
+        user_resource_id!("a@prose.org/b").into()
     );
     assert_eq!(
-        repo.get_user_info(&bare!("a@prose.org")).await?.as_ref(),
+        repo.get_user_info(&user_id!("a@prose.org")).await?.as_ref(),
         Some(&UserInfo {
             avatar: None,
             activity: None,

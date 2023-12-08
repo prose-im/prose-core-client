@@ -44,7 +44,9 @@ async fn test_disconnected() -> Result<()> {
 
     assert_eq!(
         output_events,
-        vec![ServerEvent::Connection(ConnectionEvent::Disconnected { error: None })]
+        vec![ServerEvent::Connection(ConnectionEvent::Disconnected {
+            error: None
+        })]
     );
 
     Ok(())

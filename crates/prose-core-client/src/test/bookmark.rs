@@ -5,7 +5,6 @@
 
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
 use crate::dtos::RoomId;
-use crate::util::jid_ext::BareJidExt;
 
 impl Bookmark {
     pub fn direct_message(jid: impl Into<RoomId>) -> Self {

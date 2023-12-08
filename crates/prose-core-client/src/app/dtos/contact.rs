@@ -12,6 +12,6 @@ pub struct Contact {
     pub id: UserId,
     pub name: String,
     pub availability: Availability,
-    pub activity: Option<UserStatus>,
+    pub status: Option<UserStatus>,
     pub group: Group,
 }

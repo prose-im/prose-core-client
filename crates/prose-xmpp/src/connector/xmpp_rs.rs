@@ -68,9 +68,9 @@ impl ConnectorTrait for Connector {
             Ok(client)
         }
 
-        connect(jid, password).await.map(
-            |client| Box::new(Connection::new(client, event_handler)) as Box<dyn ConnectionTrait>
-        )
+        connect(jid, password).await.map(|client| {
+            Box::new(Connection::new(client, event_handler)) as Box<dyn ConnectionTrait>
+        })
     }
 }
 
@@ -91,38 +91,37 @@ impl Connection {
         let (mut writer, mut reader) = client.split();
         let event_handler = Arc::new(event_handler);
 
-        let read_handle =
-            {
-                let conn = Connection::new_with_sender(sender.clone());
-                let event_handler = event_handler.clone();
+        let read_handle = {
+            let conn = Connection::new_with_sender(sender.clone());
+            let event_handler = event_handler.clone();
 
-                task::spawn(async move {
-                    while let Some(event) = reader.next().await {
-                        match event {
-                            Event::Disconnected(err) => {
-                                (event_handler)(
-                                    &conn,
-                                    ConnectionEvent::Disconnected {
-                                        error: Some(ConnectionError::Generic {
-                                            msg: err.to_string(),
-                                        }),
-                                    },
-                                )
-                                .await;
-                                break;
-                            }
-                            Event::Online { .. } => (),
-                            Event::Stanza(stanza) => {
-                                #[cfg(feature = "trace-stanzas")]
-                                tracing::info!(direction = "IN", "{}", String::from(&stanza));
+            task::spawn(async move {
+                while let Some(event) = reader.next().await {
+                    match event {
+                        Event::Disconnected(err) => {
+                            (event_handler)(
+                                &conn,
+                                ConnectionEvent::Disconnected {
+                                    error: Some(ConnectionError::Generic {
+                                        msg: err.to_string(),
+                                    }),
+                                },
+                            )
+                            .await;
+                            break;
+                        }
+                        Event::Online { .. } => (),
+                        Event::Stanza(stanza) => {
+                            #[cfg(feature = "trace-stanzas")]
+                            tracing::info!(direction = "IN", "{}", String::from(&stanza));
 
-                                let fut = (event_handler)(&conn, ConnectionEvent::Stanza(stanza));
-                                task::spawn(async move { fut.await });
-                            }
+                            let fut = (event_handler)(&conn, ConnectionEvent::Stanza(stanza));
+                            task::spawn(async move { fut.await });
                         }
                     }
-                })
-            };
+                }
+            })
+        };
 
         let write_handle = task::spawn(async move {
             while let Some(packet) = rx.recv().await {
@@ -148,21 +147,20 @@ impl Connection {
             })
         };
 
-        let timeout_handle =
-            {
-                let conn = Connection::new_with_sender(sender.clone());
-                let event_handler = event_handler.clone();
+        let timeout_handle = {
+            let conn = Connection::new_with_sender(sender.clone());
+            let event_handler = event_handler.clone();
 
-                task::spawn(async move {
-                    let mut interval = time::interval(Duration::from_secs(2));
+            task::spawn(async move {
+                let mut interval = time::interval(Duration::from_secs(2));
 
-                    loop {
-                        interval.tick().await;
-                        let fut = (event_handler)(&conn, ConnectionEvent::TimeoutTimer);
-                        task::spawn(async move { fut.await });
-                    }
-                })
-            };
+                loop {
+                    interval.tick().await;
+                    let fut = (event_handler)(&conn, ConnectionEvent::TimeoutTimer);
+                    task::spawn(async move { fut.await });
+                }
+            })
+        };
 
         Connection {
             sender,

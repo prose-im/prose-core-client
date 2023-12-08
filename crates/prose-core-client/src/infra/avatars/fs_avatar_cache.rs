@@ -113,11 +113,10 @@ impl AvatarCache for FsAvatarCache {
 
 impl FsAvatarCache {
     fn filename_for(&self, jid: &UserId, image_checksum: &AvatarImageId) -> PathBuf {
-        self.path
-            .join(format!(
-                "{}-{}.jpg",
-                jid.to_string(),
-                image_checksum.as_ref()
-            ))
+        self.path.join(format!(
+            "{}-{}.jpg",
+            jid.to_string(),
+            image_checksum.as_ref()
+        ))
     }
 }

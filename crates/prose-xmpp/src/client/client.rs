@@ -84,18 +84,17 @@ impl ClientInner {
 
         let inner = self.clone();
 
-        let connection =
-            (self.context.connector_provider)()
-                .connect(
-                    jid,
-                    password.as_ref(),
-                    Box::new(move |_, event| {
-                        let inner = inner.clone();
+        let connection = (self.context.connector_provider)()
+            .connect(
+                jid,
+                password.as_ref(),
+                Box::new(move |_, event| {
+                    let inner = inner.clone();
 
-                        Box::pin(async move { inner.handle_event(event).await }) as PinnedFuture<_>
-                    }),
-                )
-                .await?;
+                    Box::pin(async move { inner.handle_event(event).await }) as PinnedFuture<_>
+                }),
+            )
+            .await?;
 
         self.context.connection.write().replace(connection);
 
@@ -144,15 +143,14 @@ impl ClientInner {
     }
 
     fn handle_stanza(ctx: &ModuleContextInner, mods: &ModuleLookup, stanza: Element) {
-        let elem =
-            match XMPPElement::try_from_element(stanza) {
-                Ok(None) => return,
-                Ok(Some(elem)) => elem,
-                Err(err) => {
-                    error!("Failed to parse stanza. {}", err);
-                    return;
-                }
-            };
+        let elem = match XMPPElement::try_from_element(stanza) {
+            Ok(None) => return,
+            Ok(Some(elem)) => elem,
+            Err(err) => {
+                error!("Failed to parse stanza. {}", err);
+                return;
+            }
+        };
 
         let mut wakers = Vec::<Waker>::new();
         let mut idx = 0;
@@ -213,10 +211,9 @@ impl TryFrom<Arc<ModuleContextInner>> for Client {
     type Error = anyhow::Error;
 
     fn try_from(value: Arc<ModuleContextInner>) -> std::result::Result<Self, Self::Error> {
-        let mods = value
-            .mods
-            .upgrade()
-            .ok_or(anyhow::format_err!("Used module after client was released."))?;
+        let mods = value.mods.upgrade().ok_or(anyhow::format_err!(
+            "Used module after client was released."
+        ))?;
 
         Ok(Client {
             inner: Arc::new(ClientInner {

@@ -27,7 +27,9 @@ impl UserId {
     }
 
     pub fn with_resource(&self, res: impl AsRef<str>) -> Result<UserResourceId, jid::Error> {
-        Ok(UserResourceId::from(self.0.with_resource_str(res.as_ref())?))
+        Ok(UserResourceId::from(
+            self.0.with_resource_str(res.as_ref())?,
+        ))
     }
 
     pub fn username(&self) -> &str {
