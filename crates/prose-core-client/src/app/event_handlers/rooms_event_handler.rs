@@ -160,6 +160,7 @@ impl RoomsEventHandler {
                     .await?;
             }
             RoomEventType::RoomConfigChanged => {
+                info!("Config changed for room {}.", event.room_id);
                 self.sidebar_domain_service
                     .handle_changed_room_config(&event.room_id)
                     .await?;

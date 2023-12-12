@@ -303,8 +303,14 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         room.set_description(config.room_description);
 
         if room.r#type == config.room_type {
+            info!("Room type remained for {}.", room_id);
             return Ok(room);
         }
+
+        info!(
+            "Room type changed from {} to {} for {}.",
+            room.r#type, config.room_type, room_id
+        );
 
         self.connected_rooms_repo
             .update(
@@ -327,7 +333,7 @@ impl RoomsDomainService {
         let nickname = format!(
             "{}#{}",
             user_jid.username(),
-            general_purpose::STANDARD.encode(user_jid.to_string())
+            general_purpose::URL_SAFE_NO_PAD.encode(user_jid.to_string())
         );
 
         // Insert pending room so that we don't miss any stanzas for this room while we're

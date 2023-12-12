@@ -489,9 +489,11 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         let item_type = BookmarkType::try_from(room.r#type.clone())?;
 
         if item.name == item_name && item.r#type == item_type {
+            info!("No changes required for SidebarItem {}.", room_id);
             return Ok(());
         }
 
+        info!("Updating SidebarItem {}…", room_id);
         item.name = item_name;
         item.r#type = item_type;
 
