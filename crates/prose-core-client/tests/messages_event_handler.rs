@@ -18,7 +18,6 @@ use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::{room_id, user_id, ClientRoomEventType};
 use prose_xmpp::jid;
-use prose_xmpp::mods::chat;
 use prose_xmpp::stanza::Message;
 
 #[tokio::test]

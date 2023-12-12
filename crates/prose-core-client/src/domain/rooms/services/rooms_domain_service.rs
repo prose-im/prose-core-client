@@ -8,6 +8,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
+
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
@@ -53,7 +54,7 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
     /// - Dispatches `ClientEvent::RoomChanged` of type `RoomEventType::AttributesChanged`
     ///   after processing.
-    async fn rename_room(&self, room_jid: &RoomId, name: &str) -> Result<(), RoomError>;
+    async fn rename_room(&self, room_id: &RoomId, name: &str) -> Result<(), RoomError>;
 
     /// Reconfigures the room identified by `room_jid` according to `spec` and renames it to `new_name`.
     ///
@@ -66,8 +67,14 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   after processing.
     async fn reconfigure_room_with_spec(
         &self,
-        room_jid: &RoomId,
+        room_id: &RoomId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<Arc<RoomInternals>, RoomError>;
+
+    /// Loads the configuration for `room_id` and updates the corresponding `RoomInternals`
+    /// accordingly. Call this method after the room configuration changed.
+    /// Returns `RoomError::RoomNotFound` if no room with `room_id` exists.
+    async fn reevaluate_room_spec(&self, room_id: &RoomId)
+        -> Result<Arc<RoomInternals>, RoomError>;
 }

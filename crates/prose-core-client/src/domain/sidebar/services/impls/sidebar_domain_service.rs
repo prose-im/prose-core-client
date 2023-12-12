@@ -476,7 +476,38 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     }
 
     async fn handle_changed_room_config(&self, room_id: &RoomId) -> Result<()> {
-        todo!("Implement me");
+        let room = self
+            .rooms_domain_service
+            .reevaluate_room_spec(room_id)
+            .await?;
+
+        let Some(mut item) = self.sidebar_repo.get(room_id) else {
+            return Ok(());
+        };
+
+        let item_name = room.name().unwrap_or(room.room_id.to_string());
+        let item_type = BookmarkType::try_from(room.r#type.clone())?;
+
+        if item.name == item_name && item.r#type == item_type {
+            return Ok(());
+        }
+
+        item.name = item_name;
+        item.r#type = item_type;
+
+        self.sidebar_repo.put(&item);
+
+        if let Err(err) = self.bookmarks_service.save_bookmark(&(&item).into()).await {
+            error!(
+                "Failed to save bookmark after configuration change. Reason: {}",
+                err.to_string()
+            );
+        }
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(())
     }
 
     /// Removes all connected rooms and sidebar items.
@@ -619,18 +650,7 @@ impl SidebarDomainService {
     ) -> Result<RoomId> {
         let room_name = room.name().unwrap_or(room.room_id.to_string());
 
-        let bookmark_type = match room.r#type {
-            RoomType::Pending => {
-                unreachable!("RoomsDomainService unexpectedly returned a pending room.")
-            }
-            RoomType::DirectMessage => BookmarkType::DirectMessage,
-            RoomType::Group => BookmarkType::Group,
-            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
-            RoomType::PublicChannel => BookmarkType::PublicChannel,
-            RoomType::Generic => {
-                bail!("The joined/created room did not match any of our specifications.")
-            }
-        };
+        let bookmark_type = BookmarkType::try_from(room.r#type.clone())?;
 
         let mut new_sidebar_item = SidebarItem {
             name: room_name.clone(),
@@ -695,5 +715,25 @@ impl From<&SidebarItem> for Bookmark {
             is_favorite: value.is_favorite,
             in_sidebar: true,
         }
+    }
+}
+
+impl TryFrom<RoomType> for BookmarkType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RoomType) -> Result<Self, Self::Error> {
+        let value = match value {
+            RoomType::Pending => {
+                unreachable!("RoomsDomainService unexpectedly returned a pending room.")
+            }
+            RoomType::DirectMessage => BookmarkType::DirectMessage,
+            RoomType::Group => BookmarkType::Group,
+            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
+            RoomType::PublicChannel => BookmarkType::PublicChannel,
+            RoomType::Generic => {
+                bail!("The joined/created room did not match any of our specifications.")
+            }
+        };
+        Ok(value)
     }
 }

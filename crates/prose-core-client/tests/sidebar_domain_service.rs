@@ -924,16 +924,78 @@ async fn test_handle_destroyed_room() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_handle_temporary_removal_from_room() -> Result<()> {
+async fn test_handles_temporary_removal_from_room() -> Result<()> {
     panic!("Implement me!")
 }
 
 #[tokio::test]
-async fn test_handle_permanent_removal_from_room() -> Result<()> {
+async fn test_handles_permanent_removal_from_room() -> Result<()> {
     panic!("Implement me!")
 }
 
 #[tokio::test]
 async fn test_handles_changed_room_config() -> Result<()> {
-    panic!("Implement me")
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    // Make sure that the method calls are in the exact order…
+    let mut seq = Sequence::new();
+
+    deps.rooms_domain_service
+        .expect_reevaluate_room_spec()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(Arc::new(
+                    RoomInternals::private_channel(room_id!("room@conf.prose.org"))
+                        .with_name("New Room Name"),
+                ))
+            })
+        });
+
+    deps.sidebar_repo
+        .expect_get()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| {
+            Some(SidebarItem::public_channel(
+                room_id!("room@conf.prose.org"),
+                "Old Room Name",
+            ))
+        });
+
+    deps.sidebar_repo
+        .expect_put()
+        .with(predicate::eq(SidebarItem::private_channel(
+            room_id!("room@conf.prose.org"),
+            "New Room Name",
+        )))
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| ());
+
+    deps.bookmarks_service
+        .expect_save_bookmark()
+        .with(predicate::eq(
+            Bookmark::private_channel(room_id!("room@conf.prose.org"), "New Room Name")
+                .set_in_sidebar(true),
+        ))
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .handle_changed_room_config(&room_id!("room@conf.prose.org"))
+        .await?;
+
+    Ok(())
 }

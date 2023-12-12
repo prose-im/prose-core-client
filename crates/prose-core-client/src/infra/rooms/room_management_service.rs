@@ -14,7 +14,8 @@ use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
 
 use crate::domain::rooms::models::{
-    PublicRoomInfo, RoomAffiliation, RoomError, RoomSessionInfo, RoomSessionMember, RoomSpec,
+    PublicRoomInfo, RoomAffiliation, RoomConfig, RoomError, RoomSessionInfo, RoomSessionMember,
+    RoomSpec,
 };
 use crate::domain::rooms::services::RoomManagementService;
 use crate::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
@@ -87,9 +88,11 @@ impl RoomManagementService for XMPPClient {
 
         Ok(RoomSessionInfo {
             room_id: room_jid,
-            room_name: room_info.name,
-            room_description: room_info.description,
-            room_type: spec.room_type(),
+            config: RoomConfig {
+                room_name: room_info.name,
+                room_description: room_info.description,
+                room_type: spec.room_type(),
+            },
             user_nickname,
             members,
             room_has_been_created,
@@ -122,24 +125,12 @@ impl RoomManagementService for XMPPClient {
 
         let user_nickname = occupant_id.nickname().to_string();
         let room_jid = occupant_id.room_id();
-        let room_info = self.load_room_info(&room_jid).await?;
-
-        let room_type = 'room_type: {
-            for room_spec in RoomSpec::iter() {
-                if room_spec.is_satisfied_by(&room_info) {
-                    break 'room_type room_spec.room_type();
-                }
-            }
-            RoomType::Generic
-        };
-
+        let room_config = self.load_room_config(&room_jid).await?;
         let members = self.load_room_members(&room_jid).await?;
 
         Ok(RoomSessionInfo {
             room_id: room_jid,
-            room_name: room_info.name,
-            room_description: room_info.description,
-            room_type,
+            config: room_config,
             user_nickname,
             members,
             room_has_been_created: false,
@@ -179,6 +170,25 @@ impl RoomManagementService for XMPPClient {
         }
 
         Ok(())
+    }
+
+    async fn load_room_config(&self, room_jid: &RoomId) -> Result<RoomConfig, RoomError> {
+        let room_info = self.load_room_info(&room_jid).await?;
+
+        let room_type = 'room_type: {
+            for room_spec in RoomSpec::iter() {
+                if room_spec.is_satisfied_by(&room_info) {
+                    break 'room_type room_spec.room_type();
+                }
+            }
+            RoomType::Generic
+        };
+
+        Ok(RoomConfig {
+            room_name: room_info.name,
+            room_description: room_info.description,
+            room_type,
+        })
     }
 
     async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError> {
@@ -226,39 +236,28 @@ impl XMPPClient {
     async fn load_room_members(&self, jid: &RoomId) -> Result<Vec<RoomSessionMember>, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
 
-        let owners = muc_mod
-            .request_users(jid, Affiliation::Owner)
-            .await
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|user| RoomSessionMember {
-                id: UserId::from(user.jid.to_bare()),
-                affiliation: RoomAffiliation::Owner,
-                nick: user.nick,
-            });
+        let mut members = vec![];
+        let affiliations = vec![
+            (Affiliation::Owner, RoomAffiliation::Owner),
+            (Affiliation::Member, RoomAffiliation::Member),
+            (Affiliation::Admin, RoomAffiliation::Admin),
+        ];
 
-        let members = muc_mod
-            .request_users(jid, Affiliation::Member)
-            .await
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|user| RoomSessionMember {
-                id: UserId::from(user.jid.to_bare()),
-                affiliation: RoomAffiliation::Member,
-                nick: user.nick,
-            });
+        for (xmpp_affiliation, domain_affiliation) in affiliations {
+            members.extend(
+                muc_mod
+                    .request_users(jid, xmpp_affiliation)
+                    .await
+                    .unwrap_or(vec![])
+                    .into_iter()
+                    .map(move |user| RoomSessionMember {
+                        id: UserId::from(user.jid.to_bare()),
+                        affiliation: domain_affiliation.clone(),
+                        nick: user.nick,
+                    }),
+            )
+        }
 
-        let admins = muc_mod
-            .request_users(jid, Affiliation::Admin)
-            .await
-            .unwrap_or(vec![])
-            .into_iter()
-            .map(|user| RoomSessionMember {
-                id: UserId::from(user.jid.to_bare()),
-                affiliation: RoomAffiliation::Admin,
-                nick: user.nick,
-            });
-
-        Ok(owners.chain(members).chain(admins).collect())
+        Ok(members)
     }
 }

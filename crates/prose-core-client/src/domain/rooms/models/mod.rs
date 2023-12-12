@@ -9,7 +9,7 @@ pub use public_room_info::PublicRoomInfo;
 pub use room_affiliation::RoomAffiliation;
 pub use room_error::RoomError;
 pub use room_internals::{RoomInfo, RoomInternals};
-pub use room_session_info::{RoomSessionInfo, RoomSessionMember};
+pub use room_session_info::{RoomConfig, RoomSessionInfo, RoomSessionMember};
 pub use room_spec::RoomSpec;
 
 mod compose_state;

@@ -29,7 +29,6 @@ impl RoomInternals {
     pub fn group(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
             room_id: jid.into(),
-            description: None,
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::Group,
         })
@@ -38,7 +37,6 @@ impl RoomInternals {
     pub fn public_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
             room_id: jid.into(),
-            description: None,
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PublicChannel,
         })
@@ -47,7 +45,6 @@ impl RoomInternals {
     pub fn private_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
             room_id: jid.into(),
-            description: None,
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PrivateChannel,
         })
@@ -59,7 +56,7 @@ impl RoomInternals {
     }
 
     pub fn with_name(self, name: impl AsRef<str>) -> Self {
-        self.set_name(name.as_ref());
+        self.set_name(Some(name.as_ref().to_string()));
         self
     }
 

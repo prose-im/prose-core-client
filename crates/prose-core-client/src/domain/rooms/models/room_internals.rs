@@ -24,8 +24,6 @@ pub struct RoomInternals {
 pub struct RoomInfo {
     /// The JID of the room.
     pub room_id: RoomId,
-    /// The description of the room.
-    pub description: Option<String>,
     /// The nickname with which our user is connected to the room.
     pub user_nickname: String,
     /// The type of the room.
@@ -36,6 +34,8 @@ pub struct RoomInfo {
 pub struct RoomState {
     /// The name of the room.
     pub name: Option<String>,
+    /// The description of the room.
+    pub description: Option<String>,
     /// The room's topic.
     pub topic: Option<String>,
     /// The participants in the room.
@@ -61,8 +61,16 @@ impl RoomInternals {
         self.state.read().name.clone()
     }
 
-    pub fn set_name(&self, name: &str) {
-        self.state.write().name.replace(name.to_string());
+    pub fn set_name(&self, name: Option<String>) {
+        self.state.write().name = name
+    }
+
+    pub fn description(&self) -> Option<String> {
+        self.state.read().description.clone()
+    }
+
+    pub fn set_description(&self, name: Option<String>) {
+        self.state.write().description = name
     }
 
     pub fn topic(&self) -> Option<String> {
@@ -87,7 +95,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 room_id: room_id.clone(),
-                description: None,
                 user_nickname: nickname.to_string(),
                 r#type: RoomType::Pending,
             },
@@ -103,6 +110,7 @@ impl RoomInternals {
     pub fn by_resolving_with_info(
         &self,
         name: Option<String>,
+        description: Option<String>,
         info: RoomInfo,
         members: Vec<RegisteredMember>,
     ) -> Self {
@@ -110,6 +118,7 @@ impl RoomInternals {
 
         let mut state = self.state.read().clone();
         state.name = name;
+        state.description = description;
         state.participants.set_registered_members(members);
 
         Self {
@@ -122,7 +131,6 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 room_id: self.room_id.clone(),
-                description: self.description.clone(),
                 user_nickname: self.user_nickname.clone(),
                 r#type: new_type,
             },
@@ -136,12 +144,12 @@ impl RoomInternals {
         Self {
             info: RoomInfo {
                 room_id: RoomId::from(contact_id.clone().into_inner()),
-                description: None,
                 user_nickname: "no_nickname".to_string(),
                 r#type: RoomType::DirectMessage,
             },
             state: RwLock::new(RoomState {
                 name: Some(contact_name.to_string()),
+                description: None,
                 topic: None,
                 participants: ParticipantList::for_direct_message(contact_id, contact_name),
             }),
@@ -191,12 +199,12 @@ mod tests {
             RoomInternals {
                 info: RoomInfo {
                     room_id: room_id!("contact@prose.org"),
-                    description: None,
                     user_nickname: "no_nickname".to_string(),
                     r#type: RoomType::DirectMessage,
                 },
                 state: RwLock::new(RoomState {
                     name: Some("Jane Doe".to_string()),
+                    description: None,
                     topic: None,
                     participants: ParticipantList::for_direct_message(
                         &user_id!("contact@prose.org"),

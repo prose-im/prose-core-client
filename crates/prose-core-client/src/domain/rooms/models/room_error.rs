@@ -15,6 +15,8 @@ pub enum RoomError {
     RoomIsAlreadyConnected(RoomId),
     #[error("No room exists with the specified JID.")]
     RoomNotFound,
+    #[error("Room was modified while performing an action")]
+    RoomWasModified,
     #[error("A public channel with the chosen name exists already.")]
     PublicChannelNameConflict,
     #[error("Group must have at least two participants.")]

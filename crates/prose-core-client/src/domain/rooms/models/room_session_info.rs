@@ -10,12 +10,17 @@ use crate::domain::shared::models::{RoomId, RoomType, UserId};
 #[derive(Debug, PartialEq, Clone)]
 pub struct RoomSessionInfo {
     pub room_id: RoomId,
-    pub room_name: Option<String>,
-    pub room_description: Option<String>,
-    pub room_type: RoomType,
+    pub config: RoomConfig,
     pub user_nickname: String,
     pub members: Vec<RoomSessionMember>,
     pub room_has_been_created: bool,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct RoomConfig {
+    pub room_name: Option<String>,
+    pub room_description: Option<String>,
+    pub room_type: RoomType,
 }
 
 #[derive(Debug, PartialEq, Clone)]

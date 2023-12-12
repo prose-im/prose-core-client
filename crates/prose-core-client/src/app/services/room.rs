@@ -98,7 +98,7 @@ impl<Kind> Debug for Room<Kind> {
         f.debug_struct("Room")
             .field("jid", &self.data.room_id)
             .field("name", &self.data.name())
-            .field("description", &self.data.description)
+            .field("description", &self.data.description())
             .field("user_nickname", &self.data.user_nickname)
             .field("subject", &self.data.topic())
             .field("occupants", &self.data.participants())
@@ -127,8 +127,8 @@ impl<Kind> Room<Kind> {
         self.data.name()
     }
 
-    pub fn description(&self) -> Option<&str> {
-        self.data.description.as_deref()
+    pub fn description(&self) -> Option<String> {
+        self.data.description()
     }
 
     pub fn user_nickname(&self) -> &str {

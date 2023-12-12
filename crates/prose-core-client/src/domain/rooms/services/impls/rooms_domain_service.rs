@@ -100,7 +100,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         self.room_attributes_service
             .set_name(&room.room_id, name.as_ref())
             .await?;
-        room.set_name(name);
+        room.set_name(Some(name.to_string()));
 
         self.client_event_dispatcher
             .dispatch_room_event(room, ClientRoomEventType::AttributesChanged);
@@ -281,6 +281,37 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 );
             }
         }
+    }
+
+    /// Loads the configuration for `room_id` and updates the corresponding `RoomInternals`
+    /// accordingly. Call this method after the room configuration changed.
+    /// Returns `RoomError::RoomNotFound` if no room with `room_id` exists.
+    async fn reevaluate_room_spec(
+        &self,
+        room_id: &RoomId,
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        let Some(room) = self.connected_rooms_repo.get(room_id) else {
+            return Err(RoomError::RoomNotFound);
+        };
+
+        let config = self
+            .room_management_service
+            .load_room_config(room_id)
+            .await?;
+
+        room.set_name(config.room_name);
+        room.set_description(config.room_description);
+
+        if room.r#type == config.room_type {
+            return Ok(room);
+        }
+
+        self.connected_rooms_repo
+            .update(
+                room_id,
+                Box::new(|room| room.by_changing_type(config.room_type)),
+            )
+            .ok_or(RoomError::RoomWasModified)
     }
 }
 
@@ -610,7 +641,8 @@ impl RoomsDomainService {
     ) -> Result<Arc<RoomInternals>, RoomError> {
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
-        let room_name = info.room_name;
+        let room_name = info.config.room_name;
+        let room_description = info.config.room_description;
 
         let mut members = Vec::with_capacity(info.members.len());
         for member in info.members {
@@ -632,22 +664,20 @@ impl RoomsDomainService {
 
         let room_info = RoomInfo {
             room_id: info.room_id.clone(),
-            description: info.room_description,
             user_nickname: info.user_nickname,
-            r#type: info.room_type,
+            r#type: info.config.room_type,
         };
 
         let Some(room) = self.connected_rooms_repo.update(&info.room_id, {
             let room_name = room_name;
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
-                room.by_resolving_with_info(room_name, room_info, members)
+                let room =
+                    room.by_resolving_with_info(room_name, room_description, room_info, members);
+                room
             })
         }) else {
-            return Err(RequestError::Generic {
-                msg: "Room was modified during connection".to_string(),
-            }
-            .into());
+            return Err(RoomError::RoomWasModified);
         };
 
         Ok(room)

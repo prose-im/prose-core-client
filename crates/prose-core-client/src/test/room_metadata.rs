@@ -3,7 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::domain::rooms::models::{RoomAffiliation, RoomSessionInfo, RoomSessionMember};
+use crate::domain::rooms::models::{
+    RoomAffiliation, RoomConfig, RoomSessionInfo, RoomSessionMember,
+};
 use crate::domain::shared::models::RoomType;
 use crate::dtos::{RoomId, UserId};
 use crate::test::mock_data;
@@ -38,9 +40,11 @@ impl RoomSessionInfo {
     pub fn new_room(room_jid: impl Into<RoomId>, room_type: RoomType) -> Self {
         Self {
             room_id: room_jid.into(),
-            room_name: None,
-            room_description: None,
-            room_type,
+            config: RoomConfig {
+                room_name: None,
+                room_description: None,
+                room_type,
+            },
             user_nickname: mock_data::account_jid().username().to_string(),
             members: vec![],
             room_has_been_created: true,
