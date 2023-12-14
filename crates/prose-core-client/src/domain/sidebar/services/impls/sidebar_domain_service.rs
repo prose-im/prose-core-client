@@ -406,6 +406,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    /// Handles a destroyed room.
+    ///
+    /// - Removes the connected room.
+    /// - Deletes the corresponding sidebar item.
+    /// - Joins `alternate_room` if set (see `insert_item_by_creating_or_joining_room`).
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_destroyed_room(
         &self,
         room_jid: &RoomId,
@@ -455,6 +461,14 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    /// Handles removal from a room.
+    ///
+    /// If the removal is temporary:
+    /// - Deletes the connected room.
+    /// - Sets an error on the corresponding sidebar item.
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
+    ///
+    /// If the removal is permanent, follows the procedure described in `handle_destroyed_room`.
     async fn handle_removal_from_room(&self, room_jid: &RoomId, is_permanent: bool) -> Result<()> {
         if is_permanent {
             return self.handle_destroyed_room(room_jid, None).await;
@@ -475,6 +489,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    /// Handles a changed room configuration.
+    ///
+    /// - Reloads the configuration and adjusts the connected room accordingly.
+    /// - Replaces the connected room if the type of room changed.
+    /// - Updates the sidebar & associated bookmark to reflect the updated configuration.
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_changed_room_config(&self, room_id: &RoomId) -> Result<()> {
         let room = self
             .rooms_domain_service

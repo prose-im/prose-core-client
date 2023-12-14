@@ -37,6 +37,14 @@ impl UserEndpointId {
             UserEndpointId::Occupant(_) => None,
         }
     }
+
+    pub fn to_user_id(&self) -> Option<UserId> {
+        match self {
+            UserEndpointId::User(id) => Some(id.clone()),
+            UserEndpointId::UserResource(id) => Some(id.to_user_id()),
+            UserEndpointId::Occupant(_) => None,
+        }
+    }
 }
 
 impl From<UserId> for UserEndpointId {

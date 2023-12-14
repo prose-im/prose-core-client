@@ -111,17 +111,34 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// purged or deleted altogether. It should usually only happen when debugging.
     async fn handle_remote_purge(&self) -> Result<()>;
 
-    // TODO: Document me
+    /// Handles a destroyed room.
+    ///
+    /// - Removes the connected room.
+    /// - Deletes the corresponding sidebar item.
+    /// - Joins `alternate_room` if set (see `insert_item_by_creating_or_joining_room`).
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_destroyed_room(
         &self,
         room_id: &RoomId,
         alternate_room: Option<RoomId>,
     ) -> Result<()>;
 
-    // TODO: Document me
+    /// Handles removal from a room.
+    ///
+    /// If the removal is temporary:
+    /// - Deletes the connected room.
+    /// - Sets an error on the corresponding sidebar item.
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
+    ///
+    /// If the removal is permanent, follows the procedure described in `handle_destroyed_room`.
     async fn handle_removal_from_room(&self, room_id: &RoomId, is_permanent: bool) -> Result<()>;
 
-    // TODO: Document me
+    /// Handles a changed room configuration.
+    ///
+    /// - Reloads the configuration and adjusts the connected room accordingly.
+    /// - Replaces the connected room if the type of room changed.
+    /// - Updates the sidebar & associated bookmark to reflect the updated configuration.
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_changed_room_config(&self, room_id: &RoomId) -> Result<()>;
 
     /// Removes all connected rooms and sidebar items.

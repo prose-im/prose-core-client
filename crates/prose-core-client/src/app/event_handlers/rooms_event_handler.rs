@@ -122,7 +122,13 @@ impl RoomsEventHandler {
             OccupantEventType::DisconnectedByServer => {
                 room.participants_mut()
                     .set_availability(&participant_id, &Availability::Unavailable);
-                // TODO: If this affects us we should keep the connected room around, but add an error message to it.
+
+                if event.is_self {
+                    self.sidebar_domain_service
+                        .handle_removal_from_room(&event.occupant_id.room_id(), false)
+                        .await?;
+                }
+
                 true
             }
             OccupantEventType::PermanentlyRemoved => 'outer: {
@@ -239,7 +245,10 @@ impl RoomsEventHandler {
                     state,
                 );
 
-                // TODO: Don't send an event when this is about us. Neither in DirectMessages nor in MUC room.
+                // We won't send an event for our own compose state…
+                if event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id()) {
+                    return Ok(());
+                }
 
                 self.client_event_dispatcher
                     .dispatch_room_event(room, ClientRoomEventType::ComposingUsersChanged);
