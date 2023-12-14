@@ -12,7 +12,7 @@ use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub::owner::Configure;
 use xmpp_parsers::pubsub::pubsub::{Item, Items, Notify, PublishOptions, Retract};
-use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName};
+use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName, PubSubEvent};
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
@@ -37,10 +37,22 @@ impl Module for PubSub {
     }
 
     fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
-        self.ctx
-            .schedule_event(ClientEvent::PubSub(Event::PubSubMessage {
-                message: pubsub.clone(),
-            }));
+        let Some(node) = pubsub.events.first().map(|event| event.node()) else {
+            return Ok(());
+        };
+
+        // Ignore nodes that are handled in other modules…
+        match node {
+            _ if node.0 == ns::BOOKMARKS => (),
+            _ if node.0 == ns::BOOKMARKS2 => (),
+            _ => {
+                self.ctx
+                    .schedule_event(ClientEvent::PubSub(Event::PubSubMessage {
+                        message: pubsub.clone(),
+                    }));
+            }
+        }
+
         Ok(())
     }
 }
@@ -275,5 +287,22 @@ impl PubSub {
         };
 
         Ok(sub)
+    }
+}
+
+trait PubSubEventExt {
+    fn node(&self) -> &NodeName;
+}
+
+impl PubSubEventExt for PubSubEvent {
+    fn node(&self) -> &NodeName {
+        match self {
+            PubSubEvent::Configuration { node, .. } => node,
+            PubSubEvent::Delete { node, .. } => node,
+            PubSubEvent::PublishedItems { node, .. } => node,
+            PubSubEvent::RetractedItems { node, .. } => node,
+            PubSubEvent::Purge { node, .. } => node,
+            PubSubEvent::Subscription { node, .. } => node,
+        }
     }
 }

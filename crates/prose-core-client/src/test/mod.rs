@@ -12,7 +12,6 @@ pub use mock_app_dependencies::{
     MockAppDependencies, MockRoomFactoryDependencies, MockRoomsDomainServiceDependencies,
     MockSidebarDomainServiceDependencies,
 };
-use prose_xmpp::test::ClientTestAdditions;
 use prose_xmpp::Client;
 
 use crate::app::event_handlers::ServerEvent;
@@ -68,7 +67,10 @@ macro_rules! occupant_id {
     };
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub async fn parse_xml(xml: &str) -> Result<Vec<ServerEvent>> {
+    use prose_xmpp::test::ClientTestAdditions;
+
     let client = Client::connected_client().await?;
 
     client
