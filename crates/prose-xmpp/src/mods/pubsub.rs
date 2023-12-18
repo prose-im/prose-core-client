@@ -6,6 +6,8 @@
 use anyhow::Result;
 use jid::Jid;
 use minidom::Element;
+use std::collections::HashSet;
+use std::sync::OnceLock;
 use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::disco::Item as DiscoItem;
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
@@ -41,17 +43,26 @@ impl Module for PubSub {
             return Ok(());
         };
 
+        static IGNORED_PUBSUB_NODES: OnceLock<HashSet<&str>> = OnceLock::new();
+        let ignored_pubsub_nodes = IGNORED_PUBSUB_NODES.get_or_init(|| {
+            let mut m = HashSet::new();
+            m.insert(ns::AVATAR_METADATA);
+            m.insert(ns::BOOKMARKS);
+            m.insert(ns::BOOKMARKS2);
+            m.insert(ns::USER_ACTIVITY);
+            m.insert(ns::VCARD4);
+            m
+        });
+
         // Ignore nodes that are handled in other modules…
-        match node {
-            _ if node.0 == ns::BOOKMARKS => (),
-            _ if node.0 == ns::BOOKMARKS2 => (),
-            _ => {
-                self.ctx
-                    .schedule_event(ClientEvent::PubSub(Event::PubSubMessage {
-                        message: pubsub.clone(),
-                    }));
-            }
+        if ignored_pubsub_nodes.contains(node.0.as_str()) {
+            return Ok(());
         }
+
+        self.ctx
+            .schedule_event(ClientEvent::PubSub(Event::PubSubMessage {
+                message: pubsub.clone(),
+            }));
 
         Ok(())
     }

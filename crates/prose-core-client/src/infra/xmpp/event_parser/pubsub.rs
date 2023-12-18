@@ -20,6 +20,7 @@ use crate::infra::xmpp::type_conversions::bookmark::ns;
 pub fn parse_pubsub_event(ctx: &mut Context, event: XMPPPubSubEvent) -> Result<()> {
     match event {
         XMPPPubSubEvent::PubSubMessage { mut message } => {
+            // Ignore all PubSub nodes except ns::PROSE_BOOKMARK…
             let partition_idx = partition(&mut message.events, |event| {
                 let node = match event {
                     PubSubEvent::Configuration { node, .. } => node,
