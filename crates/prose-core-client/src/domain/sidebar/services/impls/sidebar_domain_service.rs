@@ -496,6 +496,15 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// - Updates the sidebar & associated bookmark to reflect the updated configuration.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_changed_room_config(&self, room_id: &RoomId) -> Result<()> {
+        let Some(room) = self.connected_rooms_repo.get(room_id) else {
+            return Ok(());
+        };
+
+        // Ignore pending rooms…
+        if room.is_pending() {
+            return Ok(());
+        }
+
         let room = self
             .rooms_domain_service
             .reevaluate_room_spec(room_id)

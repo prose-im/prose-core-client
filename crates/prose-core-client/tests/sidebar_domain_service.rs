@@ -1018,6 +1018,18 @@ async fn test_handles_changed_room_config() -> Result<()> {
     // Make sure that the method calls are in the exact order…
     let mut seq = Sequence::new();
 
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .return_once(move |_| {
+            Some(Arc::new(
+                RoomInternals::private_channel(room_id!("room@conf.prose.org"))
+                    .with_name("Old Room Name"),
+            ))
+        });
+
     deps.rooms_domain_service
         .expect_reevaluate_room_spec()
         .with(predicate::eq(room_id!("room@conf.prose.org")))
@@ -1069,6 +1081,29 @@ async fn test_handles_changed_room_config() -> Result<()> {
         .once()
         .with(predicate::eq(ClientEvent::SidebarChanged))
         .return_once(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .handle_changed_room_config(&room_id!("room@conf.prose.org"))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_ignores_changed_config_for_pending_room() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .return_once(move |_| {
+            Some(Arc::new(RoomInternals::pending(
+                &room_id!("room@conf.prose.org"),
+                "nick",
+            )))
+        });
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
