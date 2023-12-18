@@ -3,12 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use chrono::{DateTime, Utc};
 
 use crate::domain::shared::models::{
-    AnonOccupantId, Availability, OccupantId, ParticipantId, UserBasicInfo, UserId,
+    AnonOccupantId, Availability, ParticipantId, UserBasicInfo, UserId,
 };
 
 use super::{ComposeState, RoomAffiliation};
@@ -36,7 +36,6 @@ pub struct RegisteredMember {
     pub user_id: UserId,
     pub affiliation: RoomAffiliation,
     pub name: Option<String>,
-    pub occupant_id: Option<OccupantId>,
 }
 
 impl ParticipantList {
@@ -137,11 +136,18 @@ impl ParticipantList {
     pub fn set_registered_members(&mut self, members: impl IntoIterator<Item = RegisteredMember>) {
         let members = members.into_iter().collect::<Vec<RegisteredMember>>();
 
+        let known_member_ids = self
+            .participants_map
+            .iter()
+            .filter_map(|(_, p)| p.real_id.clone())
+            .collect::<HashSet<UserId>>();
+
         for member in members {
-            let participant_id = member
-                .occupant_id
-                .map(ParticipantId::Occupant)
-                .unwrap_or_else(|| ParticipantId::User(member.user_id.clone()));
+            if known_member_ids.contains(&member.user_id) {
+                continue;
+            }
+
+            let participant_id = ParticipantId::User(member.user_id.clone());
 
             if self.participants_map.contains_key(&participant_id) {
                 continue;
@@ -402,13 +408,11 @@ mod tests {
                 user_id: user_id!("a@prose.org"),
                 affiliation: RoomAffiliation::Member,
                 name: Some("User A".to_string()),
-                occupant_id: Some(occupant_id!("room@conference.prose.org/a")),
             },
             RegisteredMember {
                 user_id: user_id!("b@prose.org"),
                 affiliation: RoomAffiliation::Member,
                 name: Some("User B".to_string()),
-                occupant_id: None,
             },
         ]);
 

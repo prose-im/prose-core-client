@@ -143,12 +143,7 @@ impl<Kind> Room<Kind> {
         self.data
             .participants()
             .iter()
-            .map(|p| ParticipantInfo {
-                id: p.real_id.clone(),
-                name: p.name.as_deref().unwrap_or("<anonymous>").to_string(),
-                availability: p.availability.clone(),
-                affiliation: p.affiliation.clone(),
-            })
+            .map(ParticipantInfo::from)
             .collect()
     }
 }

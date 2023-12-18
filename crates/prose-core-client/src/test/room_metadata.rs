@@ -11,27 +11,24 @@ use crate::dtos::{RoomId, UserId};
 use crate::test::mock_data;
 
 impl RoomSessionMember {
-    pub fn owner(id: UserId, nick: Option<&str>) -> Self {
+    pub fn owner(id: UserId) -> Self {
         Self {
             id,
             affiliation: RoomAffiliation::Owner,
-            nick: nick.map(ToString::to_string),
         }
     }
 
-    pub fn member(id: UserId, nick: Option<&str>) -> Self {
+    pub fn member(id: UserId) -> Self {
         Self {
             id,
             affiliation: RoomAffiliation::Member,
-            nick: nick.map(ToString::to_string),
         }
     }
 
-    pub fn admin(id: UserId, nick: Option<&str>) -> Self {
+    pub fn admin(id: UserId) -> Self {
         Self {
             id,
             affiliation: RoomAffiliation::Admin,
-            nick: nick.map(ToString::to_string),
         }
     }
 }

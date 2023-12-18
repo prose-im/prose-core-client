@@ -27,6 +27,4 @@ pub struct RoomConfig {
 pub struct RoomSessionMember {
     pub id: UserId,
     pub affiliation: RoomAffiliation,
-    // Only available if member is currently an occupant.
-    pub nick: Option<String>,
 }

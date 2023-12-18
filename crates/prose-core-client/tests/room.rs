@@ -29,7 +29,6 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
             user_id: user_id!("a@prose.org"),
             name: Some("Aron Doe".to_string()),
             affiliation: RoomAffiliation::Owner,
-            occupant_id: None,
         }])
         .with_participants([(
             occupant_id!("room@conference.prose.org/b"),
@@ -107,7 +106,6 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
             user_id: user_id!("a@prose.org"),
             name: Some("Aron Doe".to_string()),
             affiliation: RoomAffiliation::Owner,
-            occupant_id: None,
         }])
         .with_participants([(
             occupant_id!("room@conference.prose.org/b"),

@@ -3,24 +3,310 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
 use mockall::{predicate, Sequence};
+use parking_lot::Mutex;
 
+use prose_core_client::app::event_handlers::{
+    OccupantEvent, OccupantEventType, RoomsEventHandler, ServerEvent, ServerEventHandler,
+    UserStatusEvent, UserStatusEventType,
+};
+use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::rooms::models::{
-    RegisteredMember, RoomAffiliation, RoomError, RoomInternals, RoomSessionInfo,
+    RegisteredMember, RoomAffiliation, RoomConfig, RoomError, RoomInternals, RoomSessionInfo,
     RoomSessionMember, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait,
 };
-use prose_core_client::domain::shared::models::{RoomId, RoomType};
-use prose_core_client::dtos::{Participant, PublicRoomInfo, UserId, UserProfile};
-use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
-use prose_core_client::{room_id, user_id};
+use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserResourceId};
+use prose_core_client::dtos::{
+    Availability, Participant, ParticipantInfo, PublicRoomInfo, UserId, UserProfile,
+};
+use prose_core_client::test::{mock_data, MockAppDependencies, MockRoomsDomainServiceDependencies};
+use prose_core_client::{occupant_id, room_id, user_id, user_resource_id};
 use prose_xmpp::test::IncrementingIDProvider;
+
+#[tokio::test]
+async fn test_joins_room() -> Result<()> {
+    // This test simulates the process of joining a room. It also simulates the received presence
+    // events from online occupants and sends these to the RoomsEventHandler to make sure that
+    // we don't have duplicate participants afterwards (registered members & occupants).
+
+    let mut deps = MockRoomsDomainServiceDependencies::default();
+    let mut seq = Sequence::new();
+    let event_handler = Arc::new(OnceLock::<RoomsEventHandler>::new());
+
+    let room = Arc::new(Mutex::new(Arc::new(RoomInternals::pending(
+        &room_id!("room@conf.prose.org"),
+        "user1#dXNlcjFAcHJvc2Uub3Jn",
+    ))));
+
+    deps.ctx.set_connection_properties(ConnectionProperties {
+        connected_jid: user_resource_id!("user1@prose.org/res"),
+        server_features: Default::default(),
+    });
+
+    deps.connected_rooms_repo
+        .expect_set()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room.lock().clone()))
+        .return_once(|_| Ok(()));
+
+    let events = vec![
+        ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@conf.prose.org/user1#dXNlcjFAcHJvc2Uub3Jn").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 0,
+            },
+        }),
+        ServerEvent::Occupant(OccupantEvent {
+            occupant_id: occupant_id!("room@conf.prose.org/user1#dXNlcjFAcHJvc2Uub3Jn"),
+            anon_occupant_id: None,
+            real_id: Some(user_id!("user1@prose.org")),
+            is_self: true,
+            r#type: OccupantEventType::AffiliationChanged {
+                affiliation: RoomAffiliation::Owner,
+            },
+        }),
+        ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@conf.prose.org/user2#dXNlcjJAcHJvc2Uub3Jn").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 0,
+            },
+        }),
+        ServerEvent::Occupant(OccupantEvent {
+            occupant_id: occupant_id!("room@conf.prose.org/user2#dXNlcjJAcHJvc2Uub3Jn"),
+            anon_occupant_id: None,
+            real_id: Some(user_id!("user2@prose.org")),
+            is_self: false,
+            r#type: OccupantEventType::AffiliationChanged {
+                affiliation: RoomAffiliation::Member,
+            },
+        }),
+    ];
+
+    {
+        let event_handler = event_handler.clone();
+        deps.room_management_service
+            .expect_join_room()
+            .once()
+            .in_sequence(&mut seq)
+            .with(
+                predicate::eq(occupant_id!(
+                    "room@conf.prose.org/user1#dXNlcjFAcHJvc2Uub3Jn"
+                )),
+                predicate::always(),
+            )
+            .return_once(|_, _| {
+                Box::pin(async move {
+                    let event_handler = event_handler.get().unwrap();
+
+                    for event in events {
+                        event_handler
+                            .handle_event(event)
+                            .await
+                            .expect("Unexpected error");
+                    }
+
+                    Ok(RoomSessionInfo {
+                        room_id: room_id!("room@conf.prose.org"),
+                        config: RoomConfig {
+                            room_name: Some("Room Name".to_string()),
+                            room_description: None,
+                            room_type: RoomType::PrivateChannel,
+                        },
+                        user_nickname: "user#dXNlcjFAcHJvc2Uub3Jn".to_string(),
+                        members: vec![
+                            RoomSessionMember {
+                                id: user_id!("user1@prose.org"),
+                                affiliation: RoomAffiliation::Owner,
+                            },
+                            RoomSessionMember {
+                                id: user_id!("user2@prose.org"),
+                                affiliation: RoomAffiliation::Member,
+                            },
+                            RoomSessionMember {
+                                id: user_id!("user3@prose.org"),
+                                affiliation: RoomAffiliation::Member,
+                            },
+                        ],
+                        room_has_been_created: false,
+                    })
+                })
+            });
+    }
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .times(6)
+            .with(predicate::eq(room_id!("room@conf.prose.org")))
+            .returning(move |_| Some(room.lock().clone()));
+    }
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .times(3)
+        .returning(|_, _| ());
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .times(6)
+        .with(predicate::in_iter([
+            user_id!("user1@prose.org"),
+            user_id!("user2@prose.org"),
+            user_id!("user3@prose.org"),
+        ]))
+        .returning(|user_id| {
+            let username = user_id.formatted_username();
+            Box::pin(async move { Ok(Some(username)) })
+        });
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_update()
+            .once()
+            .in_sequence(&mut seq)
+            .with(
+                predicate::eq(room_id!("room@conf.prose.org")),
+                predicate::always(),
+            )
+            .return_once(move |_, handler| {
+                let updated_room = Arc::new(handler(room.lock().clone()));
+                *room.lock() = updated_room.clone();
+                Some(updated_room)
+            });
+    }
+
+    let rooms_deps = deps.into_deps();
+    let service = Arc::new(RoomsDomainService::from(rooms_deps.clone()));
+
+    let mut deps = MockAppDependencies::default().into_deps();
+    deps.rooms_domain_service = service.clone();
+    deps.client_event_dispatcher = rooms_deps.client_event_dispatcher.clone();
+    deps.connected_rooms_repo = rooms_deps.connected_rooms_repo.clone();
+    deps.ctx = rooms_deps.ctx.clone();
+    deps.id_provider = rooms_deps.id_provider.clone();
+    deps.room_attributes_service = rooms_deps.room_attributes_service.clone();
+    deps.room_management_service = rooms_deps.room_management_service.clone();
+    deps.room_participation_service = rooms_deps.room_participation_service.clone();
+    deps.user_profile_repo = rooms_deps.user_profile_repo.clone();
+
+    event_handler
+        .set(RoomsEventHandler::from(&deps))
+        .map_err(|_| ())
+        .unwrap();
+
+    service
+        .create_or_join_room(CreateOrEnterRoomRequest::JoinRoom {
+            room_jid: room_id!("room@conf.prose.org"),
+            password: None,
+        })
+        .await?;
+
+    let mut participants = room
+        .lock()
+        .participants()
+        .iter()
+        .map(ParticipantInfo::from)
+        .collect::<Vec<_>>();
+    participants.sort_by_key(|p| p.name.clone());
+
+    assert_eq!(
+        participants,
+        vec![
+            ParticipantInfo {
+                id: Some(user_id!("user1@prose.org")),
+                name: "User1".to_string(),
+                availability: Availability::Available,
+                affiliation: RoomAffiliation::Owner
+            },
+            ParticipantInfo {
+                id: Some(user_id!("user2@prose.org")),
+                name: "User2".to_string(),
+                availability: Availability::Available,
+                affiliation: RoomAffiliation::Member
+            },
+            ParticipantInfo {
+                id: Some(user_id!("user3@prose.org")),
+                name: "User3".to_string(),
+                availability: Availability::Unavailable,
+                affiliation: RoomAffiliation::Member
+            }
+        ]
+    );
+
+    let events = vec![
+        ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@conf.prose.org/user3#dXNlcjNAcHJvc2Uub3Jn").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 0,
+            },
+        }),
+        ServerEvent::Occupant(OccupantEvent {
+            occupant_id: occupant_id!("room@conf.prose.org/user3#dXNlcjNAcHJvc2Uub3Jn"),
+            anon_occupant_id: None,
+            real_id: Some(user_id!("user3@prose.org")),
+            is_self: false,
+            r#type: OccupantEventType::AffiliationChanged {
+                affiliation: RoomAffiliation::Member,
+            },
+        }),
+    ];
+
+    let event_handler = event_handler.get().unwrap();
+
+    for event in events {
+        event_handler
+            .handle_event(event)
+            .await
+            .expect("Unexpected error");
+    }
+
+    let mut participants = room
+        .lock()
+        .participants()
+        .iter()
+        .map(ParticipantInfo::from)
+        .collect::<Vec<_>>();
+    participants.sort_by_key(|p| p.name.clone());
+
+    assert_eq!(
+        participants,
+        vec![
+            ParticipantInfo {
+                id: Some(user_id!("user1@prose.org")),
+                name: "User1".to_string(),
+                availability: Availability::Available,
+                affiliation: RoomAffiliation::Owner
+            },
+            ParticipantInfo {
+                id: Some(user_id!("user2@prose.org")),
+                name: "User2".to_string(),
+                availability: Availability::Available,
+                affiliation: RoomAffiliation::Member
+            },
+            ParticipantInfo {
+                id: Some(user_id!("user3@prose.org")),
+                name: "User3".to_string(),
+                availability: Availability::Available,
+                affiliation: RoomAffiliation::Member
+            }
+        ]
+    );
+
+    Ok(())
+}
 
 #[tokio::test]
 async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
@@ -126,7 +412,6 @@ async fn test_creates_group() -> Result<()> {
                             RoomSessionMember {
                                 id: mock_data::account_jid().into_user_id(),
                                 affiliation: RoomAffiliation::Owner,
-                                nick: None,
                             },
                         ]),
                     )
@@ -356,19 +641,16 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                         user_id: mock_data::account_jid().into_user_id(),
                         name: Some("Jane Doe".to_string()),
                         affiliation: RoomAffiliation::Owner,
-                        occupant_id: None,
                     },
                     RegisteredMember {
                         user_id: user_id!("a@prose.org"),
                         name: Some("Member A".to_string()),
                         affiliation: RoomAffiliation::Owner,
-                        occupant_id: None,
                     },
                     RegisteredMember {
                         user_id: user_id!("b@prose.org"),
                         name: Some("Member B".to_string()),
                         affiliation: RoomAffiliation::Owner,
-                        occupant_id: None,
                     },
                 ]),
             ))
@@ -483,13 +765,11 @@ async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Resul
                 user_id: mock_data::account_jid().into_user_id(),
                 name: Some("Jane Doe".to_string()),
                 affiliation: RoomAffiliation::Owner,
-                occupant_id: None,
             },
             RegisteredMember {
                 user_id: user_id!("a@prose.org"),
                 name: Some("Member A".to_string()),
                 affiliation: RoomAffiliation::Owner,
-                occupant_id: None,
             },
         ]),
     );
@@ -572,13 +852,11 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
                             user_id: mock_data::account_jid().into_user_id(),
                             name: Some("Jane Doe".to_string()),
                             affiliation: RoomAffiliation::Owner,
-                            occupant_id: None,
                         },
                         RegisteredMember {
                             user_id: user_id!("a@prose.org"),
                             name: Some("Member A".to_string()),
                             affiliation: RoomAffiliation::Owner,
-                            occupant_id: None,
                         },
                     ],
                 ),

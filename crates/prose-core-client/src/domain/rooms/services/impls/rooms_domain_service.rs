@@ -536,7 +536,6 @@ impl RoomsDomainService {
                             info.members.push(RoomSessionMember {
                                 id: participant.clone(),
                                 affiliation: RoomAffiliation::Owner,
-                                nick: None,
                             });
                         }
                     }
@@ -662,9 +661,6 @@ impl RoomsDomainService {
                 user_id: member.id,
                 name,
                 affiliation: member.affiliation,
-                occupant_id: member
-                    .nick
-                    .and_then(|nick| info.room_id.occupant_id_with_nickname(nick).ok()),
             });
         }
 

@@ -253,7 +253,6 @@ impl XMPPClient {
                     .map(move |user| RoomSessionMember {
                         id: UserId::from(user.jid.to_bare()),
                         affiliation: domain_affiliation.clone(),
-                        nick: user.nick,
                     }),
             )
         }

@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use super::{Availability, UserId};
-use crate::domain::rooms::models::RoomAffiliation;
+use crate::domain::rooms::models::{Participant, RoomAffiliation};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBasicInfo {
@@ -25,4 +25,15 @@ pub struct ParticipantInfo {
     pub name: String,
     pub availability: Availability,
     pub affiliation: RoomAffiliation,
+}
+
+impl From<&Participant> for ParticipantInfo {
+    fn from(value: &Participant) -> Self {
+        ParticipantInfo {
+            id: value.real_id.clone(),
+            name: value.name.as_deref().unwrap_or("<anonymous>").to_string(),
+            availability: value.availability.clone(),
+            affiliation: value.affiliation.clone(),
+        }
+    }
 }

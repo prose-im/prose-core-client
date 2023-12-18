@@ -147,6 +147,7 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
 
     let expanded = quote! {
+        #[derive(Clone)]
         pub struct #dependencies_struct_name {
             #(#struct_fields,)*
         }
