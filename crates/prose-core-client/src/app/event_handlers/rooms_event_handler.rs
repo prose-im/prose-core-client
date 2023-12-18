@@ -196,6 +196,26 @@ impl RoomsEventHandler {
                     })
                     .await?;
             }
+            RoomEventType::UserAdded {
+                user_id,
+                affiliation,
+                reason,
+            } => {
+                info!(
+                    "User {user_id} was added to room {} via invitation. Reason: {}",
+                    event.room_id,
+                    reason.as_deref().unwrap_or("<no reason>")
+                );
+
+                let room = self.get_room(&event.room_id)?;
+
+                let name = self.user_profile_repo.get_display_name(&user_id).await?;
+                room.participants_mut()
+                    .add_user(&user_id, &affiliation, name.as_deref());
+
+                self.client_event_dispatcher
+                    .dispatch_room_event(room, ClientRoomEventType::ParticipantsChanged);
+            }
         }
 
         Ok(())

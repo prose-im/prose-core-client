@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use jid::Jid;
+use tracing::info;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::Status;
 
@@ -35,7 +36,8 @@ pub fn parse_message(ctx: &mut Context, message: Message) -> Result<()> {
 
     match message.type_ {
         MessageType::Groupchat => parse_group_chat_message(ctx, from, message)?,
-        MessageType::Chat | MessageType::Normal => parse_chat_message(ctx, from, message)?,
+        MessageType::Chat => parse_chat_message(ctx, from, message)?,
+        MessageType::Normal => parse_normal_message(ctx, from, message)?,
         MessageType::Headline | MessageType::Error => ignore_stanza(ctx, message)?,
     };
     Ok(())
@@ -90,6 +92,23 @@ fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> R
 fn parse_chat_message(ctx: &mut Context, _from: Jid, message: Message) -> Result<()> {
     ctx.push_event(MessageEvent {
         r#type: MessageEventType::Received(message),
+    });
+    Ok(())
+}
+
+fn parse_normal_message(ctx: &mut Context, from: Jid, message: Message) -> Result<()> {
+    let Some(muc_invite) = message.muc_invite() else {
+        info!("Received unknown 'normal' message.");
+        return Ok(());
+    };
+
+    ctx.push_event(RoomEvent {
+        room_id: RoomId::from(from.into_bare()),
+        r#type: RoomEventType::UserAdded {
+            user_id: muc_invite.jid.into(),
+            affiliation: muc_invite.affiliation.into(),
+            reason: muc_invite.reason,
+        },
     });
     Ok(())
 }

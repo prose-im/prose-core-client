@@ -411,3 +411,33 @@ async fn test_received_invite() -> Result<()> {
 
     Ok(())
 }
+
+#[mt_test]
+async fn test_user_was_invited() -> Result<()> {
+    let events = parse_xml(
+        r#"
+        <message xmlns="jabber:client" from="room@groups.prose.org">
+            <x xmlns="http://jabber.org/protocol/muc#user">
+                <item affiliation="member" jid="user2@prose.org">
+                    <reason>Invited by user1@prose.org/res</reason>
+                </item>
+            </x>
+        </message>
+      "#,
+    )
+    .await?;
+
+    assert_eq!(
+        events,
+        vec![ServerEvent::Room(RoomEvent {
+            room_id: room_id!("room@groups.prose.org"),
+            r#type: RoomEventType::UserAdded {
+                user_id: user_id!("user2@prose.org"),
+                affiliation: RoomAffiliation::Member,
+                reason: Some("Invited by user1@prose.org/res".to_string()),
+            },
+        })]
+    );
+
+    Ok(())
+}

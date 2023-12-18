@@ -83,7 +83,16 @@ impl ParticipantList {
     pub fn set_affiliation(&mut self, id: &ParticipantId, affiliation: &RoomAffiliation) {
         self.participants_map
             .entry(id.clone())
-            .and_modify(|participant| participant.affiliation = affiliation.clone());
+            .and_modify(|participant| participant.affiliation = affiliation.clone())
+            .or_insert_with(|| Participant {
+                real_id: None,
+                anon_occupant_id: None,
+                name: None,
+                affiliation: affiliation.clone(),
+                availability: Availability::Unavailable,
+                compose_state: ComposeState::Idle,
+                compose_state_updated: DateTime::default(),
+            });
     }
 
     /// Sets the participant's compose state. Does nothing if the participant doesn't exist.
@@ -98,6 +107,38 @@ impl ParticipantList {
             .and_modify(|participant| {
                 participant.compose_state = compose_state;
                 participant.compose_state_updated = timestamp.clone()
+            });
+    }
+
+    pub fn add_user(
+        &mut self,
+        real_id: &UserId,
+        affiliation: &RoomAffiliation,
+        name: Option<&str>,
+    ) {
+        if self
+            .participants_map
+            .values()
+            .find(|p| p.real_id.as_ref() == Some(real_id))
+            .is_some()
+        {
+            return;
+        }
+
+        self.participants_map
+            .entry(ParticipantId::User(real_id.clone()))
+            .and_modify(|participant| {
+                participant.affiliation = affiliation.clone();
+                participant.name = name.map(ToString::to_string);
+            })
+            .or_insert_with(|| Participant {
+                real_id: Some(real_id.clone()),
+                anon_occupant_id: None,
+                name: name.map(ToString::to_string),
+                affiliation: affiliation.clone(),
+                availability: Availability::Unavailable,
+                compose_state: ComposeState::Idle,
+                compose_state_updated: DateTime::default(),
             });
     }
 

@@ -123,6 +123,12 @@ pub enum RoomEventType {
         sender: UserResourceId,
         password: Option<String>,
     },
+    /// A user was added via an invitation.
+    UserAdded {
+        user_id: UserId,
+        affiliation: RoomAffiliation,
+        reason: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -20,7 +20,7 @@ use prose_core_client::domain::shared::models::{
     OccupantId, RoomId, UserId, UserOrResourceId, UserResourceId,
 };
 use prose_core_client::domain::user_info::models::Presence;
-use prose_core_client::dtos::{Availability, Participant, UserBasicInfo};
+use prose_core_client::dtos::{Availability, Participant, ParticipantInfo, UserBasicInfo};
 use prose_core_client::test::{
     ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
@@ -100,6 +100,67 @@ async fn test_adds_participant() -> Result<()> {
             compose_state_updated: Default::default(),
             anon_occupant_id: None,
         }
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_adds_invited_participant() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    let room = Arc::new(RoomInternals::private_channel(room_id!(
+        "room@conference.prose.org"
+    )));
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .return_once(move |_| Some(room.clone()));
+    }
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .with(predicate::eq(user_id!("user@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("John Doe".to_string())) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .with(
+            predicate::eq(room.clone()),
+            predicate::eq(ClientRoomEventType::ParticipantsChanged),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    event_handler
+        .handle_event(ServerEvent::Room(RoomEvent {
+            room_id: room_id!("room@conference.prose.org"),
+            r#type: RoomEventType::UserAdded {
+                user_id: user_id!("user@prose.org"),
+                affiliation: RoomAffiliation::Member,
+                reason: None,
+            },
+        }))
+        .await?;
+
+    assert_eq!(
+        room.participants()
+            .iter()
+            .map(ParticipantInfo::from)
+            .collect::<Vec<_>>(),
+        vec![ParticipantInfo {
+            id: Some(user_id!("user@prose.org")),
+            name: "John Doe".to_string(),
+            availability: Availability::Unavailable,
+            affiliation: RoomAffiliation::Member,
+        }]
     );
 
     Ok(())
