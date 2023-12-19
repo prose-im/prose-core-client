@@ -100,6 +100,10 @@ impl From<PlatformDependencies> for AppDependencies {
         let messages_repo = Arc::new(CachingMessageRepository::new(d.store.clone()));
         let sidebar_repo = Arc::new(InMemorySidebarRepository::new());
         let time_provider = d.time_provider;
+        let user_info_repo = Arc::new(CachingUserInfoRepository::new(
+            d.store.clone(),
+            d.xmpp.clone(),
+        ));
         let user_profile_repo = Arc::new(CachingUserProfileRepository::new(
             d.store.clone(),
             d.xmpp.clone(),
@@ -124,6 +128,7 @@ impl From<PlatformDependencies> for AppDependencies {
             room_attributes_service: d.xmpp.clone(),
             room_management_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),
+            user_info_repo: user_info_repo.clone(),
             user_profile_repo: user_profile_repo.clone(),
         };
 
@@ -196,10 +201,7 @@ impl From<PlatformDependencies> for AppDependencies {
             sidebar_repo,
             time_provider,
             user_account_service: d.xmpp.clone(),
-            user_info_repo: Arc::new(CachingUserInfoRepository::new(
-                d.store.clone(),
-                d.xmpp.clone(),
-            )),
+            user_info_repo,
             user_info_service: d.xmpp.clone(),
             user_profile_repo,
             user_profile_service: d.xmpp.clone(),

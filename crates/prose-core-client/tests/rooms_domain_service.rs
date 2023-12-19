@@ -24,7 +24,7 @@ use prose_core_client::domain::rooms::services::{
 };
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserResourceId};
 use prose_core_client::dtos::{
-    Availability, Participant, ParticipantInfo, PublicRoomInfo, UserId, UserProfile,
+    Availability, Participant, ParticipantInfo, PublicRoomInfo, UserId, UserInfo, UserProfile,
 };
 use prose_core_client::test::{mock_data, MockAppDependencies, MockRoomsDomainServiceDependencies};
 use prose_core_client::{occupant_id, room_id, user_id, user_resource_id};
@@ -228,18 +228,21 @@ async fn test_joins_room() -> Result<()> {
             ParticipantInfo {
                 id: Some(user_id!("user1@prose.org")),
                 name: "User1".to_string(),
+                is_self: true,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Owner
             },
             ParticipantInfo {
                 id: Some(user_id!("user2@prose.org")),
                 name: "User2".to_string(),
+                is_self: false,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Member
             },
             ParticipantInfo {
                 id: Some(user_id!("user3@prose.org")),
                 name: "User3".to_string(),
+                is_self: false,
                 availability: Availability::Unavailable,
                 affiliation: RoomAffiliation::Member
             }
@@ -290,18 +293,21 @@ async fn test_joins_room() -> Result<()> {
             ParticipantInfo {
                 id: Some(user_id!("user1@prose.org")),
                 name: "User1".to_string(),
+                is_self: true,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Owner
             },
             ParticipantInfo {
                 id: Some(user_id!("user2@prose.org")),
                 name: "User2".to_string(),
+                is_self: false,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Member
             },
             ParticipantInfo {
                 id: Some(user_id!("user3@prose.org")),
                 name: "User3".to_string(),
+                is_self: false,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Member
             }
@@ -487,6 +493,7 @@ async fn test_creates_group() -> Result<()> {
                             real_id: Some(user_id!("a@prose.org")),
                             anon_occupant_id: None,
                             name: Some("Tick".to_string()),
+                            is_self: false,
                             affiliation: RoomAffiliation::Owner,
                             availability: Default::default(),
                             compose_state: Default::default(),
@@ -496,6 +503,7 @@ async fn test_creates_group() -> Result<()> {
                             real_id: Some(user_id!("b@prose.org")),
                             anon_occupant_id: None,
                             name: Some("Trick".to_string()),
+                            is_self: false,
                             affiliation: RoomAffiliation::Owner,
                             availability: Default::default(),
                             compose_state: Default::default(),
@@ -505,6 +513,7 @@ async fn test_creates_group() -> Result<()> {
                             real_id: Some(user_id!("c@prose.org")),
                             anon_occupant_id: None,
                             name: Some("Track".to_string()),
+                            is_self: false,
                             affiliation: RoomAffiliation::Owner,
                             availability: Default::default(),
                             compose_state: Default::default(),
@@ -514,6 +523,7 @@ async fn test_creates_group() -> Result<()> {
                             real_id: Some(user_id!("jane.doe@prose.org")),
                             anon_occupant_id: None,
                             name: Some("Jane".to_string()),
+                            is_self: true,
                             affiliation: RoomAffiliation::Owner,
                             availability: Default::default(),
                             compose_state: Default::default(),
@@ -554,6 +564,79 @@ async fn test_creates_group() -> Result<()> {
         .await;
 
     assert!(result.is_ok());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_joins_direct_message() -> Result<()> {
+    let mut deps = MockRoomsDomainServiceDependencies::default();
+    let mut seq = Sequence::new();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(room_id!("user2@prose.org")))
+        .return_once(|_| None);
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(user_id!("user2@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
+
+    deps.user_info_repo
+        .expect_get_user_info()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(user_id!("user2@prose.org")))
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(Some(UserInfo {
+                    avatar: None,
+                    activity: None,
+                    availability: Availability::Available,
+                }))
+            })
+        });
+
+    deps.connected_rooms_repo
+        .expect_set()
+        .once()
+        .in_sequence(&mut seq)
+        .with(predicate::eq(Arc::new(RoomInternals::for_direct_message(
+            &user_id!("user2@prose.org"),
+            "Jennifer Doe",
+            &Availability::Available,
+        ))))
+        .return_once(|_| Ok(()));
+
+    let service = RoomsDomainService::from(deps.into_deps());
+    let room = service
+        .create_or_join_room(CreateOrEnterRoomRequest::JoinDirectMessage {
+            participant: user_id!("user2@prose.org"),
+        })
+        .await?;
+
+    let mut participants = room
+        .participants()
+        .iter()
+        .map(ParticipantInfo::from)
+        .collect::<Vec<_>>();
+    participants.sort_by_key(|p| p.name.clone());
+
+    assert_eq!(
+        participants,
+        vec![ParticipantInfo {
+            id: Some(user_id!("user2@prose.org")),
+            name: "Jennifer Doe".to_string(),
+            is_self: false,
+            availability: Availability::Available,
+            affiliation: RoomAffiliation::Owner
+        },]
+    );
 
     Ok(())
 }
@@ -661,16 +744,19 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                     RegisteredMember {
                         user_id: user_id!("jane.doe@prose.org"),
                         name: Some("Jane Doe".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Owner,
                     },
                     RegisteredMember {
                         user_id: user_id!("a@prose.org"),
                         name: Some("Member A".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Owner,
                     },
                     RegisteredMember {
                         user_id: user_id!("b@prose.org"),
                         name: Some("Member B".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Owner,
                     },
                 ]),
@@ -786,11 +872,13 @@ async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Resul
                 user_id: mock_data::account_jid().into_user_id(),
                 name: Some("Jane Doe".to_string()),
                 affiliation: RoomAffiliation::Owner,
+                is_self: false,
             },
             RegisteredMember {
                 user_id: user_id!("a@prose.org"),
                 name: Some("Member A".to_string()),
                 affiliation: RoomAffiliation::Owner,
+                is_self: false,
             },
         ]),
     );
@@ -873,11 +961,13 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
                             user_id: mock_data::account_jid().into_user_id(),
                             name: Some("Jane Doe".to_string()),
                             affiliation: RoomAffiliation::Owner,
+                            is_self: false,
                         },
                         RegisteredMember {
                             user_id: user_id!("a@prose.org"),
                             name: Some("Member A".to_string()),
                             affiliation: RoomAffiliation::Owner,
+                            is_self: false,
                         },
                     ],
                 ),

@@ -23,6 +23,7 @@ pub struct UserPresenceInfo {
 pub struct ParticipantInfo {
     pub id: Option<UserId>,
     pub name: String,
+    pub is_self: bool,
     pub availability: Availability,
     pub affiliation: RoomAffiliation,
 }
@@ -32,6 +33,7 @@ impl From<&Participant> for ParticipantInfo {
         ParticipantInfo {
             id: value.real_id.clone(),
             name: value.name.as_deref().unwrap_or("<anonymous>").to_string(),
+            is_self: value.is_self,
             availability: value.availability.clone(),
             affiliation: value.affiliation.clone(),
         }

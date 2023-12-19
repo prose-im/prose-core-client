@@ -250,6 +250,7 @@ pub struct MockRoomsDomainServiceDependencies {
     pub room_attributes_service: MockRoomAttributesService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
+    pub user_info_repo: MockUserInfoRepository,
     pub user_profile_repo: MockUserProfileRepository,
 }
 
@@ -270,6 +271,7 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             room_attributes_service: Arc::new(value.room_attributes_service),
             room_management_service: Arc::new(value.room_management_service),
             room_participation_service: Arc::new(value.room_participation_service),
+            user_info_repo: Arc::new(value.user_info_repo),
             user_profile_repo: Arc::new(value.user_profile_repo),
         }
     }

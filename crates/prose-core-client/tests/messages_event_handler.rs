@@ -15,6 +15,7 @@ use prose_core_client::app::event_handlers::{
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
 use prose_core_client::domain::shared::models::{RoomId, UserId};
+use prose_core_client::dtos::Availability;
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::{room_id, user_id, ClientRoomEventType};
 use prose_xmpp::jid;
@@ -83,9 +84,10 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
 async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::direct_message(user_id!(
-        "jane.doe@prose.org"
-    )));
+    let room = Arc::new(RoomInternals::direct_message(
+        user_id!("jane.doe@prose.org"),
+        &Availability::Unavailable,
+    ));
 
     deps.connected_rooms_repo
         .expect_get()

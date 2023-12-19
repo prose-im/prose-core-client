@@ -101,6 +101,7 @@ impl From<SdkRoomAffiliation> for RoomAffiliation {
 pub struct ParticipantInfo {
     jid: Option<BareJid>,
     name: String,
+    is_self: bool,
     availability: Availability,
     affiliation: RoomAffiliation,
 }
@@ -115,6 +116,11 @@ impl ParticipantInfo {
     #[wasm_bindgen(getter)]
     pub fn jid(&self) -> Option<BareJid> {
         self.jid.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "isSelf")]
+    pub fn is_self(&self) -> bool {
+        self.is_self
     }
 
     #[wasm_bindgen(getter)]
@@ -133,6 +139,7 @@ impl From<SdkParticipantInfo> for ParticipantInfo {
         Self {
             jid: value.id.map(|id| id.into_inner().into()),
             name: value.name,
+            is_self: value.is_self,
             availability: value.availability.into(),
             affiliation: value.affiliation.into(),
         }

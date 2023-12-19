@@ -94,6 +94,7 @@ async fn test_adds_participant() -> Result<()> {
         Participant {
             real_id: Some(user_id!("real-jid@prose.org")),
             name: Some("George Washington".to_string()),
+            is_self: false,
             affiliation: RoomAffiliation::Member,
             availability: Availability::Available,
             compose_state: ComposeState::Idle,
@@ -158,6 +159,7 @@ async fn test_adds_invited_participant() -> Result<()> {
         vec![ParticipantInfo {
             id: Some(user_id!("user@prose.org")),
             name: "John Doe".to_string(),
+            is_self: false,
             availability: Availability::Unavailable,
             affiliation: RoomAffiliation::Member,
         }]
@@ -178,6 +180,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
                     real_id: None,
                     anon_occupant_id: None,
                     name: None,
+                    is_self: false,
                     affiliation: RoomAffiliation::Admin,
                     availability: Availability::Available,
                     compose_state: ComposeState::Composing,
@@ -234,6 +237,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
             real_id: None,
             anon_occupant_id: None,
             name: None,
+            is_self: false,
             affiliation: RoomAffiliation::Member,
             availability: Availability::Unavailable,
             compose_state: ComposeState::Idle,
@@ -440,6 +444,7 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
     let room = Arc::new(RoomInternals::for_direct_message(
         &user_id!("contact@prose.org"),
         "Janice Doe",
+        &Availability::Unavailable,
     ));
 
     {
@@ -539,6 +544,7 @@ async fn test_handles_presence() -> Result<()> {
     let room = Arc::new(RoomInternals::for_direct_message(
         &user_id!("sender@prose.org"),
         "Janice Doe",
+        &Availability::Unavailable,
     ));
 
     let room = room.clone();
@@ -547,6 +553,60 @@ async fn test_handles_presence() -> Result<()> {
         .once()
         .with(predicate::eq(room_id!("sender@prose.org")))
         .return_once(move |_| Some(room.clone()));
+
+    deps.user_info_repo
+        .expect_set_user_presence()
+        .once()
+        .with(
+            predicate::eq(UserOrResourceId::from(user_resource_id!(
+                "sender@prose.org/resource"
+            ))),
+            predicate::eq(Presence {
+                priority: 1,
+                availability: Availability::Available,
+                status: None,
+            }),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::ContactChanged {
+            id: user_id!("sender@prose.org"),
+        }))
+        .return_once(|_| ());
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    event_handler
+        .handle_event(ServerEvent::UserStatus(UserStatusEvent {
+            user_id: user_resource_id!("sender@prose.org/resource").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::Available,
+                priority: 1,
+            },
+        }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_handles_contact_presence_with_no_room() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("sender@prose.org")))
+        .return_once(move |_| None);
 
     deps.user_info_repo
         .expect_set_user_presence()
@@ -600,6 +660,7 @@ async fn test_swallows_self_presence() -> Result<()> {
     let room = Arc::new(RoomInternals::for_direct_message(
         &user_id!("hello@prose.org"),
         "Janice Doe",
+        &Availability::Unavailable,
     ));
 
     let room = room.clone();

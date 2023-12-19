@@ -13,10 +13,10 @@ use crate::dtos::{Availability, Participant, UserId};
 use crate::test::mock_data;
 
 impl RoomInternals {
-    pub fn direct_message(jid: UserId) -> Self {
+    pub fn direct_message(jid: UserId, availability: &Availability) -> Self {
         let jid = jid.into();
 
-        Self::for_direct_message(&jid, &jid.formatted_username())
+        Self::for_direct_message(&jid, &jid.formatted_username(), availability)
     }
 
     pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
@@ -85,6 +85,7 @@ impl Participant {
         Participant {
             real_id: None,
             name: None,
+            is_self: false,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
             compose_state_updated: Default::default(),
@@ -98,6 +99,7 @@ impl Participant {
             real_id: None,
             anon_occupant_id: None,
             name: None,
+            is_self: false,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
             compose_state_updated: Default::default(),

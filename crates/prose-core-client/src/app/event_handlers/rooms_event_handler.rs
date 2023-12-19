@@ -91,7 +91,7 @@ impl RoomsEventHandler {
                         != Some(&affiliation)
                     {
                         participants_changed = true;
-                        participants.set_affiliation(&participant_id, &affiliation);
+                        participants.set_affiliation(&participant_id, event.is_self, &affiliation);
                     }
                 }
 
@@ -120,8 +120,11 @@ impl RoomsEventHandler {
                 true
             }
             OccupantEventType::DisconnectedByServer => {
-                room.participants_mut()
-                    .set_availability(&participant_id, &Availability::Unavailable);
+                room.participants_mut().set_availability(
+                    &participant_id,
+                    event.is_self,
+                    &Availability::Unavailable,
+                );
 
                 if event.is_self {
                     self.sidebar_domain_service
@@ -211,7 +214,7 @@ impl RoomsEventHandler {
 
                 let name = self.user_profile_repo.get_display_name(&user_id).await?;
                 room.participants_mut()
-                    .add_user(&user_id, &affiliation, name.as_deref());
+                    .add_user(&user_id, false, &affiliation, name.as_deref());
 
                 self.client_event_dispatcher
                     .dispatch_room_event(room, ClientRoomEventType::ParticipantsChanged);
@@ -222,17 +225,29 @@ impl RoomsEventHandler {
     }
 
     async fn handle_user_status_event(&self, event: UserStatusEvent) -> Result<()> {
-        let room = self.get_room(&event.user_id.to_room_id())?;
-        let participant_id = event.user_id.to_participant_id();
+        let is_self_event =
+            event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id());
 
         match event.r#type {
             UserStatusEventType::AvailabilityChanged {
                 availability,
                 priority,
             } => {
-                room.participants_mut()
-                    .set_availability(&participant_id, &availability);
+                let mut room_changed = false;
 
+                // If we have a room, update it…
+                if let Ok(room) = self.get_room(&event.user_id.to_room_id()) {
+                    let participant_id = event.user_id.to_participant_id();
+                    room.participants_mut().set_availability(
+                        &participant_id,
+                        is_self_event,
+                        &availability,
+                    );
+                    room_changed = true;
+                };
+
+                // if we do not have a room and the event is from a contact, we'll still want
+                // to update our repo…
                 let Some(id) = event.user_id.to_user_or_resource_id() else {
                     return Ok(());
                 };
@@ -248,17 +263,27 @@ impl RoomsEventHandler {
                     )
                     .await?;
 
-                let user_id = id.to_user_id();
-
                 // We won't send an event for our own availability…
-                if user_id == self.ctx.connected_id()?.into_user_id() {
+                if is_self_event {
                     return Ok(());
                 }
 
                 self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::ContactChanged { id: user_id });
+                    .dispatch_event(ClientEvent::ContactChanged {
+                        id: id.to_user_id(),
+                    });
+
+                if room_changed {
+                    self.client_event_dispatcher
+                        .dispatch_event(ClientEvent::SidebarChanged)
+                }
             }
             UserStatusEventType::ComposeStateChanged { state } => {
+                let Ok(room) = self.get_room(&event.user_id.to_room_id()) else {
+                    return Ok(());
+                };
+                let participant_id = event.user_id.to_participant_id();
+
                 room.participants_mut().set_compose_state(
                     &participant_id,
                     &self.time_provider.now(),
@@ -266,7 +291,7 @@ impl RoomsEventHandler {
                 );
 
                 // We won't send an event for our own compose state…
-                if event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id()) {
+                if is_self_event {
                     return Ok(());
                 }
 

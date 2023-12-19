@@ -25,6 +25,7 @@ pub struct Participant {
     pub real_id: Option<UserId>,
     pub anon_occupant_id: Option<AnonOccupantId>,
     pub name: Option<String>,
+    pub is_self: bool,
     pub affiliation: RoomAffiliation,
     pub availability: Availability,
     pub compose_state: ComposeState,
@@ -36,10 +37,15 @@ pub struct RegisteredMember {
     pub user_id: UserId,
     pub affiliation: RoomAffiliation,
     pub name: Option<String>,
+    pub is_self: bool,
 }
 
 impl ParticipantList {
-    pub fn for_direct_message(contact_id: &UserId, contact_name: &str) -> Self {
+    pub fn for_direct_message(
+        contact_id: &UserId,
+        contact_name: &str,
+        availability: &Availability,
+    ) -> Self {
         Self {
             anon_occupant_id_to_participant_id_map: Default::default(),
             participants_map: HashMap::from([(
@@ -48,8 +54,9 @@ impl ParticipantList {
                     real_id: Some(contact_id.clone()),
                     anon_occupant_id: None,
                     name: Some(contact_name.to_string()),
+                    is_self: false,
                     affiliation: RoomAffiliation::Owner,
-                    availability: Default::default(),
+                    availability: availability.clone(),
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 },
@@ -59,11 +66,17 @@ impl ParticipantList {
 
     /// Modifies the participant's availability or inserts a new participant with the availability
     /// if it didn't exist.
-    pub fn set_availability(&mut self, id: &ParticipantId, availability: &Availability) {
+    pub fn set_availability(
+        &mut self,
+        id: &ParticipantId,
+        is_self: bool,
+        availability: &Availability,
+    ) {
         self.participants_map
             .entry(id.clone())
             .and_modify(|participant| {
                 participant.availability = availability.clone();
+                participant.is_self = is_self;
                 if availability == &Availability::Unavailable {
                     participant.compose_state = ComposeState::Idle;
                 }
@@ -72,6 +85,7 @@ impl ParticipantList {
                 real_id: None,
                 anon_occupant_id: None,
                 name: None,
+                is_self,
                 affiliation: RoomAffiliation::None,
                 availability: availability.clone(),
                 compose_state: ComposeState::Idle,
@@ -80,14 +94,23 @@ impl ParticipantList {
     }
 
     /// Sets the participant's affiliation. Does nothing if the participant doesn't exist.
-    pub fn set_affiliation(&mut self, id: &ParticipantId, affiliation: &RoomAffiliation) {
+    pub fn set_affiliation(
+        &mut self,
+        id: &ParticipantId,
+        is_self: bool,
+        affiliation: &RoomAffiliation,
+    ) {
         self.participants_map
             .entry(id.clone())
-            .and_modify(|participant| participant.affiliation = affiliation.clone())
+            .and_modify(|participant| {
+                participant.affiliation = affiliation.clone();
+                participant.is_self = is_self;
+            })
             .or_insert_with(|| Participant {
                 real_id: None,
                 anon_occupant_id: None,
                 name: None,
+                is_self,
                 affiliation: affiliation.clone(),
                 availability: Availability::Unavailable,
                 compose_state: ComposeState::Idle,
@@ -113,6 +136,7 @@ impl ParticipantList {
     pub fn add_user(
         &mut self,
         real_id: &UserId,
+        is_self: bool,
         affiliation: &RoomAffiliation,
         name: Option<&str>,
     ) {
@@ -130,11 +154,13 @@ impl ParticipantList {
             .and_modify(|participant| {
                 participant.affiliation = affiliation.clone();
                 participant.name = name.map(ToString::to_string);
+                participant.is_self = is_self;
             })
             .or_insert_with(|| Participant {
                 real_id: Some(real_id.clone()),
                 anon_occupant_id: None,
                 name: name.map(ToString::to_string),
+                is_self,
                 affiliation: affiliation.clone(),
                 availability: Availability::Unavailable,
                 compose_state: ComposeState::Idle,
@@ -198,6 +224,7 @@ impl ParticipantList {
                 real_id: Some(member.user_id),
                 anon_occupant_id: None,
                 name: member.name,
+                is_self: member.is_self,
                 affiliation: member.affiliation,
                 availability: Default::default(),
                 compose_state: Default::default(),
@@ -291,10 +318,12 @@ mod tests {
 
         state.set_availability(
             &occupant_id!("room@prose.org/a").into(),
+            false,
             &Availability::Unavailable,
         );
         state.set_affiliation(
             &occupant_id!("room@prose.org/a").into(),
+            false,
             &RoomAffiliation::Owner,
         );
         state.set_ids_and_name(
@@ -304,8 +333,16 @@ mod tests {
             None,
         );
 
-        state.set_availability(&user_id!("b@prose.org").into(), &Availability::Unavailable);
-        state.set_affiliation(&user_id!("b@prose.org").into(), &RoomAffiliation::Member);
+        state.set_availability(
+            &user_id!("b@prose.org").into(),
+            false,
+            &Availability::Unavailable,
+        );
+        state.set_affiliation(
+            &user_id!("b@prose.org").into(),
+            false,
+            &RoomAffiliation::Member,
+        );
 
         assert_eq!(state.participants_map.len(), 2);
         assert_eq!(
@@ -337,6 +374,7 @@ mod tests {
 
         state.set_availability(
             &occupant_id!("room@prose.org/a").into(),
+            false,
             &Availability::Unavailable,
         );
 
@@ -430,10 +468,12 @@ mod tests {
         // connecting to the room.
         list.set_availability(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
+            false,
             &Availability::Available,
         );
         list.set_affiliation(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
+            false,
             &RoomAffiliation::Member,
         );
         list.set_ids_and_name(
@@ -449,11 +489,13 @@ mod tests {
                 user_id: user_id!("a@prose.org"),
                 affiliation: RoomAffiliation::Member,
                 name: Some("User A".to_string()),
+                is_self: false,
             },
             RegisteredMember {
                 user_id: user_id!("b@prose.org"),
                 affiliation: RoomAffiliation::Member,
                 name: Some("User B".to_string()),
+                is_self: false,
             },
         ]);
 
@@ -466,6 +508,7 @@ mod tests {
                         real_id: Some(user_id!("a@prose.org")),
                         anon_occupant_id: None,
                         name: Some("User A".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
                         compose_state: Default::default(),
@@ -478,6 +521,7 @@ mod tests {
                         real_id: Some(user_id!("b@prose.org")),
                         anon_occupant_id: None,
                         name: Some("User B".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Unavailable,
                         compose_state: Default::default(),
@@ -490,10 +534,12 @@ mod tests {
         // Now the second member comes online…
         list.set_availability(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
+            false,
             &Availability::Available,
         );
         list.set_affiliation(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
+            false,
             &RoomAffiliation::Member,
         );
         list.set_ids_and_name(
@@ -512,6 +558,7 @@ mod tests {
                         real_id: Some(user_id!("a@prose.org")),
                         anon_occupant_id: None,
                         name: Some("User A".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
                         compose_state: Default::default(),
@@ -524,6 +571,7 @@ mod tests {
                         real_id: Some(user_id!("b@prose.org")),
                         anon_occupant_id: None,
                         name: Some("User B New Name".to_string()),
+                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
                         compose_state: Default::default(),
@@ -537,7 +585,11 @@ mod tests {
     #[test]
     fn test_registered_members_in_direct_message_room() {
         // Start with a fresh state…
-        let mut list = ParticipantList::for_direct_message(&user_id!("a@prose.org"), "User A");
+        let mut list = ParticipantList::for_direct_message(
+            &user_id!("a@prose.org"),
+            "User A",
+            &Availability::Unavailable,
+        );
 
         assert_eq!(
             list.participants_map,
@@ -547,6 +599,7 @@ mod tests {
                     real_id: Some(user_id!("a@prose.org")),
                     anon_occupant_id: None,
                     name: Some("User A".to_string()),
+                    is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability: Availability::Unavailable,
                     compose_state: Default::default(),
@@ -558,6 +611,7 @@ mod tests {
         // Now the user comes online…
         list.set_availability(
             &ParticipantId::User(user_id!("a@prose.org")),
+            false,
             &Availability::Available,
         );
 
@@ -569,6 +623,7 @@ mod tests {
                     real_id: Some(user_id!("a@prose.org")),
                     anon_occupant_id: None,
                     name: Some("User A".to_string()),
+                    is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability: Availability::Available,
                     compose_state: Default::default(),

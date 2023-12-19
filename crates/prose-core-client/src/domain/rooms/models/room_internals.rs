@@ -11,7 +11,7 @@ use parking_lot::{
 };
 
 use crate::domain::rooms::models::{ParticipantList, RegisteredMember};
-use crate::domain::shared::models::{RoomId, RoomType, UserId};
+use crate::domain::shared::models::{Availability, RoomId, RoomType, UserId};
 
 /// Contains information about a connected room and its state.
 #[derive(Debug)]
@@ -140,7 +140,11 @@ impl RoomInternals {
 }
 
 impl RoomInternals {
-    pub fn for_direct_message(contact_id: &UserId, contact_name: &str) -> Self {
+    pub fn for_direct_message(
+        contact_id: &UserId,
+        contact_name: &str,
+        availability: &Availability,
+    ) -> Self {
         Self {
             info: RoomInfo {
                 room_id: RoomId::from(contact_id.clone().into_inner()),
@@ -151,7 +155,11 @@ impl RoomInternals {
                 name: Some(contact_name.to_string()),
                 description: None,
                 topic: None,
-                participants: ParticipantList::for_direct_message(contact_id, contact_name),
+                participants: ParticipantList::for_direct_message(
+                    contact_id,
+                    contact_name,
+                    availability,
+                ),
             }),
         }
     }
@@ -191,8 +199,11 @@ mod tests {
 
     #[test]
     fn test_room_internals_for_direct_message() {
-        let internals =
-            RoomInternals::for_direct_message(&user_id!("contact@prose.org"), "Jane Doe");
+        let internals = RoomInternals::for_direct_message(
+            &user_id!("contact@prose.org"),
+            "Jane Doe",
+            &Availability::Available,
+        );
 
         assert_eq!(
             internals,
@@ -208,7 +219,8 @@ mod tests {
                     topic: None,
                     participants: ParticipantList::for_direct_message(
                         &user_id!("contact@prose.org"),
-                        "Jane Doe"
+                        "Jane Doe",
+                        &Availability::Available
                     )
                 })
             }

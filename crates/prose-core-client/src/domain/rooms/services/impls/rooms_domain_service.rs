@@ -20,7 +20,7 @@ use prose_xmpp::{IDProvider, RequestError};
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynIDProvider,
     DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
-    DynRoomParticipationService, DynUserProfileRepository,
+    DynRoomParticipationService, DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
     RegisteredMember, RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomSessionInfo,
@@ -28,7 +28,6 @@ use crate::domain::rooms::models::{
 };
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
-use crate::domain::shared::utils::build_contact_name;
 use crate::util::StringExt;
 use crate::ClientRoomEventType;
 
@@ -47,6 +46,7 @@ pub struct RoomsDomainService {
     room_attributes_service: DynRoomAttributesService,
     room_management_service: DynRoomManagementService,
     room_participation_service: DynRoomParticipationService,
+    user_info_repo: DynUserInfoRepository,
     user_profile_repo: DynUserProfileRepository,
 }
 
@@ -369,19 +369,21 @@ impl RoomsDomainService {
             return Ok(room);
         }
 
-        let user_profile = self
+        let contact_name = self
             .user_profile_repo
-            .get(participant)
-            .await
-            .ok()
-            .map(|maybe_profile| maybe_profile.unwrap_or_default())
+            .get_display_name(participant)
+            .await?
+            .unwrap_or_else(|| participant.formatted_username());
+        let user_info = self
+            .user_info_repo
+            .get_user_info(participant)
+            .await?
             .unwrap_or_default();
-
-        let contact_name = build_contact_name(&participant, &user_profile);
 
         let room = Arc::new(RoomInternals::for_direct_message(
             &participant,
             &contact_name,
+            &user_info.availability,
         ));
 
         match self.connected_rooms_repo.set(room.clone()) {
@@ -634,6 +636,7 @@ impl RoomsDomainService {
         // taken already.
         let room_name = info.config.room_name;
         let room_description = info.config.room_description;
+        let current_user_id = self.ctx.connected_id()?.into_user_id();
 
         let mut members = Vec::with_capacity(info.members.len());
         for member in info.members {
@@ -642,11 +645,13 @@ impl RoomsDomainService {
                 .get_display_name(&member.id)
                 .await
                 .unwrap_or_default();
+            let is_self = member.id == current_user_id;
 
             members.push(RegisteredMember {
                 user_id: member.id,
                 name,
                 affiliation: member.affiliation,
+                is_self,
             });
         }
 
