@@ -154,7 +154,7 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(getter)]
-            pub fn members(&self) -> ParticipantInfoArray {
+            pub fn participants(&self) -> ParticipantInfoArray {
                 self.room
                     .participants()
                     .into_iter()

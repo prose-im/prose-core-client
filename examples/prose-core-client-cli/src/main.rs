@@ -994,7 +994,7 @@ async fn main() -> Result<()> {
                 }?;
             }
             Selection::ListRoomParticipants => {
-                let Some(room) = select_muc_room(&client).await? else {
+                let Some(room) = select_room(&client, |_| true).await? else {
                     continue;
                 };
                 let occupants = room
