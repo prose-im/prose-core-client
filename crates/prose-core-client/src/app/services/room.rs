@@ -23,7 +23,7 @@ use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomSpec};
 use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{Message as MessageDTO, MessageSender, UserBasicInfo, UserId};
-use crate::ClientRoomEventType;
+use crate::{ClientEvent, ClientRoomEventType};
 
 pub struct Room<Kind> {
     inner: Arc<RoomInner>,
@@ -210,7 +210,10 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
-        self.drafts_repo.set(&self.data.room_id, text).await
+        self.drafts_repo.set(&self.data.room_id, text).await?;
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+        Ok(())
     }
 
     pub async fn load_draft(&self) -> Result<Option<String>> {

@@ -336,6 +336,7 @@ async fn select_room(
     let mut rooms = client
         .sidebar
         .sidebar_items()
+        .await
         .into_iter()
         .filter_map(|room| {
             if !filter(&room) {
@@ -372,7 +373,7 @@ async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
 }
 
 async fn select_sidebar_item(client: &Client) -> Result<Option<SidebarItem>> {
-    let items = client.sidebar.sidebar_items();
+    let items = client.sidebar.sidebar_items().await;
     if items.is_empty() {
         return Ok(None);
     }
@@ -694,6 +695,7 @@ async fn list_connected_rooms(client: &Client) -> Result<()> {
     let mut rooms = client
         .sidebar
         .sidebar_items()
+        .await
         .into_iter()
         .map(|item| item.room)
         .collect::<Vec<_>>();
@@ -918,7 +920,7 @@ async fn main() -> Result<()> {
                 }
             }
             Selection::ListSidebarItems => {
-                let items = client.sidebar.sidebar_items().into_iter().fold(
+                let items = client.sidebar.sidebar_items().await.into_iter().fold(
                     HashMap::new(),
                     |mut map, item| {
                         let category = match item.room {

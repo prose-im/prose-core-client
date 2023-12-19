@@ -9,8 +9,8 @@ use tracing::error;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynConnectedRoomsReadOnlyRepository, DynRoomFactory, DynSidebarDomainService,
-    DynSidebarReadOnlyRepository,
+    DynConnectedRoomsReadOnlyRepository, DynDraftsRepository, DynRoomFactory,
+    DynSidebarDomainService, DynSidebarReadOnlyRepository,
 };
 use crate::domain::shared::models::RoomId;
 use crate::dtos::SidebarItem as SidebarItemDTO;
@@ -20,6 +20,8 @@ pub struct SidebarService {
     #[inject]
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
+    drafts_repo: DynDraftsRepository,
+    #[inject]
     room_factory: DynRoomFactory,
     #[inject]
     sidebar_domain_service: DynSidebarDomainService,
@@ -28,7 +30,7 @@ pub struct SidebarService {
 }
 
 impl SidebarService {
-    pub fn sidebar_items(&self) -> Vec<SidebarItemDTO> {
+    pub async fn sidebar_items(&self) -> Vec<SidebarItemDTO> {
         let items = self.sidebar_repo.get_all();
         let mut item_dtos = vec![];
 
@@ -45,7 +47,12 @@ impl SidebarService {
                 name: item.name,
                 room: self.room_factory.build(room),
                 is_favorite: item.is_favorite,
-                has_draft: false,  // TODO
+                has_draft: self
+                    .drafts_repo
+                    .get(&item.jid)
+                    .await
+                    .unwrap_or_default()
+                    .is_some(),
                 unread_count: 0,   // TODO
                 mentions_count: 0, // TODO
                 error: item.error,

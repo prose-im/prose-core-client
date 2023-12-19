@@ -38,7 +38,7 @@ impl DomainDraftsRepository for DraftsRepository {
             .await?;
         let collection = tx.readable_collection(DraftsRecord::collection())?;
         let record = collection.get::<_, DraftsRecord>(room_id).await?;
-        Ok(record.map(|r| r.text))
+        Ok(record.and_then(|r| (!r.text.is_empty()).then_some(r.text)))
     }
 
     async fn set(&self, room_id: &BareJid, draft: Option<&str>) -> anyhow::Result<()> {

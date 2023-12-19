@@ -155,10 +155,11 @@ impl Client {
     }
 
     #[wasm_bindgen(js_name = "sidebarItems")]
-    pub fn sidebar_items(&self) -> SidebarItemsArray {
+    pub async fn sidebar_items(&self) -> SidebarItemsArray {
         self.client
             .sidebar
             .sidebar_items()
+            .await
             .into_iter()
             .map(|item| {
                 JsValue::from(SidebarItem {
