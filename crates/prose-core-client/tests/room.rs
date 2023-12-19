@@ -11,13 +11,12 @@ use xmpp_parsers::mam::Fin;
 use xmpp_parsers::rsm::SetResult;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
-use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::rooms::models::{RegisteredMember, RoomAffiliation, RoomInternals};
 use prose_core_client::domain::rooms::services::RoomFactory;
-use prose_core_client::domain::shared::models::RoomJid;
-use prose_core_client::domain::shared::models::RoomType;
-use prose_core_client::dtos::{Member, Occupant};
-use prose_core_client::room;
+use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
+use prose_core_client::dtos::Participant;
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
+use prose_core_client::{occupant_id, room_id, user_id};
 use prose_xmpp::stanza::message::MucUser;
 use prose_xmpp::{bare, jid};
 
@@ -25,22 +24,22 @@ use prose_xmpp::{bare, jid};
 async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(room!("room@conference.prose.org"))
-        .with_members([(
-            bare!("a@prose.org"),
-            Member {
-                name: "Aron Doe".to_string(),
-            },
-        )])
-        .with_occupants([(
-            jid!("room@conference.prose.org/b"),
-            Occupant::owner().set_name("Bernhard Doe"),
+    let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
+        .with_members([RegisteredMember {
+            user_id: user_id!("a@prose.org"),
+            name: Some("Aron Doe".to_string()),
+            affiliation: RoomAffiliation::Owner,
+            is_self: false,
+        }])
+        .with_participants([(
+            occupant_id!("room@conference.prose.org/b"),
+            Participant::owner().set_name("Bernhard Doe"),
         )]);
 
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
-        .with(predicate::eq(bare!("c@prose.org")))
+        .with(predicate::eq(user_id!("c@prose.org")))
         .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_repo
@@ -103,22 +102,22 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(room!("room@conference.prose.org"))
-        .with_members([(
-            bare!("a@prose.org"),
-            Member {
-                name: "Aron Doe".to_string(),
-            },
-        )])
-        .with_occupants([(
-            jid!("room@conference.prose.org/b"),
-            Occupant::owner().set_name("Bernhard Doe"),
+    let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
+        .with_members([RegisteredMember {
+            user_id: user_id!("a@prose.org"),
+            name: Some("Aron Doe".to_string()),
+            affiliation: RoomAffiliation::Owner,
+            is_self: false,
+        }])
+        .with_participants([(
+            occupant_id!("room@conference.prose.org/b"),
+            Participant::owner().set_name("Bernhard Doe"),
         )]);
 
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
-        .with(predicate::eq(bare!("c@prose.org")))
+        .with(predicate::eq(user_id!("c@prose.org")))
         .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_archive_service
@@ -241,7 +240,7 @@ async fn test_toggle_reaction() -> Result<()> {
         )
         .return_once(|_, _, _, _| Box::pin(async { Ok(()) }));
 
-    let internals = RoomInternals::group(room!("room@conference.prose.org"));
+    let internals = RoomInternals::group(room_id!("room@conference.prose.org"));
 
     let room = RoomFactory::from(deps)
         .build(Arc::new(internals))
@@ -261,14 +260,15 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         .expect_rename_item()
         .once()
         .with(
-            predicate::eq(room!("room@conference.prose.org")),
+            predicate::eq(room_id!("room@conference.prose.org")),
             predicate::eq("New Name"),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
         .build(Arc::new(
-            RoomInternals::public_channel(room!("room@conference.prose.org")).with_name("Old Name"),
+            RoomInternals::public_channel(room_id!("room@conference.prose.org"))
+                .with_name("Old Name"),
         ))
         .to_generic_room();
 

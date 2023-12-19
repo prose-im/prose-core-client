@@ -14,7 +14,6 @@ use std::{env, fs};
 use anyhow::Result;
 use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
-use minidom::convert::IntoAttributeValue;
 use minidom::Element;
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -22,12 +21,13 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Bookmark, Contact, Message, Occupant, PublicRoomInfo, SidebarItem,
+    Address, Bookmark, Contact, Message, ParticipantInfo, PublicRoomInfo, RoomId, SidebarItem,
+    UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
 use prose_core_client::{
-    open_store, Client, ClientDelegate, ClientEvent, RoomEventType, SqliteDriver,
+    open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, SqliteDriver,
 };
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
@@ -53,7 +53,9 @@ async fn configure_client() -> Result<(BareJid, Client)> {
     let (jid, password) = load_credentials();
 
     println!("Connecting to server as {}…", jid);
-    client.connect(&jid.to_bare(), password).await?;
+    client
+        .connect(&UserId::from(jid.to_bare()), password)
+        .await?;
     println!("Connected.");
 
     println!("Starting room observation…");
@@ -237,7 +239,7 @@ impl From<PublicRoomInfo> for JidWithName {
 impl From<Contact> for JidWithName {
     fn from(value: Contact) -> Self {
         Self {
-            jid: value.jid,
+            jid: value.id.into_inner(),
             name: value.name,
         }
     }
@@ -284,73 +286,84 @@ impl Display for ConnectedRoomEnvelope {
     }
 }
 
-struct OccupantEnvelope(Occupant);
+struct ParticipantEnvelope(ParticipantInfo);
 
-impl Display for OccupantEnvelope {
+impl Display for ParticipantEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{:<20} {:<10}",
+            "{:<20} {:<20} {:<10} {}",
             self.0
-                .jid
+                .id
                 .as_ref()
                 .map(|jid| jid.to_string())
                 .unwrap_or("<unknown real jid>".to_string())
                 .truncate_to(20),
-            self.0
-                .affiliation
-                .clone()
-                .into_attribute_value()
-                .unwrap_or("<no affiliation>".to_string()),
+            self.0.name,
+            self.0.affiliation,
+            self.0.availability
         )
     }
 }
 
 #[allow(dead_code)]
-async fn select_contact(client: &Client) -> Result<BareJid> {
+async fn select_contact(client: &Client) -> Result<UserId> {
     let contacts = client.contacts.load_contacts().await?.into_iter();
     Ok(
         select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
-            .jid
+            .id
             .clone(),
     )
 }
 
-async fn select_multiple_contacts(client: &Client) -> Result<Vec<BareJid>> {
+async fn select_multiple_contacts(client: &Client) -> Result<Vec<UserId>> {
     let contacts = client
         .contacts
         .load_contacts()
         .await?
         .into_iter()
         .map(JidWithName::from);
-    Ok(select_multiple_jids_from_list(contacts))
-}
-
-async fn select_room(client: &Client) -> Result<RoomEnvelope> {
-    let mut rooms = client
-        .sidebar
-        .sidebar_items()
+    Ok(select_multiple_jids_from_list(contacts)
         .into_iter()
-        .map(|item| item.room)
-        .collect::<Vec<_>>();
-    rooms.sort_by(compare_room_envelopes);
-    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+        .map(UserId::from)
+        .collect())
 }
 
-async fn select_muc_room(client: &Client) -> Result<RoomEnvelope> {
+async fn select_room(
+    client: &Client,
+    filter: impl Fn(&SidebarItem) -> bool,
+) -> Result<Option<RoomEnvelope>> {
     let mut rooms = client
         .sidebar
         .sidebar_items()
         .into_iter()
         .filter_map(|room| {
-            if let RoomEnvelope::DirectMessage(_) = room.room {
+            if !filter(&room) {
                 return None;
             }
             Some(room.room)
         })
         .collect::<Vec<_>>();
     rooms.sort_by(compare_room_envelopes);
-    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
+
+    if rooms.is_empty() {
+        println!("Could not find any matching rooms.");
+        return Ok(None);
+    }
+
+    Ok(Some(
+        select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone(),
+    ))
+}
+
+async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
+    select_room(client, |room| {
+        if let RoomEnvelope::DirectMessage(_) = room.room {
+            return false;
+        }
+        true
+    })
+    .await
 }
 
 async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
@@ -398,7 +411,7 @@ fn select_multiple_jids_from_list(jids: impl IntoIterator<Item = JidWithName>) -
         .collect()
 }
 
-async fn load_avatar(client: &Client, jid: &BareJid) -> Result<()> {
+async fn load_avatar(client: &Client, jid: &UserId) -> Result<()> {
     println!("Loading avatar for {}…", jid);
     match client.user_data.load_avatar(jid).await? {
         Some(path) => println!("Saved avatar image to {:?}.", path),
@@ -430,7 +443,7 @@ async fn save_avatar(client: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
+async fn load_user_profile(client: &Client, jid: &UserId) -> Result<()> {
     println!("Loading profile for {}…", jid);
     let profile = client.user_data.load_user_profile(jid).await?;
 
@@ -468,11 +481,11 @@ async fn load_user_profile(client: &Client, jid: &BareJid) -> Result<()> {
     Ok(())
 }
 
-async fn update_user_profile(client: &Client, jid: BareJid) -> Result<()> {
+async fn update_user_profile(client: &Client, id: UserId) -> Result<()> {
     println!("Loading current profile…");
     let mut profile = client
         .user_data
-        .load_user_profile(&jid)
+        .load_user_profile(&id)
         .await?
         .unwrap_or_default();
 
@@ -514,7 +527,7 @@ async fn load_contacts(client: &Client) -> Result<()> {
     Availability: {:?}
     Group: {:?}
     "#,
-            contact.jid, contact.name, contact.availability, contact.group,
+            contact.id, contact.name, contact.availability, contact.group,
         );
     }
 
@@ -522,7 +535,9 @@ async fn load_contacts(client: &Client) -> Result<()> {
 }
 
 async fn load_messages(client: &Client) -> Result<()> {
-    let room = select_room(client).await?;
+    let Some(room) = select_room(client, |_| true).await? else {
+        return Ok(());
+    };
 
     let messages = match room {
         RoomEnvelope::DirectMessage(room) => room.load_latest_messages().await?,
@@ -559,7 +574,9 @@ impl Display for MessageEnvelope {
 }
 
 async fn send_message(client: &Client) -> Result<()> {
-    let room = select_room(client).await?.to_generic_room();
+    let Some(room) = select_room(client, |_| true).await? else {
+        return Ok(());
+    };
 
     let body = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message")
@@ -568,7 +585,7 @@ async fn send_message(client: &Client) -> Result<()> {
         .interact_text()
         .unwrap();
 
-    room.send_message(body).await
+    room.to_generic_room().send_message(body).await
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -624,7 +641,7 @@ impl Delegate {
         };
 
         match r#type {
-            RoomEventType::MessagesAppended { message_ids } => {
+            ClientRoomEventType::MessagesAppended { message_ids } => {
                 let message_id_refs = message_ids.iter().collect::<Vec<_>>();
                 let messages = room
                     .to_generic_room()
@@ -723,8 +740,12 @@ enum Selection {
     LoadPublicRooms,
     #[strum(serialize = "Join public room")]
     JoinPublicRoom,
+    #[strum(serialize = "Join room by JID")]
+    JoinRoomByJid,
     #[strum(serialize = "Destroy public room")]
     DestroyPublicRoom,
+    #[strum(serialize = "Destroy connected room")]
+    DestroyConnectedRoom,
     #[strum(serialize = "List connected rooms")]
     ListConnectedRooms,
     #[strum(serialize = "Rename connected room")]
@@ -737,13 +758,19 @@ enum Selection {
     RemoveSidebarItem,
     #[strum(serialize = "Set room subject")]
     SetRoomTopic,
-    #[strum(serialize = "List occupants in room")]
-    ListRoomOccupants,
-    #[strum(serialize = "List members in room")]
-    ListRoomMembers,
+    #[strum(serialize = "List participants in room")]
+    ListRoomParticipants,
+    #[strum(serialize = "Resend group invites")]
+    ResendGroupInvites,
+    #[strum(serialize = "Invite user to private channel")]
+    InviteUserToPrivateChannel,
+    #[strum(serialize = "Convert group to private channel")]
+    ConvertGroupToPrivateChannel,
     #[strum(serialize = "[Debug] Load bookmarks")]
     LoadBookmarks,
-    #[strum(serialize = "[Debug] Delete bookmarks PubSub node")]
+    #[strum(serialize = "[Debug] Delete individual bookmarks")]
+    DeleteIndividualBookmarks,
+    #[strum(serialize = "[Debug] Delete whole bookmarks PubSub node")]
     DeleteBookmarksPubSubNode,
     #[strum(serialize = "[Debug] Send raw XML")]
     SendRawXML,
@@ -755,7 +782,7 @@ enum Selection {
 #[tokio::main]
 async fn main() -> Result<()> {
     env::set_var("RUST_BACKTRACE", "1");
-    enable_debug_logging(Level::TRACE);
+    enable_debug_logging(Level::INFO);
 
     let (jid, client) = configure_client().await?;
 
@@ -765,17 +792,17 @@ async fn main() -> Result<()> {
         match select_command() {
             Selection::LoadUserProfile => {
                 let jid = prompt_bare_jid(&jid);
-                load_user_profile(&client, &jid).await?;
+                load_user_profile(&client, &jid.into()).await?;
             }
             Selection::UpdateUserProfile => {
-                update_user_profile(&client, jid.clone()).await?;
+                update_user_profile(&client, jid.clone().into()).await?;
             }
             Selection::DeleteUserProfile => {
                 client.account.delete_profile().await?;
             }
             Selection::LoadUserAvatar => {
                 let jid = prompt_bare_jid(&jid);
-                load_avatar(&client, &jid).await?;
+                load_avatar(&client, &jid.into()).await?;
             }
             Selection::SaveUserAvatar => {
                 save_avatar(&client).await?;
@@ -834,6 +861,10 @@ async fn main() -> Result<()> {
                 let room = select_public_channel(&client).await?;
                 client.rooms.join_room(&room.jid, None).await?;
             }
+            Selection::JoinRoomByJid => {
+                let jid = prompt_bare_jid(None);
+                client.rooms.join_room(&jid.into(), None).await?;
+            }
             Selection::DestroyPublicRoom => {
                 let rooms = client
                     .rooms
@@ -855,13 +886,27 @@ async fn main() -> Result<()> {
                     .interact()
                     .unwrap();
                 println!();
-                client.rooms.destroy_room(&rooms[selection].jid).await?;
+                client
+                    .rooms
+                    .destroy_room(&rooms[selection].jid.clone().into())
+                    .await?;
+            }
+            Selection::DestroyConnectedRoom => {
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+                client
+                    .rooms
+                    .destroy_room(room.to_generic_room().jid())
+                    .await?;
             }
             Selection::ListConnectedRooms => {
                 list_connected_rooms(&client).await?;
             }
             Selection::RenameConnectedRoom => {
-                let room = select_room(&client).await?;
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
                 let name = prompt_string("Enter a new name:");
 
                 match room {
@@ -897,13 +942,19 @@ async fn main() -> Result<()> {
                     let values = items.get(key).unwrap();
                     for value in values {
                         println!(
-                            "  - {:<36} | has draft: {} | unread count: {}",
+                            "  - {:<36} | {:<50} | has draft: {} | unread count: {}",
                             value
                                 .room
                                 .to_generic_room()
                                 .name()
                                 .unwrap_or("<untitled>".to_string())
                                 .truncate_to(36),
+                            value
+                                .room
+                                .to_generic_room()
+                                .jid()
+                                .to_string()
+                                .truncate_to(50),
                             value.has_draft,
                             value.unread_count
                         );
@@ -929,34 +980,74 @@ async fn main() -> Result<()> {
                     .await?;
             }
             Selection::SetRoomTopic => {
-                let room = select_muc_room(&client).await?;
+                let Some(room) = select_muc_room(&client).await? else {
+                    continue;
+                };
                 let subject = prompt_string("Enter a subject:");
 
                 match room {
                     RoomEnvelope::DirectMessage(_) => unreachable!(),
-                    RoomEnvelope::Group(room) => room.set_topic(Some(&subject)).await,
-                    RoomEnvelope::PrivateChannel(room) => room.set_topic(Some(&subject)).await,
-                    RoomEnvelope::PublicChannel(room) => room.set_topic(Some(&subject)).await,
-                    RoomEnvelope::Generic(room) => room.set_topic(Some(&subject)).await,
+                    RoomEnvelope::Group(room) => room.set_topic(Some(subject)).await,
+                    RoomEnvelope::PrivateChannel(room) => room.set_topic(Some(subject)).await,
+                    RoomEnvelope::PublicChannel(room) => room.set_topic(Some(subject)).await,
+                    RoomEnvelope::Generic(room) => room.set_topic(Some(subject)).await,
                 }?;
             }
-            Selection::ListRoomOccupants => {
-                let room = select_muc_room(&client).await?.to_generic_room();
+            Selection::ListRoomParticipants => {
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
                 let occupants = room
-                    .occupants_dbg()
-                    .into_iter()
-                    .map(|o| OccupantEnvelope(o).to_string())
+                    .to_generic_room()
+                    .participants()
+                    .iter()
+                    .map(|o| ParticipantEnvelope(o.clone()).to_string())
                     .collect::<Vec<_>>();
                 println!("{}", occupants.join("\n"))
             }
-            Selection::ListRoomMembers => {
-                let room = select_muc_room(&client).await?.to_generic_room();
-                let members = room
-                    .members()
-                    .iter()
-                    .map(|info| info.jid.to_string())
-                    .collect::<Vec<_>>();
-                println!("{}", members.join("\n"))
+            Selection::ResendGroupInvites => {
+                let Some(RoomEnvelope::Group(room)) = select_room(&client, |item| {
+                    if let RoomEnvelope::Group(_) = item.room {
+                        return true;
+                    }
+                    false
+                })
+                .await?
+                else {
+                    continue;
+                };
+
+                room.resend_invites_to_members().await?;
+            }
+            Selection::InviteUserToPrivateChannel => {
+                let Some(RoomEnvelope::PrivateChannel(room)) = select_room(&client, |item| {
+                    if let RoomEnvelope::PrivateChannel(_) = item.room {
+                        return true;
+                    }
+                    false
+                })
+                .await?
+                else {
+                    continue;
+                };
+
+                let contact = select_contact(&client).await?;
+                room.invite_users(vec![&contact]).await?;
+            }
+            Selection::ConvertGroupToPrivateChannel => {
+                let Some(RoomEnvelope::Group(room)) = select_room(&client, |item| {
+                    if let RoomEnvelope::Group(_) = item.room {
+                        return true;
+                    }
+                    false
+                })
+                .await?
+                else {
+                    continue;
+                };
+
+                let channel_name = prompt_string("Enter a name for the private channel");
+                room.convert_to_private_channel(&channel_name).await?;
             }
             Selection::LoadBookmarks => {
                 let bookmarks = client
@@ -967,6 +1058,20 @@ async fn main() -> Result<()> {
                     .map(|b| JidWithName::from(b).to_string())
                     .collect::<Vec<_>>();
                 println!("{}", bookmarks.join("\n"));
+            }
+            Selection::DeleteIndividualBookmarks => {
+                let bookmarks = client
+                    .debug
+                    .load_bookmarks()
+                    .await?
+                    .into_iter()
+                    .map(JidWithName::from)
+                    .collect::<Vec<_>>();
+                let selected_bookmarks = select_multiple_jids_from_list(bookmarks);
+                client
+                    .debug
+                    .delete_bookmarks(selected_bookmarks.into_iter().map(RoomId::from))
+                    .await?;
             }
             Selection::DeleteBookmarksPubSubNode => {
                 println!("Deleting PubSub node…");

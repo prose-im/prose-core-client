@@ -3,12 +3,15 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::ns;
-use crate::util::ElementExt;
+use std::str::FromStr;
+
+use anyhow::bail;
 use jid::Jid;
 use minidom::Element;
-use std::str::FromStr;
 use xmpp_parsers::message::MessagePayload;
+
+use crate::ns;
+use crate::util::ElementExt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct MediatedInvite {
@@ -58,6 +61,10 @@ impl TryFrom<Element> for MediatedInvite {
                 _ if child.is("password", ns::MUC_USER) => password = Some(child.text()),
                 _ => (),
             }
+        }
+
+        if invites.is_empty() {
+            bail!("Missing invite element in mediated invite")
         }
 
         Ok(MediatedInvite { invites, password })
@@ -117,9 +124,11 @@ impl TryFrom<Element> for Continue {
 }
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::jid;
     use anyhow::Result;
+
+    use crate::jid;
+
+    use super::*;
 
     #[test]
     fn test_deserialize_mediated_invite() -> Result<()> {

@@ -120,6 +120,11 @@ impl Chat {
         self.send_message_stanza(stanza)
     }
 
+    pub fn send_raw_message(&self, message: Message) -> Result<()> {
+        self.ctx.send_stanza(message)?;
+        Ok(())
+    }
+
     pub fn update_message(
         &self,
         id: message::Id,

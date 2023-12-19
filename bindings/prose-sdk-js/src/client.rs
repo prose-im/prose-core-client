@@ -7,13 +7,13 @@ use base64::{engine::general_purpose, Engine as _};
 use js_sys::Array;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::{RoomJid, SoftwareVersion, UserActivity};
+use prose_core_client::dtos::{RoomId, SoftwareVersion, UserStatus};
 use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, StoreAvatarCache};
 
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    try_jid_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
+    try_user_id_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
     ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray, UserMetadata, UserProfile,
 };
 
@@ -187,7 +187,7 @@ impl Client {
     /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "startConversation")]
     pub async fn start_conversation(&self, participants: Array) -> Result<BareJid> {
-        let participants = try_jid_vec_from_string_array(participants)?;
+        let participants = try_user_id_vec_from_string_array(participants)?;
 
         Ok(self
             .client
@@ -204,7 +204,7 @@ impl Client {
     /// Pass a String[] as participants where each string is a valid BareJid.
     #[wasm_bindgen(js_name = "createGroup")]
     pub async fn create_group(&self, participants: Array) -> Result<BareJid> {
-        let participants = try_jid_vec_from_string_array(participants)?;
+        let participants = try_user_id_vec_from_string_array(participants)?;
 
         Ok(self
             .client
@@ -249,11 +249,22 @@ impl Client {
         Ok(self
             .client
             .rooms
-            .join_room(&RoomJid::from(room_jid.clone()), password.as_deref())
+            .join_room(&RoomId::from(room_jid.clone()), password.as_deref())
             .await
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?
             .into_inner()
             .into())
+    }
+
+    /// Destroys the room identified by `room_jid`.
+    #[wasm_bindgen(js_name = "destroyRoom")]
+    pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
+        self.client
+            .rooms
+            .destroy_room(&RoomId::from(room_jid.clone()))
+            .await
+            .map_err(|err| WasmError::from(anyhow::Error::from(err)))?;
+        Ok(())
     }
 
     /// XEP-0108: User Activity
@@ -265,7 +276,7 @@ impl Client {
         text: Option<String>,
     ) -> Result<()> {
         let user_activity = if let Some(icon) = &icon {
-            Some(UserActivity {
+            Some(UserStatus {
                 emoji: icon.clone(),
                 status: text.clone(),
             })

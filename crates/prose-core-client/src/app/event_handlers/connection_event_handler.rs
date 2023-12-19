@@ -9,12 +9,10 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::{client, Event};
 
 use crate::app::deps::{DynAppContext, DynClientEventDispatcher};
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
-use crate::client_event::ConnectionEvent;
-use crate::ClientEvent;
+use crate::app::event_handlers::{ConnectionEvent, ServerEvent, ServerEventHandler};
+use crate::{ClientEvent, ConnectionEvent as ClientConnectionEvent};
 
 #[derive(InjectDependencies)]
 pub struct ConnectionEventHandler {
@@ -26,31 +24,36 @@ pub struct ConnectionEventHandler {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl XMPPEventHandler for ConnectionEventHandler {
+impl ServerEventHandler for ConnectionEventHandler {
     fn name(&self) -> &'static str {
         "connection"
     }
 
-    async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>> {
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
-            Event::Client(event) => match event {
-                client::Event::Connected => {
-                    // We'll send an event from our `connect` method since we need to gather
-                    // information about the server first. Once we'll fire the event SDK consumers
-                    // can be sure that we have everything we need.
-                    Ok(None)
-                }
-                client::Event::Disconnected { error } => {
-                    self.ctx.is_observing_rooms.store(false, Ordering::Relaxed);
-                    self.client_event_dispatcher.dispatch_event(
-                        ClientEvent::ConnectionStatusChanged {
-                            event: ConnectionEvent::Disconnect { error },
-                        },
-                    );
-                    Ok(None)
-                }
-            },
-            _ => Ok(Some(event)),
+            ServerEvent::Connection(event) => self.handle_connection_event(event).await?,
+            _ => return Ok(Some(event)),
         }
+        Ok(None)
+    }
+}
+
+impl ConnectionEventHandler {
+    async fn handle_connection_event(&self, event: ConnectionEvent) -> Result<()> {
+        match event {
+            ConnectionEvent::Connected => {
+                // We'll send an event from our `connect` method since we need to gather
+                // information about the server first. Once we'll fire the event SDK consumers
+                // can be sure that we have everything we need.
+            }
+            ConnectionEvent::Disconnected { error } => {
+                self.ctx.is_observing_rooms.store(false, Ordering::Relaxed);
+                self.client_event_dispatcher
+                    .dispatch_event(ClientEvent::ConnectionStatusChanged {
+                        event: ClientConnectionEvent::Disconnect { error },
+                    });
+            }
+        }
+        Ok(())
     }
 }

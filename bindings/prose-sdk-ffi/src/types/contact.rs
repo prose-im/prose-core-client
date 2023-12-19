@@ -5,7 +5,7 @@
 
 use crate::types::JID;
 use prose_core_client::dtos::{
-    Availability, Contact as CoreContact, Group as CoreGroup, UserActivity,
+    Availability, Contact as CoreContact, Group as CoreGroup, UserStatus,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -20,17 +20,17 @@ pub struct Contact {
     pub jid: JID,
     pub name: String,
     pub availability: Availability,
-    pub activity: Option<UserActivity>,
+    pub status: Option<UserStatus>,
     pub group: Group,
 }
 
 impl From<CoreContact> for Contact {
     fn from(value: CoreContact) -> Self {
         Contact {
-            jid: value.jid.into(),
+            jid: value.id.into_inner().into(),
             name: value.name,
             availability: value.availability,
-            activity: value.activity,
+            status: value.status,
             group: value.group.into(),
         }
     }

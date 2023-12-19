@@ -116,10 +116,10 @@ impl ClientInner {
     }
 
     fn get_mod<M: AnyModule + Clone>(&self) -> M {
-        let Some(guard) = self.mods.get(&TypeId::of::<M>()) else {
+        let Some(entry) = self.mods.iter().find(|(k, _)| k == &TypeId::of::<M>()) else {
             panic!("Could not find requested module.")
         };
-        guard.read().as_any().downcast_ref::<M>().unwrap().clone()
+        entry.1.read().as_any().downcast_ref::<M>().unwrap().clone()
     }
 
     async fn handle_event(self: Arc<Self>, event: ConnectionEvent) {

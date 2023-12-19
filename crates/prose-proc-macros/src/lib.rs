@@ -7,7 +7,7 @@ use proc_macro::TokenStream;
 
 use convert_case::{Case, Casing};
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Fields};
+use syn::{parse_macro_input, parse_quote, Attribute, Data, DeriveInput, Fields, ItemFn};
 
 #[proc_macro_attribute]
 pub fn entity(_attrs: TokenStream, stream: TokenStream) -> TokenStream {
@@ -147,6 +147,7 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
 
     let expanded = quote! {
+        #[derive(Clone)]
         pub struct #dependencies_struct_name {
             #(#struct_fields,)*
         }
@@ -158,6 +159,19 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
                 }
             }
         }
+    };
+
+    TokenStream::from(expanded)
+}
+
+/// Multi-threaded test
+#[proc_macro_attribute]
+pub fn mt_test(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as ItemFn);
+
+    let expanded = quote! {
+        #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+        #input
     };
 
     TokenStream::from(expanded)

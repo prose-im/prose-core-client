@@ -4,11 +4,10 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
-use crate::dtos::RoomJid;
-use crate::util::jid_ext::BareJidExt;
+use crate::dtos::RoomId;
 
 impl Bookmark {
-    pub fn direct_message(jid: impl Into<RoomJid>) -> Self {
+    pub fn direct_message(jid: impl Into<RoomId>) -> Self {
         let jid = jid.into();
 
         Self {
@@ -20,7 +19,7 @@ impl Bookmark {
         }
     }
 
-    pub fn group(jid: impl Into<RoomJid>, name: impl Into<String>) -> Self {
+    pub fn group(jid: impl Into<RoomId>, name: impl Into<String>) -> Self {
         let jid = jid.into();
 
         Self {
@@ -32,7 +31,7 @@ impl Bookmark {
         }
     }
 
-    pub fn public_channel(jid: impl Into<RoomJid>, name: impl Into<String>) -> Self {
+    pub fn public_channel(jid: impl Into<RoomId>, name: impl Into<String>) -> Self {
         let jid = jid.into();
 
         Self {
@@ -44,7 +43,7 @@ impl Bookmark {
         }
     }
 
-    pub fn private_channel(jid: impl Into<RoomJid>, name: impl Into<String>) -> Self {
+    pub fn private_channel(jid: impl Into<RoomId>, name: impl Into<String>) -> Self {
         let jid = jid.into();
 
         Self {

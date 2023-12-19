@@ -3,16 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::client::ModuleContext;
-use crate::mods::Module;
-use crate::stanza::UserActivity;
-use crate::{ns, Event as ClientEvent};
 use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::iq::Iq;
-use xmpp_parsers::presence::Presence;
+use xmpp_parsers::presence::{Presence, Type};
 use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
 use xmpp_parsers::{presence, pubsub};
+
+use crate::client::ModuleContext;
+use crate::mods::Module;
+use crate::stanza::UserActivity;
+use crate::{ns, ElementExt, Event as ClientEvent};
 
 #[derive(Default, Clone)]
 pub struct Status {
@@ -24,7 +25,7 @@ pub enum Event {
     Presence(Presence),
     UserActivity {
         from: Jid,
-        user_activity: UserActivity,
+        user_activity: Option<UserActivity>,
     },
 }
 
@@ -34,6 +35,16 @@ impl Module for Status {
     }
 
     fn handle_presence_stanza(&self, stanza: &Presence) -> Result<()> {
+        match stanza.type_ {
+            Type::Error
+            | Type::Probe
+            | Type::Subscribe
+            | Type::Subscribed
+            | Type::Unsubscribe
+            | Type::Unsubscribed => return Ok(()),
+            Type::None | Type::Unavailable => {}
+        }
+
         self.ctx
             .schedule_event(ClientEvent::Status(Event::Presence(stanza.clone())));
         Ok(())
@@ -44,23 +55,31 @@ impl Module for Status {
             return Ok(());
         };
 
-        match node.0.as_ref() {
-            ns::USER_ACTIVITY => {
-                let Some(item) = items.first() else {
-                    return Ok(());
-                };
-                let Some(payload) = &item.payload else {
-                    return Ok(());
-                };
-                let user_activity = UserActivity::try_from(payload.clone())?;
-                self.ctx
-                    .schedule_event(ClientEvent::Status(Event::UserActivity {
-                        from: from.clone(),
-                        user_activity,
-                    }));
-            }
-            _ => (),
+        if node.0 != ns::USER_ACTIVITY {
+            return Ok(());
         }
+
+        let Some(item) = items.first() else {
+            return Ok(());
+        };
+        let Some(payload) = &item.payload else {
+            return Ok(());
+        };
+
+        payload.expect_is("activity", ns::USER_ACTIVITY)?;
+
+        let user_activity = if payload.children().next().is_none() {
+            None
+        } else {
+            Some(UserActivity::try_from(payload.clone())?)
+        };
+
+        self.ctx
+            .schedule_event(ClientEvent::Status(Event::UserActivity {
+                from: from.clone(),
+                user_activity,
+            }));
+
         Ok(())
     }
 }
@@ -73,6 +92,7 @@ impl Status {
         show: Option<presence::Show>,
         status: Option<&str>,
         caps: Option<xmpp_parsers::caps::Caps>,
+        priority: Option<i8>,
     ) -> Result<()> {
         let mut presence = Presence::new(presence::Type::None);
         presence.show = show;
@@ -81,6 +101,9 @@ impl Status {
         }
         if let Some(caps) = caps {
             presence.add_payload(caps)
+        }
+        if let Some(priority) = priority {
+            presence.priority = priority
         }
         self.ctx.send_stanza(presence)?;
         Ok(())

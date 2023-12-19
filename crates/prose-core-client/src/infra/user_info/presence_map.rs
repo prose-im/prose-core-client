@@ -5,14 +5,12 @@
 
 use std::collections::HashMap;
 
-use jid::{BareJid, Jid};
-
-use crate::domain::shared::models::Availability;
+use crate::domain::shared::models::{Availability, UserId, UserOrResourceId};
 use crate::domain::user_info::models::Presence;
 
 #[derive(Default)]
 pub struct PresenceMap {
-    map: HashMap<BareJid, Vec<PresenceEntry>>,
+    map: HashMap<UserId, Vec<PresenceEntry>>,
 }
 
 impl PresenceMap {
@@ -21,7 +19,7 @@ impl PresenceMap {
         PresenceMap::default()
     }
 
-    pub fn update_presence(&mut self, from: &Jid, presence: Presence) {
+    pub fn update_presence(&mut self, from: &UserOrResourceId, presence: Presence) {
         if presence.availability == Availability::Unavailable {
             self.remove_presence(from)
         } else {
@@ -29,7 +27,7 @@ impl PresenceMap {
         }
     }
 
-    pub fn get_highest_presence(&self, jid: &BareJid) -> Option<&PresenceEntry> {
+    pub fn get_highest_presence(&self, jid: &UserId) -> Option<&PresenceEntry> {
         self.map
             .get(jid)
             .and_then(|entries| entries.first())
@@ -42,22 +40,22 @@ impl PresenceMap {
 }
 
 impl PresenceMap {
-    fn remove_presence(&mut self, from: &Jid) {
-        match from {
-            Jid::Bare(jid) => {
-                self.map.remove(jid);
+    fn remove_presence(&mut self, id: &UserOrResourceId) {
+        match id {
+            UserOrResourceId::User(id) => {
+                self.map.remove(id);
             }
-            Jid::Full(jid) => {
-                if let Some(entries) = self.map.get_mut(&jid.to_bare()) {
-                    entries.retain(|p| p.resource.as_deref() != Some(jid.resource_str()))
+            UserOrResourceId::UserResource(id) => {
+                if let Some(entries) = self.map.get_mut(&id.to_user_id()) {
+                    entries.retain(|p| p.resource.as_deref() != Some(id.resource()))
                 }
             }
         }
     }
 
-    fn insert_presence(&mut self, from: &Jid, presence: Presence) {
-        let entries = self.map.entry(from.to_bare()).or_default();
-        let resource = from.resource_str();
+    fn insert_presence(&mut self, id: &UserOrResourceId, presence: Presence) {
+        let entries = self.map.entry(id.to_user_id()).or_default();
+        let resource = id.resource_str();
         entries.retain(|entry| entry.resource.as_deref() != resource && entry.resource.is_some());
         let idx = entries
             .iter()
@@ -81,23 +79,24 @@ pub struct PresenceEntry {
 
 #[cfg(test)]
 mod tests {
-    use prose_xmpp::jid;
+    use crate::domain::shared::models::UserResourceId;
+    use crate::{user_id, user_resource_id};
 
     use super::*;
 
     #[test]
     fn test_update_with_eq_priority() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org/r1"), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(1));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r2"), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r2").into(), p(1));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r2".to_string())
@@ -106,17 +105,17 @@ mod tests {
 
     #[test]
     fn test_update_with_lower_priority() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org/r1"), p(2));
+        map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(2));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r2"), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r2").into(), p(1));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
@@ -125,17 +124,17 @@ mod tests {
 
     #[test]
     fn test_update_with_higher_priority() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org/r1"), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(1));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r2"), p(2));
+        map.update_presence(&user_resource_id!("a@prose.org/r2").into(), p(2));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r2".to_string())
@@ -144,42 +143,48 @@ mod tests {
 
     #[test]
     fn test_update_with_unavailable() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org/r1"), p(1));
-        map.update_presence(&jid!("a@prose.org/r2"), p(2));
+        map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r2").into(), p(2));
 
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r2".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r2"), Presence::default());
+        map.update_presence(
+            &user_resource_id!("a@prose.org/r2").into(),
+            Presence::default(),
+        );
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r1"), Presence::default());
+        map.update_presence(
+            &user_resource_id!("a@prose.org/r1").into(),
+            Presence::default(),
+        );
         assert_eq!(map.get_highest_presence(&user), None);
     }
 
     #[test]
     fn test_update_with_bare_jid() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org"), p(1));
+        map.update_presence(&user_id!("a@prose.org").into(), p(1));
         assert_eq!(map.get_highest_presence(&user).unwrap().resource, None);
         assert_eq!(
             map.get_highest_presence(&user).unwrap().presence.priority,
             1
         );
 
-        map.update_presence(&jid!("a@prose.org"), p(2));
+        map.update_presence(&user_id!("a@prose.org").into(), p(2));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().presence.priority,
             2
@@ -188,48 +193,51 @@ mod tests {
 
     #[test]
     fn test_full_jid_replaces_bare_jid() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org"), p(1));
-        map.update_presence(&jid!("a@prose.org/r1"), p(2));
+        map.update_presence(&user_id!("a@prose.org").into(), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(2));
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r1".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org/r1"), Presence::default());
+        map.update_presence(
+            &user_resource_id!("a@prose.org/r1").into(),
+            Presence::default(),
+        );
         assert_eq!(map.get_highest_presence(&user), None);
     }
 
     #[test]
     fn test_update_with_unavailable_bare_jid() {
-        let user = jid!("a@prose.org").into_bare();
+        let user = user_id!("a@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org/r1"), p(1));
-        map.update_presence(&jid!("a@prose.org/r2"), p(2));
+        map.update_presence(&user_resource_id!("a@prose.org/r1").into(), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/r2").into(), p(2));
 
         assert_eq!(
             map.get_highest_presence(&user).unwrap().resource,
             Some("r2".to_string())
         );
 
-        map.update_presence(&jid!("a@prose.org"), p(2));
+        map.update_presence(&user_id!("a@prose.org").into(), p(2));
         assert_eq!(map.get_highest_presence(&user).unwrap().resource, None);
     }
 
     #[test]
     fn test_multiple_users() {
-        let user1 = jid!("a@prose.org").into_bare();
-        let user2 = jid!("b@prose.org").into_bare();
+        let user1 = user_id!("a@prose.org");
+        let user2 = user_id!("b@prose.org");
 
         let mut map = PresenceMap::new();
 
-        map.update_presence(&jid!("a@prose.org/ra1"), p(1));
-        map.update_presence(&jid!("b@prose.org/ra2"), p(1));
+        map.update_presence(&user_resource_id!("a@prose.org/ra1").into(), p(1));
+        map.update_presence(&user_resource_id!("b@prose.org/ra2").into(), p(1));
 
         assert_eq!(
             map.get_highest_presence(&user1).unwrap().resource,

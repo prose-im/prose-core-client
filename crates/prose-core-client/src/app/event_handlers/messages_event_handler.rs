@@ -5,25 +5,22 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 use tracing::{debug, error};
 use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::mods::chat;
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::Message;
-use prose_xmpp::Event;
 
 use crate::app::deps::{
     DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository, DynMessagesRepository,
     DynMessagingService, DynSidebarDomainService, DynTimeProvider,
 };
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
+use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::RoomJid;
-use crate::RoomEventType;
+use crate::domain::shared::models::{RoomId, UserId};
+use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
@@ -43,32 +40,19 @@ pub struct MessagesEventHandler {
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl XMPPEventHandler for MessagesEventHandler {
+impl ServerEventHandler for MessagesEventHandler {
     fn name(&self) -> &'static str {
         "messages"
     }
 
-    async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>> {
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
-            Event::Chat(event) => match event {
-                chat::Event::Message(message) => {
-                    self.handle_received_message(ReceivedMessage::Message(message))
-                        .await?;
-                    Ok(None)
-                }
-                chat::Event::Carbon(carbon) => {
-                    self.handle_received_message(ReceivedMessage::Carbon(carbon))
-                        .await?;
-                    Ok(None)
-                }
-                chat::Event::Sent(message) => {
-                    self.handle_sent_message(message).await?;
-                    Ok(None)
-                }
-                _ => Ok(Some(Event::Chat(event))),
-            },
-            _ => Ok(Some(event)),
+            ServerEvent::Message(event) => {
+                self.handle_message_event(event).await?;
+            }
+            _ => return Ok(Some(event)),
         }
+        Ok(None)
     }
 }
 
@@ -85,7 +69,7 @@ impl ReceivedMessage {
         }
     }
 
-    pub fn sender(&self) -> Option<BareJid> {
+    pub fn sender(&self) -> Option<UserId> {
         match &self {
             ReceivedMessage::Message(message) => message.from.as_ref().map(|jid| jid.to_bare()),
             ReceivedMessage::Carbon(Carbon::Received(message)) => message
@@ -99,6 +83,7 @@ impl ReceivedMessage {
                 .and_then(|message| message.to.as_ref())
                 .map(|jid| jid.to_bare()),
         }
+        .map(UserId::from)
     }
 
     pub fn r#type(&self) -> Option<MessageType> {
@@ -115,13 +100,28 @@ impl ReceivedMessage {
 }
 
 impl MessagesEventHandler {
+    async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
+        match event.r#type {
+            MessageEventType::Received(message) => {
+                self.handle_received_message(ReceivedMessage::Message(message))
+                    .await?
+            }
+            MessageEventType::Sync(carbon) => {
+                self.handle_received_message(ReceivedMessage::Carbon(carbon))
+                    .await?
+            }
+            MessageEventType::Sent(message) => self.handle_sent_message(message).await?,
+        }
+        Ok(())
+    }
+
     async fn handle_received_message(&self, message: ReceivedMessage) -> Result<()> {
         let Some(from) = message.sender() else {
             error!("Received message from unknown sender.");
             return Ok(());
         };
 
-        let from = RoomJid::from(from);
+        let from = RoomId::from(from.into_inner());
 
         let mut room = self.connected_rooms_repo.get(&from);
 
@@ -129,7 +129,7 @@ impl MessagesEventHandler {
             self.sidebar_domain_service
                 .insert_item_by_creating_or_joining_room(
                     CreateOrEnterRoomRequest::JoinDirectMessage {
-                        participant: from.clone().into_inner(),
+                        participant: UserId::from(from.clone().into_inner()),
                     },
                 )
                 .await?;
@@ -143,7 +143,7 @@ impl MessagesEventHandler {
 
         if let ReceivedMessage::Message(message) = &message {
             if let Some(subject) = &message.subject() {
-                room.set_topic((!subject.is_empty()).then_some(subject));
+                room.set_topic((!subject.is_empty()).then_some(subject.to_string()));
                 return Ok(());
             }
         }
@@ -190,7 +190,7 @@ impl MessagesEventHandler {
         }
 
         self.client_event_dispatcher
-            .dispatch_room_event(room.clone(), RoomEventType::from(&message));
+            .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
 
         // Don't send delivery receipts for carbons or anything other than a regular message.
         if message_is_carbon || !message.payload.is_message() {
@@ -199,7 +199,7 @@ impl MessagesEventHandler {
 
         if let Some(message_id) = message.id.into_original_id() {
             self.messaging_service
-                .send_read_receipt(&room.jid, &room.r#type, &message_id)
+                .send_read_receipt(&room.room_id, &room.r#type, &message_id)
                 .await?;
         }
 
@@ -212,7 +212,7 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        let to = RoomJid::from(to.to_bare());
+        let to = RoomId::from(to.to_bare());
 
         let Some(room) = self.connected_rooms_repo.get(&to) else {
             error!("Sent message to recipient for which we do not have a room.");
@@ -228,7 +228,7 @@ impl MessagesEventHandler {
         self.messages_repo.append(&to, &[&message]).await?;
 
         self.client_event_dispatcher
-            .dispatch_room_event(room, RoomEventType::from(&message));
+            .dispatch_room_event(room, ClientRoomEventType::from(&message));
 
         Ok(())
     }

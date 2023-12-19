@@ -13,9 +13,12 @@ pub use crate::domain::{
     contacts::models::Group,
     general::models::SoftwareVersion,
     messaging::models::{Emoji, MessageId, Reaction, StanzaId},
-    rooms::models::{Member, Occupant, PublicRoomInfo},
-    shared::models::{Availability, RoomJid, UserBasicInfo, UserPresenceInfo},
-    user_info::models::{LastActivity, UserActivity, UserInfo, UserMetadata},
+    rooms::models::{Participant, PublicRoomInfo, RoomAffiliation},
+    shared::models::{
+        Availability, OccupantId, ParticipantInfo, RoomId, UserBasicInfo, UserId, UserPresenceInfo,
+        UserResourceId,
+    },
+    user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},
     user_profiles::models::{Address, UserProfile},
 };
 

@@ -6,14 +6,15 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
-use jid::{BareJid, FullJid};
+use jid::Jid;
 use tracing::warn;
 use url::Url;
 
-use crate::domain::user_info::models::{LastActivity, UserMetadata};
 use prose_xmpp::mods;
 use prose_xmpp::stanza::{vcard, VCard4};
 
+use crate::domain::shared::models::{UserId, UserResourceId};
+use crate::domain::user_info::models::{LastActivity, UserMetadata};
 use crate::domain::user_profiles::{
     models::{Address, UserProfile},
     services::UserProfileService,
@@ -23,7 +24,7 @@ use crate::infra::xmpp::XMPPClient;
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserProfileService for XMPPClient {
-    async fn load_profile(&self, from: &BareJid) -> Result<Option<UserProfile>> {
+    async fn load_profile(&self, from: &UserId) -> Result<Option<UserProfile>> {
         let profile = self.client.get_mod::<mods::Profile>();
 
         match profile.load_vcard(from.clone()).await {
@@ -38,13 +39,17 @@ impl UserProfileService for XMPPClient {
 
     async fn load_user_metadata(
         &self,
-        from: &FullJid,
+        from: &UserResourceId,
         now: DateTime<Utc>,
     ) -> Result<Option<UserMetadata>> {
         let profile = self.client.get_mod::<mods::Profile>();
 
-        let entity_time = profile.load_entity_time(from.clone()).await?;
-        let last_activity = profile.load_last_activity(from.clone()).await?;
+        let entity_time = profile
+            .load_entity_time(Jid::Full(from.clone().into_inner()))
+            .await?;
+        let last_activity = profile
+            .load_last_activity(Jid::Full(from.clone().into_inner()))
+            .await?;
 
         let metadata = UserMetadata {
             local_time: Some(entity_time),

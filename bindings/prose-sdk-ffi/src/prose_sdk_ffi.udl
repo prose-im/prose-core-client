@@ -133,7 +133,7 @@ enum Group {
     "Other",
 };
 
-dictionary UserActivity {
+dictionary UserStatus {
     string emoji;
     string? status;
 };
@@ -142,7 +142,7 @@ dictionary Contact {
     JID jid;
     string name;
     Availability availability;
-    UserActivity? activity;
+    UserStatus? status;
     Group group;
 };
 

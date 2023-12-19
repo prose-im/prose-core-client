@@ -8,14 +8,15 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
+
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::rooms::models::{RoomError, RoomInternals};
-use crate::domain::shared::models::RoomJid;
+use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
+use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CreateRoomType {
-    Group { participants: Vec<BareJid> },
+    Group { participants: Vec<UserId> },
     PrivateChannel { name: String },
     PublicChannel { name: String },
 }
@@ -27,11 +28,11 @@ pub enum CreateOrEnterRoomRequest {
         room_type: CreateRoomType,
     },
     JoinRoom {
-        room_jid: RoomJid,
+        room_jid: RoomId,
         password: Option<String>,
     },
     JoinDirectMessage {
-        participant: BareJid,
+        participant: UserId,
     },
 }
 
@@ -53,5 +54,27 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
     /// - Dispatches `ClientEvent::RoomChanged` of type `RoomEventType::AttributesChanged`
     ///   after processing.
-    async fn rename_room(&self, room_jid: &RoomJid, name: &str) -> Result<(), RoomError>;
+    async fn rename_room(&self, room_id: &RoomId, name: &str) -> Result<(), RoomError>;
+
+    /// Reconfigures the room identified by `room_jid` according to `spec` and renames it to `new_name`.
+    ///
+    /// If the room is not connected no action is performed, otherwise:
+    /// - Panics if the reconfiguration is not not allowed. Allowed reconfigurations are:
+    ///   - `RoomType::Group` -> `RoomType::PrivateChannel`
+    ///   - `RoomType::PublicChannel` -> `RoomType::PrivateChannel`
+    ///   - `RoomType::PrivateChannel` -> `RoomType::PublicChannel`
+    /// - Dispatches `ClientEvent::RoomChanged` of type `RoomEventType::AttributesChanged`
+    ///   after processing.
+    async fn reconfigure_room_with_spec(
+        &self,
+        room_id: &RoomId,
+        spec: RoomSpec,
+        new_name: &str,
+    ) -> Result<Arc<RoomInternals>, RoomError>;
+
+    /// Loads the configuration for `room_id` and updates the corresponding `RoomInternals`
+    /// accordingly. Call this method after the room configuration changed.
+    /// Returns `RoomError::RoomNotFound` if no room with `room_id` exists.
+    async fn reevaluate_room_spec(&self, room_id: &RoomId)
+        -> Result<Arc<RoomInternals>, RoomError>;
 }

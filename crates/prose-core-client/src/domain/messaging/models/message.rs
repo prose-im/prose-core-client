@@ -5,10 +5,12 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use jid::{BareJid, Jid};
+use jid::Jid;
 use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
+
+use crate::domain::shared::models::UserId;
 
 use super::{MessageLike, MessageLikePayload};
 
@@ -19,7 +21,7 @@ id_string!(Emoji);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Reaction {
     pub emoji: Emoji,
-    pub from: Vec<BareJid>,
+    pub from: Vec<UserId>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -36,7 +38,7 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn toggle_reaction(&mut self, user_id: &BareJid, emoji: Emoji) {
+    pub fn toggle_reaction(&mut self, user_id: &UserId, emoji: Emoji) {
         let Some(reaction) = self
             .reactions
             .iter_mut()
@@ -58,7 +60,7 @@ impl Message {
 
     pub fn reactions_from<'a, 'b: 'a>(
         &'a self,
-        user_id: &'b BareJid,
+        user_id: &'b UserId,
     ) -> impl Iterator<Item = &'a Emoji> {
         self.reactions
             .iter()
@@ -114,7 +116,7 @@ impl Message {
                 MessageLikePayload::ReadReceipt => message.is_read = true,
                 MessageLikePayload::Message { .. } => unreachable!(),
                 MessageLikePayload::Reaction { mut emojis } => {
-                    let modifier_from = modifier.from.to_bare();
+                    let modifier_from = UserId::from(modifier.from.to_bare());
 
                     // Iterate over all existing reactions
                     'outer: for reaction in &mut message.reactions {
@@ -167,15 +169,13 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
-
     use chrono::{TimeZone, Utc};
-    use jid::BareJid;
 
     use prose_xmpp::{bare, jid};
 
     use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
     use crate::test::MessageBuilder;
+    use crate::user_id;
 
     use super::*;
 
@@ -184,55 +184,55 @@ mod tests {
         let mut message = MessageBuilder::new_with_index(1).build_message();
         assert!(message.reactions.is_empty());
 
-        message.toggle_reaction(&bare!("a@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("a@prose.org"), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![Reaction {
                 emoji: "🎉".into(),
-                from: vec![bare!("a@prose.org")]
+                from: vec![user_id!("a@prose.org")]
             }]
         );
 
-        message.toggle_reaction(&bare!("b@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("b@prose.org"), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![Reaction {
                 emoji: "🎉".into(),
-                from: vec![bare!("a@prose.org"), bare!("b@prose.org")]
+                from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")]
             }]
         );
 
-        message.toggle_reaction(&bare!("b@prose.org"), "✅".into());
+        message.toggle_reaction(&user_id!("b@prose.org"), "✅".into());
         assert_eq!(
             message.reactions,
             vec![
                 Reaction {
                     emoji: "🎉".into(),
-                    from: vec![bare!("a@prose.org"), bare!("b@prose.org")]
+                    from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")]
                 },
                 Reaction {
                     emoji: "✅".into(),
-                    from: vec![bare!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org")]
                 }
             ]
         );
 
-        message.toggle_reaction(&bare!("a@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("a@prose.org"), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![
                 Reaction {
                     emoji: "🎉".into(),
-                    from: vec![bare!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org")]
                 },
                 Reaction {
                     emoji: "✅".into(),
-                    from: vec![bare!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org")]
                 }
             ]
         );
 
-        message.toggle_reaction(&bare!("b@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("b@prose.org"), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![
@@ -242,7 +242,7 @@ mod tests {
                 },
                 Reaction {
                     emoji: "✅".into(),
-                    from: vec![bare!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org")]
                 }
             ]
         );
@@ -254,24 +254,24 @@ mod tests {
         message.reactions = vec![
             Reaction {
                 emoji: "🎉".into(),
-                from: vec![bare!("a@prose.org"), bare!("b@prose.org")],
+                from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")],
             },
             Reaction {
                 emoji: "✅".into(),
-                from: vec![bare!("b@prose.org")],
+                from: vec![user_id!("b@prose.org")],
             },
         ];
 
         assert_eq!(
             message
-                .reactions_from(&bare!("a@prose.org"))
+                .reactions_from(&user_id!("a@prose.org"))
                 .cloned()
                 .collect::<Vec<Emoji>>(),
             vec!["🎉".into()]
         );
         assert_eq!(
             message
-                .reactions_from(&bare!("b@prose.org"))
+                .reactions_from(&user_id!("b@prose.org"))
                 .cloned()
                 .collect::<Vec<Emoji>>(),
             vec!["🎉".into(), "✅".into()]
@@ -371,15 +371,15 @@ mod tests {
                 reactions: vec![
                     Reaction {
                         emoji: "👍".into(),
-                        from: vec![BareJid::from_str("c@prose.org").unwrap()]
+                        from: vec![user_id!("c@prose.org")]
                     },
                     Reaction {
                         emoji: "📼".into(),
-                        from: vec![BareJid::from_str("b@prose.org").unwrap()]
+                        from: vec![user_id!("b@prose.org")]
                     },
                     Reaction {
                         emoji: "🍿".into(),
-                        from: vec![BareJid::from_str("b@prose.org").unwrap()]
+                        from: vec![user_id!("b@prose.org")]
                     }
                 ],
             }

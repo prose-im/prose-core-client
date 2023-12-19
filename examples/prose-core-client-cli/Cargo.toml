@@ -11,7 +11,7 @@ common = { path = "../common" }
 dialoguer = "0.10.3"
 jid = { workspace = true }
 minidom = { workspace = true }
-prose-core-client = { path = "../../crates/prose-core-client", features = ["debug"] }
+prose-core-client = { path = "../../crates/prose-core-client", features = ["debug", "trace-stanzas"] }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 strum = { workspace = true }
 strum_macros = { workspace = true }

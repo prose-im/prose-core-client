@@ -3,21 +3,26 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashSet;
+use std::mem;
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use async_trait::async_trait;
-use tracing::error;
+use futures::future::join_all;
+use futures::FutureExt;
+use tracing::{error, info, warn};
 
 use prose_proc_macros::DependenciesStruct;
+use prose_wasm_utils::ProseFutureExt;
 
 use crate::app::deps::{
     DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService, DynSidebarRepository,
 };
-use crate::domain::rooms::models::RoomInternals;
+use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomJid, RoomType};
+use crate::domain::shared::models::{RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
 use crate::ClientEvent;
 
@@ -40,6 +45,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///
     /// Loads the remote bookmarks then proceeds with the logic details
     /// in `extend_items_from_bookmarks`.
+    #[tracing::instrument(skip(self))]
     async fn load_and_extend_items_from_bookmarks(&self) -> Result<()> {
         let bookmarks = self.bookmarks_service.load_bookmarks().await?;
         self.extend_items_from_bookmarks(bookmarks).await?;
@@ -62,7 +68,10 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     async fn extend_items_from_bookmarks(&self, bookmarks: Vec<Bookmark>) -> Result<()> {
         let mut sidebar_changed = false;
 
-        for bookmark in bookmarks {
+        let mut sidebar_items_to_delete = HashSet::<RoomId>::new();
+        let mut bookmarks_to_save = Vec::<Bookmark>::new();
+
+        for mut bookmark in bookmarks {
             if let Some(mut sidebar_item) = self.sidebar_repo.get(&bookmark.jid) {
                 // Update basic properties
                 sidebar_item.name = bookmark.name;
@@ -75,9 +84,9 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 // we'd otherwise loose track of them, while Groups are kept because these should
                 // always be connected so that our user can receive messages from them.
                 if !bookmark.in_sidebar {
+                    self.sidebar_repo.delete(&sidebar_item.jid);
                     self.disconnect_room_for_removed_sidebar_item_if_needed(&sidebar_item)
                         .await?;
-                    self.sidebar_repo.delete(&sidebar_item.jid);
                 } else {
                     self.sidebar_repo.put(&sidebar_item);
                 }
@@ -89,10 +98,43 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 continue;
             }
 
-            let join_result = self
-                .join_room_identified_by_bookmark_if_needed(&bookmark)
-                .await;
+            let mut bookmark_modified = false;
+
+            let join_result = 'result: loop {
+                let result = self
+                    .join_room_identified_by_bookmark_if_needed(&bookmark)
+                    .await;
+
+                match result {
+                    Ok(room) => break 'result Ok(room),
+                    Err(err) => {
+                        // The room is gone…
+                        info!("Bookmarked room {} is gone.", bookmark.jid);
+                        if let Some(gone_err) = err.gone_err() {
+                            // Does it have a new location?
+                            if let Some(new_location) = gone_err.new_location {
+                                // Do we have a sidebar item already with that location?
+                                if self.sidebar_repo.get(&new_location).is_some() {
+                                    break 'result Ok(None);
+                                }
+                                info!("Following to new location {}…", new_location);
+                                let gone_room_jid = mem::replace(&mut bookmark.jid, new_location);
+                                if !bookmark_modified {
+                                    sidebar_items_to_delete.insert(gone_room_jid);
+                                    bookmark_modified = true;
+                                }
+                                continue;
+                            }
+                        }
+                        break 'result Err(err);
+                    }
+                }
+            };
             sidebar_changed = true;
+
+            if bookmark_modified {
+                bookmarks_to_save.push(bookmark.clone());
+            }
 
             let sidebar_item = match join_result {
                 Ok(None) => continue,
@@ -115,6 +157,28 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             self.sidebar_repo.put(&sidebar_item);
         }
 
+        for jid in sidebar_items_to_delete {
+            match self.bookmarks_service.delete_bookmark(&jid).await {
+                Ok(()) => (),
+                Err(err) => warn!(
+                    "Could not delete outdated bookmark. Reason {}",
+                    err.to_string()
+                ),
+            }
+        }
+
+        for bookmark in bookmarks_to_save {
+            match self.bookmarks_service.save_bookmark(&bookmark).await {
+                Ok(()) => (),
+                Err(err) => {
+                    warn!(
+                        "Could not save updated bookmark. Reason {}",
+                        err.to_string()
+                    )
+                }
+            }
+        }
+
         if sidebar_changed {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::SidebarChanged);
@@ -132,63 +196,14 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     async fn insert_item_by_creating_or_joining_room(
         &self,
         request: CreateOrEnterRoomRequest,
-    ) -> Result<RoomJid> {
+    ) -> Result<RoomId> {
         let room = self
             .rooms_domain_service
             .create_or_join_room(request)
             .await?;
 
-        if let Some(sidebar_item) = self.sidebar_repo.get(&room.jid) {
-            return Ok(sidebar_item.jid);
-        }
-
-        let room_name = room.name().unwrap_or(room.jid.to_string());
-
-        let bookmark_type = match room.r#type {
-            RoomType::Pending => {
-                unreachable!("RoomsDomainService unexpectedly returned a pending room.")
-            }
-            RoomType::DirectMessage => BookmarkType::DirectMessage,
-            RoomType::Group => BookmarkType::Group,
-            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
-            RoomType::PublicChannel => BookmarkType::PublicChannel,
-            RoomType::Generic => {
-                bail!("The joined/created room did not match any of our specifications.")
-            }
-        };
-
-        let result = self
-            .bookmarks_service
-            .save_bookmark(&Bookmark {
-                name: room_name.clone(),
-                jid: room.jid.clone(),
-                r#type: bookmark_type.clone(),
-                is_favorite: false,
-                in_sidebar: true,
-            })
-            .await;
-
-        match result {
-            Ok(_) => (),
-            Err(error) => {
-                error!("Failed to save bookmark for room {}. {}", room.jid, error)
-            }
-        }
-
-        let sidebar_item = SidebarItem {
-            name: room_name,
-            jid: room.jid.clone(),
-            r#type: bookmark_type.clone(),
-            is_favorite: false,
-            error: None,
-        };
-
-        self.sidebar_repo.put(&sidebar_item);
-
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::SidebarChanged);
-
-        Ok(sidebar_item.jid)
+        self.insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(room)
+            .await
     }
 
     /// Ensures a sidebar item exists for an active direct message or group conversation.
@@ -198,7 +213,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// corresponding bookmark.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn insert_item_for_received_message_if_needed(&self, room_jid: &RoomJid) -> Result<()> {
+    async fn insert_item_for_received_message_if_needed(&self, room_jid: &RoomId) -> Result<()> {
         // We do not need to create or join rooms here since we couldn't have received a message
         // from a room we're not connected to. Also rooms for groups are always connected no matter
         // if they are in the sidebar or not.
@@ -206,39 +221,14 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             return Ok(());
         };
 
-        let bookmark_type = match room.r#type {
-            RoomType::DirectMessage => BookmarkType::DirectMessage,
-            RoomType::Group => BookmarkType::Group,
+        match room.r#type {
+            RoomType::DirectMessage => (),
+            RoomType::Group => (),
             _ => return Ok(()),
         };
 
-        if self.sidebar_repo.get(&room.jid).is_some() {
-            return Ok(());
-        }
-
-        let bookmark_name = room.name().unwrap_or("Untitled Conversation".to_string());
-
-        self.bookmarks_service
-            .save_bookmark(&Bookmark {
-                name: bookmark_name.clone(),
-                jid: room.jid.clone(),
-                r#type: bookmark_type.clone(),
-                is_favorite: false,
-                in_sidebar: true,
-            })
+        self.insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(room)
             .await?;
-
-        self.sidebar_repo.put(&SidebarItem {
-            name: bookmark_name,
-            jid: room.jid.clone(),
-            r#type: bookmark_type,
-            is_favorite: false,
-            error: None,
-        });
-
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::SidebarChanged);
-
         Ok(())
     }
 
@@ -248,7 +238,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///   - The corresponding room will be renamed.
     ///   - The corresponding bookmark will be renamed.
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
-    async fn rename_item(&self, room_jid: &RoomJid, name: &str) -> Result<()> {
+    async fn rename_item(&self, room_jid: &RoomId, name: &str) -> Result<()> {
         // If we don't have a sidebar item for this room there's no point in renaming it. It would
         // either not be connected or be a group which cannot be renamed.
         let Some(mut item) = self.sidebar_repo.get(room_jid) else {
@@ -260,13 +250,14 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             return Ok(());
         }
 
-        // Rename the room first. If that succeeds continue.
+        // Optimistically update the sidebar item and prevent consecutive renames while ours
+        // is in progress.
+        item.name = name.to_string();
+        self.sidebar_repo.put(&item);
+
         self.rooms_domain_service
             .rename_room(room_jid, name)
             .await?;
-
-        item.name = name.to_string();
-        self.sidebar_repo.put(&item);
 
         self.bookmarks_service
             .save_bookmark(&Bookmark::from(&item))
@@ -283,20 +274,65 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// If the item is not in the list of sidebar items no action is performed, otherwise:
     ///   - The corresponding bookmark will be updated to reflect the new status of `is_favorite`.
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
-    async fn toggle_item_is_favorite(&self, room_jid: &RoomJid) -> Result<()> {
+    async fn toggle_item_is_favorite(&self, room_jid: &RoomId) -> Result<()> {
         let Some(mut sidebar_item) = self.sidebar_repo.get(room_jid) else {
             return Ok(());
         };
 
         sidebar_item.is_favorite ^= true;
 
+        self.sidebar_repo.put(&sidebar_item);
         self.bookmarks_service
             .save_bookmark(&Bookmark::from(&sidebar_item))
             .await?;
-        self.sidebar_repo.put(&sidebar_item);
 
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(())
+    }
+
+    /// Reconfigures the sidebar item identified by `room_jid` according to `spec`.
+    ///
+    /// If the item is not in the list of sidebar items no action is performed, otherwise:
+    ///   - The corresponding room will be reconfigured.
+    ///   - The corresponding bookmark's type will be updated.
+    ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
+    #[tracing::instrument(skip(self))]
+    async fn reconfigure_item_with_spec(
+        &self,
+        room_jid: &RoomId,
+        spec: RoomSpec,
+        new_name: &str,
+    ) -> Result<()> {
+        info!("Reconfiguring room {} to type {}…", room_jid, spec);
+
+        let room = self
+            .rooms_domain_service
+            .reconfigure_room_with_spec(room_jid, spec, new_name)
+            .await?;
+
+        info!(
+            "Reconfiguration of room {} finished. Room Jid is now {}",
+            room_jid, room.room_id
+        );
+
+        // The returned room has a new JID, which implies that the old room has been deleted…
+        if room_jid != &room.room_id {
+            self.connected_rooms_repo.delete(room_jid);
+            self.sidebar_repo.delete(room_jid);
+
+            if let Err(err) = self.bookmarks_service.delete_bookmark(room_jid).await {
+                warn!(
+                    "Could not delete bookmark {}. Reason: {}",
+                    room_jid,
+                    err.to_string()
+                );
+            }
+        }
+
+        self.insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(room)
+            .await?;
 
         Ok(())
     }
@@ -310,7 +346,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///   persistent connections and can be rediscovered.
     /// - Triggers a `ClientEvent::SidebarChanged` event after processing to notify of the
     ///   sidebar update.
-    async fn remove_items(&self, room_jids: &[&RoomJid]) -> Result<()> {
+    async fn remove_items(&self, room_jids: &[&RoomId]) -> Result<()> {
         for jid in room_jids {
             self.remove_item(*jid).await?;
         }
@@ -326,14 +362,14 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// - Disconnects channels and updates the repository state for each provided JID.
     /// - Bookmarks remain untouched.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_removed_items(&self, room_jids: &[&RoomJid]) -> Result<()> {
-        for jid in room_jids {
-            let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
+    async fn handle_removed_items(&self, room_ids: &[RoomId]) -> Result<()> {
+        for id in room_ids {
+            let Some(sidebar_item) = self.sidebar_repo.get(id) else {
                 continue;
             };
+            self.sidebar_repo.delete(&id);
             self.disconnect_room_for_removed_sidebar_item_if_needed(&sidebar_item)
                 .await?;
-            self.sidebar_repo.delete(&jid);
         }
 
         self.client_event_dispatcher
@@ -370,6 +406,141 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    /// Handles a destroyed room.
+    ///
+    /// - Removes the connected room.
+    /// - Deletes the corresponding sidebar item.
+    /// - Joins `alternate_room` if set (see `insert_item_by_creating_or_joining_room`).
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
+    async fn handle_destroyed_room(
+        &self,
+        room_jid: &RoomId,
+        alternate_room: Option<RoomId>,
+    ) -> Result<()> {
+        // Figure out if this affects the sidebar so that we'll have to send an event…
+        let mut dispatch_event = self.sidebar_repo.get(room_jid).is_some();
+
+        self.connected_rooms_repo.delete(room_jid);
+        self.sidebar_repo.delete(room_jid);
+
+        let mut futures = vec![self
+            .bookmarks_service
+            .delete_bookmark(room_jid)
+            .prose_boxed()];
+
+        if let Some(alternate_room) = alternate_room {
+            if self.sidebar_repo.get(&alternate_room).is_none() {
+                // `insert_item_by_creating_or_joining_room` will dispatch the
+                // `ClientEvent::SidebarChanged` event, so we don't have to…
+                dispatch_event = false;
+
+                // If we have an alternate room, we'll join that one…
+                futures.push(
+                    Box::pin(self.insert_item_by_creating_or_joining_room(
+                        CreateOrEnterRoomRequest::JoinRoom {
+                            room_jid: alternate_room,
+                            password: None,
+                        },
+                    ))
+                    .map(|res| res.map(|_| ()))
+                    .prose_boxed(),
+                );
+            }
+        }
+
+        join_all(futures)
+            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()?;
+
+        if dispatch_event {
+            self.client_event_dispatcher
+                .dispatch_event(ClientEvent::SidebarChanged);
+        }
+
+        Ok(())
+    }
+
+    /// Handles removal from a room.
+    ///
+    /// If the removal is temporary:
+    /// - Deletes the connected room.
+    /// - Sets an error on the corresponding sidebar item.
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
+    ///
+    /// If the removal is permanent, follows the procedure described in `handle_destroyed_room`.
+    async fn handle_removal_from_room(&self, room_jid: &RoomId, is_permanent: bool) -> Result<()> {
+        if is_permanent {
+            return self.handle_destroyed_room(room_jid, None).await;
+        }
+
+        self.connected_rooms_repo.delete(room_jid);
+
+        let Some(mut item) = self.sidebar_repo.get(room_jid) else {
+            return Ok(());
+        };
+
+        item.error = Some("Room is disconnected.".to_string());
+        self.sidebar_repo.put(&item);
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(())
+    }
+
+    /// Handles a changed room configuration.
+    ///
+    /// - Reloads the configuration and adjusts the connected room accordingly.
+    /// - Replaces the connected room if the type of room changed.
+    /// - Updates the sidebar & associated bookmark to reflect the updated configuration.
+    /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
+    async fn handle_changed_room_config(&self, room_id: &RoomId) -> Result<()> {
+        let Some(room) = self.connected_rooms_repo.get(room_id) else {
+            return Ok(());
+        };
+
+        // Ignore pending rooms…
+        if room.is_pending() {
+            return Ok(());
+        }
+
+        let room = self
+            .rooms_domain_service
+            .reevaluate_room_spec(room_id)
+            .await?;
+
+        let Some(mut item) = self.sidebar_repo.get(room_id) else {
+            return Ok(());
+        };
+
+        let item_name = room.name().unwrap_or(room.room_id.to_string());
+        let item_type = BookmarkType::try_from(room.r#type.clone())?;
+
+        if item.name == item_name && item.r#type == item_type {
+            info!("No changes required for SidebarItem {}.", room_id);
+            return Ok(());
+        }
+
+        info!("Updating SidebarItem {}…", room_id);
+        item.name = item_name;
+        item.r#type = item_type;
+
+        self.sidebar_repo.put(&item);
+
+        if let Err(err) = self.bookmarks_service.save_bookmark(&(&item).into()).await {
+            error!(
+                "Failed to save bookmark after configuration change. Reason: {}",
+                err.to_string()
+            );
+        }
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(())
+    }
+
     /// Removes all connected rooms and sidebar items.
     ///
     /// Call this method after logging out.
@@ -394,7 +565,7 @@ impl SidebarDomainService {
     ///   - The bookmarks are fully deleted as DirectMessages do not need to be tracked and
     ///     Public Channels can be rediscovered.
     /// - The `SidebarRepository` is updated by removing the item.
-    async fn remove_item(&self, jid: &RoomJid) -> Result<()> {
+    async fn remove_item(&self, jid: &RoomId) -> Result<()> {
         let Some(sidebar_item) = self.sidebar_repo.get(jid) else {
             return Ok(());
         };
@@ -464,7 +635,7 @@ impl SidebarDomainService {
     async fn join_room_identified_by_bookmark_if_needed(
         &self,
         bookmark: &Bookmark,
-    ) -> Result<Option<Arc<RoomInternals>>> {
+    ) -> Result<Option<Arc<RoomInternals>>, RoomError> {
         let room = match bookmark.r#type {
             BookmarkType::DirectMessage if !bookmark.in_sidebar => None,
 
@@ -478,7 +649,7 @@ impl SidebarDomainService {
             BookmarkType::DirectMessage => Some(
                 self.rooms_domain_service
                     .create_or_join_room(CreateOrEnterRoomRequest::JoinDirectMessage {
-                        participant: bookmark.jid.clone().into_inner(),
+                        participant: UserId::from(bookmark.jid.clone().into_inner()),
                     })
                     .await?,
             ),
@@ -503,6 +674,69 @@ impl SidebarDomainService {
     }
 }
 
+impl SidebarDomainService {
+    async fn insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(
+        &self,
+        room: Arc<RoomInternals>,
+    ) -> Result<RoomId> {
+        let room_name = room.name().unwrap_or(room.room_id.to_string());
+
+        let bookmark_type = BookmarkType::try_from(room.r#type.clone())?;
+
+        let mut new_sidebar_item = SidebarItem {
+            name: room_name.clone(),
+            jid: room.room_id.clone(),
+            r#type: bookmark_type.clone(),
+            is_favorite: false,
+            error: None,
+        };
+
+        if let Some(sidebar_item) = self.sidebar_repo.get(&room.room_id) {
+            if sidebar_item.name == new_sidebar_item.name
+                && sidebar_item.r#type == new_sidebar_item.r#type
+            {
+                // Nothing to do…
+                return Ok(sidebar_item.jid);
+            }
+
+            // Maintain `is_favorite` status…
+            new_sidebar_item.is_favorite = sidebar_item.is_favorite;
+        }
+
+        self.sidebar_repo.put(&new_sidebar_item);
+
+        info!(
+            "Saving bookmark for room {} (type: {})",
+            room.room_id, bookmark_type
+        );
+        let result = self
+            .bookmarks_service
+            .save_bookmark(&Bookmark {
+                name: room_name,
+                jid: room.room_id.clone(),
+                r#type: bookmark_type.clone(),
+                is_favorite: false,
+                in_sidebar: true,
+            })
+            .await;
+
+        match result {
+            Ok(_) => (),
+            Err(error) => {
+                error!(
+                    "Failed to save bookmark for room {}. {}",
+                    room.room_id, error
+                )
+            }
+        }
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(new_sidebar_item.jid)
+    }
+}
+
 impl From<&SidebarItem> for Bookmark {
     fn from(value: &SidebarItem) -> Self {
         Self {
@@ -512,5 +746,25 @@ impl From<&SidebarItem> for Bookmark {
             is_favorite: value.is_favorite,
             in_sidebar: true,
         }
+    }
+}
+
+impl TryFrom<RoomType> for BookmarkType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RoomType) -> Result<Self, Self::Error> {
+        let value = match value {
+            RoomType::Pending => {
+                unreachable!("RoomsDomainService unexpectedly returned a pending room.")
+            }
+            RoomType::DirectMessage => BookmarkType::DirectMessage,
+            RoomType::Group => BookmarkType::Group,
+            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
+            RoomType::PublicChannel => BookmarkType::PublicChannel,
+            RoomType::Generic => {
+                bail!("The joined/created room did not match any of our specifications.")
+            }
+        };
+        Ok(value)
     }
 }

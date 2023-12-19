@@ -5,20 +5,20 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::FullJid;
 use minidom::Element;
 
 use prose_xmpp::{mods, ConnectionError};
 
 use crate::domain::connection::models::ServerFeatures;
 use crate::domain::connection::services::ConnectionService;
+use crate::dtos::UserResourceId;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ConnectionService for XMPPClient {
-    async fn connect(&self, jid: &FullJid, password: &str) -> Result<(), ConnectionError> {
-        self.client.connect(jid, password).await
+    async fn connect(&self, jid: &UserResourceId, password: &str) -> Result<(), ConnectionError> {
+        self.client.connect(jid.as_ref(), password).await
     }
 
     async fn disconnect(&self) {

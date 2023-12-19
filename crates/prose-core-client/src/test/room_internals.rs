@@ -4,57 +4,48 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use chrono::{DateTime, Utc};
-use jid::{BareJid, Jid};
-use std::collections::HashMap;
-use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::muc::user::Affiliation;
 
-use crate::domain::rooms::models::{RoomInfo, RoomInternals};
-use crate::domain::shared::models::{RoomJid, RoomType};
-use crate::dtos::{Member, Occupant};
+use crate::domain::rooms::models::{
+    ComposeState, RegisteredMember, RoomAffiliation, RoomInfo, RoomInternals,
+};
+use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
+use crate::dtos::{Availability, Participant, UserId};
 use crate::test::mock_data;
-use crate::util::jid_ext::BareJidExt;
 
 impl RoomInternals {
-    pub fn direct_message(jid: impl Into<BareJid>) -> Self {
+    pub fn direct_message(jid: UserId, availability: &Availability) -> Self {
         let jid = jid.into();
 
-        Self::for_direct_message(
-            &jid,
-            &mock_data::account_jid().into_bare(),
-            &jid.to_display_name(),
+        Self::for_direct_message(&jid, &jid.formatted_username(), availability)
+    }
+
+    pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
+        Self::pending(
+            &jid.into(),
+            &format!("{}-{}", mock_data::account_jid().username(), next_hash),
         )
     }
 
-    pub fn group(jid: impl Into<RoomJid>) -> Self {
+    pub fn group(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
-            jid: jid.into(),
-            description: None,
-            user_jid: mock_data::account_jid().into_bare(),
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-            members: HashMap::new(),
+            room_id: jid.into(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::Group,
         })
     }
 
-    pub fn public_channel(jid: impl Into<RoomJid>) -> Self {
+    pub fn public_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
-            jid: jid.into(),
-            description: None,
-            user_jid: mock_data::account_jid().into_bare(),
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-            members: HashMap::new(),
+            room_id: jid.into(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PublicChannel,
         })
     }
 
-    pub fn private_channel(jid: impl Into<RoomJid>) -> Self {
+    pub fn private_channel(jid: impl Into<RoomId>) -> Self {
         Self::new(RoomInfo {
-            jid: jid.into(),
-            description: None,
-            user_jid: mock_data::account_jid().into_bare(),
-            user_nickname: mock_data::account_jid().node_str().unwrap().to_string(),
-            members: HashMap::new(),
+            room_id: jid.into(),
+            user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PrivateChannel,
         })
     }
@@ -65,44 +56,59 @@ impl RoomInternals {
     }
 
     pub fn with_name(self, name: impl AsRef<str>) -> Self {
-        self.set_name(name.as_ref());
+        self.set_name(Some(name.as_ref().to_string()));
         self
     }
 
-    pub fn with_members(mut self, members: impl IntoIterator<Item = (BareJid, Member)>) -> Self {
-        self.members = members.into_iter().collect();
+    pub fn with_topic(self, topic: Option<&str>) -> Self {
+        self.set_topic(topic.map(ToString::to_string));
         self
     }
 
-    pub fn with_occupants(self, occupant: impl IntoIterator<Item = (Jid, Occupant)>) -> Self {
-        self.set_occupants(occupant.into_iter().collect());
+    pub fn with_members(self, members: impl IntoIterator<Item = RegisteredMember>) -> Self {
+        self.participants_mut().set_registered_members(members);
+        self
+    }
+
+    pub fn with_participants<Id: Into<ParticipantId>>(
+        self,
+        occupant: impl IntoIterator<Item = (Id, Participant)>,
+    ) -> Self {
+        self.participants_mut()
+            .extend_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect());
         self
     }
 }
 
-impl Occupant {
+impl Participant {
     pub fn owner() -> Self {
-        Occupant {
-            jid: None,
+        Participant {
+            real_id: None,
             name: None,
-            affiliation: Affiliation::Owner,
-            chat_state: ChatState::Gone,
-            chat_state_updated: Default::default(),
+            is_self: false,
+            affiliation: RoomAffiliation::Owner,
+            compose_state: Default::default(),
+            compose_state_updated: Default::default(),
+            availability: Availability::Unavailable,
+            anon_occupant_id: None,
         }
     }
 
     pub fn member() -> Self {
-        Occupant {
-            jid: None,
+        Participant {
+            real_id: None,
+            anon_occupant_id: None,
             name: None,
-            affiliation: Affiliation::Owner,
-            chat_state: ChatState::Gone,
-            chat_state_updated: Default::default(),
+            is_self: false,
+            affiliation: RoomAffiliation::Owner,
+            compose_state: Default::default(),
+            compose_state_updated: Default::default(),
+            availability: Availability::Unavailable,
         }
     }
 
-    pub fn set_real_jid(mut self, jid: &BareJid) -> Self {
-        self.jid = Some(jid.clone());
+    pub fn set_real_id(mut self, id: &UserId) -> Self {
+        self.real_id = Some(id.clone());
         self
     }
 
@@ -111,13 +117,13 @@ impl Occupant {
         self
     }
 
-    pub fn set_chat_state(mut self, chat_state: ChatState) -> Self {
-        self.chat_state = chat_state;
+    pub fn set_compose_state(mut self, compose_state: ComposeState) -> Self {
+        self.compose_state = compose_state;
         self
     }
 
-    pub fn set_chat_state_updated(mut self, timestamp: DateTime<Utc>) -> Self {
-        self.chat_state_updated = timestamp;
+    pub fn set_compose_state_updated(mut self, timestamp: DateTime<Utc>) -> Self {
+        self.compose_state_updated = timestamp;
         self
     }
 }

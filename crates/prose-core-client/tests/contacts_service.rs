@@ -8,11 +8,11 @@ use anyhow::Result;
 use prose_core_client::app::dtos::Contact as ContactDTO;
 use prose_core_client::app::services::ContactsService;
 use prose_core_client::domain::contacts::models::{Contact, Group};
-use prose_core_client::domain::shared::models::Availability;
+use prose_core_client::domain::shared::models::{Availability, UserId};
 use prose_core_client::domain::user_info::models::UserInfo;
 use prose_core_client::domain::user_profiles::models::UserProfile;
 use prose_core_client::test::MockAppDependencies;
-use prose_xmpp::bare;
+use prose_core_client::user_id;
 
 #[tokio::test]
 async fn test_assembles_contact_dto() -> Result<()> {
@@ -21,17 +21,17 @@ async fn test_assembles_contact_dto() -> Result<()> {
         Box::pin(async {
             Ok(vec![
                 Contact {
-                    jid: bare!("a@prose.org"),
+                    id: user_id!("a@prose.org"),
                     name: None,
                     group: Group::Favorite,
                 },
                 Contact {
-                    jid: bare!("b@prose.org"),
+                    id: user_id!("b@prose.org"),
                     name: Some("Contact B".to_string()),
                     group: Group::Team,
                 },
                 Contact {
-                    jid: bare!("john.doe@prose.org"),
+                    id: user_id!("john.doe@prose.org"),
                     name: None,
                     group: Group::Team,
                 },
@@ -44,17 +44,17 @@ async fn test_assembles_contact_dto() -> Result<()> {
         .times(3)
         .returning(|jid| {
             let info = match &jid {
-                _ if jid == &bare!("a@prose.org") => Some(UserInfo {
+                _ if jid == &user_id!("a@prose.org") => Some(UserInfo {
                     avatar: None,
                     activity: None,
                     availability: Availability::Available,
                 }),
-                _ if jid == &bare!("b@prose.org") => Some(UserInfo {
+                _ if jid == &user_id!("b@prose.org") => Some(UserInfo {
                     avatar: None,
                     activity: None,
                     availability: Availability::Available,
                 }),
-                _ if jid == &bare!("john.doe@prose.org") => None,
+                _ if jid == &user_id!("john.doe@prose.org") => None,
                 _ => unreachable!(),
             };
 
@@ -68,14 +68,14 @@ async fn test_assembles_contact_dto() -> Result<()> {
             let mut profile = UserProfile::default();
 
             match &jid {
-                _ if jid == &bare!("a@prose.org") => {
+                _ if jid == &user_id!("a@prose.org") => {
                     profile.first_name = Some("First".to_string());
                     profile.last_name = Some("Last".to_string());
                 }
-                _ if jid == &bare!("b@prose.org") => {
+                _ if jid == &user_id!("b@prose.org") => {
                     profile.nickname = Some("Nickname".to_string());
                 }
-                _ if jid == &bare!("john.doe@prose.org") => (),
+                _ if jid == &user_id!("john.doe@prose.org") => (),
                 _ => unreachable!(),
             };
 
@@ -89,24 +89,24 @@ async fn test_assembles_contact_dto() -> Result<()> {
         contacts,
         vec![
             ContactDTO {
-                jid: bare!("a@prose.org"),
+                id: user_id!("a@prose.org"),
                 name: "First Last".to_string(),
                 availability: Availability::Available,
-                activity: None,
+                status: None,
                 group: Group::Favorite,
             },
             ContactDTO {
-                jid: bare!("b@prose.org"),
+                id: user_id!("b@prose.org"),
                 name: "Nickname".to_string(),
                 availability: Availability::Available,
-                activity: None,
+                status: None,
                 group: Group::Team,
             },
             ContactDTO {
-                jid: bare!("john.doe@prose.org"),
+                id: user_id!("john.doe@prose.org"),
                 name: "John Doe".to_string(),
                 availability: Availability::Unavailable,
-                activity: None,
+                status: None,
                 group: Group::Team,
             }
         ]

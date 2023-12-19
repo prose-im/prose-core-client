@@ -73,6 +73,10 @@ impl Module for MUC {
             return Ok(());
         };
 
+        if stanza.type_ != MessageType::Normal {
+            return Ok(());
+        }
+
         if let Some(direct_invite) = stanza.direct_invite() {
             self.ctx
                 .schedule_event(ClientEvent::MUC(Event::DirectInvite {
@@ -258,11 +262,15 @@ impl MUC {
 
     /// Destroys a room.
     /// https://xmpp.org/extensions/xep-0045.html#destroyroom
-    pub async fn destroy_room(&self, jid: &BareJid) -> Result<()> {
+    pub async fn destroy_room(
+        &self,
+        jid: &BareJid,
+        alternate_room: Option<&BareJid>,
+    ) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             Query::new(Role::Owner).with_payload(Destroy {
-                jid: None,
+                jid: alternate_room.cloned(),
                 reason: None,
             }),
         )

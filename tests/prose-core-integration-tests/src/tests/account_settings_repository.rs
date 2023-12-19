@@ -7,9 +7,9 @@ use anyhow::Result;
 
 use prose_core_client::domain::settings::models::AccountSettings;
 use prose_core_client::domain::settings::repos::AccountSettingsRepository as DomainAccountSettingsRepository;
-use prose_core_client::domain::shared::models::Availability;
+use prose_core_client::domain::shared::models::{Availability, UserId};
 use prose_core_client::infra::settings::AccountSettingsRepository;
-use prose_xmpp::bare;
+use prose_core_client::user_id;
 
 use crate::tests::{async_test, store};
 
@@ -18,12 +18,12 @@ async fn test_save_and_load_account_settings() -> Result<()> {
     let repo = AccountSettingsRepository::new(store().await?);
 
     assert_eq!(
-        repo.get(&bare!("a@prose.org")).await?,
+        repo.get(&user_id!("a@prose.org")).await?,
         AccountSettings::default()
     );
 
     repo.update(
-        &bare!("a@prose.org"),
+        &user_id!("a@prose.org"),
         Box::new(|settings: &mut AccountSettings| {
             settings.availability = Some(Availability::Away);
         }),
@@ -36,9 +36,9 @@ async fn test_save_and_load_account_settings() -> Result<()> {
     };
     assert_ne!(expected_settings, AccountSettings::default());
 
-    assert_eq!(repo.get(&bare!("a@prose.org")).await?, expected_settings);
+    assert_eq!(repo.get(&user_id!("a@prose.org")).await?, expected_settings);
     assert_eq!(
-        repo.get(&bare!("b@prose.org")).await?,
+        repo.get(&user_id!("b@prose.org")).await?,
         AccountSettings::default()
     );
 

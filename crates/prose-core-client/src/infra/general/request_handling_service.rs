@@ -7,34 +7,34 @@ use std::fmt::{Display, Formatter};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use jid::{BareJid, Jid};
 use xmpp_parsers::version::VersionResult;
 
 use prose_xmpp::mods;
 
 use crate::domain::general::models::{Capabilities, Feature, Identity, SoftwareVersion};
 use crate::domain::general::services::{RequestHandlingService, SubscriptionResponse};
+use crate::domain::shared::models::{RequestId, SenderId};
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RequestHandlingService for XMPPClient {
-    async fn respond_to_ping(&self, to: &Jid, id: &str) -> anyhow::Result<()> {
+    async fn respond_to_ping(&self, to: &SenderId, id: &RequestId) -> anyhow::Result<()> {
         let ping = self.client.get_mod::<mods::Ping>();
-        ping.send_pong(to.clone(), id).await?;
+        ping.send_pong(to.clone().into_inner(), id.as_ref()).await?;
         Ok(())
     }
 
     async fn respond_to_disco_info_query(
         &self,
-        to: &Jid,
-        id: &str,
+        to: &SenderId,
+        id: &RequestId,
         capabilities: &Capabilities,
     ) -> anyhow::Result<()> {
         let caps = self.client.get_mod::<mods::Caps>();
         caps.send_disco_info_query_response(
-            to.clone(),
-            id.to_string(),
+            to.clone().into_inner(),
+            id.as_ref().to_string(),
             (&capabilities.clone()).into(),
         )
         .await?;
@@ -43,55 +43,70 @@ impl RequestHandlingService for XMPPClient {
 
     async fn respond_to_entity_time_request(
         &self,
-        to: &Jid,
-        id: &str,
+        to: &SenderId,
+        id: &RequestId,
         now: &DateTime<Utc>,
     ) -> anyhow::Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile
-            .send_entity_time_response(now.clone().into(), to.clone(), id)
+            .send_entity_time_response(now.clone().into(), to.clone().into_inner(), id.as_ref())
             .await?;
         Ok(())
     }
 
     async fn respond_to_software_version_request(
         &self,
-        to: &Jid,
-        id: &str,
+        to: &SenderId,
+        id: &RequestId,
         version: &SoftwareVersion,
     ) -> anyhow::Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile
-            .send_software_version_response(version.clone().into(), to.clone(), id)
+            .send_software_version_response(
+                version.clone().into(),
+                to.clone().into_inner(),
+                id.as_ref(),
+            )
             .await?;
         Ok(())
     }
 
     async fn respond_to_last_activity_request(
         &self,
-        to: &Jid,
-        id: &str,
+        to: &SenderId,
+        id: &RequestId,
         last_active_seconds_ago: u64,
     ) -> anyhow::Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile
-            .send_last_activity_response(last_active_seconds_ago, None, to.clone(), id)
+            .send_last_activity_response(
+                last_active_seconds_ago,
+                None,
+                to.clone().into_inner(),
+                id.as_ref(),
+            )
             .await?;
         Ok(())
     }
 
     async fn respond_to_presence_subscription_request(
         &self,
-        to: &BareJid,
+        to: &SenderId,
         response: SubscriptionResponse,
     ) -> anyhow::Result<()> {
         let roster_mod = self.client.get_mod::<mods::Roster>();
 
         match response {
             SubscriptionResponse::Approve => {
-                roster_mod.approve_presence_subscription_request(to).await?
+                roster_mod
+                    .approve_presence_subscription_request(&to.clone().into_inner().into_bare())
+                    .await?
             }
-            SubscriptionResponse::Deny => roster_mod.deny_presence_subscription_request(to).await?,
+            SubscriptionResponse::Deny => {
+                roster_mod
+                    .deny_presence_subscription_request(&to.clone().into_inner().into_bare())
+                    .await?
+            }
         }
 
         Ok(())

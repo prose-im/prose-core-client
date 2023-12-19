@@ -21,9 +21,6 @@ async fn main() -> Result<()> {
 
     let client = Client::builder()
         .set_connector_provider(Connector::provider())
-        .add_mod(Chat::default())
-        .add_mod(Profile::default())
-        .add_mod(Status::default())
         .set_event_handler(|client, event| handle_event(client, event).map(|f| f.unwrap()))
         .build();
 
@@ -35,7 +32,7 @@ async fn main() -> Result<()> {
 
     client
         .get_mod::<Status>()
-        .send_presence(Some(Show::Chat), None, None)?;
+        .send_presence(Some(Show::Chat), None, None, None)?;
 
     tokio::select! {
         _ = tokio::signal::ctrl_c() => {

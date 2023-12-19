@@ -25,7 +25,7 @@ async fn test_set_availability_updates_settings() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(mock_data::account_jid().into_bare()),
+            predicate::eq(mock_data::account_jid().into_user_id()),
             predicate::always(),
         )
         .return_once(|_, f| {

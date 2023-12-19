@@ -5,11 +5,11 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::DynUserInfoService;
+use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 use crate::domain::user_info::repos::AvatarRepository as DomainAvatarRepository;
 use crate::infra::avatars::AvatarCache;
@@ -33,7 +33,7 @@ impl CachingAvatarRepository {
 impl DomainAvatarRepository for CachingAvatarRepository {
     async fn precache_avatar_image(
         &self,
-        user_jid: &BareJid,
+        user_jid: &UserId,
         info: &AvatarInfo,
     ) -> anyhow::Result<()> {
         if self
@@ -60,7 +60,7 @@ impl DomainAvatarRepository for CachingAvatarRepository {
 
     async fn get(
         &self,
-        user_id: &BareJid,
+        user_id: &UserId,
         info: &AvatarInfo,
     ) -> anyhow::Result<Option<PlatformImage>> {
         self.precache_avatar_image(user_id, info).await?;
@@ -73,7 +73,7 @@ impl DomainAvatarRepository for CachingAvatarRepository {
 
     async fn set(
         &self,
-        user_jid: &BareJid,
+        user_jid: &UserId,
         info: &AvatarInfo,
         image: &AvatarData,
     ) -> anyhow::Result<()> {

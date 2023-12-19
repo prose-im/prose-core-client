@@ -3,12 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::BareJid;
-
 use prose_xmpp::ConnectionError;
 
 use crate::app::services::RoomEnvelope;
 use crate::domain::messaging::models::MessageId;
+use crate::domain::shared::models::UserId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ClientEvent {
@@ -19,19 +18,19 @@ pub enum ClientEvent {
     SidebarChanged,
 
     /// Infos about a contact have changed.
-    ContactChanged { jid: BareJid },
+    ContactChanged { id: UserId },
 
     /// The avatar of a user changed.
-    AvatarChanged { jid: BareJid },
+    AvatarChanged { id: UserId },
 
     RoomChanged {
         room: RoomEnvelope,
-        r#type: RoomEventType,
+        r#type: ClientRoomEventType,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum RoomEventType {
+pub enum ClientRoomEventType {
     /// One or many messages were either received or sent.
     MessagesAppended { message_ids: Vec<MessageId> },
 
@@ -43,6 +42,9 @@ pub enum RoomEventType {
 
     /// Attributes changed like name or topic.
     AttributesChanged,
+
+    /// The list of participants has changed.
+    ParticipantsChanged,
 
     /// A user in `conversation` started or stopped typing.
     ComposingUsersChanged,

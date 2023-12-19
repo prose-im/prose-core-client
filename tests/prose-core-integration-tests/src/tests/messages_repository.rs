@@ -7,11 +7,11 @@ use anyhow::Result;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::messaging::repos::MessagesRepository;
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
-use prose_core_client::room;
 use prose_core_client::test::MessageBuilder;
-use prose_xmpp::{bare, jid};
+use prose_core_client::{room_id, user_id};
+use prose_xmpp::jid;
 
 use crate::tests::{async_test, store};
 
@@ -19,7 +19,7 @@ use crate::tests::{async_test, store};
 async fn test_can_insert_same_message_twice() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room!("a@prose.org");
+    let room_id = room_id!("a@prose.org");
     let message = MessageBuilder::new_with_index(123).build_message_like();
 
     repo.append(&room_id, &[&message]).await?;
@@ -38,7 +38,7 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
 async fn test_loads_message_with_reactions() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room!("a@prose.org");
+    let room_id = room_id!("a@prose.org");
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(3)
@@ -48,8 +48,8 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     repo.append(&room_id, &[&message1, &message2]).await?;
 
     let mut message = MessageBuilder::new_with_index(1).build_message();
-    message.toggle_reaction(&bare!("b@prose.org"), "🍿".into());
-    message.toggle_reaction(&bare!("b@prose.org"), "📼".into());
+    message.toggle_reaction(&user_id!("b@prose.org"), "🍿".into());
+    message.toggle_reaction(&user_id!("b@prose.org"), "📼".into());
 
     assert_eq!(
         repo.get_all(&room_id, &[&MessageBuilder::id_for_index(1)])
@@ -64,7 +64,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
 async fn test_load_messages_targeting() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room!("a@prose.org");
+    let room_id = room_id!("a@prose.org");
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(2).build_message_like();

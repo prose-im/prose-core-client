@@ -5,13 +5,13 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_store::prelude::*;
 use prose_store::RawKey;
 use prose_xmpp::mods::AvatarData;
 
 use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
+use crate::dtos::UserId;
 use crate::infra::avatars::AvatarCache;
 
 pub struct StoreAvatarCache {
@@ -42,7 +42,7 @@ impl KeyType for AvatarImageId {
 impl AvatarCache for StoreAvatarCache {
     async fn cache_avatar_image(
         &self,
-        _jid: &BareJid,
+        _jid: &UserId,
         image: &AvatarData,
         metadata: &AvatarInfo,
     ) -> Result<()> {
@@ -62,7 +62,7 @@ impl AvatarCache for StoreAvatarCache {
 
     async fn has_cached_avatar_image(
         &self,
-        _jid: &BareJid,
+        _jid: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<bool> {
         let tx = self
@@ -76,7 +76,7 @@ impl AvatarCache for StoreAvatarCache {
 
     async fn cached_avatar_image(
         &self,
-        _jid: &BareJid,
+        _jid: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<Option<PlatformImage>> {
         let tx = self

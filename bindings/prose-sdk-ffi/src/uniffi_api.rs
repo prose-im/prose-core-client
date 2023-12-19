@@ -10,7 +10,7 @@ pub use std::path::PathBuf;
 pub use jid::{BareJid, Error as JidParseError, FullJid};
 
 pub use prose_core_client::dtos::{
-    Address, Availability, Emoji, MessageId, StanzaId, Url, UserActivity, UserProfile,
+    Address, Availability, Emoji, MessageId, StanzaId, Url, UserProfile, UserStatus,
 };
 pub use prose_core_client::ConnectionEvent;
 pub use prose_xmpp::ConnectionError;

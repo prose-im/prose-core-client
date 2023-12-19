@@ -50,7 +50,7 @@ impl From<(&BareJid, Item)> for Contact {
         };
 
         Contact {
-            jid: roster_item.jid,
+            id: roster_item.jid.into(),
             name: roster_item.name,
             group,
         }

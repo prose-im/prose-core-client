@@ -12,7 +12,7 @@ use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider}
 use crate::app::deps::{AppContext, AppDependencies};
 use crate::app::event_handlers::{
     BookmarksEventHandler, ClientEventDispatcher, ConnectionEventHandler, MessagesEventHandler,
-    RequestsEventHandler, RoomsEventHandler, UserStateEventHandler, XMPPEventHandlerQueue,
+    RequestsEventHandler, RoomsEventHandler, ServerEventHandlerQueue, UserStateEventHandler,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
@@ -154,7 +154,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             ],
         );
 
-        let handler_queue = Arc::new(XMPPEventHandlerQueue::new());
+        let handler_queue = Arc::new(ServerEventHandlerQueue::new());
 
         let xmpp_client = Arc::new(
             {

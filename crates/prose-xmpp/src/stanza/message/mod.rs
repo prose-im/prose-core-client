@@ -19,6 +19,7 @@ pub mod fasten;
 mod forwarding;
 pub mod mam;
 mod message;
+mod muc_invite;
 mod muc_user;
 mod reactions;
 pub mod retract;

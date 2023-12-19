@@ -7,32 +7,51 @@ use std::sync::OnceLock;
 
 use tracing::error;
 
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
+use prose_xmpp::Event as XMPPEvent;
 
-pub struct XMPPEventHandlerQueue {
-    handlers: OnceLock<Vec<Box<dyn XMPPEventHandler>>>,
+use crate::app::event_handlers::{ServerEvent, ServerEventHandler};
+use crate::infra::xmpp::event_parser::parse_xmpp_event;
+
+pub struct ServerEventHandlerQueue {
+    handlers: OnceLock<Vec<Box<dyn ServerEventHandler>>>,
 }
 
-impl XMPPEventHandlerQueue {
+impl ServerEventHandlerQueue {
     pub fn new() -> Self {
         Self {
             handlers: Default::default(),
         }
     }
 
-    pub fn set_handlers(&self, handlers: Vec<Box<dyn XMPPEventHandler>>) {
+    pub fn set_handlers(&self, handlers: Vec<Box<dyn ServerEventHandler>>) {
         self.handlers
             .set(handlers)
             .map_err(|_| ())
-            .expect("Tried to applied handlers XMPPEventHandlerQueue more than once");
+            .expect("Tried to applied handlers ServerEventHandlerQueue more than once");
     }
 
     pub async fn handle_event(&self, event: XMPPEvent) {
+        let events = match parse_xmpp_event(event) {
+            Ok(event) => event,
+            Err(err) => {
+                error!("Failed to parse XMPP event. Reason: {}", err.to_string());
+                return;
+            }
+        };
+
+        for event in events {
+            self.handle_server_event(event).await
+        }
+    }
+}
+
+impl ServerEventHandlerQueue {
+    async fn handle_server_event(&self, event: ServerEvent) {
         let mut event = event;
         let handlers = self
             .handlers
             .get()
-            .expect("Handlers were not set in XMPPEventHandlerQueue");
+            .expect("Handlers were not set in ServerEventHandlerQueue");
 
         for handler in handlers.iter() {
             match handler.handle_event(event).await {

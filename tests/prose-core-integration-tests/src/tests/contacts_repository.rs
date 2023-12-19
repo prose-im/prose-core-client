@@ -10,8 +10,9 @@ use anyhow::Result;
 use prose_core_client::domain::contacts::models::{Contact, Group};
 use prose_core_client::domain::contacts::repos::ContactsRepository;
 use prose_core_client::domain::contacts::services::mocks::MockContactsService;
+use prose_core_client::domain::shared::models::UserId;
 use prose_core_client::infra::contacts::CachingContactsRepository;
-use prose_xmpp::bare;
+use prose_core_client::user_id;
 
 use crate::tests::async_test;
 
@@ -19,12 +20,12 @@ use crate::tests::async_test;
 async fn test_loads_and_caches_contacts() -> Result<()> {
     let contacts = vec![
         Contact {
-            jid: bare!("a@prose.org"),
+            id: user_id!("a@prose.org"),
             name: None,
             group: Group::Favorite,
         },
         Contact {
-            jid: bare!("b@prose.org"),
+            id: user_id!("b@prose.org"),
             name: None,
             group: Group::Team,
         },
@@ -41,8 +42,14 @@ async fn test_loads_and_caches_contacts() -> Result<()> {
     };
 
     let repo = CachingContactsRepository::new(Arc::new(service));
-    assert_eq!(repo.get_all(&bare!("account@prose.org")).await?, contacts);
-    assert_eq!(repo.get_all(&bare!("account@prose.org")).await?, contacts);
+    assert_eq!(
+        repo.get_all(&user_id!("account@prose.org")).await?,
+        contacts
+    );
+    assert_eq!(
+        repo.get_all(&user_id!("account@prose.org")).await?,
+        contacts
+    );
 
     Ok(())
 }

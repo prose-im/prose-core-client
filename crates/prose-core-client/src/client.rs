@@ -7,12 +7,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use anyhow::Result;
-use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
 
 use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore};
+use crate::domain::shared::models::UserId;
 use crate::services::{
     AccountService, CacheService, ConnectionService, ContactsService, RoomsService, SidebarService,
     UserDataService,
@@ -63,10 +63,10 @@ impl Deref for Client {
 impl Client {
     pub async fn connect(
         &self,
-        jid: &BareJid,
+        id: &UserId,
         password: impl AsRef<str>,
     ) -> Result<(), ConnectionError> {
-        self.connection.connect(jid, password).await
+        self.connection.connect(id, password).await
     }
 
     pub async fn disconnect(&self) {

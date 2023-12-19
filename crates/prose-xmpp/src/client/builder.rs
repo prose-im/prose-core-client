@@ -42,6 +42,17 @@ impl ClientBuilder {
             time_provider: Box::new(SystemTimeProvider::default()),
             event_handler: Box::new(|_, _| Box::pin(async {}) as PinnedFuture<_>),
         }
+        // Order matters…
+        .add_mod(mods::Bookmark2::default())
+        .add_mod(mods::Bookmark::default())
+        .add_mod(mods::Status::default())
+        .add_mod(mods::Caps::default())
+        .add_mod(mods::MUC::default())
+        .add_mod(mods::Chat::default())
+        .add_mod(mods::MAM::default())
+        .add_mod(mods::Profile::default())
+        .add_mod(mods::PubSub::default())
+        .add_mod(mods::Roster::default())
     }
 
     pub fn set_connector_provider(self, connector_provider: ConnectorProvider) -> Self {
@@ -73,12 +84,6 @@ impl ClientBuilder {
         }
     }
 
-    pub fn add_mod<M: AnyModule + Clone + 'static>(mut self, m: M) -> Self {
-        self.mods
-            .insert(TypeId::of::<M>(), RwLock::new(Box::new(m)));
-        self
-    }
-
     pub fn set_id_provider<P: IDProvider + 'static>(mut self, id_provider: P) -> Self {
         self.id_provider = Box::new(id_provider);
         self
@@ -91,10 +96,10 @@ impl ClientBuilder {
 
     pub fn build(self) -> Client {
         let mut mods = self.mods;
-        mods.insert(
+        mods.push((
             TypeId::of::<mods::Ping>(),
             RwLock::new(Box::new(mods::Ping::default())),
-        );
+        ));
 
         let mods = Arc::new(mods);
 
@@ -109,7 +114,7 @@ impl ClientBuilder {
             event_handler: self.event_handler,
         });
 
-        for m in mods.values() {
+        for (_, m) in mods.iter() {
             m.write().register_with(ModuleContext {
                 inner: context_inner.clone(),
             });
@@ -121,6 +126,14 @@ impl ClientBuilder {
                 context: context_inner,
             }),
         }
+    }
+}
+
+impl ClientBuilder {
+    fn add_mod<M: AnyModule + Clone + 'static>(mut self, m: M) -> Self {
+        self.mods
+            .push((TypeId::of::<M>(), RwLock::new(Box::new(m))));
+        self
     }
 }
 

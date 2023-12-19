@@ -6,13 +6,15 @@
 use anyhow::Result;
 use jid::Jid;
 use minidom::Element;
+use std::collections::HashSet;
+use std::sync::OnceLock;
 use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::disco::Item as DiscoItem;
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub::owner::Configure;
 use xmpp_parsers::pubsub::pubsub::{Item, Items, Notify, PublishOptions, Retract};
-use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName};
+use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName, PubSubEvent};
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
@@ -37,10 +39,31 @@ impl Module for PubSub {
     }
 
     fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
+        let Some(node) = pubsub.events.first().map(|event| event.node()) else {
+            return Ok(());
+        };
+
+        static IGNORED_PUBSUB_NODES: OnceLock<HashSet<&str>> = OnceLock::new();
+        let ignored_pubsub_nodes = IGNORED_PUBSUB_NODES.get_or_init(|| {
+            let mut m = HashSet::new();
+            m.insert(ns::AVATAR_METADATA);
+            m.insert(ns::BOOKMARKS);
+            m.insert(ns::BOOKMARKS2);
+            m.insert(ns::USER_ACTIVITY);
+            m.insert(ns::VCARD4);
+            m
+        });
+
+        // Ignore nodes that are handled in other modules…
+        if ignored_pubsub_nodes.contains(node.0.as_str()) {
+            return Ok(());
+        }
+
         self.ctx
             .schedule_event(ClientEvent::PubSub(Event::PubSubMessage {
                 message: pubsub.clone(),
             }));
+
         Ok(())
     }
 }
@@ -275,5 +298,22 @@ impl PubSub {
         };
 
         Ok(sub)
+    }
+}
+
+trait PubSubEventExt {
+    fn node(&self) -> &NodeName;
+}
+
+impl PubSubEventExt for PubSubEvent {
+    fn node(&self) -> &NodeName {
+        match self {
+            PubSubEvent::Configuration { node, .. } => node,
+            PubSubEvent::Delete { node, .. } => node,
+            PubSubEvent::PublishedItems { node, .. } => node,
+            PubSubEvent::RetractedItems { node, .. } => node,
+            PubSubEvent::Purge { node, .. } => node,
+            PubSubEvent::Subscription { node, .. } => node,
+        }
     }
 }

@@ -3,28 +3,32 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::{BareJid, Jid};
-use tracing::{error, info, warn};
-use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::message::MessageType;
-use xmpp_parsers::muc::MucUser;
-use xmpp_parsers::presence::Presence;
+use tracing::info;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::mods::{bookmark, bookmark2, chat, muc, status};
-use prose_xmpp::{ns, Event};
+use prose_xmpp::TimeProvider;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
+    DynSidebarDomainService, DynTimeProvider, DynUserInfoRepository, DynUserProfileRepository,
 };
-use crate::app::event_handlers::{XMPPEvent, XMPPEventHandler};
-use crate::client_event::RoomEventType;
+use crate::app::event_handlers::ServerEventHandler;
+use crate::app::event_handlers::{
+    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent, UserStatusEvent,
+    UserStatusEventType,
+};
+use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
+use crate::domain::rooms::models::RoomInternals;
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::{ParticipantId, RoomId};
+use crate::domain::user_info::models::Presence;
+use crate::dtos::Availability;
+use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct RoomsEventHandler {
@@ -40,179 +44,267 @@ pub struct RoomsEventHandler {
     time_provider: DynTimeProvider,
     #[inject]
     user_profile_repo: DynUserProfileRepository,
+    #[inject]
+    user_info_repo: DynUserInfoRepository,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl XMPPEventHandler for RoomsEventHandler {
+impl ServerEventHandler for RoomsEventHandler {
     fn name(&self) -> &'static str {
         "rooms"
     }
 
-    async fn handle_event(&self, event: XMPPEvent) -> Result<Option<XMPPEvent>> {
+    async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
-            Event::Status(event) => match event {
-                status::Event::Presence(presence) => {
-                    self.presence_did_change(presence).await?;
-                    Ok(None)
-                }
-                _ => Ok(Some(Event::Status(event))),
-            },
-            Event::Chat(event) => match event {
-                chat::Event::ChatStateChanged {
-                    from,
-                    chat_state,
-                    message_type,
-                } => {
-                    self.handle_changed_chat_state(from, chat_state, message_type)
-                        .await?;
-                    Ok(None)
-                }
-                _ => Ok(Some(Event::Chat(event))),
-            },
-            Event::MUC(event) => match event {
-                muc::Event::DirectInvite {
-                    from: _from,
-                    invite,
-                } => {
-                    self.handle_invite(invite.jid, invite.password).await?;
-                    Ok(None)
-                }
-                muc::Event::MediatedInvite { from, invite } => {
-                    self.handle_invite(from.to_bare(), invite.password).await?;
-                    Ok(None)
-                }
-            },
-            Event::Bookmark(event) => match event {
-                bookmark::Event::BookmarksChanged {
-                    bookmarks: _bookmarks,
-                } => {
-                    // TODO: Handle changed bookmarks
-                    Ok(None)
-                }
-            },
-            Event::Bookmark2(event) => match event {
-                bookmark2::Event::BookmarksPublished {
-                    bookmarks: _bookmarks,
-                } => {
-                    // TODO: Handle changed bookmarks
-                    Ok(None)
-                }
-                bookmark2::Event::BookmarksRetracted { jids: _jids } => {
-                    // TODO: Handle changed bookmarks
-                    Ok(None)
-                }
-            },
-            _ => Ok(Some(event)),
+            ServerEvent::Occupant(event) => {
+                self.handle_occupant_event(event).await?;
+            }
+            ServerEvent::Room(event) => {
+                self.handle_room_event(event).await?;
+            }
+            ServerEvent::UserStatus(event) => self.handle_user_status_event(event).await?,
+            _ => return Ok(Some(event)),
         }
+        Ok(None)
     }
 }
 
 impl RoomsEventHandler {
-    async fn presence_did_change(&self, presence: Presence) -> Result<()> {
-        let Some(from) = presence.from else {
-            error!(
-                "Received presence from unknown user. {}",
-                String::from(&minidom::Element::from(presence))
-            );
-            return Ok(());
+    fn get_room(&self, jid: &RoomId) -> Result<Arc<RoomInternals>> {
+        self.connected_rooms_repo
+            .get(jid)
+            .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))
+    }
+
+    async fn handle_occupant_event(&self, event: OccupantEvent) -> Result<()> {
+        let room = self.get_room(&event.occupant_id.room_id())?;
+        let participant_id = ParticipantId::Occupant(event.occupant_id.clone());
+
+        let participants_changed = match event.r#type {
+            OccupantEventType::AffiliationChanged { affiliation } => 'outer: {
+                let mut participants_changed = false;
+
+                {
+                    let mut participants = room.participants_mut();
+                    if participants.get(&participant_id).map(|p| &p.affiliation)
+                        != Some(&affiliation)
+                    {
+                        participants_changed = true;
+                        participants.set_affiliation(&participant_id, event.is_self, &affiliation);
+                    }
+                }
+
+                // Let's see if we knew the real id of the participant already, if not let's
+                // look up their name…
+                let (Some(real_id), Some(participant)) = (
+                    event.real_id,
+                    room.participants().get(&participant_id).cloned(),
+                ) else {
+                    break 'outer participants_changed;
+                };
+
+                if participant.real_id.is_some() {
+                    // Real id was known already…
+                    break 'outer participants_changed;
+                }
+
+                let name = self.user_profile_repo.get_display_name(&real_id).await?;
+                room.participants_mut().set_ids_and_name(
+                    &participant_id,
+                    Some(&real_id),
+                    event.anon_occupant_id.as_ref(),
+                    name.as_deref(),
+                );
+
+                true
+            }
+            OccupantEventType::DisconnectedByServer => {
+                room.participants_mut().set_availability(
+                    &participant_id,
+                    event.is_self,
+                    &Availability::Unavailable,
+                );
+
+                if event.is_self {
+                    self.sidebar_domain_service
+                        .handle_removal_from_room(&event.occupant_id.room_id(), false)
+                        .await?;
+                }
+
+                true
+            }
+            OccupantEventType::PermanentlyRemoved => 'outer: {
+                room.participants_mut().remove(&participant_id);
+
+                if event.is_self {
+                    self.sidebar_domain_service
+                        .handle_removal_from_room(&event.occupant_id.room_id(), true)
+                        .await?;
+                    // A SidebarChanged event will be sent instead
+                    break 'outer false;
+                }
+
+                true
+            }
         };
 
-        let from = from;
-        let bare_from = RoomJid::from(from.to_bare());
-
-        // Ignore presences that were sent by us. We don't have a room for the logged-in user.
-        if *bare_from == self.ctx.connected_jid()?.into_bare() {
-            return Ok(());
+        if participants_changed {
+            self.client_event_dispatcher
+                .dispatch_room_event(room, ClientRoomEventType::ParticipantsChanged);
         }
 
-        let Some(room) = self.connected_rooms_repo.get(&bare_from) else {
-            warn!(
-                "Received presence from user ({}) for which we do not have a room.",
-                from
-            );
-            return Ok(());
-        };
+        Ok(())
+    }
 
-        let Some(muc_user) = presence
-            .payloads
-            .into_iter()
-            .filter_map(|payload| {
-                if !payload.is("x", ns::MUC_USER) {
-                    return None;
+    async fn handle_room_event(&self, event: RoomEvent) -> Result<()> {
+        match event.r#type {
+            RoomEventType::Destroyed { replacement } => {
+                info!(
+                    "Room {} was destroyed. Alternative is {:?}",
+                    event.room_id, replacement
+                );
+                self.sidebar_domain_service
+                    .handle_destroyed_room(&event.room_id, replacement)
+                    .await?;
+            }
+            RoomEventType::RoomConfigChanged => {
+                info!("Config changed for room {}.", event.room_id);
+                self.sidebar_domain_service
+                    .handle_changed_room_config(&event.room_id)
+                    .await?;
+            }
+            RoomEventType::RoomTopicChanged { new_topic } => {
+                info!(
+                    "Updating topic of room {} to '{:?}'",
+                    event.room_id, new_topic
+                );
+
+                let room = self.get_room(&event.room_id)?;
+                if room.topic() != new_topic {
+                    room.set_topic(new_topic);
+                    self.client_event_dispatcher
+                        .dispatch_room_event(room, ClientRoomEventType::AttributesChanged)
                 }
-                MucUser::try_from(payload).ok()
-            })
-            .take(1)
-            .next()
-        else {
-            return Ok(());
-        };
+            }
+            RoomEventType::ReceivedInvitation { sender, password } => {
+                info!(
+                    "Joining room {} after receiving invitation from {sender}…",
+                    event.room_id
+                );
+                self.sidebar_domain_service
+                    .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
+                        room_jid: event.room_id,
+                        password,
+                    })
+                    .await?;
+            }
+            RoomEventType::UserAdded {
+                user_id,
+                affiliation,
+                reason,
+            } => {
+                info!(
+                    "User {user_id} was added to room {} via invitation. Reason: {}",
+                    event.room_id,
+                    reason.as_deref().unwrap_or("<no reason>")
+                );
 
-        // Let's try to pull out the real jid of our user…
-        let Some((jid, affiliation)) = muc_user
-            .items
-            .into_iter()
-            .filter_map(|item| item.jid.map(|jid| (jid, item.affiliation)))
-            .take(1)
-            .next()
-        else {
-            return Ok(());
-        };
+                let room = self.get_room(&event.room_id)?;
 
-        info!("Received real jid for {}: {}", from, jid);
+                let name = self.user_profile_repo.get_display_name(&user_id).await?;
+                room.participants_mut()
+                    .add_user(&user_id, false, &affiliation, name.as_deref());
 
-        let bare_jid = jid.into_bare();
-        let name = self.user_profile_repo.get_display_name(&bare_jid).await?;
-
-        room.insert_occupant(&from, Some(&bare_jid), name.as_deref(), &affiliation);
-
-        Ok(())
-    }
-
-    async fn handle_invite(&self, room_jid: BareJid, password: Option<String>) -> Result<()> {
-        info!("Joining room {} after receiving invite…", room_jid);
-
-        self.sidebar_domain_service
-            .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                room_jid: RoomJid::from(room_jid),
-                password,
-            })
-            .await?;
+                self.client_event_dispatcher
+                    .dispatch_room_event(room, ClientRoomEventType::ParticipantsChanged);
+            }
+        }
 
         Ok(())
     }
 
-    pub async fn handle_changed_chat_state(
-        &self,
-        from: Jid,
-        chat_state: ChatState,
-        message_type: MessageType,
-    ) -> Result<()> {
-        let bare_from = RoomJid::from(from.to_bare());
+    async fn handle_user_status_event(&self, event: UserStatusEvent) -> Result<()> {
+        let is_self_event =
+            event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id());
 
-        let Some(room) = self.connected_rooms_repo.get(&bare_from) else {
-            error!("Received chat state from sender for which we do not have a room.");
-            return Ok(());
-        };
+        match event.r#type {
+            UserStatusEventType::AvailabilityChanged {
+                availability,
+                priority,
+            } => {
+                let mut room_changed = false;
 
-        let jid = if message_type == MessageType::Groupchat {
-            from
-        } else {
-            Jid::Bare(bare_from.into_inner())
-        };
-        let now = self.time_provider.now();
+                // If we have a room, update it…
+                if let Ok(room) = self.get_room(&event.user_id.to_room_id()) {
+                    let participant_id = event.user_id.to_participant_id();
+                    room.participants_mut().set_availability(
+                        &participant_id,
+                        is_self_event,
+                        &availability,
+                    );
+                    room_changed = true;
+                };
 
-        room.set_occupant_chat_state(&jid, &now, chat_state);
+                // if we do not have a room and the event is from a contact, we'll still want
+                // to update our repo…
+                let Some(id) = event.user_id.to_user_or_resource_id() else {
+                    return Ok(());
+                };
 
-        self.client_event_dispatcher
-            .dispatch_room_event(room, RoomEventType::ComposingUsersChanged);
+                self.user_info_repo
+                    .set_user_presence(
+                        &id,
+                        &Presence {
+                            priority,
+                            availability,
+                            status: None,
+                        },
+                    )
+                    .await?;
+
+                // We won't send an event for our own availability…
+                if is_self_event {
+                    return Ok(());
+                }
+
+                self.client_event_dispatcher
+                    .dispatch_event(ClientEvent::ContactChanged {
+                        id: id.to_user_id(),
+                    });
+
+                if room_changed {
+                    self.client_event_dispatcher
+                        .dispatch_event(ClientEvent::SidebarChanged)
+                }
+            }
+            UserStatusEventType::ComposeStateChanged { state } => {
+                let Ok(room) = self.get_room(&event.user_id.to_room_id()) else {
+                    return Ok(());
+                };
+                let participant_id = event.user_id.to_participant_id();
+
+                room.participants_mut().set_compose_state(
+                    &participant_id,
+                    &self.time_provider.now(),
+                    state,
+                );
+
+                // We won't send an event for our own compose state…
+                if is_self_event {
+                    return Ok(());
+                }
+
+                self.client_event_dispatcher
+                    .dispatch_room_event(room, ClientRoomEventType::ComposingUsersChanged);
+            }
+        }
 
         Ok(())
     }
 }
 
-impl From<&MessageLike> for RoomEventType {
+impl From<&MessageLike> for ClientRoomEventType {
     fn from(message: &MessageLike) -> Self {
         if let Some(ref target) = message.target {
             if message.payload == MessageLikePayload::Retraction {

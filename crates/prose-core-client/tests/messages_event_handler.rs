@@ -9,36 +9,39 @@ use anyhow::Result;
 use mockall::predicate;
 use xmpp_parsers::message::MessageType;
 
-use prose_core_client::app::event_handlers::{MessagesEventHandler, XMPPEvent, XMPPEventHandler};
+use prose_core_client::app::event_handlers::{
+    MessageEvent, MessageEventType, MessagesEventHandler, ServerEvent, ServerEventHandler,
+};
 use prose_core_client::domain::rooms::models::RoomInternals;
 use prose_core_client::domain::rooms::services::CreateOrEnterRoomRequest;
-use prose_core_client::domain::shared::models::RoomJid;
+use prose_core_client::domain::shared::models::{RoomId, UserId};
+use prose_core_client::dtos::Availability;
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::{room, RoomEventType};
-use prose_xmpp::mods::chat;
+use prose_core_client::{room_id, user_id, ClientRoomEventType};
+use prose_xmpp::jid;
 use prose_xmpp::stanza::Message;
-use prose_xmpp::{bare, jid};
 
 #[tokio::test]
 async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room =
-        Arc::new(RoomInternals::group(room!("group@conference.prose.org")).with_name("Group Name"));
+    let room = Arc::new(
+        RoomInternals::group(room_id!("group@conference.prose.org")).with_name("Group Name"),
+    );
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("group@conference.prose.org")))
+            .with(predicate::eq(room_id!("group@conference.prose.org")))
             .return_once(|_| Some(room));
     }
 
     deps.sidebar_domain_service
         .expect_insert_item_for_received_message_if_needed()
         .once()
-        .with(predicate::eq(room!("group@conference.prose.org")))
+        .with(predicate::eq(room_id!("group@conference.prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
@@ -56,7 +59,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
         .once()
         .with(
             predicate::eq(room),
-            predicate::eq(RoomEventType::MessagesAppended {
+            predicate::eq(ClientRoomEventType::MessagesAppended {
                 message_ids: vec!["message-id".into()],
             }),
         )
@@ -64,12 +67,14 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
-        .handle_event(XMPPEvent::Chat(chat::Event::Message(
-            Message::default()
-                .set_id("message-id".into())
-                .set_from(jid!("group@conference.prose.org/jane.doe"))
-                .set_body("Hello World"),
-        )))
+        .handle_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Received(
+                Message::default()
+                    .set_id("message-id".into())
+                    .set_from(jid!("group@conference.prose.org/jane.doe"))
+                    .set_body("Hello World"),
+            ),
+        }))
         .await?;
 
     Ok(())
@@ -79,35 +84,38 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
 async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::direct_message(bare!("jane.doe@prose.org")));
+    let room = Arc::new(RoomInternals::direct_message(
+        user_id!("jane.doe@prose.org"),
+        &Availability::Unavailable,
+    ));
 
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(room!("jane.doe@prose.org")))
+        .with(predicate::eq(room_id!("jane.doe@prose.org")))
         .return_once(|_| None);
 
     deps.sidebar_domain_service
         .expect_insert_item_by_creating_or_joining_room()
         .once()
         .with(predicate::eq(CreateOrEnterRoomRequest::JoinDirectMessage {
-            participant: bare!("jane.doe@prose.org"),
+            participant: user_id!("jane.doe@prose.org"),
         }))
-        .return_once(|_| Box::pin(async { Ok(room!("jane.doe@prose.org")) }));
+        .return_once(|_| Box::pin(async { Ok(room_id!("jane.doe@prose.org")) }));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room!("jane.doe@prose.org")))
+            .with(predicate::eq(room_id!("jane.doe@prose.org")))
             .return_once(|_| Some(room));
     }
 
     deps.sidebar_domain_service
         .expect_insert_item_for_received_message_if_needed()
         .once()
-        .with(predicate::eq(room!("jane.doe@prose.org")))
+        .with(predicate::eq(room_id!("jane.doe@prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
@@ -125,7 +133,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
         .once()
         .with(
             predicate::eq(room),
-            predicate::eq(RoomEventType::MessagesAppended {
+            predicate::eq(ClientRoomEventType::MessagesAppended {
                 message_ids: vec!["message-id".into()],
             }),
         )
@@ -133,13 +141,15 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
-        .handle_event(XMPPEvent::Chat(chat::Event::Message(
-            Message::default()
-                .set_type(MessageType::Chat)
-                .set_id("message-id".into())
-                .set_from(jid!("jane.doe@prose.org"))
-                .set_body("Hello World"),
-        )))
+        .handle_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Received(
+                Message::default()
+                    .set_type(MessageType::Chat)
+                    .set_id("message-id".into())
+                    .set_from(jid!("jane.doe@prose.org"))
+                    .set_body("Hello World"),
+            ),
+        }))
         .await?;
 
     Ok(())

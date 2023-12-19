@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use jid::{BareJid, Jid};
 
 use prose_proc_macros::InjectDependencies;
 
@@ -12,6 +11,7 @@ use crate::app::deps::{
     DynAvatarRepository, DynTimeProvider, DynUserInfoRepository, DynUserProfileRepository,
     DynUserProfileService,
 };
+use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{PlatformImage, UserMetadata};
 use crate::domain::user_profiles::models::UserProfile;
 
@@ -30,7 +30,7 @@ pub struct UserDataService {
 }
 
 impl UserDataService {
-    pub async fn load_avatar(&self, from: &BareJid) -> Result<Option<PlatformImage>> {
+    pub async fn load_avatar(&self, from: &UserId) -> Result<Option<PlatformImage>> {
         let Some(avatar_metadata) = self
             .user_info_repo
             .get_user_info(from)
@@ -43,17 +43,20 @@ impl UserDataService {
         Ok(image)
     }
 
-    pub async fn load_user_profile(&self, from: &BareJid) -> Result<Option<UserProfile>> {
+    pub async fn load_user_profile(&self, from: &UserId) -> Result<Option<UserProfile>> {
         self.user_profile_repo.get(from).await
     }
 
-    pub async fn load_user_metadata(&self, from: &BareJid) -> Result<Option<UserMetadata>> {
-        let Jid::Full(full_jid) = self.user_info_repo.resolve_bare_jid_to_full(from) else {
+    pub async fn load_user_metadata(&self, from: &UserId) -> Result<Option<UserMetadata>> {
+        let Some(resource_id) = self
+            .user_info_repo
+            .resolve_user_id_to_user_resource_id(from)
+        else {
             return Ok(None);
         };
         let metadata = self
             .user_profile_service
-            .load_user_metadata(&full_jid, self.time_provider.now())
+            .load_user_metadata(&resource_id, self.time_provider.now())
             .await?;
         Ok(metadata)
     }

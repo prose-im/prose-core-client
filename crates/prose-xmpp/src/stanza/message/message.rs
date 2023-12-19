@@ -18,6 +18,7 @@ use prose_utils::id_string;
 
 use crate::ns;
 use crate::stanza::message::fasten::ApplyTo;
+use crate::stanza::message::muc_invite::MucInvite;
 use crate::stanza::message::muc_user::MucUser;
 use crate::stanza::message::stanza_id::StanzaId;
 use crate::stanza::message::{carbons, Reactions};
@@ -142,6 +143,10 @@ impl Message {
     }
 
     pub fn muc_user(&self) -> Option<MucUser> {
+        self.typed_payload("x", ns::MUC_USER)
+    }
+
+    pub fn muc_invite(&self) -> Option<MucInvite> {
         self.typed_payload("x", ns::MUC_USER)
     }
 }

@@ -7,12 +7,12 @@ use std::collections::HashMap;
 
 use parking_lot::RwLock;
 
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 use crate::domain::sidebar::models::SidebarItem;
 use crate::domain::sidebar::repos::{SidebarReadOnlyRepository, SidebarRepository};
 
 pub struct InMemorySidebarRepository {
-    sidebar_items: RwLock<HashMap<RoomJid, SidebarItem>>,
+    sidebar_items: RwLock<HashMap<RoomId, SidebarItem>>,
 }
 
 impl InMemorySidebarRepository {
@@ -24,7 +24,7 @@ impl InMemorySidebarRepository {
 }
 
 impl SidebarReadOnlyRepository for InMemorySidebarRepository {
-    fn get(&self, jid: &RoomJid) -> Option<SidebarItem> {
+    fn get(&self, jid: &RoomId) -> Option<SidebarItem> {
         self.sidebar_items.read().get(jid).cloned()
     }
 
@@ -47,7 +47,7 @@ impl SidebarRepository for InMemorySidebarRepository {
             .insert(item.jid.clone(), item.clone());
     }
 
-    fn delete(&self, item: &RoomJid) {
+    fn delete(&self, item: &RoomId) {
         self.sidebar_items.write().remove(item);
     }
 

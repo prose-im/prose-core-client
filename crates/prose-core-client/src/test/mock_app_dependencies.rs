@@ -8,14 +8,14 @@ use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};
 use derivative::Derivative;
-use jid::{BareJid, FullJid};
+use jid::BareJid;
 use parking_lot::RwLock;
 
+use prose_xmpp::bare;
 use prose_xmpp::test::IncrementingIDProvider;
-use prose_xmpp::{bare, full};
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynBookmarksService, DynClientEventDispatcher,
+    AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
     DynDraftsRepository, DynIDProvider, DynMessageArchiveService, DynMessagesRepository,
     DynMessagingService, DynRoomAttributesService, DynRoomParticipationService,
     DynSidebarDomainService, DynSidebarReadOnlyRepository, DynTimeProvider,
@@ -31,7 +31,9 @@ use crate::domain::contacts::services::mocks::MockContactsService;
 use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
 use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
-use crate::domain::messaging::services::mocks::{MockMessageArchiveService, MockMessagingService};
+use crate::domain::messaging::services::mocks::{
+    MockMessageArchiveService, MockMessageMigrationDomainService, MockMessagingService,
+};
 use crate::domain::rooms::repos::mocks::{
     MockConnectedRoomsReadOnlyRepository, MockConnectedRoomsReadWriteRepository,
 };
@@ -51,7 +53,9 @@ use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoR
 use crate::domain::user_info::services::mocks::MockUserInfoService;
 use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
 use crate::domain::user_profiles::services::mocks::MockUserProfileService;
+use crate::dtos::UserResourceId;
 use crate::test::ConstantTimeProvider;
+use crate::user_resource_id;
 
 pub fn mock_reference_date() -> DateTime<Utc> {
     Utc.with_ymd_and_hms(2021, 09, 06, 0, 0, 0).unwrap().into()
@@ -61,8 +65,8 @@ pub fn mock_muc_service() -> BareJid {
     bare!("conference.prose.org")
 }
 
-pub fn mock_account_jid() -> FullJid {
-    full!("jane.doe@prose.org/macOS")
+pub fn mock_account_jid() -> UserResourceId {
+    user_resource_id!("jane.doe@prose.org/macOS")
 }
 
 impl Default for AppContext {
@@ -140,6 +144,7 @@ impl From<MockAppDependencies> for AppDependencies {
         let user_profile_repo = Arc::new(mock.user_profile_repo);
 
         let room_factory = {
+            let ctx = ctx.clone();
             let client_event_dispatcher = client_event_dispatcher.clone();
             let drafts_repo = drafts_repo.clone();
             let message_archive_service = message_archive_service.clone();
@@ -154,6 +159,7 @@ impl From<MockAppDependencies> for AppDependencies {
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
                     data: data.clone(),
+                    ctx: ctx.clone(),
                     time_provider: time_provider.clone(),
                     messaging_service: messaging_service.clone(),
                     message_archive_service: message_archive_service.clone(),
@@ -240,9 +246,11 @@ pub struct MockRoomsDomainServiceDependencies {
     pub ctx: AppContext,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub id_provider: DynIDProvider,
+    pub message_migration_domain_service: MockMessageMigrationDomainService,
     pub room_attributes_service: MockRoomAttributesService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
+    pub user_info_repo: MockUserInfoRepository,
     pub user_profile_repo: MockUserProfileRepository,
 }
 
@@ -259,9 +267,11 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
             ctx: Arc::new(value.ctx),
             id_provider: Arc::new(value.id_provider),
+            message_migration_domain_service: Arc::new(value.message_migration_domain_service),
             room_attributes_service: Arc::new(value.room_attributes_service),
             room_management_service: Arc::new(value.room_management_service),
             room_participation_service: Arc::new(value.room_participation_service),
+            user_info_repo: Arc::new(value.user_info_repo),
             user_profile_repo: Arc::new(value.user_profile_repo),
         }
     }
@@ -270,8 +280,10 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct MockRoomFactoryDependencies {
+    pub attributes_service: MockRoomAttributesService,
     pub bookmarks_service: MockBookmarksService,
     pub client_event_dispatcher: MockClientEventDispatcherTrait,
+    pub ctx: AppContext,
     pub drafts_repo: MockDraftsRepository,
     pub message_archive_service: MockMessageArchiveService,
     pub message_repo: MockMessagesRepository,
@@ -281,20 +293,20 @@ pub struct MockRoomFactoryDependencies {
     pub sidebar_repo: MockSidebarReadOnlyRepository,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
-    pub attributes_service: MockRoomAttributesService,
     pub user_profile_repo: MockUserProfileRepository,
 }
 
 pub struct MockSealedRoomFactoryDependencies {
     pub bookmarks_service: DynBookmarksService,
     pub client_event_dispatcher: DynClientEventDispatcher,
+    pub ctx: DynAppContext,
     pub drafts_repo: DynDraftsRepository,
     pub message_archive_service: DynMessageArchiveService,
     pub message_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
     pub participation_service: DynRoomParticipationService,
-    pub sidebar_repo: DynSidebarReadOnlyRepository,
     pub sidebar_domain_service: DynSidebarDomainService,
+    pub sidebar_repo: DynSidebarReadOnlyRepository,
     pub time_provider: DynTimeProvider,
     pub topic_service: DynRoomAttributesService,
     pub user_profile_repo: DynUserProfileRepository,
@@ -305,6 +317,7 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
         Self {
             bookmarks_service: Arc::new(value.bookmarks_service),
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
+            ctx: Arc::new(value.ctx),
             drafts_repo: Arc::new(value.drafts_repo),
             message_archive_service: Arc::new(value.message_archive_service),
             message_repo: Arc::new(value.message_repo),
@@ -324,6 +337,7 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
         RoomFactory::new(Arc::new(move |data| {
             RoomInner {
                 data: data.clone(),
+                ctx: value.ctx.clone(),
                 client_event_dispatcher: value.client_event_dispatcher.clone(),
                 drafts_repo: value.drafts_repo.clone(),
                 message_archive_service: value.message_archive_service.clone(),

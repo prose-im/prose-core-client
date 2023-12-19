@@ -10,7 +10,7 @@ use anyhow::Result;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::RoomInternals;
-use crate::domain::shared::models::RoomJid;
+use crate::domain::shared::models::RoomId;
 
 type UpdateHandler = Box<dyn FnOnce(Arc<RoomInternals>) -> RoomInternals + Send>;
 
@@ -18,7 +18,7 @@ pub struct RoomAlreadyExistsError;
 
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ConnectedRoomsReadOnlyRepository: SendUnlessWasm + SyncUnlessWasm {
-    fn get(&self, room_jid: &RoomJid) -> Option<Arc<RoomInternals>>;
+    fn get(&self, room_jid: &RoomId) -> Option<Arc<RoomInternals>>;
     fn get_all(&self) -> Vec<Arc<RoomInternals>>;
 }
 
@@ -27,9 +27,9 @@ pub trait ConnectedRoomsRepository: ConnectedRoomsReadOnlyRepository {
 
     /// If a room with `room_jid` was found returns the room returned by `block` otherwise
     /// returns `None`.
-    fn update(&self, room_jid: &RoomJid, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
+    fn update(&self, room_jid: &RoomId, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
 
-    fn delete(&self, room_jid: &RoomJid);
+    fn delete(&self, room_jid: &RoomId);
     fn delete_all(&self);
 }
 
@@ -38,14 +38,14 @@ mockall::mock! {
     pub ConnectedRoomsReadWriteRepository {}
 
     impl ConnectedRoomsReadOnlyRepository for ConnectedRoomsReadWriteRepository {
-        fn get(&self, room_jid: &RoomJid) -> Option<Arc<RoomInternals>>;
+        fn get(&self, room_jid: &RoomId) -> Option<Arc<RoomInternals>>;
         fn get_all(&self) -> Vec<Arc<RoomInternals>>;
     }
 
     impl ConnectedRoomsRepository for ConnectedRoomsReadWriteRepository {
         fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError>;
-        fn update(&self, room_jid: &RoomJid, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
-        fn delete(&self, room_jid: &RoomJid);
+        fn update(&self, room_jid: &RoomId, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
+        fn delete(&self, room_jid: &RoomId);
         fn delete_all(&self);
     }
 }
