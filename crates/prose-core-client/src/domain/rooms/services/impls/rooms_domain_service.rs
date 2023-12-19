@@ -327,14 +327,7 @@ impl RoomsDomainService {
         room_jid: &RoomId,
         password: Option<&str>,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        let user_jid = self.ctx.connected_id()?.to_user_id();
-        // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
-        // identical between multiple sessions so that these would be displayed as one user.
-        let nickname = format!(
-            "{}#{}",
-            user_jid.username(),
-            general_purpose::URL_SAFE_NO_PAD.encode(user_jid.to_string())
-        );
+        let nickname = self.build_nickname()?;
 
         // Insert pending room so that we don't miss any stanzas for this room while we're
         // connecting to it…
@@ -407,12 +400,9 @@ impl RoomsDomainService {
         service: &BareJid,
         request: CreateRoomType,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        let user_jid = self.ctx.connected_id()?.into_user_id();
-
         let result = match request {
             CreateRoomType::Group { participants } => {
-                self.create_or_join_group(&service, &user_jid, participants)
-                    .await
+                self.create_or_join_group(&service, participants).await
             }
             CreateRoomType::PrivateChannel { name } => {
                 // We'll use a random ID for the jid of the private channel. This way
@@ -423,7 +413,6 @@ impl RoomsDomainService {
 
                 self.create_or_join_room_with_spec(
                     &service,
-                    &user_jid,
                     &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
                     RoomSpec::PrivateChannel,
@@ -446,7 +435,6 @@ impl RoomsDomainService {
 
                 self.create_or_join_room_with_spec(
                     &service,
-                    &user_jid,
                     &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
                     RoomSpec::PublicChannel,
@@ -473,18 +461,19 @@ impl RoomsDomainService {
     async fn create_or_join_group(
         &self,
         service: &BareJid,
-        user_jid: &UserId,
         participants: Vec<UserId>,
     ) -> Result<RoomSessionInfo, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
         }
 
+        let user_jid = self.ctx.connected_id()?.into_user_id();
+
         // Load participant infos so that we can build a nice human-readable name for the group…
         let mut participant_names = vec![];
         let participants_including_self = participants
             .iter()
-            .chain(iter::once(user_jid))
+            .chain(iter::once(&user_jid))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -520,7 +509,6 @@ impl RoomsDomainService {
         let info = self
             .create_or_join_room_with_spec(
                 service,
-                user_jid,
                 &group_hash,
                 &group_name,
                 RoomSpec::Group,
@@ -568,14 +556,12 @@ impl RoomsDomainService {
     async fn create_or_join_room_with_spec<Fut: Future<Output = Result<()>> + 'static>(
         &self,
         service: &BareJid,
-        user_jid: &UserId,
         room_id: &str,
         room_name: &str,
         spec: RoomSpec,
         perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
-        // We generate a random suffix to prevent any nickname conflicts…
-        let nickname = format!("{}-{}", user_jid.username(), self.id_provider.new_id());
+        let nickname = self.build_nickname()?;
 
         let mut attempt = 0;
 
@@ -703,6 +689,18 @@ impl RoomsDomainService {
         }
 
         Ok(true)
+    }
+
+    fn build_nickname(&self) -> Result<String, RoomError> {
+        // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
+        // identical between multiple sessions so that these would be displayed as one user.
+        let user_id = self.ctx.connected_id()?.to_user_id();
+
+        Ok(format!(
+            "{}#{}",
+            user_id.username(),
+            general_purpose::URL_SAFE_NO_PAD.encode(user_id.to_string())
+        ))
     }
 
     fn insert_pending_room(&self, room_jid: &RoomId, nickname: &str) -> Result<(), RoomError> {

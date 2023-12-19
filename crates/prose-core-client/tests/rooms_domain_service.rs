@@ -13,10 +13,10 @@ use prose_core_client::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomsEventHandler, ServerEvent, ServerEventHandler,
     UserStatusEvent, UserStatusEventType,
 };
-use prose_core_client::domain::connection::models::ConnectionProperties;
+use prose_core_client::domain::connection::models::{ConnectionProperties, ServerFeatures};
 use prose_core_client::domain::rooms::models::{
-    RegisteredMember, RoomAffiliation, RoomConfig, RoomError, RoomInternals, RoomSessionInfo,
-    RoomSessionMember, RoomSpec,
+    RegisteredMember, RoomAffiliation, RoomConfig, RoomError, RoomInfo, RoomInternals,
+    RoomSessionInfo, RoomSessionMember, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
@@ -28,6 +28,7 @@ use prose_core_client::dtos::{
 };
 use prose_core_client::test::{mock_data, MockAppDependencies, MockRoomsDomainServiceDependencies};
 use prose_core_client::{occupant_id, room_id, user_id, user_resource_id};
+use prose_xmpp::bare;
 use prose_xmpp::test::IncrementingIDProvider;
 
 #[tokio::test]
@@ -351,11 +352,16 @@ async fn test_creates_group() -> Result<()> {
     // Make sure that the method calls are in the exact order…
     let mut seq = Sequence::new();
 
+    deps.ctx.set_connection_properties(ConnectionProperties {
+        connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
+        server_features: Default::default(),
+    });
+
     // jane.doe@prose.org + a@prose.org + b@prose.org + c@prose.org
-    let group_jid =
+    let group_id =
         room_id!("org.prose.group.b41be06eda5bac6e7fc5ad069d6cd863c4f329eb@conference.prose.org");
-    let occupant_id = group_jid
-        .occupant_id_with_nickname("jane.doe-hash-1")
+    let occupant_id = group_id
+        .occupant_id_with_nickname("jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn")
         .unwrap();
 
     let account_node = mock_data::account_jid().to_user_id().username().to_string();
@@ -391,13 +397,13 @@ async fn test_creates_group() -> Result<()> {
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Arc::new(RoomInternals::mock_pending_room(
-            group_jid.clone(),
-            "hash-1",
+        .with(predicate::eq(Arc::new(RoomInternals::pending(
+            &group_id,
+            "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn",
         ))))
         .return_once(|_| Ok(()));
     {
-        let group_jid = group_jid.clone();
+        let group_jid = group_id.clone();
         deps.room_management_service
             .expect_create_or_join_room()
             .once()
@@ -426,7 +432,7 @@ async fn test_creates_group() -> Result<()> {
         .once()
         .in_sequence(&mut seq)
         .with(
-            predicate::eq(group_jid.clone()),
+            predicate::eq(group_id.clone()),
             predicate::eq(vec![
                 user_id!("a@prose.org"),
                 user_id!("b@prose.org"),
@@ -458,7 +464,7 @@ async fn test_creates_group() -> Result<()> {
         });
 
     {
-        let group_jid = group_jid.clone();
+        let group_jid = group_id.clone();
         deps.connected_rooms_repo
             .expect_update()
             .once()
@@ -524,7 +530,7 @@ async fn test_creates_group() -> Result<()> {
         .expect_invite_users_to_room()
         .once()
         .with(
-            predicate::eq(group_jid.clone()),
+            predicate::eq(group_id.clone()),
             predicate::eq(vec![
                 user_id!("a@prose.org"),
                 user_id!("b@prose.org"),
@@ -557,6 +563,12 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
 
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
+    deps.ctx.set_connection_properties(ConnectionProperties {
+        connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
+        server_features: ServerFeatures {
+            muc_service: Some(bare!("conference.prose.org")),
+        },
+    });
 
     deps.room_management_service
         .expect_load_public_rooms()
@@ -573,9 +585,9 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Arc::new(RoomInternals::mock_pending_room(
-            room_id!("org.prose.channel.hash-1@conference.prose.org"),
-            "hash-2",
+        .with(predicate::eq(Arc::new(RoomInternals::pending(
+            &room_id!("org.prose.channel.hash-1@conference.prose.org"),
+            "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn",
         ))))
         .return_once(|_| Ok(()));
 
@@ -599,9 +611,11 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
             predicate::always(),
         )
         .return_once(|_, _| {
-            Some(Arc::new(RoomInternals::public_channel(room_id!(
-                "org.prose.channel.hash-1@conference.prose.org"
-            ))))
+            Some(Arc::new(RoomInternals::new(RoomInfo {
+                room_id: room_id!("org.prose.channel.hash-1@conference.prose.org"),
+                user_nickname: "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn".to_string(),
+                r#type: RoomType::PublicChannel,
+            })))
         });
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -623,9 +637,14 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
 
-    let channel_jid = room_id!("org.prose.channel.hash-1@conf.prose.org");
-    let occupant_id = channel_jid
-        .occupant_id_with_nickname(&format!("{}-hash-2", mock_data::account_jid().username()))
+    deps.ctx.set_connection_properties(ConnectionProperties {
+        connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
+        server_features: Default::default(),
+    });
+
+    let channel_id = room_id!("org.prose.channel.hash-1@conf.prose.org");
+    let occupant_id = channel_id
+        .occupant_id_with_nickname("jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn")
         .unwrap();
 
     // Make sure that the method calls are in the exact order…
@@ -640,7 +659,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             Some(Arc::new(
                 RoomInternals::group(room_id!("group@conf.prose.org")).with_members(vec![
                     RegisteredMember {
-                        user_id: mock_data::account_jid().into_user_id(),
+                        user_id: user_id!("jane.doe@prose.org"),
                         name: Some("Jane Doe".to_string()),
                         affiliation: RoomAffiliation::Owner,
                     },
@@ -669,14 +688,14 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Arc::new(RoomInternals::mock_pending_room(
-            channel_jid.clone(),
-            "hash-2",
+        .with(predicate::eq(Arc::new(RoomInternals::pending(
+            &channel_id,
+            "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn",
         ))))
         .return_once(|_| Ok(()));
 
     {
-        let channel_jid = channel_jid.clone();
+        let channel_jid = channel_id.clone();
         deps.room_management_service
             .expect_create_or_join_room()
             .once()
@@ -697,7 +716,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     }
 
     {
-        let channel_jid = channel_jid.clone();
+        let channel_jid = channel_id.clone();
         deps.connected_rooms_repo
             .expect_update()
             .once()
@@ -717,7 +736,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .with(
             predicate::eq(room_id!("group@conf.prose.org")),
             predicate::eq(RoomType::Group),
-            predicate::eq(channel_jid.clone()),
+            predicate::eq(channel_id.clone()),
             predicate::eq(RoomType::PrivateChannel),
         )
         .return_once(|_, _, _, _| Box::pin(async { Ok(()) }));
@@ -727,7 +746,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .times(2)
         .in_sequence(&mut seq)
         .with(
-            predicate::eq(channel_jid.clone()),
+            predicate::eq(channel_id.clone()),
             predicate::in_iter(vec![user_id!("a@prose.org"), user_id!("b@prose.org")]),
         )
         .returning(|_, _| Box::pin(async { Ok(()) }));
@@ -738,7 +757,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .in_sequence(&mut seq)
         .with(
             predicate::eq(room_id!("group@conf.prose.org")),
-            predicate::eq(Some(channel_jid.clone())),
+            predicate::eq(Some(channel_id.clone())),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
