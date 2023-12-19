@@ -256,6 +256,17 @@ impl Client {
             .into())
     }
 
+    /// Destroys the room identified by `room_jid`.
+    #[wasm_bindgen(js_name = "destroyRoom")]
+    pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
+        self.client
+            .rooms
+            .destroy_room(&RoomId::from(room_jid.clone()))
+            .await
+            .map_err(|err| WasmError::from(anyhow::Error::from(err)))?;
+        Ok(())
+    }
+
     /// XEP-0108: User Activity
     /// https://xmpp.org/extensions/xep-0108.html
     #[wasm_bindgen(js_name = "sendActivity")]
