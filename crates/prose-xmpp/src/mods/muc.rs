@@ -73,6 +73,10 @@ impl Module for MUC {
             return Ok(());
         };
 
+        if stanza.type_ != MessageType::Normal {
+            return Ok(());
+        }
+
         if let Some(direct_invite) = stanza.direct_invite() {
             self.ctx
                 .schedule_event(ClientEvent::MUC(Event::DirectInvite {

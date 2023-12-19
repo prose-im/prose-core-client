@@ -22,12 +22,6 @@ pub fn parse_message(ctx: &mut Context, message: Message) -> Result<()> {
         return missing_attribute(ctx, "from", message);
     };
 
-    // Ignore messages that contain invites…
-    // TODO: Handle this in the XMPP lib
-    if message.direct_invite().is_some() || message.mediated_invite().is_some() {
-        return Ok(());
-    }
-
     // Ignore messages that contain a chat state but no body…
     // TODO: Handle this in the XMPP lib
     if message.chat_state().is_some() && message.body().is_none() {
@@ -97,6 +91,12 @@ fn parse_chat_message(ctx: &mut Context, _from: Jid, message: Message) -> Result
 }
 
 fn parse_normal_message(ctx: &mut Context, from: Jid, message: Message) -> Result<()> {
+    // Ignore messages that contain invites…
+    // TODO: Handle this in the XMPP lib
+    if message.direct_invite().is_some() || message.mediated_invite().is_some() {
+        return Ok(());
+    }
+
     let Some(muc_invite) = message.muc_invite() else {
         info!("Received unknown 'normal' message.");
         return Ok(());

@@ -245,6 +245,8 @@ async fn test_joins_room() -> Result<()> {
         ]
     );
 
+    // Now simulate user3 coming online…
+
     let events = vec![
         ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@conf.prose.org/user3#dXNlcjNAcHJvc2Uub3Jn").into(),
