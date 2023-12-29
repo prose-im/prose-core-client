@@ -1,6 +1,6 @@
 [bindings.swift]
 cdylib_name = "prose-sdk-ffi"
-module_name = "ProseCoreFFI"
+module_name = "prose_sdk_ffi"
 
 [bindings.swift.custom_types.PathBuf]
 type_name = "URL"
@@ -19,11 +19,3 @@ type_name = "Date"
 imports = [ "Foundation" ]
 into_custom = "Date(timeIntervalSince1970: TimeInterval({}) / 1_000)"
 from_custom = "Int64({}.timeIntervalSince1970 * 1_000)"
-
-[bindings.swift.custom_types.MessageId]
-into_custom = "MessageId({})"
-from_custom = "{}.rawValue"
-
-[bindings.swift.custom_types.Emoji]
-into_custom = "Emoji({})"
-from_custom = "{}.rawValue"

@@ -3,11 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::path::PathBuf;
+use parking_lot::{Mutex, RwLock};
+use std::fs;
+use std::path::{Path, PathBuf};
+use tracing::info;
 
 use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
-use prose_core_client::{Client as ProseClient, ClientDelegate as ProseClientDelegate};
-use prose_xmpp::ConnectionError;
+use prose_core_client::{
+    open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarCache,
+    SqliteDriver,
+};
+use prose_xmpp::{connector, ConnectionError};
 
 use crate::types::{ClientEvent, Message, JID};
 use crate::{ClientError, Contact};
@@ -18,16 +24,27 @@ pub trait ClientDelegate: Send + Sync {
 
 pub struct Client {
     jid: JID,
-    client: ProseClient,
+    client: RwLock<Option<ProseClient>>,
+    cache_dir: PathBuf,
+    delegate: Mutex<Option<Box<dyn ProseClientDelegate>>>,
 }
 
 impl Client {
     pub fn new(
-        _jid: JID,
-        _cache_dir: String,
-        _delegate: Option<Box<dyn ClientDelegate>>,
+        jid: JID,
+        cache_dir: String,
+        delegate: Option<Box<dyn ClientDelegate>>,
     ) -> Result<Self, ClientError> {
-        todo!("FIXME")
+        let cache_dir = Path::new(&cache_dir).join(jid.to_string());
+
+        Ok(Self {
+            jid,
+            client: Default::default(),
+            cache_dir,
+            delegate: Mutex::new(
+                delegate.map(|d| Box::new(DelegateWrapper(d)) as Box<dyn ProseClientDelegate>),
+            ),
+        })
 
         // #[uniffi::export] supports async but doesn't support static methods and
         // the UDL allows static methods but no async methods. Meh.
@@ -54,32 +71,35 @@ impl Client {
     }
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl Client {
     pub fn jid(&self) -> JID {
         self.jid.clone()
     }
 
     pub async fn connect(&self, password: String) -> Result<(), ConnectionError> {
-        self.client
+        self.client()
+            .await
+            .map_err(|e| ConnectionError::Generic { msg: e.to_string() })?
             .connect(&self.jid.to_bare().unwrap().into(), password)
             .await?;
         Ok(())
     }
 
     pub async fn disconnect(&self) -> Result<(), ClientError> {
-        self.client.disconnect().await;
+        self.client().await?.disconnect().await;
         Ok(())
     }
 
     pub async fn load_contacts(&self) -> Result<Vec<Contact>, ClientError> {
-        let items = self.client.contacts.load_contacts().await?;
+        let items = self.client().await?.contacts.load_contacts().await?;
         Ok(items.into_iter().map(Into::into).collect())
     }
 
     pub async fn load_profile(&self, from: JID) -> Result<Option<UserProfile>, ClientError> {
         let profile = self
-            .client
+            .client()
+            .await?
             .user_data
             .load_user_profile(&from.to_bare().unwrap().into())
             .await?;
@@ -87,18 +107,19 @@ impl Client {
     }
 
     pub async fn save_profile(&self, profile: UserProfile) -> Result<(), ClientError> {
-        let profile = self.client.account.set_profile(&profile).await?;
+        let profile = self.client().await?.account.set_profile(&profile).await?;
         Ok(profile)
     }
 
     pub async fn delete_profile(&self) -> Result<(), ClientError> {
-        self.client.account.delete_profile().await?;
+        self.client().await?.account.delete_profile().await?;
         Ok(())
     }
 
     pub async fn load_avatar(&self, from: JID) -> Result<Option<PathBuf>, ClientError> {
         let path = self
-            .client
+            .client()
+            .await?
             .user_data
             .load_avatar(&from.to_bare().unwrap().into())
             .await?;
@@ -106,7 +127,11 @@ impl Client {
     }
 
     pub async fn save_avatar(&self, image_path: PathBuf) -> Result<(), ClientError> {
-        self.client.account.set_avatar_from_url(&image_path).await?;
+        self.client()
+            .await?
+            .account
+            .set_avatar_from_url(&image_path)
+            .await?;
         Ok(())
     }
 
@@ -221,8 +246,37 @@ impl Client {
     }
 
     pub async fn set_availability(&self, availability: Availability) -> Result<(), ClientError> {
-        self.client.account.set_availability(availability).await?;
+        self.client()
+            .await?
+            .account
+            .set_availability(availability)
+            .await?;
         Ok(())
+    }
+}
+
+impl Client {
+    async fn client(&self) -> Result<ProseClient, ClientError> {
+        if let Some(client) = self.client.read().clone() {
+            return Ok(client);
+        }
+
+        info!("Caching data at {:?}", self.cache_dir);
+        fs::create_dir_all(&self.cache_dir).map_err(anyhow::Error::new)?;
+
+        let store = open_store(SqliteDriver::new(self.cache_dir.join("cache.sqlite")))
+            .await
+            .map_err(|e| ClientError::Generic { msg: e.to_string() })?;
+
+        let client = ProseClient::builder()
+            .set_connector_provider(connector::xmpp_rs::Connector::provider())
+            .set_store(store)
+            .set_avatar_cache(FsAvatarCache::new(&self.cache_dir.join("Avatars"))?)
+            .set_delegate(self.delegate.lock().take())
+            .build();
+        self.client.write().replace(client.clone());
+
+        Ok(client)
     }
 }
 

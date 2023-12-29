@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 mod ci;
+mod swift;
 mod wasm;
 
 pub(crate) mod paths {
@@ -32,6 +33,7 @@ struct Xtask {
 enum Command {
     WasmPack(wasm::Args),
     CI(ci::Args),
+    Swift(swift::Args),
 }
 
 #[tokio::main]
@@ -39,5 +41,6 @@ async fn main() -> Result<()> {
     match Xtask::parse().cmd {
         Command::WasmPack(args) => args.run().await,
         Command::CI(args) => args.run().await,
+        Command::Swift(args) => args.run().await,
     }
 }

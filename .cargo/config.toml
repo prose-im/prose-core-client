@@ -1,6 +1,5 @@
 [alias]
 xtask = "run --package xtask --"
-uniffi-bindgen = "run --package uniffi-bindgen --"
 
 [build]
 #target = "wasm32-unknown-unknown"

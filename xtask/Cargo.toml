@@ -6,6 +6,7 @@ publish = false
 
 [dependencies]
 anyhow = "1.0"
+cargo-swift = "0.5"
 clap = { version = "4.3", features = ["derive"] }
 http = "0.2"
 octocrab = "0.23"

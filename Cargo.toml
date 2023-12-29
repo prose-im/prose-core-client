@@ -4,7 +4,6 @@ members = [
 	"bindings/*",
 	"examples/*",
 	"tests/*",
-	"uniffi-bindgen",
 	"xtask",
 ]
 default-members = ["crates/*"]
@@ -38,7 +37,7 @@ tokio-xmpp = "3.4"
 tracing = { version = "0.1" }
 tracing-log = "0.2.0"
 tracing-subscriber = "0.3"
-uniffi = "0.24"
+uniffi = "0.25"
 url = "2.3"
 uuid = {version = "1.1", features=["v4", "fast-rng", "macro-diagnostics"]}
 wasm-bindgen = { version = "0.2" }
