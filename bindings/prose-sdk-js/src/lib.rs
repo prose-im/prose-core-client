@@ -9,6 +9,7 @@
 extern crate alloc;
 extern crate core;
 
+use tracing::info;
 use tracing_subscriber::fmt::format::Pretty;
 use tracing_subscriber::prelude::*;
 use tracing_web::{performance_layer, MakeConsoleWriter};
@@ -19,6 +20,8 @@ mod connector;
 mod delegate;
 mod types;
 mod util;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[wasm_bindgen(start)]
 pub fn start() {
@@ -34,4 +37,6 @@ pub fn start() {
         .with(fmt_layer)
         .with(perf_layer)
         .init();
+
+    info!("prose-sdk-js Version {VERSION}");
 }
