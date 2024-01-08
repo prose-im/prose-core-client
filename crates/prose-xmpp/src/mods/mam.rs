@@ -117,6 +117,7 @@ struct MAMFutureState {
 impl RequestFuture<MAMFutureState, (Vec<mam::ArchivedMessage>, mam::Fin)> {
     fn new_mam_request(id: String, query_id: mam::QueryId) -> Self {
         RequestFuture::new(
+            format!("MAM {id}"),
             MAMFutureState {
                 id,
                 query_id,

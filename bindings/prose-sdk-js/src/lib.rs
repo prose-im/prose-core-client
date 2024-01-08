@@ -10,9 +10,8 @@ extern crate alloc;
 extern crate core;
 
 use tracing::info;
-use tracing_subscriber::fmt::format::Pretty;
+use tracing_subscriber::fmt::format::{FmtSpan, Pretty};
 use tracing_subscriber::prelude::*;
-use tracing_web::{performance_layer, MakeConsoleWriter};
 use wasm_bindgen::prelude::*;
 
 mod client;
@@ -30,8 +29,10 @@ pub fn start() {
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)
         .without_time()
-        .with_writer(MakeConsoleWriter);
-    let perf_layer = performance_layer().with_details_from_fields(Pretty::default());
+        .with_writer(tracing_web::MakeWebConsoleWriter::new().with_pretty_level())
+        .with_level(false)
+        .with_span_events(FmtSpan::ACTIVE);
+    let perf_layer = tracing_web::performance_layer().with_details_from_fields(Pretty::default());
 
     tracing_subscriber::registry()
         .with(fmt_layer)

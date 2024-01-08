@@ -11,6 +11,7 @@ use std::task::{Poll, Waker};
 use anyhow::Result;
 use minidom::Element;
 use parking_lot::Mutex;
+use tracing::error;
 use xmpp_parsers::iq::IqType;
 
 use crate::util::module_future_state::{ModuleFuturePoll, ModuleFutureState};
@@ -36,9 +37,11 @@ pub(crate) struct IQReducerState {
 
 impl RequestFuture<IQReducerState, Option<Element>> {
     pub fn new_iq_request(id: impl Into<String>) -> Self {
+        let id = id.into();
         RequestFuture::new(
+            id.clone(),
             IQReducerState {
-                request_id: id.into(),
+                request_id: id,
                 element: None,
             },
             |state, element| {
@@ -66,12 +69,14 @@ impl RequestFuture<IQReducerState, Option<Element>> {
 
 impl<T: Send, U> RequestFuture<T, U> {
     pub fn new(
+        identifier: impl Into<String>,
         initial_value: T,
         reducer: ElementReducer<T>,
         transformer: ResultTransformer<T, U>,
     ) -> Self {
         RequestFuture {
             state: Arc::new(Mutex::new(ReducerFutureState {
+                identifier: identifier.into(),
                 reducer,
                 transformer,
                 value: Some(initial_value),
@@ -84,6 +89,7 @@ impl<T: Send, U> RequestFuture<T, U> {
     pub fn failed(err: RequestError) -> Self {
         RequestFuture {
             state: Arc::new(Mutex::new(ReducerFutureState {
+                identifier: "".to_string(),
                 reducer: |_, _| unreachable!(),
                 transformer: |_| unreachable!(),
                 value: None,
@@ -95,6 +101,7 @@ impl<T: Send, U> RequestFuture<T, U> {
 }
 
 pub(crate) struct ReducerFutureState<T, U> {
+    identifier: String,
     reducer: ElementReducer<T>,
     transformer: ResultTransformer<T, U>,
     value: Option<T>,
@@ -129,6 +136,7 @@ impl<T: Send, U> ModuleFutureState for ReducerFutureState<T, U> {
     }
 
     fn fail_with_timeout(&mut self) -> Option<Waker> {
+        error!("Request with id '{}' timed out.", self.identifier);
         self.result = Some(Err(RequestError::TimedOut));
         self.waker.take()
     }

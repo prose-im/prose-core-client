@@ -444,6 +444,7 @@ struct JoinRoomState {
 impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>)> {
     pub fn new_join_room_request(room_jid: FullJid) -> Self {
         RequestFuture::new(
+            format!("MUC {room_jid}"),
             JoinRoomState {
                 room_jid,
                 presences: vec![],

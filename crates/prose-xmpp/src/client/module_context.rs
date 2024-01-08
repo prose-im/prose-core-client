@@ -13,7 +13,8 @@ use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
 use prose_wasm_utils::PinnedFuture;
-use xmpp_parsers::iq::Iq;
+use tracing::instrument;
+use xmpp_parsers::iq::{Iq, IqType};
 
 use crate::client::builder::UndefinedConnector;
 use crate::client::{ConnectorProvider, EventHandler, ModuleLookup};
@@ -28,10 +29,15 @@ pub struct ModuleContext {
 }
 
 impl ModuleContext {
+    #[instrument(name = "Sending IQ…", skip(self, iq), fields(id=%iq.id, ns=tracing::field::Empty))]
     pub(crate) fn send_iq(
         &self,
         iq: Iq,
     ) -> impl Future<Output = Result<Option<Element>, RequestError>> {
+        if let IqType::Get(ref element) = iq.payload {
+            tracing::Span::current().record("ns", &tracing::field::display(element.ns()));
+        }
+
         let future = RequestFuture::new_iq_request(&iq.id);
         self.send_stanza_with_future(iq, future)
     }

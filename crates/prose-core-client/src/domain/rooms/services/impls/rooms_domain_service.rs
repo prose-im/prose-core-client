@@ -322,6 +322,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 }
 
 impl RoomsDomainService {
+    #[tracing::instrument(name = "Join room", skip(self, room_jid, password), fields(room_id = %room_jid))]
     async fn join_room(
         &self,
         room_jid: &RoomId,
@@ -335,20 +336,12 @@ impl RoomsDomainService {
 
         let full_room_jid = room_jid.occupant_id_with_nickname(&nickname)?;
 
-        info!(
-            "Trying to join room {} with nickname {}…",
-            room_jid, nickname
-        );
-
         let info = match self
             .room_management_service
             .join_room(&full_room_jid, password)
             .await
         {
-            Ok(info) => {
-                info!("Successfully joined room.");
-                Ok(info)
-            }
+            Ok(info) => Ok(info),
             Err(error) => {
                 // Remove pending room again…
                 self.connected_rooms_repo.delete(room_jid);
