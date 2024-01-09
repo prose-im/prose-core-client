@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use futures::join;
 use std::future::Future;
 use std::iter;
 use std::sync::Arc;
@@ -362,16 +363,16 @@ impl RoomsDomainService {
             return Ok(room);
         }
 
-        let contact_name = self
-            .user_profile_repo
-            .get_display_name(participant)
-            .await?
+        let (contact_name, user_info) = join!(
+            self.user_profile_repo.get_display_name(participant),
+            self.user_info_repo.get_user_info(participant)
+        );
+
+        // Let's ignore potential errors here since the information we're gathering is optional…
+        let contact_name = contact_name
+            .unwrap_or_default()
             .unwrap_or_else(|| participant.formatted_username());
-        let user_info = self
-            .user_info_repo
-            .get_user_info(participant)
-            .await?
-            .unwrap_or_default();
+        let user_info = user_info.unwrap_or_default().unwrap_or_default();
 
         let room = Arc::new(RoomInternals::for_direct_message(
             &participant,
