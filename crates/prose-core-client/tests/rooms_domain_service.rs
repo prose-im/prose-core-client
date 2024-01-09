@@ -43,7 +43,7 @@ async fn test_joins_room() -> Result<()> {
 
     let room = Arc::new(Mutex::new(Arc::new(RoomInternals::pending(
         &room_id!("room@conf.prose.org"),
-        "user1#dXNlcjFAcHJvc2Uub3Jn",
+        "user1#3dea7f2",
     ))));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
@@ -60,14 +60,14 @@ async fn test_joins_room() -> Result<()> {
 
     let events = vec![
         ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@conf.prose.org/user1#dXNlcjFAcHJvc2Uub3Jn").into(),
+            user_id: occupant_id!("room@conf.prose.org/user1#3dea7f2").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
                 availability: Availability::Available,
                 priority: 0,
             },
         }),
         ServerEvent::Occupant(OccupantEvent {
-            occupant_id: occupant_id!("room@conf.prose.org/user1#dXNlcjFAcHJvc2Uub3Jn"),
+            occupant_id: occupant_id!("room@conf.prose.org/user1#3dea7f2"),
             anon_occupant_id: None,
             real_id: Some(user_id!("user1@prose.org")),
             is_self: true,
@@ -76,14 +76,14 @@ async fn test_joins_room() -> Result<()> {
             },
         }),
         ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@conf.prose.org/user2#dXNlcjJAcHJvc2Uub3Jn").into(),
+            user_id: occupant_id!("room@conf.prose.org/user2#fdbda94").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
                 availability: Availability::Available,
                 priority: 0,
             },
         }),
         ServerEvent::Occupant(OccupantEvent {
-            occupant_id: occupant_id!("room@conf.prose.org/user2#dXNlcjJAcHJvc2Uub3Jn"),
+            occupant_id: occupant_id!("room@conf.prose.org/user2#fdbda94"),
             anon_occupant_id: None,
             real_id: Some(user_id!("user2@prose.org")),
             is_self: false,
@@ -100,9 +100,7 @@ async fn test_joins_room() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
-                predicate::eq(occupant_id!(
-                    "room@conf.prose.org/user1#dXNlcjFAcHJvc2Uub3Jn"
-                )),
+                predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
                 predicate::always(),
             )
             .return_once(|_, _| {
@@ -123,7 +121,7 @@ async fn test_joins_room() -> Result<()> {
                             room_description: None,
                             room_type: RoomType::PrivateChannel,
                         },
-                        user_nickname: "user#dXNlcjFAcHJvc2Uub3Jn".to_string(),
+                        user_nickname: "user#3dea7f2".to_string(),
                         members: vec![
                             RoomSessionMember {
                                 id: user_id!("user1@prose.org"),
@@ -367,7 +365,7 @@ async fn test_creates_group() -> Result<()> {
     let group_id =
         room_id!("org.prose.group.b41be06eda5bac6e7fc5ad069d6cd863c4f329eb@conference.prose.org");
     let occupant_id = group_id
-        .occupant_id_with_nickname("jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn")
+        .occupant_id_with_nickname("jane.doe#3c1234b")
         .unwrap();
 
     let account_node = mock_data::account_jid().to_user_id().username().to_string();
@@ -405,7 +403,7 @@ async fn test_creates_group() -> Result<()> {
         .in_sequence(&mut seq)
         .with(predicate::eq(Arc::new(RoomInternals::pending(
             &group_id,
-            "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn",
+            "jane.doe#3c1234b",
         ))))
         .return_once(|_| Ok(()));
     {
@@ -670,7 +668,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .once()
         .with(predicate::eq(Arc::new(RoomInternals::pending(
             &room_id!("org.prose.channel.hash-1@conference.prose.org"),
-            "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn",
+            "jane.doe#3c1234b",
         ))))
         .return_once(|_| Ok(()));
 
@@ -696,7 +694,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .return_once(|_, _| {
             Some(Arc::new(RoomInternals::new(RoomInfo {
                 room_id: room_id!("org.prose.channel.hash-1@conference.prose.org"),
-                user_nickname: "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn".to_string(),
+                user_nickname: "jane.doe#3c1234b".to_string(),
                 r#type: RoomType::PublicChannel,
             })))
         });
@@ -727,7 +725,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
 
     let channel_id = room_id!("org.prose.channel.hash-1@conf.prose.org");
     let occupant_id = channel_id
-        .occupant_id_with_nickname("jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn")
+        .occupant_id_with_nickname("jane.doe#3c1234b")
         .unwrap();
 
     // Make sure that the method calls are in the exact order…
@@ -776,7 +774,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .in_sequence(&mut seq)
         .with(predicate::eq(Arc::new(RoomInternals::pending(
             &channel_id,
-            "jane.doe#amFuZS5kb2VAcHJvc2Uub3Jn",
+            "jane.doe#3c1234b",
         ))))
         .return_once(|_| Ok(()));
 

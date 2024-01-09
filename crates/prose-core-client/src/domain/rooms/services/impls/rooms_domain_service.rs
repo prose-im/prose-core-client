@@ -3,14 +3,13 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use futures::join;
 use std::future::Future;
 use std::iter;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use base64::{engine::general_purpose, Engine as _};
+use futures::join;
 use jid::{BareJid, NodePart};
 use sha1::{Digest, Sha1};
 use tracing::{debug, error, info, warn};
@@ -36,6 +35,8 @@ use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait
 
 const GROUP_PREFIX: &str = "org.prose.group";
 const CHANNEL_PREFIX: &str = "org.prose.channel";
+const NICKNAME_MAX_LEN: usize = 20;
+const NICKNAME_HASH_LEN: usize = 7;
 
 #[derive(DependenciesStruct)]
 pub struct RoomsDomainService {
@@ -329,7 +330,7 @@ impl RoomsDomainService {
         room_jid: &RoomId,
         password: Option<&str>,
     ) -> Result<Arc<RoomInternals>, RoomError> {
-        let nickname = self.build_nickname()?;
+        let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
 
         // Insert pending room so that we don't miss any stanzas for this room while we're
         // connecting to it…
@@ -557,7 +558,7 @@ impl RoomsDomainService {
         spec: RoomSpec,
         perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
-        let nickname = self.build_nickname()?;
+        let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
 
         let mut attempt = 0;
 
@@ -690,23 +691,35 @@ impl RoomsDomainService {
         Ok(true)
     }
 
-    fn build_nickname(&self) -> Result<String, RoomError> {
-        // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
-        // identical between multiple sessions so that these would be displayed as one user.
-        let user_id = self.ctx.connected_id()?.to_user_id();
-
-        Ok(format!(
-            "{}#{}",
-            user_id.username(),
-            general_purpose::URL_SAFE_NO_PAD.encode(user_id.to_string())
-        ))
-    }
-
     fn insert_pending_room(&self, room_jid: &RoomId, nickname: &str) -> Result<(), RoomError> {
         self.connected_rooms_repo
             .set(Arc::new(RoomInternals::pending(room_jid, nickname)))
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
     }
+}
+
+fn build_nickname(user_id: &UserId) -> String {
+    // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
+    // identical between multiple sessions so that these would be displayed as one user.
+
+    let mut hasher = Sha1::new();
+    hasher.update(user_id.to_string().to_lowercase());
+    let hash = format!("{:x}", hasher.finalize());
+
+    let username = user_id.username();
+    let username_max_length = username
+        .chars()
+        .count()
+        .min(NICKNAME_MAX_LEN - NICKNAME_HASH_LEN - 1);
+
+    format!(
+        "{}#{}",
+        username
+            .chars()
+            .take(username_max_length)
+            .collect::<String>(),
+        &hash[hash.len() - NICKNAME_HASH_LEN..]
+    )
 }
 
 trait ParticipantsVecExt {
@@ -757,5 +770,23 @@ mod tests {
             ]
             .group_name_hash()
         )
+    }
+
+    #[test]
+    fn test_build_nickname() {
+        assert_eq!(build_nickname(&user_id!("user@prose.org")), "user#1ed8798");
+        assert_eq!(
+            build_nickname(&user_id!("super-long-username@prose.org")),
+            "super-long-u#fac4746"
+        );
+        assert_eq!(build_nickname(&user_id!("josé@prose.org")), "josé#6c09790");
+        assert_eq!(
+            build_nickname(&user_id!("JoséAndrés123@prose.org")),
+            "joséandrés12#7ebd867"
+        );
+        assert_eq!(
+            build_nickname(&user_id!("TwelveCharsé@prose.org")),
+            "twelvecharsé#3246eb5"
+        );
     }
 }
