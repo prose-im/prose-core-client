@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::domain::rooms::models::RoomSidebarState;
 use crate::domain::shared::models::RoomId;
 
 use super::BookmarkType;
@@ -12,6 +13,5 @@ pub struct Bookmark {
     pub name: String,
     pub jid: RoomId,
     pub r#type: BookmarkType,
-    pub is_favorite: bool,
-    pub in_sidebar: bool,
+    pub sidebar_state: RoomSidebarState,
 }

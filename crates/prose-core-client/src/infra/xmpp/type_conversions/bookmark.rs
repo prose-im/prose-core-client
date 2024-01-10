@@ -9,6 +9,7 @@ use jid::BareJid;
 use minidom::{Element, IntoAttributeValue};
 use xmpp_parsers::pubsub::PubSubPayload;
 
+use crate::domain::rooms::models::RoomSidebarState;
 use prose_xmpp::{ElementExt, ParseError, RequestError};
 
 use crate::domain::shared::models::RoomId;
@@ -24,12 +25,20 @@ impl TryFrom<Element> for Bookmark {
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("bookmark", ns::PROSE_BOOKMARK)?;
 
+        let in_sidebar = value.attr("sidebar").is_some();
+        let is_favorite = value.attr("favorite").is_some();
+
+        let sidebar_state = match (in_sidebar, is_favorite) {
+            (true, true) => RoomSidebarState::Favorite,
+            (true, _) => RoomSidebarState::InSidebar,
+            (false, _) => RoomSidebarState::NotInSidebar,
+        };
+
         Ok(Self {
             name: value.attr_req("name")?.to_string(),
             jid: RoomId::from(BareJid::from_str(&value.attr_req("jid")?)?),
             r#type: BookmarkType::from_str(&value.attr_req("type")?)?,
-            is_favorite: value.attr("favorite").is_some(),
-            in_sidebar: value.attr("sidebar").is_some(),
+            sidebar_state,
         })
     }
 }
@@ -40,8 +49,14 @@ impl From<Bookmark> for Element {
             .attr("name", value.name)
             .attr("jid", value.jid)
             .attr("type", value.r#type)
-            .attr("favorite", value.is_favorite.then_some("1"))
-            .attr("sidebar", value.in_sidebar.then_some("1"))
+            .attr(
+                "favorite",
+                (value.sidebar_state == RoomSidebarState::Favorite).then_some("1"),
+            )
+            .attr(
+                "sidebar",
+                value.sidebar_state.is_in_sidebar().then_some("1"),
+            )
             .build()
     }
 }

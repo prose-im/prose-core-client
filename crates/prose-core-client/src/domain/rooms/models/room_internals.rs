@@ -17,7 +17,36 @@ use crate::domain::shared::models::{Availability, RoomId, RoomType, UserId};
 #[derive(Debug)]
 pub struct RoomInternals {
     info: RoomInfo,
-    state: RwLock<RoomState>,
+    state: RwLock<RoomDetails>,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum RoomSidebarState {
+    /// The room is not visible in the sidebar.
+    NotInSidebar,
+    /// The room is visible in the sidebar.
+    InSidebar,
+    /// The room is visible in the sidebar as a favorite.
+    Favorite,
+}
+
+impl RoomSidebarState {
+    pub fn is_in_sidebar(&self) -> bool {
+        match self {
+            Self::NotInSidebar => false,
+            Self::InSidebar | Self::Favorite => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum RoomState {
+    #[default]
+    Connecting,
+    Connected,
+    Disconnected {
+        error: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -30,8 +59,8 @@ pub struct RoomInfo {
     pub r#type: RoomType,
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
-pub struct RoomState {
+#[derive(Clone, Debug, PartialEq)]
+pub struct RoomDetails {
     /// The name of the room.
     pub name: Option<String>,
     /// The description of the room.
@@ -40,6 +69,10 @@ pub struct RoomState {
     pub topic: Option<String>,
     /// The participants in the room.
     pub participants: ParticipantList,
+    /// Whether the room is visible in the sidebar.
+    pub sidebar_state: RoomSidebarState,
+    /// The state the room is in.
+    pub room_state: RoomState,
 }
 
 impl Deref for RoomInternals {
@@ -88,17 +121,32 @@ impl RoomInternals {
     pub fn participants_mut(&self) -> MappedRwLockWriteGuard<ParticipantList> {
         RwLockWriteGuard::map(self.state.write(), |s| &mut s.participants)
     }
+
+    pub fn sidebar_state(&self) -> RoomSidebarState {
+        self.state.read().sidebar_state
+    }
+
+    pub fn set_sidebar_state(&self, state: RoomSidebarState) {
+        self.state.write().sidebar_state = state
+    }
 }
 
 impl RoomInternals {
-    pub fn pending(room_id: &RoomId, nickname: &str) -> Self {
+    pub fn pending(room_id: &RoomId, nickname: &str, sidebar_state: RoomSidebarState) -> Self {
         Self {
             info: RoomInfo {
                 room_id: room_id.clone(),
                 user_nickname: nickname.to_string(),
                 r#type: RoomType::Pending,
             },
-            state: Default::default(),
+            state: RwLock::new(RoomDetails {
+                name: None,
+                description: None,
+                topic: None,
+                participants: Default::default(),
+                sidebar_state,
+                room_state: Default::default(),
+            }),
         }
     }
 
@@ -144,6 +192,7 @@ impl RoomInternals {
         contact_id: &UserId,
         contact_name: &str,
         availability: &Availability,
+        sidebar_state: RoomSidebarState,
     ) -> Self {
         Self {
             info: RoomInfo {
@@ -151,7 +200,7 @@ impl RoomInternals {
                 user_nickname: "no_nickname".to_string(),
                 r#type: RoomType::DirectMessage,
             },
-            state: RwLock::new(RoomState {
+            state: RwLock::new(RoomDetails {
                 name: Some(contact_name.to_string()),
                 description: None,
                 topic: None,
@@ -160,6 +209,8 @@ impl RoomInternals {
                     contact_name,
                     availability,
                 ),
+                sidebar_state,
+                room_state: Default::default(),
             }),
         }
     }
@@ -213,7 +264,7 @@ mod tests {
                     user_nickname: "no_nickname".to_string(),
                     r#type: RoomType::DirectMessage,
                 },
-                state: RwLock::new(RoomState {
+                state: RwLock::new(RoomDetails {
                     name: Some("Jane Doe".to_string()),
                     description: None,
                     topic: None,

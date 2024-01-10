@@ -20,7 +20,7 @@ use crate::app::deps::{
     DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService, DynSidebarRepository,
 };
-use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
+use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSidebarState, RoomSpec};
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType, SidebarItem};
@@ -75,7 +75,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             if let Some(mut sidebar_item) = self.sidebar_repo.get(&bookmark.jid) {
                 // Update basic properties
                 sidebar_item.name = bookmark.name;
-                sidebar_item.is_favorite = bookmark.is_favorite;
+                sidebar_item.is_favorite = bookmark.sidebar_state == RoomSidebarState::Favorite;
                 sidebar_item.r#type = bookmark.r#type;
                 sidebar_changed = true;
 
@@ -83,7 +83,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 // Private Channels, as Private Channels are kept in the bookmarks list because
                 // we'd otherwise loose track of them, while Groups are kept because these should
                 // always be connected so that our user can receive messages from them.
-                if !bookmark.in_sidebar {
+                if !bookmark.sidebar_state.is_in_sidebar() {
                     self.sidebar_repo.delete(&sidebar_item.jid);
                     self.disconnect_room_for_removed_sidebar_item_if_needed(&sidebar_item)
                         .await?;
@@ -94,7 +94,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 continue;
             }
 
-            if !bookmark.in_sidebar {
+            if !bookmark.sidebar_state.is_in_sidebar() {
                 continue;
             }
 
@@ -142,14 +142,14 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                     name: room.name().unwrap_or(bookmark.name),
                     jid: bookmark.jid,
                     r#type: bookmark.r#type,
-                    is_favorite: bookmark.is_favorite,
+                    is_favorite: bookmark.sidebar_state == RoomSidebarState::Favorite,
                     error: None,
                 },
                 Err(err) => SidebarItem {
                     name: bookmark.name,
                     jid: bookmark.jid,
                     r#type: bookmark.r#type,
-                    is_favorite: bookmark.is_favorite,
+                    is_favorite: bookmark.sidebar_state == RoomSidebarState::Favorite,
                     error: Some(err.to_string()),
                 },
             };
@@ -199,7 +199,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ) -> Result<RoomId> {
         let room = self
             .rooms_domain_service
-            .create_or_join_room(request)
+            .create_or_join_room(request, RoomSidebarState::InSidebar)
             .await?;
 
         self.insert_or_update_sidebar_item_and_bookmark_for_room_if_needed(room)
@@ -581,8 +581,7 @@ impl SidebarDomainService {
             // public channels.
             BookmarkType::Group | BookmarkType::PrivateChannel => {
                 let mut bookmark = Bookmark::from(&sidebar_item);
-                bookmark.is_favorite = false;
-                bookmark.in_sidebar = false;
+                bookmark.sidebar_state = RoomSidebarState::NotInSidebar;
                 self.bookmarks_service.save_bookmark(&bookmark).await?;
             }
             BookmarkType::DirectMessage | BookmarkType::PublicChannel => {
@@ -637,10 +636,12 @@ impl SidebarDomainService {
         bookmark: &Bookmark,
     ) -> Result<Option<Arc<RoomInternals>>, RoomError> {
         let room = match bookmark.r#type {
-            BookmarkType::DirectMessage if !bookmark.in_sidebar => None,
+            BookmarkType::DirectMessage if !bookmark.sidebar_state.is_in_sidebar() => None,
 
             // For channels, we're only participating in them if they're in the sidebar.
-            BookmarkType::PublicChannel | BookmarkType::PrivateChannel if !bookmark.in_sidebar => {
+            BookmarkType::PublicChannel | BookmarkType::PrivateChannel
+                if !bookmark.sidebar_state.is_in_sidebar() =>
+            {
                 None
             }
 
@@ -648,9 +649,12 @@ impl SidebarDomainService {
             // insert the placeholder room instead.
             BookmarkType::DirectMessage => Some(
                 self.rooms_domain_service
-                    .create_or_join_room(CreateOrEnterRoomRequest::JoinDirectMessage {
-                        participant: UserId::from(bookmark.jid.clone().into_inner()),
-                    })
+                    .create_or_join_room(
+                        CreateOrEnterRoomRequest::JoinDirectMessage {
+                            participant: UserId::from(bookmark.jid.clone().into_inner()),
+                        },
+                        bookmark.sidebar_state,
+                    )
                     .await?,
             ),
 
@@ -661,10 +665,13 @@ impl SidebarDomainService {
             BookmarkType::Group | BookmarkType::PublicChannel | BookmarkType::PrivateChannel => {
                 Some(
                     self.rooms_domain_service
-                        .create_or_join_room(CreateOrEnterRoomRequest::JoinRoom {
-                            room_jid: bookmark.jid.clone(),
-                            password: None,
-                        })
+                        .create_or_join_room(
+                            CreateOrEnterRoomRequest::JoinRoom {
+                                room_jid: bookmark.jid.clone(),
+                                password: None,
+                            },
+                            bookmark.sidebar_state,
+                        )
                         .await?,
                 )
             }
@@ -715,8 +722,7 @@ impl SidebarDomainService {
                 name: room_name,
                 jid: room.room_id.clone(),
                 r#type: bookmark_type.clone(),
-                is_favorite: false,
-                in_sidebar: true,
+                sidebar_state: RoomSidebarState::InSidebar,
             })
             .await;
 
@@ -743,8 +749,11 @@ impl From<&SidebarItem> for Bookmark {
             name: value.name.clone(),
             jid: value.jid.clone(),
             r#type: value.r#type.clone(),
-            is_favorite: value.is_favorite,
-            in_sidebar: true,
+            sidebar_state: if value.is_favorite {
+                RoomSidebarState::Favorite
+            } else {
+                RoomSidebarState::InSidebar
+            },
         }
     }
 }

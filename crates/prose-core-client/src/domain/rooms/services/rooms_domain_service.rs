@@ -11,7 +11,7 @@ use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSpec};
+use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSidebarState, RoomSpec};
 use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +43,7 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     async fn create_or_join_room(
         &self,
         request: CreateOrEnterRoomRequest,
+        sidebar_state: RoomSidebarState,
     ) -> Result<Arc<RoomInternals>, RoomError>;
 
     /// Renames the room identified by `room_jid` to `name`.

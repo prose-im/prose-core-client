@@ -24,7 +24,7 @@ use crate::app::deps::{
 };
 use crate::domain::rooms::models::{
     RegisteredMember, RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomSessionInfo,
-    RoomSessionMember, RoomSpec,
+    RoomSessionMember, RoomSidebarState, RoomSpec,
 };
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
@@ -58,16 +58,18 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
     async fn create_or_join_room(
         &self,
         request: CreateOrEnterRoomRequest,
+        sidebar_state: RoomSidebarState,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         match request {
             CreateOrEnterRoomRequest::Create { service, room_type } => {
-                self.create_room(&service, room_type).await
+                self.create_room(&service, room_type, sidebar_state).await
             }
             CreateOrEnterRoomRequest::JoinRoom { room_jid, password } => {
-                self.join_room(&room_jid, password.as_deref()).await
+                self.join_room(&room_jid, password.as_deref(), sidebar_state)
+                    .await
             }
             CreateOrEnterRoomRequest::JoinDirectMessage { participant } => {
-                self.join_direct_message(&participant).await
+                self.join_direct_message(&participant, sidebar_state).await
             }
         }
     }
@@ -144,6 +146,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                         CreateRoomType::PrivateChannel {
                             name: new_name.to_string(),
                         },
+                        room.sidebar_state(),
                     )
                     .await
                 {
@@ -329,12 +332,13 @@ impl RoomsDomainService {
         &self,
         room_jid: &RoomId,
         password: Option<&str>,
+        sidebar_state: RoomSidebarState,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
 
         // Insert pending room so that we don't miss any stanzas for this room while we're
         // connecting to it…
-        self.insert_pending_room(room_jid, &nickname)?;
+        self.insert_pending_room(room_jid, &nickname, sidebar_state)?;
 
         let full_room_jid = room_jid.occupant_id_with_nickname(&nickname)?;
 
@@ -357,6 +361,7 @@ impl RoomsDomainService {
     async fn join_direct_message(
         &self,
         participant: &UserId,
+        sidebar_state: RoomSidebarState,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let room_id = RoomId::from(participant.clone().into_inner());
 
@@ -379,6 +384,7 @@ impl RoomsDomainService {
             &participant,
             &contact_name,
             &user_info.availability,
+            sidebar_state,
         ));
 
         match self.connected_rooms_repo.set(room.clone()) {
@@ -396,10 +402,12 @@ impl RoomsDomainService {
         &self,
         service: &BareJid,
         request: CreateRoomType,
+        sidebar_state: RoomSidebarState,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let result = match request {
             CreateRoomType::Group { participants } => {
-                self.create_or_join_group(&service, participants).await
+                self.create_or_join_group(&service, participants, sidebar_state)
+                    .await
             }
             CreateRoomType::PrivateChannel { name } => {
                 // We'll use a random ID for the jid of the private channel. This way
@@ -413,6 +421,7 @@ impl RoomsDomainService {
                     &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
                     RoomSpec::PrivateChannel,
+                    sidebar_state,
                     |_| async { Ok(()) },
                 )
                 .await
@@ -435,6 +444,7 @@ impl RoomsDomainService {
                     &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
                     RoomSpec::PublicChannel,
+                    sidebar_state,
                     |_| async { Ok(()) },
                 )
                 .await
@@ -459,6 +469,7 @@ impl RoomsDomainService {
         &self,
         service: &BareJid,
         participants: Vec<UserId>,
+        sidebar_state: RoomSidebarState,
     ) -> Result<RoomSessionInfo, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
@@ -509,6 +520,7 @@ impl RoomsDomainService {
                 &group_hash,
                 &group_name,
                 RoomSpec::Group,
+                sidebar_state,
                 |info| {
                     // Try to promote all participants to owners…
                     info!("Update participant affiliations…");
@@ -535,7 +547,7 @@ impl RoomsDomainService {
                             Ok(())
                         }
                     }
-                },
+                }
             )
             .await?;
 
@@ -556,6 +568,7 @@ impl RoomsDomainService {
         room_id: &str,
         room_name: &str,
         spec: RoomSpec,
+        sidebar_state: RoomSidebarState,
         perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
@@ -578,7 +591,7 @@ impl RoomsDomainService {
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
-            self.insert_pending_room(&room_jid, &nickname)?;
+            self.insert_pending_room(&room_jid, &nickname, sidebar_state)?;
 
             // Try to create or enter the room and configure it…
             let result = self
@@ -691,9 +704,18 @@ impl RoomsDomainService {
         Ok(true)
     }
 
-    fn insert_pending_room(&self, room_jid: &RoomId, nickname: &str) -> Result<(), RoomError> {
+    fn insert_pending_room(
+        &self,
+        room_jid: &RoomId,
+        nickname: &str,
+        sidebar_state: RoomSidebarState,
+    ) -> Result<(), RoomError> {
         self.connected_rooms_repo
-            .set(Arc::new(RoomInternals::pending(room_jid, nickname)))
+            .set(Arc::new(RoomInternals::pending(
+                room_jid,
+                nickname,
+                sidebar_state,
+            )))
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
     }
 }
