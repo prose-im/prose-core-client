@@ -71,6 +71,7 @@ impl IntoAttributeValue for BookmarkType {
                 BookmarkType::Group => "group",
                 BookmarkType::PrivateChannel => "private-channel",
                 BookmarkType::PublicChannel => "public-channel",
+                BookmarkType::Generic => "generic",
             }
             .to_string(),
         )

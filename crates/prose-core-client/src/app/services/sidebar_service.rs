@@ -3,16 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use anyhow::Result;
-use tracing::error;
 
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
     DynConnectedRoomsReadOnlyRepository, DynDraftsRepository, DynRoomFactory,
-    DynSidebarDomainService, DynSidebarReadOnlyRepository,
+    DynSidebarDomainService,
 };
-use crate::domain::shared::models::RoomId;
+use crate::domain::rooms::models::{RoomInternals, RoomSidebarState};
+use crate::domain::shared::models::{RoomId, RoomType};
 use crate::dtos::SidebarItem as SidebarItemDTO;
 
 #[derive(InjectDependencies)]
@@ -25,37 +27,33 @@ pub struct SidebarService {
     room_factory: DynRoomFactory,
     #[inject]
     sidebar_domain_service: DynSidebarDomainService,
-    #[inject]
-    sidebar_repo: DynSidebarReadOnlyRepository,
 }
 
 impl SidebarService {
     pub async fn sidebar_items(&self) -> Vec<SidebarItemDTO> {
-        let items = self.sidebar_repo.get_all();
+        let rooms: Vec<Arc<RoomInternals>> = self.connected_rooms_repo.get_all();
         let mut item_dtos = vec![];
 
-        for item in items {
-            let Some(room) = self.connected_rooms_repo.get(&item.jid) else {
-                error!(
-                    "Couldn't find connected room for sidebar item with jid {}",
-                    item.jid
-                );
+        for room in rooms {
+            if room.r#type == RoomType::Unknown {
                 continue;
-            };
+            }
+
+            let is_favorite = room.sidebar_state() == RoomSidebarState::Favorite;
+            let id = room.room_id.clone();
 
             let item_dto = SidebarItemDTO {
-                name: item.name,
+                name: room.name().unwrap_or_else(|| id.to_string()),
                 room: self.room_factory.build(room),
-                is_favorite: item.is_favorite,
+                is_favorite,
                 has_draft: self
                     .drafts_repo
-                    .get(&item.jid)
+                    .get(&id)
                     .await
                     .unwrap_or_default()
                     .is_some(),
                 unread_count: 0,   // TODO
                 mentions_count: 0, // TODO
-                error: item.error,
             };
             item_dtos.push(item_dto)
         }

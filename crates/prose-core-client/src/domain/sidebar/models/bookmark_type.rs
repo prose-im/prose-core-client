@@ -5,12 +5,15 @@
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::domain::shared::models::RoomType;
+
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum BookmarkType {
     DirectMessage,
     Group,
     PrivateChannel,
     PublicChannel,
+    Generic,
 }
 
 impl Display for BookmarkType {
@@ -23,7 +26,23 @@ impl Display for BookmarkType {
                 BookmarkType::Group => "Group",
                 BookmarkType::PrivateChannel => "Private Channel",
                 BookmarkType::PublicChannel => "Public Channel",
+                BookmarkType::Generic => "Generic",
             }
         )
+    }
+}
+
+impl From<RoomType> for BookmarkType {
+    fn from(value: RoomType) -> Self {
+        match value {
+            RoomType::Unknown => {
+                unreachable!("Cannot build a bookmark from an unknown room type.")
+            }
+            RoomType::DirectMessage => BookmarkType::DirectMessage,
+            RoomType::Group => BookmarkType::Group,
+            RoomType::PrivateChannel => BookmarkType::PrivateChannel,
+            RoomType::PublicChannel => BookmarkType::PublicChannel,
+            RoomType::Generic => BookmarkType::Generic,
+        }
     }
 }

@@ -10,10 +10,7 @@ pub use js_array::*;
 pub use message::Message;
 pub use room::RoomEnvelopeExt;
 pub use sidebar_item::{SidebarItem, SidebarItemsArray};
-pub use user_info::{
-    ParticipantInfo, ParticipantInfoArray, UserBasicInfo, UserBasicInfoArray, UserPresenceInfo,
-    UserPresenceInfoArray,
-};
+pub use user_info::{ParticipantInfo, ParticipantInfoArray, UserBasicInfo, UserBasicInfoArray};
 pub use user_metadata::UserMetadata;
 pub use user_profile::UserProfile;
 

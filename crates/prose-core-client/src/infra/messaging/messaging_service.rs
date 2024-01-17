@@ -163,7 +163,7 @@ trait RoomMessageType {
 impl RoomMessageType for RoomType {
     fn message_type(&self) -> MessageType {
         match self {
-            RoomType::Pending => unreachable!("Pending room tried to send a message"),
+            RoomType::Unknown => unreachable!("Pending room tried to send a message"),
             RoomType::DirectMessage => MessageType::Chat,
             RoomType::Group
             | RoomType::PrivateChannel

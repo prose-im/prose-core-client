@@ -13,7 +13,7 @@ pub use crate::domain::{
     contacts::models::Group,
     general::models::SoftwareVersion,
     messaging::models::{Emoji, MessageId, Reaction, StanzaId},
-    rooms::models::{Participant, PublicRoomInfo, RoomAffiliation},
+    rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
         Availability, OccupantId, ParticipantInfo, RoomId, UserBasicInfo, UserId, UserPresenceInfo,
         UserResourceId,
@@ -22,7 +22,7 @@ pub use crate::domain::{
     user_profiles::models::{Address, UserProfile},
 };
 
-#[cfg(feature = "debug")]
+#[cfg(any(feature = "debug", feature = "test"))]
 pub use crate::domain::sidebar::models::Bookmark;
 
 mod contact;

@@ -49,12 +49,12 @@ impl AccountService {
 
     pub async fn set_availability(&self, availability: Availability) -> Result<()> {
         self.user_account_service
-            .set_availability(&self.ctx.capabilities, &availability)
+            .set_availability(&self.ctx.capabilities, availability)
             .await?;
         self.account_settings_repo
             .update(
                 &self.ctx.connected_id()?.to_user_id(),
-                Box::new(|settings| settings.availability = Some(availability)),
+                Box::new(move |settings| settings.availability = Some(availability)),
             )
             .await?;
         Ok(())

@@ -5,9 +5,12 @@
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Clone, PartialEq)]
+use crate::domain::sidebar::models::BookmarkType;
+
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum RoomType {
-    Pending,
+    /// The type of room is not yet known since we're still connecting to it.
+    Unknown,
     DirectMessage,
     Group,
     PrivateChannel,
@@ -18,12 +21,24 @@ pub enum RoomType {
 impl Display for RoomType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            RoomType::Pending => write!(f, "Pending"),
+            RoomType::Unknown => write!(f, "Unknown"),
             RoomType::DirectMessage => write!(f, "Direct Message"),
             RoomType::Group => write!(f, "Group"),
             RoomType::PrivateChannel => write!(f, "Private Channel"),
             RoomType::PublicChannel => write!(f, "Public Channel"),
             RoomType::Generic => write!(f, "Generic"),
+        }
+    }
+}
+
+impl From<BookmarkType> for RoomType {
+    fn from(value: BookmarkType) -> Self {
+        match value {
+            BookmarkType::DirectMessage => RoomType::DirectMessage,
+            BookmarkType::Group => RoomType::Group,
+            BookmarkType::PrivateChannel => RoomType::PrivateChannel,
+            BookmarkType::PublicChannel => RoomType::PublicChannel,
+            BookmarkType::Generic => RoomType::Generic,
         }
     }
 }

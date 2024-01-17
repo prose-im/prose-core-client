@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::domain::rooms::models::RoomSidebarState;
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
 use crate::dtos::RoomId;
 
@@ -14,8 +15,7 @@ impl Bookmark {
             name: jid.to_display_name(),
             jid,
             r#type: BookmarkType::DirectMessage,
-            is_favorite: false,
-            in_sidebar: false,
+            sidebar_state: RoomSidebarState::NotInSidebar,
         }
     }
 
@@ -26,8 +26,7 @@ impl Bookmark {
             name: name.into(),
             jid,
             r#type: BookmarkType::Group,
-            is_favorite: false,
-            in_sidebar: false,
+            sidebar_state: RoomSidebarState::NotInSidebar,
         }
     }
 
@@ -38,8 +37,7 @@ impl Bookmark {
             name: name.into(),
             jid,
             r#type: BookmarkType::PublicChannel,
-            is_favorite: false,
-            in_sidebar: false,
+            sidebar_state: RoomSidebarState::NotInSidebar,
         }
     }
 
@@ -50,8 +48,7 @@ impl Bookmark {
             name: name.into(),
             jid,
             r#type: BookmarkType::PrivateChannel,
-            is_favorite: false,
-            in_sidebar: false,
+            sidebar_state: RoomSidebarState::NotInSidebar,
         }
     }
 }
@@ -62,13 +59,8 @@ impl Bookmark {
         self
     }
 
-    pub fn set_is_favorite(mut self, is_favorite: bool) -> Self {
-        self.is_favorite = is_favorite;
-        self
-    }
-
-    pub fn set_in_sidebar(mut self, in_sidebar: bool) -> Self {
-        self.in_sidebar = in_sidebar;
+    pub fn set_sidebar_state(mut self, state: RoomSidebarState) -> Self {
+        self.sidebar_state = state;
         self
     }
 }

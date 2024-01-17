@@ -13,6 +13,7 @@ pub use mock_app_dependencies::{
     MockSidebarDomainServiceDependencies,
 };
 use prose_xmpp::Client;
+pub use room_internals::DisconnectedState;
 
 use crate::app::event_handlers::ServerEvent;
 use crate::parse_xmpp_event;
@@ -23,7 +24,6 @@ mod message_builder;
 mod mock_app_dependencies;
 mod room_internals;
 mod room_metadata;
-mod sidebar_item;
 
 pub mod mock_data {
     pub use super::mock_app_dependencies::{

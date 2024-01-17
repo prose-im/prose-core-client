@@ -18,19 +18,24 @@ pub struct RoomAlreadyExistsError;
 
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ConnectedRoomsReadOnlyRepository: SendUnlessWasm + SyncUnlessWasm {
-    fn get(&self, room_jid: &RoomId) -> Option<Arc<RoomInternals>>;
+    fn get(&self, room_id: &RoomId) -> Option<Arc<RoomInternals>>;
     fn get_all(&self) -> Vec<Arc<RoomInternals>>;
 }
 
 pub trait ConnectedRoomsRepository: ConnectedRoomsReadOnlyRepository {
     fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError>;
 
-    /// If a room with `room_jid` was found returns the room returned by `block` otherwise
-    /// returns `None`.
-    fn update(&self, room_jid: &RoomId, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
+    fn set_or_replace(&self, room: Arc<RoomInternals>) -> Option<Arc<RoomInternals>>;
 
-    fn delete(&self, room_jid: &RoomId);
-    fn delete_all(&self);
+    /// If a room with `room_id` was found returns the room returned by `block` otherwise
+    /// returns `None`.
+    fn update(&self, room_id: &RoomId, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
+
+    /// Deletes the room identified by `room_id` from the repository and returns the removed room.
+    fn delete(&self, room_id: &RoomId) -> Option<Arc<RoomInternals>>;
+
+    /// Deletes all rooms from the repository and returns the removed rooms.
+    fn delete_all(&self) -> Vec<Arc<RoomInternals>>;
 }
 
 #[cfg(feature = "test")]
@@ -38,14 +43,15 @@ mockall::mock! {
     pub ConnectedRoomsReadWriteRepository {}
 
     impl ConnectedRoomsReadOnlyRepository for ConnectedRoomsReadWriteRepository {
-        fn get(&self, room_jid: &RoomId) -> Option<Arc<RoomInternals>>;
+        fn get(&self, room_id: &RoomId) -> Option<Arc<RoomInternals>>;
         fn get_all(&self) -> Vec<Arc<RoomInternals>>;
     }
 
     impl ConnectedRoomsRepository for ConnectedRoomsReadWriteRepository {
         fn set(&self, room: Arc<RoomInternals>) -> Result<(), RoomAlreadyExistsError>;
-        fn update(&self, room_jid: &RoomId, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
-        fn delete(&self, room_jid: &RoomId);
-        fn delete_all(&self);
+        fn set_or_replace(&self, room: Arc<RoomInternals>) -> Option<Arc<RoomInternals>>;
+        fn update(&self, room_id: &RoomId, block: UpdateHandler) -> Option<Arc<RoomInternals>>;
+        fn delete(&self, room_id: &RoomId) -> Option<Arc<RoomInternals>>;
+        fn delete_all(&self) -> Vec<Arc<RoomInternals>>;
     }
 }

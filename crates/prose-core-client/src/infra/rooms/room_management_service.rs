@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use async_trait::async_trait;
-use jid::{BareJid, FullJid};
+use jid::BareJid;
 use strum::IntoEnumIterator;
 use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::muc::user::{Affiliation, Status};
@@ -191,9 +191,9 @@ impl RoomManagementService for XMPPClient {
         })
     }
 
-    async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError> {
+    async fn exit_room(&self, occupant_id: &OccupantId) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        muc_mod.exit_room(room_jid).await?;
+        muc_mod.exit_room(occupant_id.as_ref()).await?;
         Ok(())
     }
 

@@ -62,7 +62,7 @@ impl ClientEventDispatcherTrait for ClientEventDispatcher {
 
     fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: ClientRoomEventType) {
         // We're not sending events for rooms that are still pending…
-        if room.r#type == RoomType::Pending {
+        if room.r#type == RoomType::Unknown {
             return;
         }
 

@@ -74,7 +74,7 @@ impl ConnectionService {
         }
 
         self.user_account_service
-            .set_availability(&self.ctx.capabilities, &availability)
+            .set_availability(&self.ctx.capabilities, availability)
             .await
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),

@@ -8,7 +8,7 @@ pub use participant_list::{Participant, ParticipantList, RegisteredMember};
 pub use public_room_info::PublicRoomInfo;
 pub use room_affiliation::RoomAffiliation;
 pub use room_error::RoomError;
-pub use room_internals::{RoomInfo, RoomInternals, RoomSidebarState};
+pub use room_internals::{RoomInfo, RoomInternals, RoomSidebarState, RoomState};
 pub use room_session_info::{RoomConfig, RoomSessionInfo, RoomSessionMember};
 pub use room_spec::RoomSpec;
 

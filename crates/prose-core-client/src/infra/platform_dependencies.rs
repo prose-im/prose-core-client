@@ -27,7 +27,6 @@ use crate::infra::messaging::{
 };
 use crate::infra::rooms::InMemoryConnectedRoomsRepository;
 use crate::infra::settings::{AccountSettingsRecord, AccountSettingsRepository};
-use crate::infra::sidebar::InMemorySidebarRepository;
 use crate::infra::user_info::caching_avatar_repository::CachingAvatarRepository;
 use crate::infra::user_info::{CachingUserInfoRepository, UserInfoRecord};
 use crate::infra::user_profile::{CachingUserProfileRepository, UserProfileRecord};
@@ -98,7 +97,6 @@ impl From<PlatformDependencies> for AppDependencies {
         let drafts_repo = Arc::new(DraftsRepository::new(d.store.clone()));
         let id_provider = d.id_provider;
         let messages_repo = Arc::new(CachingMessageRepository::new(d.store.clone()));
-        let sidebar_repo = Arc::new(InMemorySidebarRepository::new());
         let time_provider = d.time_provider;
         let user_info_repo = Arc::new(CachingUserInfoRepository::new(
             d.store.clone(),
@@ -139,9 +137,9 @@ impl From<PlatformDependencies> for AppDependencies {
             bookmarks_service: d.xmpp.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
+            ctx: ctx.clone(),
             room_management_service: d.xmpp.clone(),
             rooms_domain_service: rooms_domain_service.clone(),
-            sidebar_repo: sidebar_repo.clone(),
         };
 
         let sidebar_domain_service = Arc::new(SidebarDomainService::from(
@@ -198,7 +196,6 @@ impl From<PlatformDependencies> for AppDependencies {
             rooms_domain_service,
             short_id_provider: d.short_id_provider,
             sidebar_domain_service,
-            sidebar_repo,
             time_provider,
             user_account_service: d.xmpp.clone(),
             user_info_repo,

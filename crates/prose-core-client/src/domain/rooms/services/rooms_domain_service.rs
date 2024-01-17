@@ -26,14 +26,76 @@ pub enum CreateOrEnterRoomRequest {
     Create {
         service: BareJid,
         room_type: CreateRoomType,
+        behavior: CreateRoomBehavior,
     },
     JoinRoom {
-        room_jid: RoomId,
+        room_id: RoomId,
         password: Option<String>,
+        behavior: JoinRoomBehavior,
     },
     JoinDirectMessage {
         participant: UserId,
     },
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum CreateRoomBehavior {
+    /// Joins the specified alternate room when encountering a tombstone with the same JID.
+    FollowIfGone,
+    /// Fails the room creation operation if a tombstone with the same JID is encountered.
+    FailIfGone,
+    /// Creates a new, unique room by appending a monotonically increasing suffix when a room
+    /// when encountering a tombstone with the same JID.
+    CreateUniqueIfGone,
+    /// Tries to join the specified alternate room when encountering a tombstone with the same JID.
+    /// If no alternate room is specified, it creates a new, unique room with a monotonically
+    /// increasing suffix.
+    FollowThenCreateUnique,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct JoinRoomBehavior {
+    pub on_redirect: JoinRoomRedirectBehavior,
+    pub on_failure: JoinRoomFailureBehavior,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum JoinRoomRedirectBehavior {
+    /// Joins the specified alternate room when encountering a tombstone with the same JID.
+    FollowIfGone,
+    /// Fails the room creation operation if a tombstone with the same JID is encountered.
+    FailIfGone,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum JoinRoomFailureBehavior {
+    /// If the connection fails, the room is removed.
+    RemoveOnError,
+    /// If the connection fails, the room will be retained and its status property set
+    /// to `Disconnected` with an error message.
+    RetainOnError,
+}
+
+impl JoinRoomBehavior {
+    /// Defines the standard behavior if the join was user initiated. In such cases we would
+    /// usually show a dedicated UI and an alert if the operation fails.
+    pub fn user_initiated() -> Self {
+        Self {
+            on_redirect: JoinRoomRedirectBehavior::FollowIfGone,
+            on_failure: JoinRoomFailureBehavior::RemoveOnError,
+        }
+    }
+
+    /// Defines the standard behavior if the join was system initiated. This could be the case
+    /// i.e. when we've received changed bookmarks from the server or an invite from another user.
+    /// In such cases we want the room that could not be connected to, to stick around in the
+    /// sidebar since we don't have a dedicated UI.
+    pub fn system_initiated() -> Self {
+        Self {
+            on_redirect: JoinRoomRedirectBehavior::FollowIfGone,
+            on_failure: JoinRoomFailureBehavior::RetainOnError,
+        }
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

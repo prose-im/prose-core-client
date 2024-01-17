@@ -10,7 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::RoomSpec;
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::RoomId;
+use crate::domain::shared::models::{RoomId, UserEndpointId};
 use crate::domain::sidebar::models::Bookmark;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -21,7 +21,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///
     /// Loads the remote bookmarks then proceeds with the logic details
     /// in `extend_items_from_bookmarks`.
-    async fn load_and_extend_items_from_bookmarks(&self) -> Result<()>;
+    async fn populate_sidebar(&self) -> Result<()>;
 
     /// Extends the sidebar with items from a collection of bookmarks.
     ///
@@ -56,9 +56,12 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// corresponding bookmark.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn insert_item_for_received_message_if_needed(&self, room_id: &RoomId) -> Result<()>;
+    async fn insert_item_for_received_message_if_needed(
+        &self,
+        sender: &UserEndpointId,
+    ) -> Result<()>;
 
-    /// Renames the sidebar item identified by `room_jid` to `name`.
+    /// Renames the sidebar item identified by `room_id` to `name`.
     ///
     /// If the item is not in the list of sidebar items no action is performed, otherwise:
     ///   - The corresponding room will be renamed.
@@ -66,14 +69,14 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
     async fn rename_item(&self, room_id: &RoomId, name: &str) -> Result<()>;
 
-    /// Toggles the `is_favorite` flag for the sidebar item identified by `room_jid`.
+    /// Toggles the `is_favorite` flag for the sidebar item identified by `room_id`.
     ///
     /// If the item is not in the list of sidebar items no action is performed, otherwise:
     ///   - The corresponding bookmark will be updated to reflect the new status of `is_favorite`.
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
     async fn toggle_item_is_favorite(&self, room_id: &RoomId) -> Result<()>;
 
-    /// Reconfigures the sidebar item identified by `room_jid` according to `spec` and renames it
+    /// Reconfigures the sidebar item identified by `room_id` according to `spec` and renames it
     /// to `new_name`.
     ///
     /// If the item is not in the list of sidebar items no action is performed, otherwise:
@@ -87,7 +90,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
         new_name: &str,
     ) -> Result<()>;
 
-    /// Removes multiple sidebar items associated with the provided `room_jids`.
+    /// Removes multiple sidebar items associated with the provided `room_ids`.
     ///
     /// - Disconnects channels and updates the repository state for each provided JID.
     /// - Groups and Private Channels have their bookmarks updated to reflect they are not in

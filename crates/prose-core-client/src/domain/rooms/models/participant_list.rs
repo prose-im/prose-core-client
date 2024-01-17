@@ -44,7 +44,7 @@ impl ParticipantList {
     pub fn for_direct_message(
         contact_id: &UserId,
         contact_name: &str,
-        availability: &Availability,
+        availability: Availability,
     ) -> Self {
         Self {
             anon_occupant_id_to_participant_id_map: Default::default(),
@@ -56,7 +56,7 @@ impl ParticipantList {
                     name: Some(contact_name.to_string()),
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
-                    availability: availability.clone(),
+                    availability,
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 },
@@ -588,7 +588,7 @@ mod tests {
         let mut list = ParticipantList::for_direct_message(
             &user_id!("a@prose.org"),
             "User A",
-            &Availability::Unavailable,
+            Availability::Unavailable,
         );
 
         assert_eq!(

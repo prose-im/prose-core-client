@@ -11,7 +11,6 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use futures::join;
 use jid::{BareJid, NodePart};
-use sha1::{Digest, Sha1};
 use tracing::{debug, error, info, warn};
 
 use prose_proc_macros::DependenciesStruct;
@@ -26,17 +25,19 @@ use crate::domain::rooms::models::{
     RegisteredMember, RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomSessionInfo,
     RoomSessionMember, RoomSidebarState, RoomSpec,
 };
-use crate::domain::rooms::services::CreateOrEnterRoomRequest;
+use crate::domain::rooms::services::rooms_domain_service::{
+    CreateRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
+};
+use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
+use crate::dtos::RoomState;
 use crate::util::StringExt;
 use crate::ClientRoomEventType;
 
 use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
+use super::{build_nickname, ParticipantsVecExt};
 
-const GROUP_PREFIX: &str = "org.prose.group";
 const CHANNEL_PREFIX: &str = "org.prose.channel";
-const NICKNAME_MAX_LEN: usize = 20;
-const NICKNAME_HASH_LEN: usize = 7;
 
 #[derive(DependenciesStruct)]
 pub struct RoomsDomainService {
@@ -61,11 +62,20 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         sidebar_state: RoomSidebarState,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         match request {
-            CreateOrEnterRoomRequest::Create { service, room_type } => {
-                self.create_room(&service, room_type, sidebar_state).await
+            CreateOrEnterRoomRequest::Create {
+                service,
+                room_type,
+                behavior,
+            } => {
+                self.create_room(&service, room_type, sidebar_state, behavior)
+                    .await
             }
-            CreateOrEnterRoomRequest::JoinRoom { room_jid, password } => {
-                self.join_room(&room_jid, password.as_deref(), sidebar_state)
+            CreateOrEnterRoomRequest::JoinRoom {
+                room_id: room_jid,
+                password,
+                behavior,
+            } => {
+                self.join_room(&room_jid, password.as_deref(), sidebar_state, behavior)
                     .await
             }
             CreateOrEnterRoomRequest::JoinDirectMessage { participant } => {
@@ -89,7 +99,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         match room.r#type {
             // We do not allow renaming Direct Messages or Groups since those names should always
             // represent the list of participants.
-            RoomType::Pending | RoomType::DirectMessage | RoomType::Group => {
+            RoomType::Unknown | RoomType::DirectMessage | RoomType::Group => {
                 panic!("Unsupported action")
             }
             RoomType::PublicChannel => {
@@ -147,6 +157,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                             name: new_name.to_string(),
                         },
                         room.sidebar_state(),
+                        CreateRoomBehavior::FailIfGone,
                     )
                     .await
                 {
@@ -277,7 +288,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             | (RoomType::PrivateChannel, _)
             | (RoomType::PublicChannel, _)
             | (RoomType::DirectMessage, _)
-            | (RoomType::Pending, _)
+            | (RoomType::Unknown, _)
             | (RoomType::Generic, _) => {
                 panic!(
                     "Cannot convert room of type {} to type {}.",
@@ -320,40 +331,69 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         self.connected_rooms_repo
             .update(
                 room_id,
-                Box::new(|room| room.by_changing_type(config.room_type)),
+                Box::new(move |room| room.by_changing_type(config.room_type)),
             )
             .ok_or(RoomError::RoomWasModified)
     }
 }
 
 impl RoomsDomainService {
-    #[tracing::instrument(name = "Join room", skip(self, room_jid, password), fields(room_id = %room_jid))]
+    #[tracing::instrument(name = "Join room", skip(self, room_id, password), fields(room_id = %room_id))]
     async fn join_room(
         &self,
-        room_jid: &RoomId,
+        room_id: &RoomId,
         password: Option<&str>,
         sidebar_state: RoomSidebarState,
+        behavior: JoinRoomBehavior,
     ) -> Result<Arc<RoomInternals>, RoomError> {
+        let remove_or_retain_room_on_error =
+            |room: Arc<RoomInternals>, error: &RoomError| match behavior.on_failure {
+                JoinRoomFailureBehavior::RemoveOnError => {
+                    self.connected_rooms_repo.delete(&room_id);
+                }
+                JoinRoomFailureBehavior::RetainOnError => room.set_state(RoomState::Disconnected {
+                    error: Some(error.to_string()),
+                    can_retry: true,
+                }),
+            };
+
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
+        let mut room_id = room_id.clone();
 
-        // Insert pending room so that we don't miss any stanzas for this room while we're
-        // connecting to it…
-        self.insert_pending_room(room_jid, &nickname, sidebar_state)?;
+        let info = 'info: loop {
+            // Insert pending room so that we don't miss any stanzas for this room while we're
+            // connecting to it…
+            let room = self.insert_connecting_room(&room_id, &nickname, sidebar_state)?;
 
-        let full_room_jid = room_jid.occupant_id_with_nickname(&nickname)?;
+            let full_room_jid = room_id.occupant_id_with_nickname(&nickname)?;
 
-        let info = match self
-            .room_management_service
-            .join_room(&full_room_jid, password)
-            .await
-        {
-            Ok(info) => Ok(info),
-            Err(error) => {
-                // Remove pending room again…
-                self.connected_rooms_repo.delete(room_jid);
-                Err(error)
-            }
-        }?;
+            match self
+                .room_management_service
+                .join_room(&full_room_jid, password)
+                .await
+            {
+                Ok(info) => break 'info info,
+                Err(error) => {
+                    let Some(gone_error) = error.gone_err() else {
+                        remove_or_retain_room_on_error(room, &error);
+                        return Err(error);
+                    };
+
+                    match (behavior.on_redirect, gone_error.new_location) {
+                        (JoinRoomRedirectBehavior::FollowIfGone, Some(new_location)) => {
+                            self.connected_rooms_repo.delete(&room_id);
+                            room_id = new_location;
+                            continue;
+                        }
+                        (JoinRoomRedirectBehavior::FollowIfGone, None)
+                        | (JoinRoomRedirectBehavior::FailIfGone, _) => {
+                            remove_or_retain_room_on_error(room, &error);
+                            return Err(error);
+                        }
+                    }
+                }
+            };
+        };
 
         self.finalize_pending_room(info).await
     }
@@ -365,8 +405,10 @@ impl RoomsDomainService {
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let room_id = RoomId::from(participant.clone().into_inner());
 
-        if let Some(room) = self.connected_rooms_repo.get(&room_id) {
-            return Ok(room);
+        match self.connected_rooms_repo.get(&room_id) {
+            Some(room) if room.state() == RoomState::Pending => (),
+            None => (),
+            Some(room) => return Ok(room),
         }
 
         let (contact_name, user_info) = join!(
@@ -383,19 +425,12 @@ impl RoomsDomainService {
         let room = Arc::new(RoomInternals::for_direct_message(
             &participant,
             &contact_name,
-            &user_info.availability,
+            user_info.availability,
             sidebar_state,
         ));
 
-        match self.connected_rooms_repo.set(room.clone()) {
-            Ok(()) => Ok(room),
-            Err(_err) => {
-                if let Some(room) = self.connected_rooms_repo.get(&room_id) {
-                    return Ok(room);
-                }
-                return Err(RoomError::RoomIsAlreadyConnected(room_id));
-            }
-        }
+        self.connected_rooms_repo.set_or_replace(room.clone());
+        Ok(room)
     }
 
     async fn create_room(
@@ -403,10 +438,11 @@ impl RoomsDomainService {
         service: &BareJid,
         request: CreateRoomType,
         sidebar_state: RoomSidebarState,
+        behavior: CreateRoomBehavior,
     ) -> Result<Arc<RoomInternals>, RoomError> {
         let result = match request {
             CreateRoomType::Group { participants } => {
-                self.create_or_join_group(&service, participants, sidebar_state)
+                self.create_or_join_group(&service, participants, sidebar_state, behavior)
                     .await
             }
             CreateRoomType::PrivateChannel { name } => {
@@ -422,6 +458,7 @@ impl RoomsDomainService {
                     &name,
                     RoomSpec::PrivateChannel,
                     sidebar_state,
+                    behavior,
                     |_| async { Ok(()) },
                 )
                 .await
@@ -445,6 +482,7 @@ impl RoomsDomainService {
                     &name,
                     RoomSpec::PublicChannel,
                     sidebar_state,
+                    behavior,
                     |_| async { Ok(()) },
                 )
                 .await
@@ -470,6 +508,7 @@ impl RoomsDomainService {
         service: &BareJid,
         participants: Vec<UserId>,
         sidebar_state: RoomSidebarState,
+        behavior: CreateRoomBehavior,
     ) -> Result<RoomSessionInfo, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
@@ -521,6 +560,7 @@ impl RoomsDomainService {
                 &group_name,
                 RoomSpec::Group,
                 sidebar_state,
+                behavior,
                 |info| {
                     // Try to promote all participants to owners…
                     info!("Update participant affiliations…");
@@ -569,20 +609,15 @@ impl RoomsDomainService {
         room_name: &str,
         spec: RoomSpec,
         sidebar_state: RoomSidebarState,
+        behavior: CreateRoomBehavior,
         perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
 
         let mut attempt = 0;
+        let mut unique_room_id = room_id.to_string();
 
         loop {
-            let unique_room_id = if attempt == 0 {
-                room_id.to_string()
-            } else {
-                format!("{}#{}", room_id, attempt)
-            };
-            attempt += 1;
-
             let room_jid = RoomId::from(BareJid::from_parts(
                 Some(&NodePart::new(&unique_room_id)?),
                 &service.domain(),
@@ -591,7 +626,7 @@ impl RoomsDomainService {
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
-            self.insert_pending_room(&room_jid, &nickname, sidebar_state)?;
+            self.insert_connecting_room(&room_jid, &nickname, sidebar_state)?;
 
             // Try to create or enter the room and configure it…
             let result = self
@@ -607,11 +642,25 @@ impl RoomsDomainService {
 
                     // In this case the room existed in the past but was deleted. We'll modify
                     // the name and try again…
-                    if error.is_gone_err() {
-                        continue;
-                    }
+                    let Some(gone_error) = error.gone_err() else {
+                        return Err(error.into());
+                    };
 
-                    return Err(error.into());
+                    match (behavior, gone_error.new_location) {
+                        (CreateRoomBehavior::CreateUniqueIfGone, _)
+                        | (CreateRoomBehavior::FollowThenCreateUnique, None) => {
+                            unique_room_id = format!("{}#{}", room_id, attempt);
+                            attempt += 1;
+                            continue;
+                        }
+                        (CreateRoomBehavior::FollowIfGone, Some(new_location))
+                        | (CreateRoomBehavior::FollowThenCreateUnique, Some(new_location)) => {
+                            unique_room_id = new_location.to_string();
+                            continue;
+                        }
+                        (CreateRoomBehavior::FailIfGone, _)
+                        | (CreateRoomBehavior::FollowIfGone, None) => return Err(error.into()),
+                    }
                 }
             };
 
@@ -704,111 +753,25 @@ impl RoomsDomainService {
         Ok(true)
     }
 
-    fn insert_pending_room(
+    fn insert_connecting_room(
         &self,
         room_jid: &RoomId,
         nickname: &str,
         sidebar_state: RoomSidebarState,
-    ) -> Result<(), RoomError> {
+    ) -> Result<Arc<RoomInternals>, RoomError> {
+        // If we have a pending room waiting for us we'll switch that to connecting and do not
+        // insert a new one.
+        if let Some(pending_room) = self.connected_rooms_repo.get(room_jid) {
+            if pending_room.state() == RoomState::Pending {
+                pending_room.set_state(RoomState::Connecting);
+                return Ok(pending_room);
+            }
+        }
+
+        let room = Arc::new(RoomInternals::connecting(room_jid, nickname, sidebar_state));
         self.connected_rooms_repo
-            .set(Arc::new(RoomInternals::pending(
-                room_jid,
-                nickname,
-                sidebar_state,
-            )))
-            .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))
-    }
-}
-
-fn build_nickname(user_id: &UserId) -> String {
-    // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
-    // identical between multiple sessions so that these would be displayed as one user.
-
-    let mut hasher = Sha1::new();
-    hasher.update(user_id.to_string().to_lowercase());
-    let hash = format!("{:x}", hasher.finalize());
-
-    let username = user_id.username();
-    let username_max_length = username
-        .chars()
-        .count()
-        .min(NICKNAME_MAX_LEN - NICKNAME_HASH_LEN - 1);
-
-    format!(
-        "{}#{}",
-        username
-            .chars()
-            .take(username_max_length)
-            .collect::<String>(),
-        &hash[hash.len() - NICKNAME_HASH_LEN..]
-    )
-}
-
-trait ParticipantsVecExt {
-    fn group_name_hash(&self) -> String;
-}
-
-impl ParticipantsVecExt for Vec<UserId> {
-    fn group_name_hash(&self) -> String {
-        let mut sorted_participant_jids =
-            self.iter().map(|jid| jid.to_string()).collect::<Vec<_>>();
-        sorted_participant_jids.sort();
-
-        let mut hasher = Sha1::new();
-        hasher.update(sorted_participant_jids.join(","));
-        format!("{}.{:x}", GROUP_PREFIX, hasher.finalize())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::user_id;
-
-    use super::*;
-
-    #[test]
-    fn test_group_name_for_participants() {
-        assert_eq!(
-            vec![
-                user_id!("a@prose.org"),
-                user_id!("b@prose.org"),
-                user_id!("c@prose.org")
-            ]
-            .group_name_hash(),
-            "org.prose.group.7c138d7281db96e0d42fe026a4195c85a7dc2cae".to_string()
-        );
-
-        assert_eq!(
-            vec![
-                user_id!("a@prose.org"),
-                user_id!("b@prose.org"),
-                user_id!("c@prose.org")
-            ]
-            .group_name_hash(),
-            vec![
-                user_id!("c@prose.org"),
-                user_id!("a@prose.org"),
-                user_id!("b@prose.org")
-            ]
-            .group_name_hash()
-        )
-    }
-
-    #[test]
-    fn test_build_nickname() {
-        assert_eq!(build_nickname(&user_id!("user@prose.org")), "user#1ed8798");
-        assert_eq!(
-            build_nickname(&user_id!("super-long-username@prose.org")),
-            "super-long-u#fac4746"
-        );
-        assert_eq!(build_nickname(&user_id!("josé@prose.org")), "josé#6c09790");
-        assert_eq!(
-            build_nickname(&user_id!("JoséAndrés123@prose.org")),
-            "joséandrés12#7ebd867"
-        );
-        assert_eq!(
-            build_nickname(&user_id!("TwelveCharsé@prose.org")),
-            "twelvecharsé#3246eb5"
-        );
+            .set(room.clone())
+            .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))?;
+        Ok(room)
     }
 }

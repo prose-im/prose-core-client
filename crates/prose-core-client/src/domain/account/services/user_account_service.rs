@@ -27,7 +27,7 @@ pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
     async fn set_availability(
         &self,
         capabilities: &Capabilities,
-        availability: &Availability,
+        availability: Availability,
     ) -> Result<()>;
     async fn set_user_activity(&self, user_activity: Option<&UserStatus>) -> Result<()>;
 

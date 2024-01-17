@@ -8,7 +8,7 @@ use tracing::info;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use prose_core_client::dtos::MessageId;
+use prose_core_client::dtos::{MessageId, RoomState as SdkRoomState};
 use prose_core_client::services::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom, RoomEnvelope,
 };
@@ -27,8 +27,27 @@ type Result<T, E = JsError> = std::result::Result<T, E>;
 const TS_APPEND_CONTENT: &'static str = r#"
 export type RoomID = string;
 
+export interface RoomState {
+    readonly type: RoomStateType
+}
+
+export interface RoomStateConnecting extends RoomState {
+    type: RoomStateType.Connecting
+}
+
+export interface RoomStateConnected extends RoomState {
+    type: RoomStateType.Connected
+}
+
+export interface RoomStateDisconnected extends RoomState {
+    type: RoomStateType.Disconnected
+    readonly error?: string;
+    readonly canRetry?: boolean;
+}
+
 export interface RoomBase {
     readonly type: RoomType;
+    readonly state: RoomState;
     readonly id: RoomID;
     readonly name: string;
     readonly participants: ParticipantInfo[];
@@ -100,6 +119,14 @@ pub enum RoomType {
     Generic = 4,
 }
 
+#[wasm_bindgen]
+#[derive(Debug, Clone)]
+pub enum RoomStateType {
+    Connecting = 0,
+    Connected = 1,
+    Disconnected = 2,
+}
+
 #[wasm_bindgen(skip_typescript)]
 pub struct RoomDirectMessage {
     kind: RoomType,
@@ -130,6 +157,53 @@ pub struct RoomGeneric {
     room: SdkRoom<Generic>,
 }
 
+#[wasm_bindgen(skip_typescript)]
+pub struct RoomState {
+    kind: RoomStateType,
+    error: Option<String>,
+    can_retry: bool,
+}
+
+#[wasm_bindgen]
+impl RoomState {
+    #[wasm_bindgen(getter, js_name = "type")]
+    pub fn kind(&self) -> RoomStateType {
+        self.kind.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn error(&self) -> Option<String> {
+        self.error.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "canRetry")]
+    pub fn can_retry(&self) -> bool {
+        self.can_retry
+    }
+}
+
+impl From<SdkRoomState> for RoomState {
+    fn from(value: SdkRoomState) -> Self {
+        match value {
+            SdkRoomState::Pending | SdkRoomState::Connecting => Self {
+                kind: RoomStateType::Connecting,
+                error: None,
+                can_retry: false,
+            },
+            SdkRoomState::Connected => Self {
+                kind: RoomStateType::Connected,
+                error: None,
+                can_retry: false,
+            },
+            SdkRoomState::Disconnected { error, can_retry } => Self {
+                kind: RoomStateType::Connecting,
+                error,
+                can_retry,
+            },
+        }
+    }
+}
+
 macro_rules! base_room_impl {
     ($t:ident) => {
         #[wasm_bindgen]
@@ -137,6 +211,11 @@ macro_rules! base_room_impl {
             #[wasm_bindgen(getter, js_name = "type")]
             pub fn kind(&self) -> RoomType {
                 self.kind.clone()
+            }
+
+            #[wasm_bindgen(getter)]
+            pub fn state(&self) -> RoomState {
+                RoomState::from(self.room.state())
             }
 
             #[wasm_bindgen(getter)]

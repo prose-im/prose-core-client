@@ -22,7 +22,7 @@ use crate::app::deps::{
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomSpec};
 use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
-use crate::dtos::{Message as MessageDTO, MessageSender, UserBasicInfo, UserId};
+use crate::dtos::{Message as MessageDTO, MessageSender, RoomState, UserBasicInfo, UserId};
 use crate::{ClientEvent, ClientRoomEventType};
 
 pub struct Room<Kind> {
@@ -121,6 +121,10 @@ impl<Kind> Room<Kind> {
 impl<Kind> Room<Kind> {
     pub fn jid(&self) -> &RoomId {
         &self.data.room_id
+    }
+
+    pub fn state(&self) -> RoomState {
+        self.data.state()
     }
 
     pub fn name(&self) -> Option<String> {

@@ -3,8 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::ops::Deref;
+
 use anyhow::Result;
 use async_trait::async_trait;
+use jid::Jid;
 use tracing::{debug, error};
 use xmpp_parsers::message::MessageType;
 
@@ -18,8 +21,7 @@ use crate::app::deps::{
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
-use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomId, UserId};
+use crate::domain::shared::models::{RoomId, UserEndpointId};
 use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
@@ -69,33 +71,37 @@ impl ReceivedMessage {
         }
     }
 
-    pub fn sender(&self) -> Option<UserId> {
-        match &self {
-            ReceivedMessage::Message(message) => message.from.as_ref().map(|jid| jid.to_bare()),
-            ReceivedMessage::Carbon(Carbon::Received(message)) => message
-                .stanza
-                .as_ref()
-                .and_then(|message| message.from.as_ref())
-                .map(|jid| jid.to_bare()),
-            ReceivedMessage::Carbon(Carbon::Sent(message)) => message
-                .stanza
-                .as_ref()
-                .and_then(|message| message.to.as_ref())
-                .map(|jid| jid.to_bare()),
-        }
-        .map(UserId::from)
-    }
-
-    pub fn r#type(&self) -> Option<MessageType> {
-        match self {
-            ReceivedMessage::Message(message) => Some(message.type_.clone()),
+    pub fn sender(&self) -> Option<UserEndpointId> {
+        let message = match &self {
+            ReceivedMessage::Message(message) => Some(message),
             ReceivedMessage::Carbon(Carbon::Received(message)) => {
-                message.stanza.as_ref().map(|m| m.type_.clone())
+                message.stanza.as_ref().map(|b| b.deref())
             }
             ReceivedMessage::Carbon(Carbon::Sent(message)) => {
-                message.stanza.as_ref().map(|m| m.type_.clone())
+                message.stanza.as_ref().map(|b| b.deref())
             }
+        };
+
+        let Some(message) = message else { return None };
+
+        let Some(from) = message.from.clone() else {
+            return None;
+        };
+
+        match message.type_ {
+            MessageType::Groupchat => {
+                let Jid::Full(from) = from else {
+                    error!("Expected FullJid in ChatState");
+                    return None;
+                };
+                UserEndpointId::Occupant(from.into())
+            }
+            _ => match from {
+                Jid::Bare(from) => UserEndpointId::User(from.into()),
+                Jid::Full(from) => UserEndpointId::UserResource(from.into()),
+            },
         }
+        .into()
     }
 }
 
@@ -121,33 +127,7 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        let from = RoomId::from(from.into_inner());
-
-        let mut room = self.connected_rooms_repo.get(&from);
-
-        if room.is_none() && message.r#type() == Some(MessageType::Chat) {
-            self.sidebar_domain_service
-                .insert_item_by_creating_or_joining_room(
-                    CreateOrEnterRoomRequest::JoinDirectMessage {
-                        participant: UserId::from(from.clone().into_inner()),
-                    },
-                )
-                .await?;
-            room = self.connected_rooms_repo.get(&from);
-        }
-
-        let Some(room) = room else {
-            error!("Received message from sender for which we do not have a room.");
-            return Ok(());
-        };
-
-        if let ReceivedMessage::Message(message) = &message {
-            if let Some(subject) = &message.subject() {
-                room.set_topic((!subject.is_empty()).then_some(subject.to_string()));
-                return Ok(());
-            }
-        }
-
+        let room_id = from.to_room_id();
         let message_is_carbon = message.is_carbon();
         let now = self.time_provider.now();
 
@@ -175,9 +155,6 @@ impl MessagesEventHandler {
             }
         };
 
-        debug!("Caching received message…");
-        self.messages_repo.append(&from, &[&message]).await?;
-
         if message.payload.is_message() {
             match self
                 .sidebar_domain_service
@@ -185,9 +162,20 @@ impl MessagesEventHandler {
                 .await
             {
                 Ok(_) => (),
-                Err(err) => error!("Could not add group to sidebar. {}", err.to_string()),
+                Err(err) => error!(
+                    "Could not insert sidebar item for message. {}",
+                    err.to_string()
+                ),
             }
         }
+
+        let Some(room) = self.connected_rooms_repo.get(&room_id) else {
+            error!("Received message from sender for which we do not have a room.");
+            return Ok(());
+        };
+
+        debug!("Caching received message…");
+        self.messages_repo.append(&room_id, &[&message]).await?;
 
         self.client_event_dispatcher
             .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));

@@ -7,7 +7,10 @@ pub use room_attributes_service::RoomAttributesService;
 pub use room_factory::RoomFactory;
 pub use room_management_service::RoomManagementService;
 pub use room_participation_service::RoomParticipationService;
-pub use rooms_domain_service::{CreateOrEnterRoomRequest, CreateRoomType, RoomsDomainService};
+pub use rooms_domain_service::{
+    CreateOrEnterRoomRequest, CreateRoomBehavior, CreateRoomType, JoinRoomBehavior,
+    JoinRoomFailureBehavior, JoinRoomRedirectBehavior, RoomsDomainService,
+};
 
 pub mod impls;
 mod room_attributes_service;

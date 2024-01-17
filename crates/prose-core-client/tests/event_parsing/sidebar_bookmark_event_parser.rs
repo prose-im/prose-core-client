@@ -6,6 +6,7 @@
 use anyhow::Result;
 
 use prose_core_client::app::event_handlers::{ServerEvent, SidebarBookmarkEvent};
+use prose_core_client::domain::rooms::models::RoomSidebarState;
 use prose_core_client::domain::shared::models::RoomId;
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType};
 use prose_core_client::room_id;
@@ -46,22 +47,19 @@ async fn test_added_or_updated_items() -> Result<()> {
                         name: "Private Channel".to_string(),
                         jid: room_id!("pc@conference.prose.org"),
                         r#type: BookmarkType::PrivateChannel,
-                        is_favorite: true,
-                        in_sidebar: true,
+                        sidebar_state: RoomSidebarState::Favorite
                     },
                     Bookmark {
                         name: "Group".to_string(),
                         jid: room_id!("group@conference.prose.org"),
                         r#type: BookmarkType::Group,
-                        is_favorite: false,
-                        in_sidebar: false,
+                        sidebar_state: RoomSidebarState::NotInSidebar
                     },
                     Bookmark {
                         name: "Direct Message".to_string(),
                         jid: room_id!("user@prose.org"),
                         r#type: BookmarkType::DirectMessage,
-                        is_favorite: false,
-                        in_sidebar: true,
+                        sidebar_state: RoomSidebarState::InSidebar
                     }
                 ]
             }

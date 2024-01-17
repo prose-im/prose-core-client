@@ -33,7 +33,7 @@ impl MessageArchiveService for XMPPClient {
         let after: Option<stanza_id::Id> = after.map(|id| id.as_ref().into());
 
         let result = match room_type {
-            RoomType::Pending => unreachable!("Tried to load messages for a pending room"),
+            RoomType::Unknown => unreachable!("Tried to load messages for a pending room"),
             RoomType::DirectMessage => {
                 mam.load_messages_in_chat(
                     room_jid,

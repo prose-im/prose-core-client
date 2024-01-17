@@ -29,7 +29,7 @@ impl RoomFactory {
         let inner = Arc::new((self.builder)(room));
 
         match room_type {
-            RoomType::Pending => {
+            RoomType::Unknown => {
                 panic!("Cannot convert pending room to RoomEnvelope")
             }
             RoomType::DirectMessage => RoomEnvelope::DirectMessage(inner.into()),

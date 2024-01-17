@@ -18,8 +18,7 @@ use crate::app::deps::{
     AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
     DynDraftsRepository, DynIDProvider, DynMessageArchiveService, DynMessagesRepository,
     DynMessagingService, DynRoomAttributesService, DynRoomParticipationService,
-    DynSidebarDomainService, DynSidebarReadOnlyRepository, DynTimeProvider,
-    DynUserProfileRepository,
+    DynSidebarDomainService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::MockClientEventDispatcherTrait;
 use crate::app::services::RoomInner;
@@ -44,9 +43,6 @@ use crate::domain::rooms::services::mocks::{
 };
 use crate::domain::rooms::services::RoomFactory;
 use crate::domain::settings::repos::mocks::MockAccountSettingsRepository;
-use crate::domain::sidebar::repos::mocks::{
-    MockSidebarReadOnlyRepository, MockSidebarReadWriteRepository,
-};
 use crate::domain::sidebar::services::impls::SidebarDomainServiceDependencies;
 use crate::domain::sidebar::services::mocks::{MockBookmarksService, MockSidebarDomainService};
 use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoRepository};
@@ -111,7 +107,6 @@ pub struct MockAppDependencies {
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub short_id_provider: DynIDProvider,
     pub sidebar_domain_service: MockSidebarDomainService,
-    pub sidebar_repo: MockSidebarReadOnlyRepository,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
     pub user_account_service: MockUserAccountService,
@@ -140,7 +135,6 @@ impl From<MockAppDependencies> for AppDependencies {
         let room_participation_service = Arc::new(mock.room_participation_service);
         let room_attributes_service = Arc::new(mock.room_attributes_service);
         let sidebar_domain_service = Arc::new(mock.sidebar_domain_service);
-        let sidebar_repo = Arc::new(mock.sidebar_repo);
         let user_profile_repo = Arc::new(mock.user_profile_repo);
 
         let room_factory = {
@@ -197,7 +191,6 @@ impl From<MockAppDependencies> for AppDependencies {
             rooms_domain_service: Arc::new(mock.rooms_domain_service),
             short_id_provider: mock.short_id_provider,
             sidebar_domain_service,
-            sidebar_repo,
             time_provider: mock.time_provider,
             user_account_service: Arc::new(mock.user_account_service),
             user_info_repo: Arc::new(mock.user_info_repo),
@@ -216,7 +209,6 @@ pub struct MockSidebarDomainServiceDependencies {
     pub ctx: AppContext,
     pub room_management_service: MockRoomManagementService,
     pub rooms_domain_service: MockRoomsDomainService,
-    pub sidebar_repo: MockSidebarReadWriteRepository,
 }
 
 impl MockSidebarDomainServiceDependencies {
@@ -231,9 +223,9 @@ impl From<MockSidebarDomainServiceDependencies> for SidebarDomainServiceDependen
             bookmarks_service: Arc::new(value.bookmarks_service),
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
+            ctx: Arc::new(value.ctx),
             room_management_service: Arc::new(value.room_management_service),
             rooms_domain_service: Arc::new(value.rooms_domain_service),
-            sidebar_repo: Arc::new(value.sidebar_repo),
         }
     }
 }
@@ -290,7 +282,6 @@ pub struct MockRoomFactoryDependencies {
     pub messaging_service: MockMessagingService,
     pub participation_service: MockRoomParticipationService,
     pub sidebar_domain_service: MockSidebarDomainService,
-    pub sidebar_repo: MockSidebarReadOnlyRepository,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
     pub user_profile_repo: MockUserProfileRepository,
@@ -306,7 +297,6 @@ pub struct MockSealedRoomFactoryDependencies {
     pub messaging_service: DynMessagingService,
     pub participation_service: DynRoomParticipationService,
     pub sidebar_domain_service: DynSidebarDomainService,
-    pub sidebar_repo: DynSidebarReadOnlyRepository,
     pub time_provider: DynTimeProvider,
     pub topic_service: DynRoomAttributesService,
     pub user_profile_repo: DynUserProfileRepository,
@@ -323,7 +313,6 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
             message_repo: Arc::new(value.message_repo),
             messaging_service: Arc::new(value.messaging_service),
             participation_service: Arc::new(value.participation_service),
-            sidebar_repo: Arc::new(value.sidebar_repo),
             sidebar_domain_service: Arc::new(value.sidebar_domain_service),
             time_provider: Arc::new(value.time_provider),
             topic_service: Arc::new(value.attributes_service),

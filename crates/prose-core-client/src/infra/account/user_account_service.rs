@@ -48,11 +48,11 @@ impl UserAccountService for XMPPClient {
     async fn set_availability(
         &self,
         capabilities: &Capabilities,
-        availability: &Availability,
+        availability: Availability,
     ) -> Result<()> {
         let status_mod = self.client.get_mod::<mods::Status>();
         status_mod.send_presence(
-            Some(availability.clone().try_into()?),
+            Some(availability.try_into()?),
             None,
             Some(capabilities.into()),
             None,

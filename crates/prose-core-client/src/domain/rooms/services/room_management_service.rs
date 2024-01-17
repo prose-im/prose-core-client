@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use async_trait::async_trait;
-use jid::{BareJid, FullJid};
+use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
@@ -44,7 +44,7 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn load_room_config(&self, room_jid: &RoomId) -> Result<RoomConfig, RoomError>;
 
-    async fn exit_room(&self, room_jid: &FullJid) -> Result<(), RoomError>;
+    async fn exit_room(&self, occupant_id: &OccupantId) -> Result<(), RoomError>;
 
     async fn set_room_owners(&self, room_jid: &RoomId, users: &[UserId]) -> Result<(), RoomError>;
 

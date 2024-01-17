@@ -14,8 +14,12 @@ use prose_core_client::app::event_handlers::{
     ServerEventHandler, UserStatusEvent, UserStatusEventType,
 };
 use prose_core_client::domain::connection::models::ConnectionProperties;
-use prose_core_client::domain::rooms::models::{ComposeState, RoomAffiliation, RoomInternals};
-use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, RoomFactory};
+use prose_core_client::domain::rooms::models::{
+    ComposeState, RoomAffiliation, RoomInternals, RoomSidebarState,
+};
+use prose_core_client::domain::rooms::services::{
+    CreateOrEnterRoomRequest, JoinRoomBehavior, RoomFactory,
+};
 use prose_core_client::domain::shared::models::{
     OccupantId, RoomId, UserId, UserOrResourceId, UserResourceId,
 };
@@ -444,7 +448,8 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
     let room = Arc::new(RoomInternals::for_direct_message(
         &user_id!("contact@prose.org"),
         "Janice Doe",
-        &Availability::Unavailable,
+        Availability::Unavailable,
+        RoomSidebarState::InSidebar,
     ));
 
     {
@@ -517,8 +522,9 @@ async fn test_handles_invite() -> Result<()> {
         .expect_insert_item_by_creating_or_joining_room()
         .once()
         .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
-            room_jid: room_id!("group@conference.prose.org"),
+            room_id: room_id!("group@conference.prose.org"),
             password: None,
+            behavior: JoinRoomBehavior::system_initiated(),
         }))
         .return_once(|_| Box::pin(async move { Ok(room_id!("group@conference.prose.org")) }));
 
@@ -544,7 +550,8 @@ async fn test_handles_presence() -> Result<()> {
     let room = Arc::new(RoomInternals::for_direct_message(
         &user_id!("sender@prose.org"),
         "Janice Doe",
-        &Availability::Unavailable,
+        Availability::Unavailable,
+        RoomSidebarState::InSidebar,
     ));
 
     let room = room.clone();
@@ -660,7 +667,8 @@ async fn test_swallows_self_presence() -> Result<()> {
     let room = Arc::new(RoomInternals::for_direct_message(
         &user_id!("hello@prose.org"),
         "Janice Doe",
-        &Availability::Unavailable,
+        Availability::Unavailable,
+        RoomSidebarState::InSidebar,
     ));
 
     let room = room.clone();

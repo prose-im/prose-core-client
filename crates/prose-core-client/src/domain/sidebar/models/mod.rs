@@ -5,8 +5,6 @@
 
 pub use bookmark::Bookmark;
 pub use bookmark_type::BookmarkType;
-pub use sidebar_item::SidebarItem;
 
 mod bookmark;
 mod bookmark_type;
-mod sidebar_item;

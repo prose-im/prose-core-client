@@ -6,23 +6,29 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::rooms::models::{
-    ComposeState, RegisteredMember, RoomAffiliation, RoomInfo, RoomInternals,
+    ComposeState, RegisteredMember, RoomAffiliation, RoomInfo, RoomInternals, RoomSidebarState,
 };
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
-use crate::dtos::{Availability, Participant, UserId};
+use crate::dtos::{Availability, Participant, RoomState, UserId};
 use crate::test::mock_data;
 
 impl RoomInternals {
-    pub fn direct_message(jid: UserId, availability: &Availability) -> Self {
+    pub fn direct_message(jid: UserId, availability: Availability) -> Self {
         let jid = jid.into();
 
-        Self::for_direct_message(&jid, &jid.formatted_username(), availability)
+        Self::for_direct_message(
+            &jid,
+            &jid.formatted_username(),
+            availability,
+            RoomSidebarState::InSidebar,
+        )
     }
 
-    pub fn mock_pending_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
-        Self::pending(
+    pub fn mock_connecting_room(jid: impl Into<RoomId>, next_hash: &str) -> Self {
+        Self::connecting(
             &jid.into(),
             &format!("{}-{}", mock_data::account_jid().username(), next_hash),
+            RoomSidebarState::InSidebar,
         )
     }
 
@@ -78,6 +84,37 @@ impl RoomInternals {
             .extend_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect());
         self
     }
+
+    pub fn with_sidebar_state(self, state: RoomSidebarState) -> Self {
+        self.set_sidebar_state(state);
+        self
+    }
+
+    pub fn with_state(self, state: RoomState) -> Self {
+        self.set_state(state);
+        self
+    }
+
+    pub fn is_disconnected(&self) -> DisconnectedState {
+        match self.state() {
+            RoomState::Pending | RoomState::Connecting | RoomState::Connected => {
+                DisconnectedState {
+                    is_disconnected: false,
+                    can_retry: false,
+                }
+            }
+            RoomState::Disconnected { can_retry, .. } => DisconnectedState {
+                is_disconnected: true,
+                can_retry,
+            },
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DisconnectedState {
+    pub is_disconnected: bool,
+    pub can_retry: bool,
 }
 
 impl Participant {

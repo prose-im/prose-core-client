@@ -24,7 +24,9 @@ use crate::app::event_handlers::{
 use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::RoomInternals;
-use crate::domain::rooms::services::CreateOrEnterRoomRequest;
+use crate::domain::rooms::services::{
+    CreateOrEnterRoomRequest, JoinRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
+};
 use crate::domain::shared::models::{ParticipantId, RoomId};
 use crate::domain::user_info::models::Presence;
 use crate::dtos::Availability;
@@ -194,8 +196,12 @@ impl RoomsEventHandler {
                 );
                 self.sidebar_domain_service
                     .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                        room_jid: event.room_id,
+                        room_id: event.room_id,
                         password,
+                        behavior: JoinRoomBehavior {
+                            on_redirect: JoinRoomRedirectBehavior::FollowIfGone,
+                            on_failure: JoinRoomFailureBehavior::RetainOnError,
+                        },
                     })
                     .await?;
             }

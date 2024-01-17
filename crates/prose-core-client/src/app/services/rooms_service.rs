@@ -12,7 +12,9 @@ use prose_proc_macros::InjectDependencies;
 use crate::app::deps::{DynAppContext, DynRoomManagementService, DynSidebarDomainService};
 use crate::domain::rooms::models::constants::MAX_PARTICIPANTS_PER_GROUP;
 use crate::domain::rooms::models::PublicRoomInfo;
-use crate::domain::rooms::services::{CreateOrEnterRoomRequest, CreateRoomType};
+use crate::domain::rooms::services::{
+    CreateOrEnterRoomRequest, CreateRoomBehavior, CreateRoomType, JoinRoomBehavior,
+};
 use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(InjectDependencies)]
@@ -31,9 +33,7 @@ impl RoomsService {
         if self.ctx.is_observing_rooms.swap(true, Ordering::Acquire) {
             return Ok(());
         }
-        self.sidebar_domain_service
-            .load_and_extend_items_from_bookmarks()
-            .await?;
+        self.sidebar_domain_service.populate_sidebar().await?;
         Ok(())
     }
 
@@ -60,8 +60,9 @@ impl RoomsService {
     pub async fn join_room(&self, room_jid: &RoomId, password: Option<&str>) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                room_jid: room_jid.clone(),
+                room_id: room_jid.clone(),
                 password: password.map(ToString::to_string),
+                behavior: JoinRoomBehavior::user_initiated(),
             })
             .await
     }
@@ -81,6 +82,7 @@ impl RoomsService {
                 room_type: CreateRoomType::Group {
                     participants: participants.to_vec(),
                 },
+                behavior: CreateRoomBehavior::FollowThenCreateUnique,
             })
             .await
     }
@@ -95,6 +97,7 @@ impl RoomsService {
                 room_type: CreateRoomType::PrivateChannel {
                     name: channel_name.as_ref().to_string(),
                 },
+                behavior: CreateRoomBehavior::FailIfGone,
             })
             .await
     }
@@ -109,6 +112,7 @@ impl RoomsService {
                 room_type: CreateRoomType::PublicChannel {
                     name: channel_name.as_ref().to_string(),
                 },
+                behavior: CreateRoomBehavior::FollowThenCreateUnique,
             })
             .await
     }
