@@ -15,7 +15,7 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::rooms::models::{
-    ComposeState, RoomAffiliation, RoomInternals, RoomSidebarState,
+    ComposeState, Room, RoomAffiliation, RoomSidebarState,
 };
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, RoomFactory,
@@ -36,7 +36,7 @@ use prose_core_client::{
 async fn test_adds_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::group(room_id!("room@conference.prose.org")));
+    let room = Room::group(room_id!("room@conference.prose.org"));
 
     {
         let room = room.clone();
@@ -114,9 +114,7 @@ async fn test_adds_participant() -> Result<()> {
 async fn test_adds_invited_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::private_channel(room_id!(
-        "room@conference.prose.org"
-    )));
+    let room = Room::private_channel(room_id!("room@conference.prose.org"));
 
     {
         let room = room.clone();
@@ -176,23 +174,20 @@ async fn test_adds_invited_participant() -> Result<()> {
 async fn test_handles_disconnected_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::private_channel(room_id!("room@conference.prose.org")).with_participants(
-            vec![(
-                occupant_id!("room@conference.prose.org/a"),
-                Participant {
-                    real_id: None,
-                    anon_occupant_id: None,
-                    name: None,
-                    is_self: false,
-                    affiliation: RoomAffiliation::Admin,
-                    availability: Availability::Available,
-                    compose_state: ComposeState::Composing,
-                    compose_state_updated: Default::default(),
-                },
-            )],
-        ),
-    );
+    let room =
+        Room::private_channel(room_id!("room@conference.prose.org")).with_participants(vec![(
+            occupant_id!("room@conference.prose.org/a"),
+            Participant {
+                real_id: None,
+                anon_occupant_id: None,
+                name: None,
+                is_self: false,
+                affiliation: RoomAffiliation::Admin,
+                availability: Availability::Available,
+                compose_state: ComposeState::Composing,
+                compose_state_updated: Default::default(),
+            },
+        )]);
 
     {
         let room = room.clone();
@@ -256,12 +251,10 @@ async fn test_handles_disconnected_participant() -> Result<()> {
 async fn test_handles_kicked_user() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
-            occupant_id!("room@conference.prose.org/nickname"),
-            Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
-        )]),
-    );
+    let room = Room::group(room_id!("room@conference.prose.org")).with_participants([(
+        occupant_id!("room@conference.prose.org/nickname"),
+        Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
+    )]);
 
     {
         let room = room.clone();
@@ -304,7 +297,7 @@ async fn test_handles_kicked_user() -> Result<()> {
 async fn test_handles_kicked_self() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::group(room_id!("room@conference.prose.org")));
+    let room = Room::group(room_id!("room@conference.prose.org"));
 
     {
         let room = room.clone();
@@ -370,14 +363,12 @@ async fn test_handles_destroyed_room() -> Result<()> {
 async fn test_handles_compose_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("room@conference.prose.org")).with_participants([(
-            occupant_id!("room@conference.prose.org/nickname"),
-            Participant::owner()
-                .set_real_id(&user_id!("nickname@prose.org"))
-                .set_name("Janice Doe"),
-        )]),
-    );
+    let room = Room::group(room_id!("room@conference.prose.org")).with_participants([(
+        occupant_id!("room@conference.prose.org/nickname"),
+        Participant::owner()
+            .set_real_id(&user_id!("nickname@prose.org"))
+            .set_name("Janice Doe"),
+    )]);
 
     {
         let room = room.clone();
@@ -445,12 +436,12 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
 async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::for_direct_message(
+    let room = Room::for_direct_message(
         &user_id!("contact@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
-    ));
+    );
 
     {
         let room = room.clone();
@@ -547,12 +538,12 @@ async fn test_handles_invite() -> Result<()> {
 async fn test_handles_presence() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Arc::new(RoomInternals::for_direct_message(
+    let room = Room::for_direct_message(
         &user_id!("sender@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
-    ));
+    );
 
     let room = room.clone();
     deps.connected_rooms_repo
@@ -664,12 +655,12 @@ async fn test_swallows_self_presence() -> Result<()> {
         server_features: Default::default(),
     });
 
-    let room = Arc::new(RoomInternals::for_direct_message(
+    let room = Room::for_direct_message(
         &user_id!("hello@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
-    ));
+    );
 
     let room = room.clone();
     deps.connected_rooms_repo
@@ -732,9 +723,7 @@ async fn test_room_topic_changed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("room@conference.prose.org")).with_topic(Some("Old Topic")),
-    );
+    let room = Room::group(room_id!("room@conference.prose.org")).with_topic(Some("Old Topic"));
 
     {
         let room = room.clone();

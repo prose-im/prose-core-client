@@ -3,7 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
+use std::sync::Arc;
 
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
@@ -15,10 +16,9 @@ use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::OccupantId;
 
 /// Contains information about a connected room and its state.
-#[derive(Debug)]
-pub struct RoomInternals {
-    info: RoomInfo,
-    details: RwLock<RoomDetails>,
+#[derive(Debug, Clone)]
+pub struct Room {
+    inner: Arc<RoomInner>,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -79,112 +79,123 @@ pub struct RoomDetails {
     pub state: RoomState,
 }
 
-impl Deref for RoomInternals {
+#[derive(Debug)]
+struct RoomInner {
+    info: RoomInfo,
+    details: RwLock<RoomDetails>,
+}
+
+impl Deref for Room {
     type Target = RoomInfo;
 
     fn deref(&self) -> &Self::Target {
-        &self.info
+        &self.inner.info
     }
 }
 
-impl DerefMut for RoomInternals {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.info
+impl Room {
+    fn new(info: RoomInfo, details: RoomDetails) -> Self {
+        Self {
+            inner: Arc::new(RoomInner {
+                info,
+                details: RwLock::new(details),
+            }),
+        }
     }
 }
 
-impl RoomInternals {
+impl Room {
     pub fn name(&self) -> Option<String> {
-        self.details.read().name.clone()
+        self.inner.details.read().name.clone()
     }
 
     pub fn set_name(&self, name: Option<String>) {
-        self.details.write().name = name
+        self.inner.details.write().name = name
     }
 
     pub fn description(&self) -> Option<String> {
-        self.details.read().description.clone()
+        self.inner.details.read().description.clone()
     }
 
     pub fn set_description(&self, name: Option<String>) {
-        self.details.write().description = name
+        self.inner.details.write().description = name
     }
 
     pub fn topic(&self) -> Option<String> {
-        self.details.read().topic.clone()
+        self.inner.details.read().topic.clone()
     }
 
     pub fn set_topic(&self, topic: Option<String>) {
-        self.details.write().topic = topic
+        self.inner.details.write().topic = topic
     }
 
     pub fn participants(&self) -> MappedRwLockReadGuard<ParticipantList> {
-        RwLockReadGuard::map(self.details.read(), |s| &s.participants)
+        RwLockReadGuard::map(self.inner.details.read(), |s| &s.participants)
     }
 
     pub fn participants_mut(&self) -> MappedRwLockWriteGuard<ParticipantList> {
-        RwLockWriteGuard::map(self.details.write(), |s| &mut s.participants)
+        RwLockWriteGuard::map(self.inner.details.write(), |s| &mut s.participants)
     }
 
     pub fn sidebar_state(&self) -> RoomSidebarState {
-        self.details.read().sidebar_state
+        self.inner.details.read().sidebar_state
     }
 
     pub fn set_sidebar_state(&self, state: RoomSidebarState) {
-        self.details.write().sidebar_state = state
+        self.inner.details.write().sidebar_state = state
     }
 
     pub fn state(&self) -> RoomState {
-        self.details.read().state.clone()
+        self.inner.details.read().state.clone()
     }
 
     pub fn set_state(&self, state: RoomState) {
-        self.details.write().state = state
+        self.inner.details.write().state = state
     }
 }
 
-impl RoomInternals {
+impl Room {
     pub fn pending(bookmark: &Bookmark, nickname: &str) -> Self {
-        Self {
-            info: RoomInfo {
+        Self::new(
+            RoomInfo {
                 room_id: bookmark.jid.clone(),
                 user_nickname: nickname.to_string(),
                 r#type: bookmark.r#type.into(),
             },
-            details: RwLock::new(RoomDetails {
+            RoomDetails {
                 name: Some(bookmark.name.clone()),
                 description: None,
                 topic: None,
                 participants: Default::default(),
                 sidebar_state: bookmark.sidebar_state,
                 state: RoomState::Pending,
-            }),
-        }
+            },
+        )
     }
 
     pub fn connecting(room_id: &RoomId, nickname: &str, sidebar_state: RoomSidebarState) -> Self {
-        Self {
-            info: RoomInfo {
+        Self::new(
+            RoomInfo {
                 room_id: room_id.clone(),
                 user_nickname: nickname.to_string(),
                 r#type: RoomType::Unknown,
             },
-            details: RwLock::new(RoomDetails {
+            RoomDetails {
                 name: None,
                 description: None,
                 topic: None,
                 participants: Default::default(),
                 sidebar_state,
                 state: RoomState::Connecting,
-            }),
-        }
+            },
+        )
     }
 
     pub fn is_connecting(&self) -> bool {
-        self.details.read().state == RoomState::Connecting
+        self.inner.details.read().state == RoomState::Connecting
     }
     pub fn is_pending(&self) -> bool {
-        self.details.read().state == RoomState::Pending
+        self.inner.details.read().state == RoomState::Pending
     }
 
     // Resolves a pending room.
@@ -197,44 +208,41 @@ impl RoomInternals {
     ) -> Self {
         assert!(self.is_connecting(), "Cannot promote a non-connecting room");
 
-        let mut details = self.details.read().clone();
+        let mut details = self.inner.details.read().clone();
         details.name = name;
         details.description = description;
         details.participants.set_registered_members(members);
         details.state = RoomState::Connected;
 
-        Self {
-            info,
-            details: RwLock::new(details),
-        }
+        Self::new(info, details)
     }
 
     pub fn by_changing_type(&self, new_type: RoomType) -> Self {
-        Self {
-            info: RoomInfo {
+        Self::new(
+            RoomInfo {
                 room_id: self.room_id.clone(),
                 user_nickname: self.user_nickname.clone(),
                 r#type: new_type,
             },
-            details: RwLock::new(self.details.read().clone()),
-        }
+            self.inner.details.read().clone(),
+        )
     }
 }
 
-impl RoomInternals {
+impl Room {
     pub fn for_direct_message(
         contact_id: &UserId,
         contact_name: &str,
         availability: Availability,
         sidebar_state: RoomSidebarState,
     ) -> Self {
-        Self {
-            info: RoomInfo {
+        Self::new(
+            RoomInfo {
                 room_id: RoomId::from(contact_id.clone().into_inner()),
                 user_nickname: "no_nickname".to_string(),
                 r#type: RoomType::DirectMessage,
             },
-            details: RwLock::new(RoomDetails {
+            RoomDetails {
                 name: Some(contact_name.to_string()),
                 description: None,
                 topic: None,
@@ -245,25 +253,31 @@ impl RoomInternals {
                 ),
                 sidebar_state,
                 state: RoomState::Connected,
-            }),
-        }
+            },
+        )
     }
 }
 
 #[cfg(feature = "test")]
-impl RoomInternals {
-    pub fn new(info: RoomInfo) -> Self {
-        Self {
+impl Room {
+    pub fn mock(info: RoomInfo) -> Self {
+        Self::new(
             info,
-            details: RwLock::new(RoomDetails {
+            RoomDetails {
                 name: None,
                 description: None,
                 topic: None,
                 participants: Default::default(),
                 sidebar_state: RoomSidebarState::InSidebar,
                 state: Default::default(),
-            }),
-        }
+            },
+        )
+    }
+
+    pub fn with_user_nickname(self, nickname: impl Into<String>) -> Self {
+        let mut info = self.inner.info.clone();
+        info.user_nickname = nickname.into();
+        Self::new(info, self.inner.details.read().clone())
     }
 }
 
@@ -277,9 +291,10 @@ impl RoomInfo {
 }
 
 #[cfg(feature = "test")]
-impl PartialEq for RoomInternals {
+impl PartialEq for Room {
     fn eq(&self, other: &Self) -> bool {
-        self.info == other.info && *self.details.read() == *other.details.read()
+        self.inner.info == other.inner.info
+            && *self.inner.details.read() == *other.inner.details.read()
     }
 }
 
@@ -291,7 +306,7 @@ mod tests {
 
     #[test]
     fn test_room_internals_for_direct_message() {
-        let internals = RoomInternals::for_direct_message(
+        let internals = Room::for_direct_message(
             &user_id!("contact@prose.org"),
             "Jane Doe",
             Availability::Available,
@@ -300,13 +315,13 @@ mod tests {
 
         assert_eq!(
             internals,
-            RoomInternals {
-                info: RoomInfo {
+            Room::new(
+                RoomInfo {
                     room_id: room_id!("contact@prose.org"),
                     user_nickname: "no_nickname".to_string(),
                     r#type: RoomType::DirectMessage,
                 },
-                details: RwLock::new(RoomDetails {
+                RoomDetails {
                     name: Some("Jane Doe".to_string()),
                     description: None,
                     topic: None,
@@ -317,8 +332,8 @@ mod tests {
                     ),
                     sidebar_state: RoomSidebarState::Favorite,
                     state: RoomState::Connected
-                })
-            }
+                }
+            )
         )
     }
 }

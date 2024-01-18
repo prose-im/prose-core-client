@@ -15,8 +15,8 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::connection::models::{ConnectionProperties, ServerFeatures};
 use prose_core_client::domain::rooms::models::{
-    RegisteredMember, RoomAffiliation, RoomConfig, RoomError, RoomInfo, RoomInternals,
-    RoomSessionInfo, RoomSessionMember, RoomSidebarState, RoomSpec,
+    RegisteredMember, Room, RoomAffiliation, RoomConfig, RoomError, RoomInfo, RoomSessionInfo,
+    RoomSessionMember, RoomSidebarState, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
@@ -44,11 +44,11 @@ async fn test_joins_room() -> Result<()> {
     let mut seq = Sequence::new();
     let event_handler = Arc::new(OnceLock::<RoomsEventHandler>::new());
 
-    let room = Arc::new(Mutex::new(Arc::new(RoomInternals::connecting(
+    let room = Arc::new(Mutex::new(Room::connecting(
         &room_id!("room@conf.prose.org"),
         "user1#3dea7f2",
         RoomSidebarState::InSidebar,
-    ))));
+    )));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
         connected_jid: user_resource_id!("user1@prose.org/res"),
@@ -190,7 +190,7 @@ async fn test_joins_room() -> Result<()> {
                 predicate::always(),
             )
             .return_once(move |_, handler| {
-                let updated_room = Arc::new(handler(room.lock().clone()));
+                let updated_room = handler(room.lock().clone());
                 *room.lock() = updated_room.clone();
                 Some(updated_room)
             });
@@ -426,11 +426,11 @@ async fn test_creates_group() -> Result<()> {
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Arc::new(RoomInternals::connecting(
+        .with(predicate::eq(Room::connecting(
             &group_id,
             "jane.doe#3c1234b",
             RoomSidebarState::InSidebar,
-        ))))
+        )))
         .return_once(|_| Ok(()));
     {
         let group_jid = group_id.clone();
@@ -501,10 +501,7 @@ async fn test_creates_group() -> Result<()> {
             .in_sequence(&mut seq)
             .with(predicate::eq(group_jid.clone()), predicate::always())
             .return_once(move |_, handler| {
-                let room = Arc::new(RoomInternals::mock_connecting_room(
-                    group_jid.clone(),
-                    "hash-1",
-                ));
+                let room = Room::mock_connecting_room(group_jid.clone(), "hash-1");
 
                 let room = handler(room.clone());
                 let mut members = room.participants().iter().cloned().collect::<Vec<_>>();
@@ -556,7 +553,7 @@ async fn test_creates_group() -> Result<()> {
                     ]
                 );
 
-                Some(Arc::new(room))
+                Some(room)
             });
     }
 
@@ -634,12 +631,12 @@ async fn test_joins_direct_message() -> Result<()> {
         .expect_set_or_replace()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Arc::new(RoomInternals::for_direct_message(
+        .with(predicate::eq(Room::for_direct_message(
             &user_id!("user2@prose.org"),
             "Jennifer Doe",
             Availability::Available,
             RoomSidebarState::InSidebar,
-        ))))
+        )))
         .return_once(|_| None);
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -708,11 +705,11 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Arc::new(RoomInternals::connecting(
+        .with(predicate::eq(Room::connecting(
             &room_id!("org.prose.channel.hash-1@conference.prose.org"),
             "jane.doe#3c1234b",
             RoomSidebarState::InSidebar,
-        ))))
+        )))
         .return_once(|_| Ok(()));
 
     deps.room_management_service
@@ -735,11 +732,11 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
             predicate::always(),
         )
         .return_once(|_, _| {
-            Some(Arc::new(RoomInternals::new(RoomInfo {
+            Some(Room::mock(RoomInfo {
                 room_id: room_id!("org.prose.channel.hash-1@conference.prose.org"),
                 user_nickname: "jane.doe#3c1234b".to_string(),
                 r#type: RoomType::PublicChannel,
-            })))
+            }))
         });
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -784,8 +781,8 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .in_sequence(&mut seq)
         .with(predicate::eq(room_id!("group@conf.prose.org")))
         .return_once(|_| {
-            Some(Arc::new(
-                RoomInternals::group(room_id!("group@conf.prose.org")).with_members(vec![
+            Some(
+                Room::group(room_id!("group@conf.prose.org")).with_members(vec![
                     RegisteredMember {
                         user_id: user_id!("jane.doe@prose.org"),
                         name: Some("Jane Doe".to_string()),
@@ -805,7 +802,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                         affiliation: RoomAffiliation::Owner,
                     },
                 ]),
-            ))
+            )
         });
 
     deps.connected_rooms_repo
@@ -826,11 +823,11 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Arc::new(RoomInternals::connecting(
+        .with(predicate::eq(Room::connecting(
             &channel_id,
             "jane.doe#3c1234b",
             RoomSidebarState::InSidebar,
-        ))))
+        )))
         .return_once(|_| Ok(()));
 
     {
@@ -861,11 +858,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(predicate::eq(channel_jid.clone()), predicate::always())
-            .return_once(move |_, _| {
-                Some(Arc::new(RoomInternals::private_channel(
-                    channel_jid.clone(),
-                )))
-            });
+            .return_once(move |_, _| Some(Room::private_channel(channel_jid.clone())));
     }
 
     deps.message_migration_domain_service
@@ -919,22 +912,20 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
 async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::private_channel(room_id!("channel@conf.prose.org")).with_members(vec![
-            RegisteredMember {
-                user_id: mock_data::account_jid().into_user_id(),
-                name: Some("Jane Doe".to_string()),
-                affiliation: RoomAffiliation::Owner,
-                is_self: false,
-            },
-            RegisteredMember {
-                user_id: user_id!("a@prose.org"),
-                name: Some("Member A".to_string()),
-                affiliation: RoomAffiliation::Owner,
-                is_self: false,
-            },
-        ]),
-    );
+    let room = Room::private_channel(room_id!("channel@conf.prose.org")).with_members(vec![
+        RegisteredMember {
+            user_id: mock_data::account_jid().into_user_id(),
+            name: Some("Jane Doe".to_string()),
+            affiliation: RoomAffiliation::Owner,
+            is_self: false,
+        },
+        RegisteredMember {
+            user_id: user_id!("a@prose.org"),
+            name: Some("Member A".to_string()),
+            affiliation: RoomAffiliation::Owner,
+            is_self: false,
+        },
+    ]);
 
     // Make sure that the method calls are in the exact order…
     let mut seq = Sequence::new();
@@ -976,7 +967,7 @@ async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Resul
                 predicate::eq(room_id!("channel@conf.prose.org")),
                 predicate::always(),
             )
-            .return_once(|_, handler| Some(Arc::new(handler(room))));
+            .return_once(|_, handler| Some(handler(room)));
     }
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -1007,24 +998,22 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
         .in_sequence(&mut seq)
         .with(predicate::eq(room_id!("channel@conf.prose.org")))
         .return_once(|_| {
-            Some(Arc::new(
-                RoomInternals::private_channel(room_id!("channel@conf.prose.org")).with_members(
-                    vec![
-                        RegisteredMember {
-                            user_id: mock_data::account_jid().into_user_id(),
-                            name: Some("Jane Doe".to_string()),
-                            affiliation: RoomAffiliation::Owner,
-                            is_self: false,
-                        },
-                        RegisteredMember {
-                            user_id: user_id!("a@prose.org"),
-                            name: Some("Member A".to_string()),
-                            affiliation: RoomAffiliation::Owner,
-                            is_self: false,
-                        },
-                    ],
-                ),
-            ))
+            Some(
+                Room::private_channel(room_id!("channel@conf.prose.org")).with_members(vec![
+                    RegisteredMember {
+                        user_id: mock_data::account_jid().into_user_id(),
+                        name: Some("Jane Doe".to_string()),
+                        affiliation: RoomAffiliation::Owner,
+                        is_self: false,
+                    },
+                    RegisteredMember {
+                        user_id: user_id!("a@prose.org"),
+                        name: Some("Member A".to_string()),
+                        affiliation: RoomAffiliation::Owner,
+                        is_self: false,
+                    },
+                ]),
+            )
         });
 
     deps.room_management_service
@@ -1070,7 +1059,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         server_features: Default::default(),
     });
 
-    let pending_room = Arc::new(RoomInternals::pending(
+    let pending_room = Room::pending(
         &Bookmark {
             name: "".to_string(),
             jid: room_id!("user2@prose.org"),
@@ -1078,7 +1067,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             sidebar_state: RoomSidebarState::InSidebar,
         },
         "user1#3dea7f2",
-    ));
+    );
 
     {
         let pending_room = pending_room.clone();
@@ -1116,12 +1105,12 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         .expect_set_or_replace()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Arc::new(RoomInternals::for_direct_message(
+        .with(predicate::eq(Room::for_direct_message(
             &user_id!("user2@prose.org"),
             "Jennifer Doe",
             Availability::Available,
             RoomSidebarState::InSidebar,
-        ))))
+        )))
         .return_once(|_| Some(pending_room));
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -1165,7 +1154,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
         server_features: Default::default(),
     });
 
-    let pending_room = Arc::new(Mutex::new(Arc::new(RoomInternals::pending(
+    let pending_room = Arc::new(Mutex::new(Room::pending(
         &Bookmark {
             name: "Pending Channel Name".to_string(),
             jid: room_id!("room@conf.prose.org"),
@@ -1173,7 +1162,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             sidebar_state: RoomSidebarState::InSidebar,
         },
         "user1#3dea7f2",
-    ))));
+    )));
 
     {
         let pending_room = pending_room.lock().clone();
@@ -1242,7 +1231,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
                 predicate::always(),
             )
             .return_once(move |_, handler| {
-                let updated_room = Arc::new(handler(room.lock().clone()));
+                let updated_room = handler(room.lock().clone());
                 *room.lock() = updated_room.clone();
                 Some(updated_room)
             });
@@ -1273,7 +1262,7 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
-    let retained_room = Arc::new(Mutex::new(Option::<Arc<RoomInternals>>::None));
+    let retained_room = Arc::new(Mutex::new(Option::<Room>::None));
 
     deps.connected_rooms_repo
         .expect_get()

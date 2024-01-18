@@ -3,13 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use mockall::{predicate, Sequence};
 
 use prose_core_client::domain::connection::models::ConnectionProperties;
-use prose_core_client::domain::rooms::models::{RoomInternals, RoomSidebarState, RoomSpec};
+use prose_core_client::domain::rooms::models::{Room, RoomSidebarState, RoomSpec};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use prose_core_client::domain::shared::models::{
     OccupantId, RoomId, UserEndpointId, UserId, UserResourceId,
@@ -25,18 +23,14 @@ use prose_core_client::{occupant_id, room_id, user_id, user_resource_id, ClientE
 async fn test_extend_items_insert_items() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room1 = Arc::new(
-        RoomInternals::public_channel(room_id!("channel1@prose.org"))
-            .with_user_nickname("user-nickname")
-            .with_name("Channel 1")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
-    let room2 = Arc::new(
-        RoomInternals::public_channel(room_id!("channel2@prose.org"))
-            .with_user_nickname("user-nickname")
-            .with_name("Channel 2")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room1 = Room::public_channel(room_id!("channel1@prose.org"))
+        .with_user_nickname("user-nickname")
+        .with_name("Channel 1")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+    let room2 = Room::public_channel(room_id!("channel2@prose.org"))
+        .with_user_nickname("user-nickname")
+        .with_name("Channel 2")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     deps.ctx.set_connection_properties(ConnectionProperties {
         connected_jid: user_resource_id!("user1@prose.org/res"),
@@ -54,10 +48,10 @@ async fn test_extend_items_insert_items() -> Result<()> {
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Arc::new(RoomInternals::pending(
-            &Bookmark::try_from(room1.as_ref()).unwrap(),
+        .with(predicate::eq(Room::pending(
+            &Bookmark::try_from(&room1).unwrap(),
             "user1#3dea7f2",
-        ))))
+        )))
         .return_once(|_| Ok(()));
 
     deps.client_event_dispatcher
@@ -91,8 +85,8 @@ async fn test_extend_items_insert_items() -> Result<()> {
     let service = SidebarDomainService::from(deps.into_deps());
     service
         .extend_items_from_bookmarks(vec![
-            Bookmark::try_from(room1.as_ref()).unwrap(),
-            Bookmark::try_from(room2.as_ref()).unwrap(),
+            Bookmark::try_from(&room1).unwrap(),
+            Bookmark::try_from(&room2).unwrap(),
         ])
         .await?;
 
@@ -103,18 +97,14 @@ async fn test_extend_items_insert_items() -> Result<()> {
 async fn test_extend_items_removed_item() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room1 = Arc::new(
-        RoomInternals::public_channel(room_id!("channel1@prose.org"))
-            .with_user_nickname("user-nickname")
-            .with_name("Channel 1")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
-    let room2 = Arc::new(
-        RoomInternals::public_channel(room_id!("channel2@prose.org"))
-            .with_user_nickname("user-nickname")
-            .with_name("Channel 2")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room1 = Room::public_channel(room_id!("channel1@prose.org"))
+        .with_user_nickname("user-nickname")
+        .with_name("Channel 1")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+    let room2 = Room::public_channel(room_id!("channel2@prose.org"))
+        .with_user_nickname("user-nickname")
+        .with_name("Channel 2")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     {
         let rooms = vec![room1.clone(), room2.clone()];
@@ -146,7 +136,7 @@ async fn test_extend_items_removed_item() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![Bookmark::try_from(room2.as_ref()).unwrap()])
+        .extend_items_from_bookmarks(vec![Bookmark::try_from(&room2).unwrap()])
         .await?;
 
     Ok(())
@@ -157,11 +147,9 @@ async fn test_handles_updated_bookmark() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("group@prose.org"))
-            .with_name("Group")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room = Room::group(room_id!("group@prose.org"))
+        .with_name("Group")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     {
         let room = room.clone();
@@ -199,10 +187,10 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
         .once()
         .with(predicate::eq(room_id!("channel@conference.prose.org")))
         .return_once(move |_| {
-            Some(Arc::new(
-                RoomInternals::public_channel(room_id!("channel@conference.prose.org"))
+            Some(
+                Room::public_channel(room_id!("channel@conference.prose.org"))
                     .with_name("Channel Name"),
-            ))
+            )
         });
 
     deps.connected_rooms_repo
@@ -243,11 +231,9 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
 async fn test_removes_direct_message_from_sidebar() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::direct_message(user_id!("contact@prose.org"), Availability::Available)
-            .with_name("Jane Doe")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room = Room::direct_message(user_id!("contact@prose.org"), Availability::Available)
+        .with_name("Jane Doe")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     {
         let room = room.clone();
@@ -288,10 +274,7 @@ async fn test_removes_direct_message_from_sidebar() -> Result<()> {
 async fn test_handles_removed_direct_message() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(RoomInternals::direct_message(
-        user_id!("contact@prose.org"),
-        Availability::Unavailable,
-    ));
+    let room = Room::direct_message(user_id!("contact@prose.org"), Availability::Unavailable);
 
     {
         let room = room.clone();
@@ -326,11 +309,9 @@ async fn test_handles_removed_direct_message() -> Result<()> {
 async fn test_removes_group_from_sidebar() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("group@conference.prose.org"))
-            .with_name("Group Name")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room = Room::group(room_id!("group@conference.prose.org"))
+        .with_name("Group Name")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     {
         let room = room.clone();
@@ -375,11 +356,9 @@ async fn test_removes_group_from_sidebar() -> Result<()> {
 async fn test_removes_private_channel_from_sidebar() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::private_channel(room_id!("channel@conference.prose.org"))
-            .with_name("Channel Name")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room = Room::private_channel(room_id!("channel@conference.prose.org"))
+        .with_name("Channel Name")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     {
         let room = room.clone();
@@ -441,11 +420,9 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
 async fn test_insert_item_for_received_group_message_if_needed() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("group@conference.prose.org"))
-            .with_name("Group Name")
-            .with_sidebar_state(RoomSidebarState::NotInSidebar),
-    );
+    let room = Room::group(room_id!("group@conference.prose.org"))
+        .with_name("Group Name")
+        .with_sidebar_state(RoomSidebarState::NotInSidebar);
 
     {
         let room = room.clone();
@@ -506,14 +483,11 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
         )
         .return_once(|_, _| {
             Box::pin(async {
-                Ok(Arc::new(
-                    RoomInternals::direct_message(
-                        user_id!("contact@prose.org"),
-                        Availability::Available,
-                    )
-                    .with_name("Jane Doe")
-                    .with_sidebar_state(RoomSidebarState::NotInSidebar),
-                ))
+                Ok(
+                    Room::direct_message(user_id!("contact@prose.org"), Availability::Available)
+                        .with_name("Jane Doe")
+                        .with_sidebar_state(RoomSidebarState::NotInSidebar),
+                )
             })
         });
 
@@ -548,11 +522,9 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
 async fn test_renames_channel_in_sidebar() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::public_channel(room_id!("room@conference.prose.org"))
-            .with_name("Channel Name")
-            .with_sidebar_state(RoomSidebarState::Favorite),
-    );
+    let room = Room::public_channel(room_id!("room@conference.prose.org"))
+        .with_name("Channel Name")
+        .with_sidebar_state(RoomSidebarState::Favorite);
 
     {
         let room = room.clone();
@@ -603,11 +575,9 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
 async fn test_toggle_favorite() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
-    let room = Arc::new(
-        RoomInternals::public_channel(room_id!("channel@conference.prose.org"))
-            .with_name("Channel Name")
-            .with_sidebar_state(RoomSidebarState::InSidebar),
-    );
+    let room = Room::public_channel(room_id!("channel@conference.prose.org"))
+        .with_name("Channel Name")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
 
     {
         let room = room.clone();
@@ -671,13 +641,11 @@ async fn test_convert_group_to_private_channel() -> Result<()> {
                 // the RoomsEventHandler but the room will be removed from the
                 // ConnectedRoomsRepository already, so this will not be forwarded to
                 // the SidebarDomainService.
-                Ok(Arc::new(
-                    RoomInternals::private_channel(room_id!(
-                        "private-channel@conference.prose.org"
-                    ))
-                    .with_name("My Private Channel")
-                    .with_sidebar_state(RoomSidebarState::InSidebar),
-                ))
+                Ok(
+                    Room::private_channel(room_id!("private-channel@conference.prose.org"))
+                        .with_name("My Private Channel")
+                        .with_sidebar_state(RoomSidebarState::InSidebar),
+                )
             })
         });
 
@@ -737,11 +705,11 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
         .with(predicate::eq(room_id!("group@muc.prose.org")))
         .in_sequence(&mut seq)
         .return_once(|_| {
-            Some(Arc::new(
-                RoomInternals::group(room_id!("group@muc.prose.org"))
+            Some(
+                Room::group(room_id!("group@muc.prose.org"))
                     .with_name("Destroyed Group")
                     .with_sidebar_state(RoomSidebarState::Favorite),
-            ))
+            )
         });
 
     deps.connected_rooms_repo
@@ -754,7 +722,7 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Arc::new(RoomInternals::pending(
+        .with(predicate::eq(Room::pending(
             &Bookmark {
                 name: "Destroyed Group".to_string(),
                 jid: room_id!("channel@muc.prose.org"),
@@ -762,7 +730,7 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
                 sidebar_state: RoomSidebarState::Favorite,
             },
             "user1#3dea7f2",
-        ))))
+        )))
         .return_once(|_| Ok(()));
 
     deps.client_event_dispatcher
@@ -793,11 +761,9 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
         .in_sequence(&mut seq)
         .return_once(|_, _| {
             Box::pin(async {
-                Ok(Arc::new(
-                    RoomInternals::private_channel(room_id!("channel@muc.prose.org"))
-                        .with_name("The Channel")
-                        .with_sidebar_state(RoomSidebarState::Favorite),
-                ))
+                Ok(Room::private_channel(room_id!("channel@muc.prose.org"))
+                    .with_name("The Channel")
+                    .with_sidebar_state(RoomSidebarState::Favorite))
             })
         });
 
@@ -836,10 +802,8 @@ async fn test_handles_destroyed_room_without_alternate_room() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(
-        RoomInternals::private_channel(room_id!("room@conf.prose.org"))
-            .with_state(RoomState::Connected),
-    );
+    let room =
+        Room::private_channel(room_id!("room@conf.prose.org")).with_state(RoomState::Connected);
     assert_eq!(
         room.is_disconnected(),
         DisconnectedState {
@@ -886,10 +850,8 @@ async fn test_handles_temporary_removal_from_room() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(
-        RoomInternals::private_channel(room_id!("room@conf.prose.org"))
-            .with_state(RoomState::Connected),
-    );
+    let room =
+        Room::private_channel(room_id!("room@conf.prose.org")).with_state(RoomState::Connected);
     assert_eq!(
         room.is_disconnected(),
         DisconnectedState {
@@ -936,10 +898,8 @@ async fn test_handles_permanent_removal_from_room() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(
-        RoomInternals::private_channel(room_id!("room@conf.prose.org"))
-            .with_state(RoomState::Connected),
-    );
+    let room =
+        Room::private_channel(room_id!("room@conf.prose.org")).with_state(RoomState::Connected);
     assert_eq!(
         room.is_disconnected(),
         DisconnectedState {
@@ -994,11 +954,11 @@ async fn test_handles_changed_room_config() -> Result<()> {
         .in_sequence(&mut seq)
         .with(predicate::eq(room_id!("room@conf.prose.org")))
         .return_once(move |_| {
-            Some(Arc::new(
-                RoomInternals::private_channel(room_id!("room@conf.prose.org"))
+            Some(
+                Room::private_channel(room_id!("room@conf.prose.org"))
                     .with_name("Old Room Name")
                     .with_sidebar_state(RoomSidebarState::InSidebar),
-            ))
+            )
         });
 
     deps.rooms_domain_service
@@ -1008,11 +968,9 @@ async fn test_handles_changed_room_config() -> Result<()> {
         .in_sequence(&mut seq)
         .return_once(|_| {
             Box::pin(async {
-                Ok(Arc::new(
-                    RoomInternals::private_channel(room_id!("room@conf.prose.org"))
-                        .with_name("New Room Name")
-                        .with_sidebar_state(RoomSidebarState::InSidebar),
-                ))
+                Ok(Room::private_channel(room_id!("room@conf.prose.org"))
+                    .with_name("New Room Name")
+                    .with_sidebar_state(RoomSidebarState::InSidebar))
             })
         });
 
@@ -1049,11 +1007,11 @@ async fn test_ignores_changed_config_for_connecting_room() -> Result<()> {
         .once()
         .with(predicate::eq(room_id!("room@conf.prose.org")))
         .return_once(move |_| {
-            Some(Arc::new(RoomInternals::connecting(
+            Some(Room::connecting(
                 &room_id!("room@conf.prose.org"),
                 "nick",
                 RoomSidebarState::InSidebar,
-            )))
+            ))
         });
 
     let service = SidebarDomainService::from(deps.into_deps());

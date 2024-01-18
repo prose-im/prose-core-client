@@ -6,13 +6,13 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::rooms::models::{
-    ComposeState, RegisteredMember, RoomAffiliation, RoomInfo, RoomInternals, RoomSidebarState,
+    ComposeState, RegisteredMember, Room, RoomAffiliation, RoomInfo, RoomSidebarState,
 };
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
 use crate::dtos::{Availability, Participant, RoomState, UserId};
 use crate::test::mock_data;
 
-impl RoomInternals {
+impl Room {
     pub fn direct_message(jid: UserId, availability: Availability) -> Self {
         let jid = jid.into();
 
@@ -33,7 +33,7 @@ impl RoomInternals {
     }
 
     pub fn group(jid: impl Into<RoomId>) -> Self {
-        Self::new(RoomInfo {
+        Self::mock(RoomInfo {
             room_id: jid.into(),
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::Group,
@@ -41,7 +41,7 @@ impl RoomInternals {
     }
 
     pub fn public_channel(jid: impl Into<RoomId>) -> Self {
-        Self::new(RoomInfo {
+        Self::mock(RoomInfo {
             room_id: jid.into(),
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PublicChannel,
@@ -49,16 +49,11 @@ impl RoomInternals {
     }
 
     pub fn private_channel(jid: impl Into<RoomId>) -> Self {
-        Self::new(RoomInfo {
+        Self::mock(RoomInfo {
             room_id: jid.into(),
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PrivateChannel,
         })
-    }
-
-    pub fn with_user_nickname(mut self, nickname: impl Into<String>) -> Self {
-        self.user_nickname = nickname.into();
-        self
     }
 
     pub fn with_name(self, name: impl AsRef<str>) -> Self {

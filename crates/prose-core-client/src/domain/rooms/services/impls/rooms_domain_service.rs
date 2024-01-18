@@ -5,7 +5,6 @@
 
 use std::future::Future;
 use std::iter;
-use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -22,7 +21,7 @@ use crate::app::deps::{
     DynRoomParticipationService, DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::domain::rooms::models::{
-    RegisteredMember, RoomAffiliation, RoomError, RoomInfo, RoomInternals, RoomSessionInfo,
+    RegisteredMember, Room, RoomAffiliation, RoomError, RoomInfo, RoomSessionInfo,
     RoomSessionMember, RoomSidebarState, RoomSpec,
 };
 use crate::domain::rooms::services::rooms_domain_service::{
@@ -60,7 +59,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         &self,
         request: CreateOrEnterRoomRequest,
         sidebar_state: RoomSidebarState,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    ) -> Result<Room, RoomError> {
         match request {
             CreateOrEnterRoomRequest::Create {
                 service,
@@ -136,7 +135,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         room_jid: &RoomId,
         spec: RoomSpec,
         new_name: &str,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    ) -> Result<Room, RoomError> {
         let Some(room) = self.connected_rooms_repo.get(room_jid) else {
             return Err(RoomError::RoomNotFound);
         };
@@ -302,10 +301,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
     /// Loads the configuration for `room_id` and updates the corresponding `RoomInternals`
     /// accordingly. Call this method after the room configuration changed.
     /// Returns `RoomError::RoomNotFound` if no room with `room_id` exists.
-    async fn reevaluate_room_spec(
-        &self,
-        room_id: &RoomId,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    async fn reevaluate_room_spec(&self, room_id: &RoomId) -> Result<Room, RoomError> {
         let Some(room) = self.connected_rooms_repo.get(room_id) else {
             return Err(RoomError::RoomNotFound);
         };
@@ -345,9 +341,9 @@ impl RoomsDomainService {
         password: Option<&str>,
         sidebar_state: RoomSidebarState,
         behavior: JoinRoomBehavior,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    ) -> Result<Room, RoomError> {
         let remove_or_retain_room_on_error =
-            |room: Arc<RoomInternals>, error: &RoomError| match behavior.on_failure {
+            |room: Room, error: &RoomError| match behavior.on_failure {
                 JoinRoomFailureBehavior::RemoveOnError => {
                     self.connected_rooms_repo.delete(&room_id);
                 }
@@ -402,7 +398,7 @@ impl RoomsDomainService {
         &self,
         participant: &UserId,
         sidebar_state: RoomSidebarState,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    ) -> Result<Room, RoomError> {
         let room_id = RoomId::from(participant.clone().into_inner());
 
         match self.connected_rooms_repo.get(&room_id) {
@@ -422,12 +418,12 @@ impl RoomsDomainService {
             .unwrap_or_else(|| participant.formatted_username());
         let user_info = user_info.unwrap_or_default().unwrap_or_default();
 
-        let room = Arc::new(RoomInternals::for_direct_message(
+        let room = Room::for_direct_message(
             &participant,
             &contact_name,
             user_info.availability,
             sidebar_state,
-        ));
+        );
 
         self.connected_rooms_repo.set_or_replace(room.clone());
         Ok(room)
@@ -439,7 +435,7 @@ impl RoomsDomainService {
         request: CreateRoomType,
         sidebar_state: RoomSidebarState,
         behavior: CreateRoomBehavior,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    ) -> Result<Room, RoomError> {
         let result = match request {
             CreateRoomType::Group { participants } => {
                 self.create_or_join_group(&service, participants, sidebar_state, behavior)
@@ -685,10 +681,7 @@ impl RoomsDomainService {
         }
     }
 
-    async fn finalize_pending_room(
-        &self,
-        info: RoomSessionInfo,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    async fn finalize_pending_room(&self, info: RoomSessionInfo) -> Result<Room, RoomError> {
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
         let room_name = info.config.room_name;
@@ -758,7 +751,7 @@ impl RoomsDomainService {
         room_jid: &RoomId,
         nickname: &str,
         sidebar_state: RoomSidebarState,
-    ) -> Result<Arc<RoomInternals>, RoomError> {
+    ) -> Result<Room, RoomError> {
         // If we have a pending room waiting for us we'll switch that to connecting and do not
         // insert a new one.
         if let Some(pending_room) = self.connected_rooms_repo.get(room_jid) {
@@ -768,7 +761,7 @@ impl RoomsDomainService {
             }
         }
 
-        let room = Arc::new(RoomInternals::connecting(room_jid, nickname, sidebar_state));
+        let room = Room::connecting(room_jid, nickname, sidebar_state);
         self.connected_rooms_repo
             .set(room.clone())
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_jid.clone()))?;

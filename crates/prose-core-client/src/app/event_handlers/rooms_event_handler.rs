@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use tracing::info;
@@ -23,7 +21,7 @@ use crate::app::event_handlers::{
 };
 use crate::client_event::ClientRoomEventType;
 use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
-use crate::domain::rooms::models::RoomInternals;
+use crate::domain::rooms::models::Room;
 use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
 };
@@ -73,7 +71,7 @@ impl ServerEventHandler for RoomsEventHandler {
 }
 
 impl RoomsEventHandler {
-    fn get_room(&self, jid: &RoomId) -> Result<Arc<RoomInternals>> {
+    fn get_room(&self, jid: &RoomId) -> Result<Room> {
         self.connected_rooms_repo
             .get(jid)
             .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))

@@ -3,15 +3,13 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::rooms::models::{RoomError, RoomInternals, RoomSidebarState, RoomSpec};
+use crate::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec};
 use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -106,7 +104,7 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         request: CreateOrEnterRoomRequest,
         sidebar_state: RoomSidebarState,
-    ) -> Result<Arc<RoomInternals>, RoomError>;
+    ) -> Result<Room, RoomError>;
 
     /// Renames the room identified by `room_jid` to `name`.
     ///
@@ -133,11 +131,10 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
         room_id: &RoomId,
         spec: RoomSpec,
         new_name: &str,
-    ) -> Result<Arc<RoomInternals>, RoomError>;
+    ) -> Result<Room, RoomError>;
 
     /// Loads the configuration for `room_id` and updates the corresponding `RoomInternals`
     /// accordingly. Call this method after the room configuration changed.
     /// Returns `RoomError::RoomNotFound` if no room with `room_id` exists.
-    async fn reevaluate_room_spec(&self, room_id: &RoomId)
-        -> Result<Arc<RoomInternals>, RoomError>;
+    async fn reevaluate_room_spec(&self, room_id: &RoomId) -> Result<Room, RoomError>;
 }

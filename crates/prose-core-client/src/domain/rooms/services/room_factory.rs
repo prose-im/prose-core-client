@@ -6,13 +6,13 @@
 use std::sync::Arc;
 
 use crate::app::services::{RoomEnvelope, RoomInner};
-use crate::domain::rooms::models::RoomInternals;
+use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::RoomType;
 
 #[cfg(target_arch = "wasm32")]
-pub type RoomBuilder = Arc<dyn Fn(Arc<RoomInternals>) -> RoomInner>;
+pub type RoomBuilder = Arc<dyn Fn(Room) -> RoomInner>;
 #[cfg(not(target_arch = "wasm32"))]
-pub type RoomBuilder = Arc<dyn Fn(Arc<RoomInternals>) -> RoomInner + Send + Sync>;
+pub type RoomBuilder = Arc<dyn Fn(Room) -> RoomInner + Send + Sync>;
 
 #[derive(Clone)]
 pub struct RoomFactory {
@@ -24,7 +24,7 @@ impl RoomFactory {
         RoomFactory { builder }
     }
 
-    pub fn build(&self, room: Arc<RoomInternals>) -> RoomEnvelope {
+    pub fn build(&self, room: Room) -> RoomEnvelope {
         let room_type = room.r#type.clone();
         let inner = Arc::new((self.builder)(room));
 

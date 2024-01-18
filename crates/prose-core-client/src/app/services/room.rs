@@ -20,7 +20,7 @@ use crate::app::deps::{
     DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
-use crate::domain::rooms::models::{RoomAffiliation, RoomInternals, RoomSpec};
+use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{Message as MessageDTO, MessageSender, RoomState, UserBasicInfo, UserId};
 use crate::{ClientEvent, ClientRoomEventType};
@@ -55,7 +55,7 @@ impl HasMutableName for PublicChannel {}
 impl HasMutableName for Generic {}
 
 pub struct RoomInner {
-    pub(crate) data: Arc<RoomInternals>,
+    pub(crate) data: DomainRoom,
 
     pub(crate) ctx: DynAppContext,
     pub(crate) attributes_service: DynRoomAttributesService,

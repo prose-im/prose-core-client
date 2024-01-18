@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::{bail, format_err, Context, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
@@ -18,9 +16,7 @@ use crate::app::deps::{
     DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService,
 };
-use crate::domain::rooms::models::{
-    RoomError, RoomInternals, RoomSidebarState, RoomSpec, RoomState,
-};
+use crate::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec, RoomState};
 use crate::domain::rooms::services::impls::build_nickname;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::shared::models::{RoomId, RoomType, UserEndpointId, UserId};
@@ -98,14 +94,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
 
             match bookmark.r#type {
                 BookmarkType::DirectMessage => {
-                    _ = self
-                        .connected_rooms_repo
-                        .set(Arc::new(RoomInternals::for_direct_message(
-                            &UserId::from(bookmark.jid.clone().into_inner()),
-                            &bookmark.name,
-                            Availability::Unavailable,
-                            bookmark.sidebar_state,
-                        )));
+                    _ = self.connected_rooms_repo.set(Room::for_direct_message(
+                        &UserId::from(bookmark.jid.clone().into_inner()),
+                        &bookmark.name,
+                        Availability::Unavailable,
+                        bookmark.sidebar_state,
+                    ));
                 }
                 BookmarkType::Group
                 | BookmarkType::PrivateChannel
@@ -113,7 +107,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 | BookmarkType::Generic => {
                     _ = self
                         .connected_rooms_repo
-                        .set(Arc::new(RoomInternals::pending(&bookmark, &nickname)));
+                        .set(Room::pending(&bookmark, &nickname));
                 }
             };
         }
@@ -156,7 +150,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         }
 
         // …and run them in parallel.
-        let results: Vec<Result<(RoomId, Option<Arc<RoomInternals>>), RoomError>> =
+        let results: Vec<Result<(RoomId, Option<Room>), RoomError>> =
             join_all(join_room_futures).await;
 
         // Now evaluate the results…
@@ -501,17 +495,15 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         }
 
         // …and insert a pending room with the same name instead…
-        _ = self
-            .connected_rooms_repo
-            .set(Arc::new(RoomInternals::pending(
-                &Bookmark {
-                    name: room.name().unwrap_or_else(|| room.room_id.to_string()),
-                    jid: alternate_room.clone(),
-                    r#type: room.r#type.into(),
-                    sidebar_state: room.sidebar_state(),
-                },
-                &build_nickname(&self.ctx.connected_id()?.to_user_id()),
-            )));
+        _ = self.connected_rooms_repo.set(Room::pending(
+            &Bookmark {
+                name: room.name().unwrap_or_else(|| room.room_id.to_string()),
+                jid: alternate_room.clone(),
+                r#type: room.r#type.into(),
+                sidebar_state: room.sidebar_state(),
+            },
+            &build_nickname(&self.ctx.connected_id()?.to_user_id()),
+        ));
 
         // Let the UI update the sidebar…
         self.client_event_dispatcher
@@ -643,7 +635,7 @@ impl SidebarDomainService {
     /// - Private and Public Channels are disconnected when they are removed from the sidebar.
     ///
     /// If a room is disconnected, it is removed from the `ConnectedRoomsRepository`.
-    async fn disconnect_and_delete_room(&self, room: &RoomInternals) {
+    async fn disconnect_and_delete_room(&self, room: &Room) {
         match room.r#type {
             // DirectMessages do not need to be connected as they are not MUC rooms
             RoomType::DirectMessage => {
@@ -678,7 +670,7 @@ impl SidebarDomainService {
         &self,
         bookmark: &Bookmark,
         behavior: JoinRoomBehavior,
-    ) -> Result<Option<Arc<RoomInternals>>, RoomError> {
+    ) -> Result<Option<Room>, RoomError> {
         let room = match bookmark.r#type {
             BookmarkType::DirectMessage if !bookmark.sidebar_state.is_in_sidebar() => None,
 
@@ -729,7 +721,7 @@ impl SidebarDomainService {
 
 impl SidebarDomainService {
     /// Saves a bookmark for `room`. Errors will be logged but otherwise ignored.
-    async fn save_bookmark_for_room(&self, room: &RoomInternals) {
+    async fn save_bookmark_for_room(&self, room: &Room) {
         info!("Saving bookmark for room {}…", room.room_id);
 
         let bookmark = match Bookmark::try_from(room) {
@@ -754,7 +746,7 @@ impl SidebarDomainService {
         }
     }
 
-    fn try_get_room(&self, room_id: &RoomId) -> Result<Arc<RoomInternals>> {
+    fn try_get_room(&self, room_id: &RoomId) -> Result<Room> {
         let Some(room) = self.connected_rooms_repo.get(room_id) else {
             bail!("No room with id '{room_id}'")
         };
@@ -762,10 +754,10 @@ impl SidebarDomainService {
     }
 }
 
-impl TryFrom<&RoomInternals> for Bookmark {
+impl TryFrom<&Room> for Bookmark {
     type Error = anyhow::Error;
 
-    fn try_from(value: &RoomInternals) -> Result<Self> {
+    fn try_from(value: &Room) -> Result<Self> {
         let bookmark_type = match value.r#type {
             RoomType::Unknown => {
                 return Err(format_err!("Cannot create bookmark for a pending room"))

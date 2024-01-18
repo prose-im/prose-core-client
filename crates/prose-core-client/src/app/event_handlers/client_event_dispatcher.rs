@@ -3,12 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::{Arc, OnceLock, Weak};
+use std::sync::{OnceLock, Weak};
 
 use crate::app::deps::DynRoomFactory;
 use crate::app::event_handlers::ClientEventDispatcherTrait;
 use crate::client::ClientInner;
-use crate::domain::rooms::models::RoomInternals;
+use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::RoomType;
 use crate::{ClientDelegate, ClientEvent, ClientRoomEventType};
 
@@ -60,7 +60,7 @@ impl ClientEventDispatcherTrait for ClientEventDispatcher {
         delegate.handle_event(client_inner.into(), event)
     }
 
-    fn dispatch_room_event(&self, room: Arc<RoomInternals>, event: ClientRoomEventType) {
+    fn dispatch_room_event(&self, room: Room, event: ClientRoomEventType) {
         // We're not sending events for rooms that are still pending…
         if room.r#type == RoomType::Unknown {
             return;

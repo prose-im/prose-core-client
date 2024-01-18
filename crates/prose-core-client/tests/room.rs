@@ -3,15 +3,13 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use mockall::predicate;
 use xmpp_parsers::mam::Fin;
 use xmpp_parsers::rsm::SetResult;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
-use prose_core_client::domain::rooms::models::{RegisteredMember, RoomAffiliation, RoomInternals};
+use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
 use prose_core_client::dtos::Participant;
@@ -24,7 +22,7 @@ use prose_xmpp::{bare, jid};
 async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
+    let internals = Room::group(room_id!("room@conference.prose.org"))
         .with_members([RegisteredMember {
             user_id: user_id!("a@prose.org"),
             name: Some("Aron Doe".to_string()),
@@ -64,9 +62,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
             })
         });
 
-    let room = RoomFactory::from(deps)
-        .build(Arc::new(internals))
-        .to_generic_room();
+    let room = RoomFactory::from(deps).build(internals).to_generic_room();
 
     assert_eq!(
         room.load_messages_with_ids(&[
@@ -102,7 +98,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = RoomInternals::group(room_id!("room@conference.prose.org"))
+    let internals = Room::group(room_id!("room@conference.prose.org"))
         .with_members([RegisteredMember {
             user_id: user_id!("a@prose.org"),
             name: Some("Aron Doe".to_string()),
@@ -172,9 +168,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         .once()
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
-    let room = RoomFactory::from(deps)
-        .build(Arc::new(internals))
-        .to_generic_room();
+    let room = RoomFactory::from(deps).build(internals).to_generic_room();
 
     assert_eq!(
         room.load_latest_messages().await?,
@@ -240,11 +234,9 @@ async fn test_toggle_reaction() -> Result<()> {
         )
         .return_once(|_, _, _, _| Box::pin(async { Ok(()) }));
 
-    let internals = RoomInternals::group(room_id!("room@conference.prose.org"));
+    let internals = Room::group(room_id!("room@conference.prose.org"));
 
-    let room = RoomFactory::from(deps)
-        .build(Arc::new(internals))
-        .to_generic_room();
+    let room = RoomFactory::from(deps).build(internals).to_generic_room();
 
     room.toggle_reaction_to_message(MessageBuilder::id_for_index(1), "🍕".into())
         .await?;
@@ -266,10 +258,7 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
-        .build(Arc::new(
-            RoomInternals::public_channel(room_id!("room@conference.prose.org"))
-                .with_name("Old Name"),
-        ))
+        .build(Room::public_channel(room_id!("room@conference.prose.org")).with_name("Old Name"))
         .to_generic_room();
 
     room.set_name("New Name").await?;

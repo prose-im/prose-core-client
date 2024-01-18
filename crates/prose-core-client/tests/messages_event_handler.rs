@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 use mockall::{predicate, Sequence};
 use xmpp_parsers::message::MessageType;
@@ -12,7 +10,7 @@ use xmpp_parsers::message::MessageType;
 use prose_core_client::app::event_handlers::{
     MessageEvent, MessageEventType, MessagesEventHandler, ServerEvent, ServerEventHandler,
 };
-use prose_core_client::domain::rooms::models::RoomInternals;
+use prose_core_client::domain::rooms::models::Room;
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, UserEndpointId, UserId};
 use prose_core_client::dtos::Availability;
 use prose_core_client::test::MockAppDependencies;
@@ -25,9 +23,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(
-        RoomInternals::group(room_id!("group@conference.prose.org")).with_name("Group Name"),
-    );
+    let room = Room::group(room_id!("group@conference.prose.org")).with_name("Group Name");
 
     deps.sidebar_domain_service
         .expect_insert_item_for_received_message_if_needed()
@@ -93,10 +89,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Arc::new(RoomInternals::direct_message(
-        user_id!("jane.doe@prose.org"),
-        Availability::Unavailable,
-    ));
+    let room = Room::direct_message(user_id!("jane.doe@prose.org"), Availability::Unavailable);
 
     deps.sidebar_domain_service
         .expect_insert_item_for_received_message_if_needed()

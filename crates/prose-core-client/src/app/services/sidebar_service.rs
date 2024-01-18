@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::Arc;
-
 use anyhow::Result;
 
 use prose_proc_macros::InjectDependencies;
@@ -13,7 +11,7 @@ use crate::app::deps::{
     DynConnectedRoomsReadOnlyRepository, DynDraftsRepository, DynRoomFactory,
     DynSidebarDomainService,
 };
-use crate::domain::rooms::models::{RoomInternals, RoomSidebarState};
+use crate::domain::rooms::models::{Room, RoomSidebarState};
 use crate::domain::shared::models::{RoomId, RoomType};
 use crate::dtos::SidebarItem as SidebarItemDTO;
 
@@ -31,7 +29,7 @@ pub struct SidebarService {
 
 impl SidebarService {
     pub async fn sidebar_items(&self) -> Vec<SidebarItemDTO> {
-        let rooms: Vec<Arc<RoomInternals>> = self.connected_rooms_repo.get_all();
+        let rooms: Vec<Room> = self.connected_rooms_repo.get_all();
         let mut item_dtos = vec![];
 
         for room in rooms {
