@@ -726,8 +726,10 @@ enum Selection {
     LoadContacts,
     #[strum(serialize = "Add contact")]
     AddContact,
-    #[strum(serialize = "Send message")]
-    SendMessage,
+    #[strum(serialize = "Send message to contact or room")]
+    SendMessageToRoom,
+    #[strum(serialize = "Send message to anyhow")]
+    SendMessageToAnyone,
     #[strum(serialize = "Load messages")]
     LoadMessages,
     #[strum(serialize = "Delete cached data")]
@@ -816,8 +818,27 @@ async fn main() -> Result<()> {
                 let jid = prompt_bare_jid(None);
                 client.contacts.add_contact(&jid).await?;
             }
-            Selection::SendMessage => {
+            Selection::SendMessageToRoom => {
                 send_message(&client).await?;
+            }
+            Selection::SendMessageToAnyone => {
+                let jid = prompt_bare_jid(None);
+                let room_id = client.rooms.start_conversation(&[jid.into()]).await?;
+                let room: RoomEnvelope = client
+                    .sidebar
+                    .sidebar_items()
+                    .await
+                    .into_iter()
+                    .find(|r| r.room.to_generic_room().jid() == &room_id)
+                    .unwrap()
+                    .room;
+                let body = Input::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Enter message")
+                    .default(String::from("Hello World!"))
+                    .allow_empty(false)
+                    .interact_text()
+                    .unwrap();
+                room.to_generic_room().send_message(body).await?;
             }
             Selection::LoadMessages => {
                 load_messages(&client).await?;
