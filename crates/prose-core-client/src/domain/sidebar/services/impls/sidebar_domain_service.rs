@@ -64,7 +64,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///
     /// After processing all bookmarks, dispatches a `ClientEvent::SidebarChanged`.
     async fn extend_items_from_bookmarks(&self, bookmarks: Vec<Bookmark>) -> Result<()> {
-        let mut delete_rooms_futures = vec![];
+        // let mut delete_rooms_futures = vec![];
         let mut join_room_futures = vec![];
         let mut update_bookmarks_futures = vec![];
 
@@ -72,17 +72,17 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         let rooms = self.connected_rooms_repo.get_all();
         let mut rooms_changed = false;
 
-        for room in rooms.iter() {
-            if bookmarks.iter().find(|b| b.jid == room.room_id).is_some() {
-                continue;
-            }
-            // Bookmark has been deleted…
-            let room = room.clone();
-            delete_rooms_futures.push(async move { self.disconnect_and_delete_room(&room).await });
-            rooms_changed = true;
-        }
-
-        join_all(delete_rooms_futures).await;
+        // for room in rooms.iter() {
+        //     if bookmarks.iter().find(|b| b.jid == room.room_id).is_some() {
+        //         continue;
+        //     }
+        //     // Bookmark has been deleted…
+        //     let room = room.clone();
+        //     delete_rooms_futures.push(async move { self.disconnect_and_delete_room(&room).await });
+        //     rooms_changed = true;
+        // }
+        //
+        // join_all(delete_rooms_futures).await;
 
         // Insert a pending room for each bookmark so that we're able to draw the sidebar
         // before each room is connected.
