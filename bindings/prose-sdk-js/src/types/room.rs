@@ -196,7 +196,7 @@ impl From<SdkRoomState> for RoomState {
                 can_retry: false,
             },
             SdkRoomState::Disconnected { error, can_retry } => Self {
-                kind: RoomStateType::Connecting,
+                kind: RoomStateType::Disconnected,
                 error,
                 can_retry,
             },
