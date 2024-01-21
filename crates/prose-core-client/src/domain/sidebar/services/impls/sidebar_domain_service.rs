@@ -281,6 +281,34 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    async fn destroy_room(&self, room_id: &RoomId) -> Result<()> {
+        if self.connected_rooms_repo.get(room_id).is_none() {
+            return Ok(());
+        }
+
+        match self
+            .room_management_service
+            .destroy_room(room_id, None)
+            .await
+        {
+            Ok(_) => (),
+            // The room is gone but we are still somehow connected to it. Maybe an outdated
+            // bookmark? In this case let's proceed with deleting the room and the bookmark.
+            Err(err) if err.is_gone_err() => (),
+            Err(err) => {
+                return Err(err.into());
+            }
+        }
+
+        self.connected_rooms_repo.delete(room_id);
+        self.delete_bookmark(room_id).await;
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(())
+    }
+
     /// Renames the sidebar item identified by `room_id` to `name`.
     ///
     /// If the item is not in the list of sidebar items no action is performed, otherwise:

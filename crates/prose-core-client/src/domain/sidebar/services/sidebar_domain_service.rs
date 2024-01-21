@@ -61,6 +61,10 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
         sender: &UserEndpointId,
     ) -> Result<()>;
 
+    /// Destroys the room identified by `room_id` and the associated bookmark.
+    /// `ClientEvent::SidebarChanged` will be dispatched after processing.
+    async fn destroy_room(&self, room_id: &RoomId) -> Result<()>;
+
     /// Renames the sidebar item identified by `room_id` to `name`.
     ///
     /// If the item is not in the list of sidebar items no action is performed, otherwise:

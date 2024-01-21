@@ -266,7 +266,7 @@ impl MUC {
         &self,
         jid: &BareJid,
         alternate_room: Option<&BareJid>,
-    ) -> Result<()> {
+    ) -> Result<(), RequestError> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             Query::new(Role::Owner).with_payload(Destroy {

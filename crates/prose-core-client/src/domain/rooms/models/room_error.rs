@@ -39,6 +39,10 @@ pub struct GoneError {
 }
 
 impl RoomError {
+    pub(crate) fn is_gone_err(&self) -> bool {
+        self.gone_err().is_some()
+    }
+
     pub(crate) fn gone_err(&self) -> Option<GoneError> {
         let Self::RequestError(error) = &self else {
             return None;

@@ -118,9 +118,7 @@ impl RoomsService {
     }
 
     pub async fn destroy_room(&self, room_jid: &RoomId) -> Result<()> {
-        self.room_management_service
-            .destroy_room(room_jid, None)
-            .await?;
+        self.sidebar_domain_service.destroy_room(room_jid).await?;
         Ok(())
     }
 }
