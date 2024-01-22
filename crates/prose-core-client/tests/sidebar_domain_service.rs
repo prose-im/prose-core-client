@@ -646,6 +646,57 @@ async fn test_convert_group_to_private_channel() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_destroys_room() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+    let mut seq = Sequence::new();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Some(Room::private_channel(room_id!("room@conf.prose.org"))));
+
+    deps.room_management_service
+        .expect_destroy_room()
+        .once()
+        .with(
+            predicate::eq(room_id!("room@conf.prose.org")),
+            predicate::eq(None),
+        )
+        .in_sequence(&mut seq)
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.connected_rooms_repo
+        .expect_delete()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Some(Room::private_channel(room_id!("room@conf.prose.org"))));
+
+    deps.bookmarks_service
+        .expect_delete_bookmark()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .in_sequence(&mut seq)
+        .return_once(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .destroy_room(&room_id!("room@conf.prose.org"))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
