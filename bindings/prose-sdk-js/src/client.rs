@@ -5,6 +5,9 @@
 
 use base64::{engine::general_purpose, Engine as _};
 use js_sys::Array;
+use tracing::{info, Level};
+use tracing_subscriber::fmt::format::{FmtSpan, Pretty};
+use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::{RoomId, SoftwareVersion, UserStatus};
@@ -38,6 +41,12 @@ pub struct ClientConfig {
     /// Defines if sent stanzas should be logged to the console.
     #[wasm_bindgen(js_name = "logSentStanzas")]
     pub log_sent_stanzas: bool,
+
+    #[wasm_bindgen(js_name = "loggingEnabled")]
+    pub logging_enabled: bool,
+
+    #[wasm_bindgen(skip)]
+    pub logging_min_level: String,
 
     #[wasm_bindgen(skip)]
     pub client_name: String,
@@ -85,6 +94,16 @@ impl ClientConfig {
     pub fn set_client_os(&mut self, client_os: Option<String>) {
         self.client_os = client_os.clone()
     }
+
+    #[wasm_bindgen(getter, js_name = "loggingMinLevel")]
+    pub fn logging_min_level(&self) -> String {
+        self.logging_min_level.clone()
+    }
+
+    #[wasm_bindgen(setter, js_name = "loggingMinLevel")]
+    pub fn set_logging_min_level(&mut self, level: String) {
+        self.logging_min_level = level.clone()
+    }
 }
 
 impl Default for ClientConfig {
@@ -93,6 +112,8 @@ impl Default for ClientConfig {
             ping_interval: 60,
             log_received_stanzas: false,
             log_sent_stanzas: false,
+            logging_enabled: true,
+            logging_min_level: "trace".to_string(),
             client_name: env!("CARGO_PKG_NAME").to_string(),
             client_version: env!("CARGO_PKG_VERSION").to_string(),
             client_os: None,
@@ -105,6 +126,8 @@ pub struct Client {
     client: ProseClient,
 }
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[wasm_bindgen(js_class = "ProseClient")]
 impl Client {
     pub async fn init(
@@ -114,6 +137,28 @@ impl Client {
     ) -> Result<Client> {
         let store = open_store(IndexedDBDriver::new("ProseCache2")).await?;
         let config = config.unwrap_or_default();
+
+        if config.logging_enabled {
+            let fmt_layer = tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .without_time()
+                .with_writer(
+                    tracing_web::MakeWebConsoleWriter::new()
+                        .with_pretty_level()
+                        .with_max_level(config.logging_min_level.parse().unwrap_or(Level::TRACE)),
+                )
+                .with_level(false)
+                .with_span_events(FmtSpan::ACTIVE);
+            let perf_layer =
+                tracing_web::performance_layer().with_details_from_fields(Pretty::default());
+
+            tracing_subscriber::registry()
+                .with(fmt_layer)
+                .with(perf_layer)
+                .init();
+
+            info!("prose-sdk-js Version {VERSION}");
+        }
 
         let software_version = SoftwareVersion {
             name: config.client_name.clone(),
