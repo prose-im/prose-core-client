@@ -31,6 +31,11 @@ async fn test_extend_items_insert_items() -> Result<()> {
         .with_user_nickname("user-nickname")
         .with_name("Channel 2")
         .with_sidebar_state(RoomSidebarState::InSidebar);
+    // Should not be connected to due to its sidebar state
+    let room3 = Room::private_channel(room_id!("channel3@prose.org"))
+        .with_user_nickname("user-nickname")
+        .with_name("Channel 3")
+        .with_sidebar_state(RoomSidebarState::NotInSidebar);
 
     deps.ctx.set_connection_properties(ConnectionProperties {
         connected_jid: user_resource_id!("user1@prose.org/res"),
@@ -76,6 +81,7 @@ async fn test_extend_items_insert_items() -> Result<()> {
             .return_once(|_, _| Box::pin(async { Ok(room1) }));
     }
 
+    // Only one event should be fired since only the status of room channel1@prose.org changed.
     deps.client_event_dispatcher
         .expect_dispatch_event()
         .once()
@@ -87,6 +93,7 @@ async fn test_extend_items_insert_items() -> Result<()> {
         .extend_items_from_bookmarks(vec![
             Bookmark::try_from(&room1).unwrap(),
             Bookmark::try_from(&room2).unwrap(),
+            Bookmark::try_from(&room3).unwrap(),
         ])
         .await?;
 

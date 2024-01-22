@@ -6,7 +6,6 @@
 use anyhow::{bail, format_err, Context, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
-use futures::FutureExt;
 use tracing::{error, info};
 
 use prose_proc_macros::DependenciesStruct;
@@ -93,6 +92,15 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             rooms_changed = true;
 
             match bookmark.r#type {
+                // Groups are always connected…
+                BookmarkType::DirectMessage
+                | BookmarkType::PrivateChannel
+                | BookmarkType::PublicChannel
+                | BookmarkType::Generic
+                    if bookmark.sidebar_state == RoomSidebarState::NotInSidebar =>
+                {
+                    ()
+                }
                 BookmarkType::DirectMessage => {
                     _ = self.connected_rooms_repo.set(Room::for_direct_message(
                         &UserId::from(bookmark.jid.clone().into_inner()),
@@ -130,17 +138,27 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             }
 
             join_room_futures.push(async move {
-                self.join_room_identified_by_bookmark_if_needed(
-                    &bookmark,
-                    JoinRoomBehavior::system_initiated(),
-                )
-                .inspect(|_| {
-                    // Fire an event each time a room connects…
-                    self.client_event_dispatcher
-                        .dispatch_event(ClientEvent::SidebarChanged);
-                })
-                .await
-                .map(|room| (bookmark.jid.clone(), room))
+                let result = self
+                    .join_room_identified_by_bookmark_if_needed(
+                        &bookmark,
+                        JoinRoomBehavior::system_initiated(),
+                    )
+                    .await;
+
+                match result {
+                    Ok(Some(room)) => {
+                        // Fire an event each time a room connects…
+                        self.client_event_dispatcher
+                            .dispatch_event(ClientEvent::SidebarChanged);
+                        Ok((bookmark.jid.clone(), Some(room)))
+                    }
+                    Ok(None) => Ok((bookmark.jid.clone(), None)),
+                    Err(err) => {
+                        self.client_event_dispatcher
+                            .dispatch_event(ClientEvent::SidebarChanged);
+                        Err(err)
+                    }
+                }
             });
         }
 
