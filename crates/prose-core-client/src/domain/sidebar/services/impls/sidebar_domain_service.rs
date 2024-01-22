@@ -45,6 +45,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     #[tracing::instrument(skip(self))]
     async fn populate_sidebar(&self) -> Result<()> {
         let bookmarks = self.bookmarks_service.load_bookmarks().await?;
+        debug_assert!(self.connected_rooms_repo.get_all().is_empty());
         self.extend_items_from_bookmarks(bookmarks).await?;
         Ok(())
     }
@@ -71,17 +72,11 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         let rooms = self.connected_rooms_repo.get_all();
         let mut rooms_changed = false;
 
-        // for room in rooms.iter() {
-        //     if bookmarks.iter().find(|b| b.jid == room.room_id).is_some() {
-        //         continue;
-        //     }
-        //     // Bookmark has been deleted…
-        //     let room = room.clone();
-        //     delete_rooms_futures.push(async move { self.disconnect_and_delete_room(&room).await });
-        //     rooms_changed = true;
-        // }
-        //
-        // join_all(delete_rooms_futures).await;
+        // We don't need to diff here between our connected rooms and the received bookmarks.
+        // We're already receiving the diff from the PubSub node. Only when `populate_sidebar` is
+        // called we're receiving all bookmarks at once, but in that case we won't have any
+        // connected rooms. We might however receive bookmarks that we have rooms for from the
+        // PubSub node if the bookmarks changed.
 
         // Insert a pending room for each bookmark so that we're able to draw the sidebar
         // before each room is connected.

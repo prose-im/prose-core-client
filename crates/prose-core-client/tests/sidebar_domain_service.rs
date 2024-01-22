@@ -100,55 +100,6 @@ async fn test_extend_items_insert_items() -> Result<()> {
     Ok(())
 }
 
-// #[tokio::test]
-// async fn test_extend_items_removed_item() -> Result<()> {
-//     let mut deps = MockSidebarDomainServiceDependencies::default();
-//
-//     let room1 = Room::public_channel(room_id!("channel1@prose.org"))
-//         .with_user_nickname("user-nickname")
-//         .with_name("Channel 1")
-//         .with_sidebar_state(RoomSidebarState::InSidebar);
-//     let room2 = Room::public_channel(room_id!("channel2@prose.org"))
-//         .with_user_nickname("user-nickname")
-//         .with_name("Channel 2")
-//         .with_sidebar_state(RoomSidebarState::InSidebar);
-//
-//     {
-//         let rooms = vec![room1.clone(), room2.clone()];
-//         deps.connected_rooms_repo
-//             .expect_get_all()
-//             .once()
-//             .return_once(|| rooms);
-//     }
-//
-//     deps.room_management_service
-//         .expect_exit_room()
-//         .once()
-//         .with(predicate::eq(occupant_id!(
-//             "channel1@prose.org/user-nickname"
-//         )))
-//         .return_once(|_| Box::pin(async { Ok(()) }));
-//
-//     deps.connected_rooms_repo
-//         .expect_delete()
-//         .once()
-//         .with(predicate::eq(room_id!("channel1@prose.org")))
-//         .return_once(|_| Some(room1));
-//
-//     deps.client_event_dispatcher
-//         .expect_dispatch_event()
-//         .once()
-//         .with(predicate::eq(ClientEvent::SidebarChanged))
-//         .return_once(|_| ());
-//
-//     let service = SidebarDomainService::from(deps.into_deps());
-//     service
-//         .extend_items_from_bookmarks(vec![Bookmark::try_from(&room2).unwrap()])
-//         .await?;
-//
-//     Ok(())
-// }
-
 #[tokio::test]
 async fn test_handles_updated_bookmark() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
