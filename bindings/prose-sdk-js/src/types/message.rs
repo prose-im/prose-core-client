@@ -61,8 +61,10 @@ impl Message {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn date(&self) -> String {
-        "2023-07-17T09:40:48.746Z".to_string()
+    pub fn date(&self) -> js_sys::Date {
+        let timestamp_ms = self.0.timestamp.timestamp_millis() as f64;
+        let js_date = js_sys::Date::new(&JsValue::from(timestamp_ms));
+        js_date
     }
     #[wasm_bindgen(getter, js_name = "type")]
     pub fn _type(&self) -> String {
@@ -75,13 +77,6 @@ impl Message {
     #[wasm_bindgen(getter)]
     pub fn metas(&self) -> Option<String> {
         None
-    }
-
-    #[wasm_bindgen(getter)]
-    pub fn timestamp(&self) -> js_sys::Date {
-        let timestamp_ms = self.0.timestamp.timestamp_millis() as f64;
-        let js_date = js_sys::Date::new(&JsValue::from(timestamp_ms));
-        js_date
     }
 
     #[wasm_bindgen(getter)]
