@@ -10,7 +10,7 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::*;
-use crate::domain::shared::models::Availability;
+use crate::domain::shared::models::{Availability, RoomType};
 use crate::domain::user_info::models::{AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
 
@@ -20,6 +20,8 @@ pub struct AccountService {
     account_settings_repo: DynAccountSettingsRepository,
     #[inject]
     avatar_repo: DynAvatarRepository,
+    #[inject]
+    connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     ctx: DynAppContext,
     #[inject]
@@ -49,8 +51,27 @@ impl AccountService {
 
     pub async fn set_availability(&self, availability: Availability) -> Result<()> {
         self.user_account_service
-            .set_availability(&self.ctx.capabilities, availability)
+            .set_availability(None, &self.ctx.capabilities, availability)
             .await?;
+
+        for room in self.connected_rooms_repo.get_all() {
+            match room.r#type {
+                RoomType::Unknown | RoomType::DirectMessage => {}
+                RoomType::Group
+                | RoomType::PrivateChannel
+                | RoomType::PublicChannel
+                | RoomType::Generic => {
+                    self.user_account_service
+                        .set_availability(
+                            Some(room.user_full_jid()),
+                            &self.ctx.capabilities,
+                            availability,
+                        )
+                        .await?
+                }
+            }
+        }
+
         self.account_settings_repo
             .update(
                 &self.ctx.connected_id()?.to_user_id(),

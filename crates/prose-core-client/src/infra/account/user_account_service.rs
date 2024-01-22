@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use jid::Jid;
 
 use prose_xmpp::mods;
 use prose_xmpp::stanza::VCard4;
@@ -14,6 +15,7 @@ use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
 use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
+use crate::dtos::OccupantId;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -47,11 +49,13 @@ impl UserAccountService for XMPPClient {
 
     async fn set_availability(
         &self,
+        room_id: Option<OccupantId>,
         capabilities: &Capabilities,
         availability: Availability,
     ) -> Result<()> {
         let status_mod = self.client.get_mod::<mods::Status>();
         status_mod.send_presence(
+            room_id.map(|id| Jid::Full(id.into_inner())),
             Some(availability.try_into()?),
             None,
             Some(capabilities.into()),

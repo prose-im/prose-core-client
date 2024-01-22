@@ -89,13 +89,16 @@ impl Status {
     /// https://xmpp.org/rfcs/rfc6121.html#presence
     pub fn send_presence(
         &self,
+        to: Option<Jid>,
         show: Option<presence::Show>,
         status: Option<&str>,
         caps: Option<xmpp_parsers::caps::Caps>,
         priority: Option<i8>,
     ) -> Result<()> {
         let mut presence = Presence::new(presence::Type::None);
+        presence.to = to;
         presence.show = show;
+
         if let Some(status) = status {
             presence.set_status("", status);
         }
@@ -105,6 +108,7 @@ impl Status {
         if let Some(priority) = priority {
             presence.priority = priority
         }
+
         self.ctx.send_stanza(presence)?;
         Ok(())
     }

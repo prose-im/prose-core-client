@@ -155,6 +155,14 @@ impl RoomSpec {
             FormValue::optional(cfg::ROOM_OWNERS, Value::None),
             FormValue::optional(cfg::ROOM_SECRET, Value::None),
             FormValue::optional(cfg::WHOIS, Value::ListSingle("anyone".to_string())),
+            FormValue::optional(
+                cfg::PRESENCE_BROADCAST,
+                Value::ListMulti(vec![
+                    "moderator".to_string(),
+                    "participant".to_string(),
+                    "visitor".to_string(),
+                ]),
+            ),
         ];
 
         let allow_invites: bool;

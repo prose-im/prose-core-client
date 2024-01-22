@@ -12,6 +12,7 @@ use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
 use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
+use crate::dtos::OccupantId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -26,9 +27,11 @@ pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn set_availability(
         &self,
+        occupant_id: Option<OccupantId>,
         capabilities: &Capabilities,
         availability: Availability,
     ) -> Result<()>;
+
     async fn set_user_activity(&self, user_activity: Option<&UserStatus>) -> Result<()>;
 
     async fn set_profile(&self, profile: &UserProfile) -> Result<()>;

@@ -43,8 +43,12 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
     deps.user_account_service
         .expect_set_availability()
         .once()
-        .with(predicate::always(), predicate::eq(Availability::Available))
-        .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(Availability::Available),
+        )
+        .return_once(|_, _, _| Box::pin(async { Ok(Default::default()) }));
     deps.connection_service
         .expect_load_server_features()
         .once()
@@ -132,9 +136,10 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .once()
         .with(
             predicate::always(),
+            predicate::always(),
             predicate::eq(Availability::DoNotDisturb),
         )
-        .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(Default::default()) }));
     deps.connection_service
         .expect_load_server_features()
         .once()
