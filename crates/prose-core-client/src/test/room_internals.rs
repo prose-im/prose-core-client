@@ -144,6 +144,11 @@ impl Participant {
         self
     }
 
+    pub fn set_availability(mut self, availability: Availability) -> Self {
+        self.availability = availability;
+        self
+    }
+
     pub fn set_name(mut self, name: impl Into<String>) -> Self {
         self.name = Some(name.into());
         self

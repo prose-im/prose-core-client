@@ -163,7 +163,7 @@ async fn test_joins_room() -> Result<()> {
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
-        .times(3)
+        .times(6)
         .returning(|_, _| ());
 
     deps.user_profile_repo

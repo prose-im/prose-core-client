@@ -45,6 +45,13 @@ impl UserEndpointId {
             UserEndpointId::Occupant(_) => None,
         }
     }
+
+    pub fn is_occupant_id(&self) -> bool {
+        match self {
+            UserEndpointId::Occupant(_) => true,
+            UserEndpointId::User(_) | UserEndpointId::UserResource(_) => false,
+        }
+    }
 }
 
 impl From<UserId> for UserEndpointId {

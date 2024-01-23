@@ -247,7 +247,21 @@ impl RoomsEventHandler {
                         is_self_event,
                         &availability,
                     );
-                    room_changed = true;
+
+                    if room.sidebar_state().is_in_sidebar() {
+                        if event.user_id.is_occupant_id() {
+                            // The participant list should be reloaded in the UI to reflect
+                            // the new availability…
+                            self.client_event_dispatcher.dispatch_room_event(
+                                room,
+                                ClientRoomEventType::ParticipantsChanged,
+                            );
+                        }
+
+                        // If this is a DM room, a SidebarChanged event will be fired down the
+                        // line, since the UI displays an availability indicator.
+                        room_changed = true;
+                    }
                 };
 
                 // if we do not have a room and the event is from a contact, we'll still want

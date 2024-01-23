@@ -55,12 +55,12 @@ async fn test_adds_participant() -> Result<()> {
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
-        .once()
+        .times(2)
         .with(
             predicate::eq(room.clone()),
             predicate::eq(ClientRoomEventType::ParticipantsChanged),
         )
-        .return_once(|_, _| ());
+        .returning(|_, _| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
@@ -200,12 +200,12 @@ async fn test_handles_disconnected_participant() -> Result<()> {
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
-        .once()
+        .times(2)
         .with(
             predicate::eq(room.clone()),
             predicate::eq(ClientRoomEventType::ParticipantsChanged),
         )
-        .return_once(|_, _| ());
+        .returning(|_, _| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
@@ -535,7 +535,7 @@ async fn test_handles_invite() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_handles_presence() -> Result<()> {
+async fn test_handles_user_presence() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room = Room::for_direct_message(
@@ -592,6 +592,69 @@ async fn test_handles_presence() -> Result<()> {
             },
         }))
         .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_handles_occupant_presence() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    let room = Room::group(room_id!("room@muc.prose.org")).with_participants([(
+        occupant_id!("room@muc.prose.org/nick"),
+        Participant::owner()
+            .set_real_id(&user_id!("nick@prose.org"))
+            .set_availability(Availability::Available),
+    )]);
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .with(predicate::eq(room_id!("room@muc.prose.org")))
+            .return_once(move |_| Some(room.clone()));
+    }
+
+    {
+        let room = room.clone();
+        deps.client_event_dispatcher
+            .expect_dispatch_room_event()
+            .once()
+            .with(
+                predicate::eq(room.clone()),
+                predicate::eq(ClientRoomEventType::ParticipantsChanged),
+            )
+            .return_once(|_, _| ());
+    }
+
+    let event_handler = RoomsEventHandler::from(&deps.into_deps());
+
+    assert_eq!(
+        room.participants()
+            .get(&occupant_id!("room@muc.prose.org/nick").into())
+            .unwrap()
+            .availability,
+        Availability::Available
+    );
+
+    event_handler
+        .handle_event(ServerEvent::UserStatus(UserStatusEvent {
+            user_id: occupant_id!("room@muc.prose.org/nick").into(),
+            r#type: UserStatusEventType::AvailabilityChanged {
+                availability: Availability::DoNotDisturb,
+                priority: 1,
+            },
+        }))
+        .await?;
+
+    assert_eq!(
+        room.participants()
+            .get(&occupant_id!("room@muc.prose.org/nick").into())
+            .unwrap()
+            .availability,
+        Availability::DoNotDisturb
+    );
 
     Ok(())
 }
