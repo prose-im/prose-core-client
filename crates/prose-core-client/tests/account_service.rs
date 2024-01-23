@@ -113,7 +113,7 @@ async fn test_sends_availability_to_all_rooms() -> Result<()> {
     deps.account_settings_repo
         .expect_update()
         .once()
-        .return_once(|_, f| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let service = AccountService::from(&deps.into_deps());
     service.set_availability(Availability::Away).await?;
