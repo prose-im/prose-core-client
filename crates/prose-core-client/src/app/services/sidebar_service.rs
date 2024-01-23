@@ -33,7 +33,7 @@ impl SidebarService {
         let mut item_dtos = vec![];
 
         for room in rooms {
-            if room.r#type == RoomType::Unknown {
+            if room.r#type == RoomType::Unknown || !room.sidebar_state().is_in_sidebar() {
                 continue;
             }
 
