@@ -3,11 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
+use anyhow::{format_err, Result};
 use mockall::{predicate, Sequence};
+use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
 use prose_core_client::domain::connection::models::ConnectionProperties;
-use prose_core_client::domain::rooms::models::{Room, RoomSidebarState, RoomSpec};
+use prose_core_client::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use prose_core_client::domain::shared::models::{
     OccupantId, RoomId, UserEndpointId, UserId, UserResourceId,
@@ -18,6 +19,7 @@ use prose_core_client::domain::sidebar::services::SidebarDomainService as Sideba
 use prose_core_client::dtos::{Availability, RoomState};
 use prose_core_client::test::{DisconnectedState, MockSidebarDomainServiceDependencies};
 use prose_core_client::{occupant_id, room_id, user_id, user_resource_id, ClientEvent};
+use prose_xmpp::RequestError;
 
 #[tokio::test]
 async fn test_extend_items_insert_items() -> Result<()> {
@@ -646,7 +648,7 @@ async fn test_convert_group_to_private_channel() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_destroys_room() -> Result<()> {
+async fn test_destroys_room_and_deletes_bookmark() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
@@ -666,6 +668,100 @@ async fn test_destroys_room() -> Result<()> {
         )
         .in_sequence(&mut seq)
         .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.connected_rooms_repo
+        .expect_delete()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Some(Room::private_channel(room_id!("room@conf.prose.org"))));
+
+    deps.bookmarks_service
+        .expect_delete_bookmark()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .in_sequence(&mut seq)
+        .return_once(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .destroy_room(&room_id!("room@conf.prose.org"))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_does_not_delete_bookmark_when_destroy_room_fails() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+    let mut seq = Sequence::new();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Some(Room::private_channel(room_id!("room@conf.prose.org"))));
+
+    deps.room_management_service
+        .expect_destroy_room()
+        .once()
+        .with(
+            predicate::eq(room_id!("room@conf.prose.org")),
+            predicate::eq(None),
+        )
+        .in_sequence(&mut seq)
+        .return_once(|_, _| {
+            Box::pin(async { Err(RoomError::Anyhow(format_err!("Something went wrong"))) })
+        });
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    let result = service.destroy_room(&room_id!("room@conf.prose.org")).await;
+
+    assert!(result.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_deletes_bookmark_when_trying_to_destroy_gone_room() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+    let mut seq = Sequence::new();
+
+    deps.connected_rooms_repo
+        .expect_get()
+        .once()
+        .with(predicate::eq(room_id!("room@conf.prose.org")))
+        .in_sequence(&mut seq)
+        .return_once(|_| Some(Room::private_channel(room_id!("room@conf.prose.org"))));
+
+    deps.room_management_service
+        .expect_destroy_room()
+        .once()
+        .with(
+            predicate::eq(room_id!("room@conf.prose.org")),
+            predicate::eq(None),
+        )
+        .in_sequence(&mut seq)
+        .return_once(|_, _| {
+            Box::pin(async {
+                Err(RoomError::RequestError(RequestError::XMPP {
+                    err: StanzaError::new(
+                        ErrorType::Cancel,
+                        DefinedCondition::Gone,
+                        "en",
+                        "Room is gone",
+                    ),
+                }))
+            })
+        });
 
     deps.connected_rooms_repo
         .expect_delete()
