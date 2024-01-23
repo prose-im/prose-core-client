@@ -122,7 +122,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         }
 
         // Now collect the futures to connect each room…
-        for bookmark in &bookmarks {
+        for bookmark in bookmarks {
             if let Some(room) = rooms.iter().find(|r| r.room_id == bookmark.jid) {
                 if room.sidebar_state() != bookmark.sidebar_state {
                     // We have a room for that bookmark already, let's just update its sidebar_state…
@@ -140,20 +140,24 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                     )
                     .await;
 
-                match result {
-                    Ok(Some(room)) => {
-                        // Fire an event each time a room connects…
-                        self.client_event_dispatcher
-                            .dispatch_event(ClientEvent::SidebarChanged);
-                        Ok((bookmark.jid.clone(), Some(room)))
+                match &result {
+                    Ok(Some(_)) => {
+                        if bookmark.sidebar_state.is_in_sidebar() {
+                            // Fire an event each time a room connects…
+                            self.client_event_dispatcher
+                                .dispatch_event(ClientEvent::SidebarChanged);
+                        }
                     }
-                    Ok(None) => Ok((bookmark.jid.clone(), None)),
-                    Err(err) => {
-                        self.client_event_dispatcher
-                            .dispatch_event(ClientEvent::SidebarChanged);
-                        Err(err)
+                    Ok(None) => (),
+                    Err(_) => {
+                        if bookmark.sidebar_state.is_in_sidebar() {
+                            self.client_event_dispatcher
+                                .dispatch_event(ClientEvent::SidebarChanged);
+                        }
                     }
                 }
+
+                (bookmark, result)
             });
         }
 
@@ -163,29 +167,25 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         }
 
         // …and run them in parallel.
-        let results: Vec<Result<(RoomId, Option<Room>), RoomError>> =
+        let results: Vec<(Bookmark, Result<Option<Room>, RoomError>)> =
             join_all(join_room_futures).await;
 
         // Now evaluate the results…
-        for result in results {
+        for (bookmark, result) in results {
+            let room_id = bookmark.jid;
             match result {
-                Ok((saved_room_id, Some(room))) => {
+                Ok(Some(room)) => {
                     // The room was gone and we followed the redirect…
-                    if room.room_id != saved_room_id {
+                    if room.room_id != room_id {
                         update_bookmarks_futures.push(
                             async move {
                                 self.save_bookmark_for_room(&room).await;
-                                self.delete_bookmark(&saved_room_id).await;
+                                self.delete_bookmark(&room_id).await;
                             }
                             .prose_boxed(),
                         );
                         continue;
                     }
-
-                    let bookmark = bookmarks
-                        .iter()
-                        .find(|b| b.jid == saved_room_id)
-                        .expect("Expected bookmark to be in list of bookmarks.");
 
                     let bookmark_type = BookmarkType::from(room.r#type);
 
@@ -202,10 +202,27 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                     }
                 }
                 Ok(_) => (),
+                Err(error)
+                    if (error.is_gone_err() || error.is_registration_required_err())
+                        && !bookmark.sidebar_state.is_in_sidebar() =>
+                {
+                    // If a room that is hidden from the sidebar is gone or we're not
+                    // a member (anymore), we'll delete the corresponding bookmark.
+                    info!("Deleting bookmark for hidden gone room {room_id}…");
+                    update_bookmarks_futures.push(
+                        async move {
+                            self.connected_rooms_repo.delete(&room_id);
+                            self.delete_bookmark(&room_id).await;
+                        }
+                        .prose_boxed(),
+                    );
+                }
                 Err(error) => {
                     error!(
-                        "Failed to join room from bookmark. Reason: {}",
-                        error.to_string()
+                        "Failed to join room '{}' from bookmark. Reason: {}. is_subscription_required_err? {}",
+                        room_id,
+                        error.to_string(),
+                        error.is_registration_required_err()
                     )
                 }
             }

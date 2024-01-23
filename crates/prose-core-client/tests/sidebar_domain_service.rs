@@ -22,7 +22,7 @@ use prose_core_client::{occupant_id, room_id, user_id, user_resource_id, ClientE
 use prose_xmpp::RequestError;
 
 #[tokio::test]
-async fn test_extend_items_insert_items() -> Result<()> {
+async fn test_extend_items_inserts_items() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
     let room1 = Room::public_channel(room_id!("channel1@prose.org"))
@@ -103,7 +103,7 @@ async fn test_extend_items_insert_items() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_handles_updated_bookmark() -> Result<()> {
+async fn test_extend_items_updates_room() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
@@ -134,6 +134,155 @@ async fn test_handles_updated_bookmark() -> Result<()> {
         .await?;
 
     assert_eq!(room.sidebar_state(), RoomSidebarState::Favorite);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    let room1 = Room::group(room_id!("group@muc.prose.org"))
+        .with_name("Group")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+    let room2 = Room::group(room_id!("visible-gone-group@muc.prose.org"))
+        .with_name("Visible Gone Group")
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+    let room3 = Room::group(room_id!("hidden-gone-group@muc.prose.org"))
+        .with_name("Hidden Gone Group")
+        .with_sidebar_state(RoomSidebarState::NotInSidebar);
+    let room4 = Room::group(room_id!("hidden-group@muc.prose.org"))
+        .with_name("Hidden Group")
+        .with_sidebar_state(RoomSidebarState::NotInSidebar);
+
+    deps.connected_rooms_repo
+        .expect_get_all()
+        .once()
+        .return_once(|| vec![]);
+
+    deps.connected_rooms_repo
+        .expect_set()
+        .times(4)
+        .returning(|_| Ok(()));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+
+    {
+        let room1 = room1.clone();
+        deps.rooms_domain_service
+            .expect_create_or_join_room()
+            .once()
+            .with(
+                predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+                    room_id: room_id!("group@muc.prose.org"),
+                    password: None,
+                    behavior: JoinRoomBehavior::system_initiated(),
+                }),
+                predicate::eq(RoomSidebarState::InSidebar),
+            )
+            .return_once(|_, _| Box::pin(async { Ok(room1) }));
+    }
+    {
+        deps.rooms_domain_service
+            .expect_create_or_join_room()
+            .once()
+            .with(
+                predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+                    room_id: room_id!("visible-gone-group@muc.prose.org"),
+                    password: None,
+                    behavior: JoinRoomBehavior::system_initiated(),
+                }),
+                predicate::eq(RoomSidebarState::InSidebar),
+            )
+            .return_once(|_, _| {
+                Box::pin(async {
+                    Err(RoomError::RequestError(RequestError::XMPP {
+                        err: StanzaError::new(
+                            ErrorType::Cancel,
+                            DefinedCondition::Gone,
+                            "en",
+                            "Room is gone",
+                        ),
+                    }))
+                })
+            });
+    }
+    {
+        deps.rooms_domain_service
+            .expect_create_or_join_room()
+            .once()
+            .with(
+                predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+                    room_id: room_id!("hidden-gone-group@muc.prose.org"),
+                    password: None,
+                    behavior: JoinRoomBehavior::system_initiated(),
+                }),
+                predicate::eq(RoomSidebarState::NotInSidebar),
+            )
+            .return_once(|_, _| {
+                Box::pin(async {
+                    Err(RoomError::RequestError(RequestError::XMPP {
+                        err: StanzaError::new(
+                            ErrorType::Cancel,
+                            DefinedCondition::Gone,
+                            "en",
+                            "Room is gone",
+                        ),
+                    }))
+                })
+            });
+    }
+    {
+        let room4 = room4.clone();
+        deps.rooms_domain_service
+            .expect_create_or_join_room()
+            .once()
+            .with(
+                predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
+                    room_id: room_id!("hidden-group@muc.prose.org"),
+                    password: None,
+                    behavior: JoinRoomBehavior::system_initiated(),
+                }),
+                predicate::eq(RoomSidebarState::NotInSidebar),
+            )
+            .return_once(|_, _| Box::pin(async { Ok(room4) }));
+    }
+
+    // An event should be fired for each room that is in the sidebar.
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .times(2)
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .returning(|_| ());
+
+    {
+        let room3 = room3.clone();
+        deps.connected_rooms_repo
+            .expect_delete()
+            .once()
+            .with(predicate::eq(room_id!("hidden-gone-group@muc.prose.org")))
+            .return_once(|_| Some(room3));
+    }
+
+    deps.bookmarks_service
+        .expect_delete_bookmark()
+        .once()
+        .with(predicate::eq(room_id!("hidden-gone-group@muc.prose.org")))
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .extend_items_from_bookmarks(vec![
+            Bookmark::try_from(&room1).unwrap(),
+            Bookmark::try_from(&room2).unwrap(),
+            Bookmark::try_from(&room3).unwrap(),
+            Bookmark::try_from(&room4).unwrap(),
+        ])
+        .await?;
 
     Ok(())
 }

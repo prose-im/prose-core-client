@@ -68,4 +68,21 @@ impl RoomError {
             new_location: new_location.as_ref().and_then(|l| RoomId::from_iri(l).ok()),
         })
     }
+
+    pub(crate) fn is_registration_required_err(&self) -> bool {
+        let Self::RequestError(error) = &self else {
+            return false;
+        };
+
+        let RequestError::XMPP {
+            err: StanzaError {
+                defined_condition, ..
+            },
+        } = error
+        else {
+            return false;
+        };
+
+        defined_condition == &DefinedCondition::RegistrationRequired
+    }
 }
