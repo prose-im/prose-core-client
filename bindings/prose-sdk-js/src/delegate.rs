@@ -58,6 +58,15 @@ export interface ProseClientDelegate {
 
     /// A message was deleted.
     messagesDeleted(client: ProseClient, room: Room, messageIDs: string[]): void
+    
+    /// Attributes changed like name or topic.
+    roomAttributesChanged(client: ProseClient, room: Room): void
+    
+    /// The list of participants has changed.
+    roomParticipantsChanged(client: ProseClient, room: Room): void
+    
+    /// A user in `conversation` started or stopped typing.
+    composingUsersChanged(client: ProseClient, room: Room): void
 }
 "#;
 
