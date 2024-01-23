@@ -12,7 +12,7 @@ use prose_core_client::domain::shared::models::{OccupantId, RoomId, UserId};
 use prose_core_client::dtos::Availability;
 use prose_core_client::services::AccountService;
 use prose_core_client::test::{mock_data, MockAppDependencies};
-use prose_core_client::{occupant_id, room_id, user_id};
+use prose_core_client::{occupant_id, room_id, user_id, ClientEvent};
 
 #[tokio::test]
 async fn test_set_availability_updates_settings() -> Result<()> {
@@ -48,6 +48,12 @@ async fn test_set_availability_updates_settings() -> Result<()> {
                 Ok(())
             })
         });
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::AccountInfoChanged))
+        .return_once(|_| ());
 
     let service = AccountService::from(&deps.into_deps());
     service.set_availability(Availability::Away).await?;
@@ -114,6 +120,12 @@ async fn test_sends_availability_to_all_rooms() -> Result<()> {
         .expect_update()
         .once()
         .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::AccountInfoChanged))
+        .return_once(|_| ());
 
     let service = AccountService::from(&deps.into_deps());
     service.set_availability(Availability::Away).await?;

@@ -83,6 +83,12 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         }))
         .return_once(|_| ());
 
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::AccountInfoChanged))
+        .return_once(|_| ());
+
     let deps = deps.into_deps();
 
     let service = ConnectionService::from(&deps);
@@ -160,12 +166,19 @@ async fn test_restores_availability_and_resource() -> Result<()> {
                 Ok(())
             })
         });
+
     deps.client_event_dispatcher
         .expect_dispatch_event()
         .once()
         .with(predicate::eq(ClientEvent::ConnectionStatusChanged {
             event: ConnectionEvent::Connect,
         }))
+        .return_once(|_| ());
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::AccountInfoChanged))
         .return_once(|_| ());
 
     let deps = deps.into_deps();
