@@ -23,6 +23,7 @@ use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomBehavior, CreateRoomType, JoinRoomBehavior,
     RoomsDomainService as RoomsDomainServiceTrait,
 };
+use prose_core_client::domain::settings::models::AccountSettings;
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserResourceId};
 use prose_core_client::domain::sidebar::models::BookmarkType;
 use prose_core_client::dtos::{
@@ -55,9 +56,23 @@ async fn test_joins_room() -> Result<()> {
         server_features: Default::default(),
     });
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(AccountSettings {
+                    availability: Some(Availability::DoNotDisturb),
+                    resource: None,
+                })
+            })
+        });
+
     deps.connected_rooms_repo
         .expect_get()
         .once()
+        .in_sequence(&mut seq)
         .with(predicate::eq(room_id!("room@conf.prose.org")))
         .return_once(|_| None);
 
@@ -112,8 +127,10 @@ async fn test_joins_room() -> Result<()> {
             .with(
                 predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
                 predicate::always(),
+                predicate::eq(deps.ctx.capabilities.clone()),
+                predicate::eq(Availability::DoNotDisturb),
             )
-            .return_once(|_, _| {
+            .return_once(|_, _, _, _| {
                 Box::pin(async move {
                     let event_handler = event_handler.get().unwrap();
 
@@ -333,6 +350,11 @@ async fn test_joins_room() -> Result<()> {
 async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(AccountSettings::default()) }));
+
     deps.room_management_service
         .expect_load_public_rooms()
         .once()
@@ -388,6 +410,19 @@ async fn test_creates_group() -> Result<()> {
 
     let account_node = mock_data::account_jid().to_user_id().username().to_string();
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(AccountSettings {
+                    availability: Some(Availability::Away),
+                    resource: None,
+                })
+            })
+        });
+
     {
         let account_node = account_node.clone();
         deps.user_profile_repo
@@ -442,8 +477,10 @@ async fn test_creates_group() -> Result<()> {
                 predicate::eq(occupant_id),
                 predicate::eq("Jane, Tick, Track, Trick"),
                 predicate::eq(RoomSpec::Group),
+                predicate::eq(deps.ctx.capabilities.clone()),
+                predicate::eq(Availability::Away),
             )
-            .return_once(|_, _, _| {
+            .return_once(|_, _, _, _, _| {
                 Box::pin(async {
                     Ok(
                         RoomSessionInfo::new_room(group_jid, RoomType::Group).with_members(vec![
@@ -682,6 +719,11 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         },
     });
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(AccountSettings::default()) }));
+
     deps.room_management_service
         .expect_load_public_rooms()
         .once()
@@ -715,7 +757,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     deps.room_management_service
         .expect_create_or_join_room()
         .once()
-        .return_once(|_, _, _| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async {
                 Ok(RoomSessionInfo::new_room(
                     room_id!("org.prose.channel.hash-1@conference.prose.org"),
@@ -805,6 +847,18 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             )
         });
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| {
+            Box::pin(async {
+                Ok(AccountSettings {
+                    availability: Some(Availability::DoNotDisturb),
+                    resource: None,
+                })
+            })
+        });
+
     deps.connected_rooms_repo
         .expect_delete()
         .once()
@@ -840,8 +894,10 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                 predicate::eq(occupant_id),
                 predicate::eq("Private Channel"),
                 predicate::eq(RoomSpec::PrivateChannel),
+                predicate::eq(deps.ctx.capabilities.clone()),
+                predicate::eq(Availability::DoNotDisturb),
             )
-            .return_once(|_, _, _| {
+            .return_once(|_, _, _, _, _| {
                 Box::pin(async move {
                     Ok(RoomSessionInfo::new_room(
                         channel_jid.clone(),
@@ -1174,15 +1230,22 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             .return_once(|_| Some(pending_room));
     }
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(AccountSettings::default()) }));
+
     deps.room_management_service
         .expect_join_room()
         .once()
         .with(
             predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
             predicate::always(),
+            predicate::always(),
+            predicate::always(),
         )
         .in_sequence(&mut seq)
-        .return_once(|_, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async {
                 Ok(RoomSessionInfo {
                     room_id: room_id!("room@conf.prose.org"),
@@ -1271,6 +1334,11 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
         .in_sequence(&mut seq)
         .return_once(|_| None);
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(AccountSettings::default()) }));
+
     {
         let retained_room = retained_room.clone();
         deps.connected_rooms_repo
@@ -1287,7 +1355,7 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
         .expect_join_room()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async { Err(RoomError::Anyhow(format_err!("failure-error-message"))) })
         });
 
@@ -1327,6 +1395,11 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
         .in_sequence(&mut seq)
         .return_once(|_| None);
 
+    deps.account_settings_repo
+        .expect_get()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(AccountSettings::default()) }));
+
     deps.connected_rooms_repo
         .expect_set()
         .once()
@@ -1337,7 +1410,7 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
         .expect_join_room()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async { Err(RoomError::Anyhow(format_err!("failure-error-message"))) })
         });
 

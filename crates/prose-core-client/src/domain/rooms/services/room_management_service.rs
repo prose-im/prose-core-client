@@ -8,10 +8,12 @@ use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
+use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
     PublicRoomInfo, RoomConfig, RoomError, RoomSessionInfo, RoomSpec,
 };
 use crate::domain::shared::models::{OccupantId, RoomId, UserId};
+use crate::dtos::Availability;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -27,12 +29,16 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         occupant_id: &OccupantId,
         room_name: &str,
         spec: RoomSpec,
+        capabilities: &Capabilities,
+        availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError>;
 
     async fn join_room(
         &self,
         occupant_id: &OccupantId,
         password: Option<&str>,
+        capabilities: &Capabilities,
+        availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError>;
 
     async fn reconfigure_room(

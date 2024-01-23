@@ -233,6 +233,7 @@ impl From<MockSidebarDomainServiceDependencies> for SidebarDomainServiceDependen
 #[derive(Derivative)]
 #[derivative(Default)]
 pub struct MockRoomsDomainServiceDependencies {
+    pub account_settings_repo: MockAccountSettingsRepository,
     pub client_event_dispatcher: MockClientEventDispatcherTrait,
     pub connected_rooms_repo: MockConnectedRoomsReadWriteRepository,
     pub ctx: AppContext,
@@ -255,6 +256,7 @@ impl MockRoomsDomainServiceDependencies {
 impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies {
     fn from(value: MockRoomsDomainServiceDependencies) -> Self {
         Self {
+            account_settings_repo: Arc::new(value.account_settings_repo),
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
             ctx: Arc::new(value.ctx),

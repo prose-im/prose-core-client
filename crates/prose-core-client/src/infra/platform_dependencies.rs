@@ -91,6 +91,7 @@ fn create_collection<D: Driver, E: Entity>(tx: &D::UpgradeTransaction<'_>) -> Re
 
 impl From<PlatformDependencies> for AppDependencies {
     fn from(d: PlatformDependencies) -> Self {
+        let account_settings_repo = Arc::new(AccountSettingsRepository::new(d.store.clone()));
         let client_event_dispatcher = d.client_event_dispatcher;
         let connected_rooms_repo = Arc::new(InMemoryConnectedRoomsRepository::new());
         let ctx = Arc::new(d.ctx);
@@ -118,6 +119,7 @@ impl From<PlatformDependencies> for AppDependencies {
         ));
 
         let rooms_domain_service_dependencies = RoomsDomainServiceDependencies {
+            account_settings_repo: account_settings_repo.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
             ctx: ctx.clone(),
@@ -176,7 +178,7 @@ impl From<PlatformDependencies> for AppDependencies {
         };
 
         Self {
-            account_settings_repo: Arc::new(AccountSettingsRepository::new(d.store.clone())),
+            account_settings_repo,
             avatar_repo: Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache)),
             client_event_dispatcher,
             connected_rooms_repo,

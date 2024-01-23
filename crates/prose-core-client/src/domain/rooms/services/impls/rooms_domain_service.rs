@@ -16,10 +16,12 @@ use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
-    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsRepository, DynIDProvider,
-    DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
-    DynRoomParticipationService, DynUserInfoRepository, DynUserProfileRepository,
+    DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
+    DynConnectedRoomsRepository, DynIDProvider, DynMessageMigrationDomainService,
+    DynRoomAttributesService, DynRoomManagementService, DynRoomParticipationService,
+    DynUserInfoRepository, DynUserProfileRepository,
 };
+use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
     RegisteredMember, Room, RoomAffiliation, RoomError, RoomInfo, RoomSessionInfo,
     RoomSessionMember, RoomSidebarState, RoomSpec,
@@ -29,7 +31,7 @@ use crate::domain::rooms::services::rooms_domain_service::{
 };
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::shared::models::{RoomId, RoomType, UserId};
-use crate::dtos::RoomState;
+use crate::dtos::{Availability, RoomState};
 use crate::util::StringExt;
 use crate::ClientRoomEventType;
 
@@ -40,6 +42,7 @@ const CHANNEL_PREFIX: &str = "org.prose.channel";
 
 #[derive(DependenciesStruct)]
 pub struct RoomsDomainService {
+    account_settings_repo: DynAccountSettingsRepository,
     client_event_dispatcher: DynClientEventDispatcher,
     connected_rooms_repo: DynConnectedRoomsRepository,
     ctx: DynAppContext,
@@ -355,6 +358,13 @@ impl RoomsDomainService {
 
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
         let mut room_id = room_id.clone();
+        let availability = self
+            .account_settings_repo
+            .get(&self.ctx.connected_id()?.to_user_id())
+            .await?
+            .availability
+            .unwrap_or(Availability::Available);
+        let capabilities = &self.ctx.capabilities;
 
         let info = 'info: loop {
             // Insert pending room so that we don't miss any stanzas for this room while we're
@@ -365,7 +375,7 @@ impl RoomsDomainService {
 
             match self
                 .room_management_service
-                .join_room(&full_room_jid, password)
+                .join_room(&full_room_jid, password, capabilities, availability)
                 .await
             {
                 Ok(info) => break 'info info,
@@ -436,10 +446,25 @@ impl RoomsDomainService {
         sidebar_state: RoomSidebarState,
         behavior: CreateRoomBehavior,
     ) -> Result<Room, RoomError> {
+        let availability = self
+            .account_settings_repo
+            .get(&self.ctx.connected_id()?.to_user_id())
+            .await?
+            .availability
+            .unwrap_or(Availability::Available);
+        let capabilities = &self.ctx.capabilities;
+
         let result = match request {
             CreateRoomType::Group { participants } => {
-                self.create_or_join_group(&service, participants, sidebar_state, behavior)
-                    .await
+                self.create_or_join_group(
+                    &service,
+                    participants,
+                    sidebar_state,
+                    behavior,
+                    capabilities,
+                    availability,
+                )
+                .await
             }
             CreateRoomType::PrivateChannel { name } => {
                 // We'll use a random ID for the jid of the private channel. This way
@@ -455,6 +480,8 @@ impl RoomsDomainService {
                     RoomSpec::PrivateChannel,
                     sidebar_state,
                     behavior,
+                    capabilities,
+                    availability,
                     |_| async { Ok(()) },
                 )
                 .await
@@ -479,6 +506,8 @@ impl RoomsDomainService {
                     RoomSpec::PublicChannel,
                     sidebar_state,
                     behavior,
+                    capabilities,
+                    availability,
                     |_| async { Ok(()) },
                 )
                 .await
@@ -505,6 +534,8 @@ impl RoomsDomainService {
         participants: Vec<UserId>,
         sidebar_state: RoomSidebarState,
         behavior: CreateRoomBehavior,
+        capabilities: &Capabilities,
+        availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
@@ -557,6 +588,8 @@ impl RoomsDomainService {
                 RoomSpec::Group,
                 sidebar_state,
                 behavior,
+                capabilities,
+                availability,
                 |info| {
                     // Try to promote all participants to owners…
                     info!("Update participant affiliations…");
@@ -606,6 +639,8 @@ impl RoomsDomainService {
         spec: RoomSpec,
         sidebar_state: RoomSidebarState,
         behavior: CreateRoomBehavior,
+        capabilities: &Capabilities,
+        availability: Availability,
         perform_additional_config: impl FnOnce(&mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomSessionInfo, RoomError> {
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
@@ -627,7 +662,13 @@ impl RoomsDomainService {
             // Try to create or enter the room and configure it…
             let result = self
                 .room_management_service
-                .create_or_join_room(&full_room_jid, room_name, spec.clone())
+                .create_or_join_room(
+                    &full_room_jid,
+                    room_name,
+                    spec.clone(),
+                    capabilities,
+                    availability,
+                )
                 .await;
 
             let mut info = match result {

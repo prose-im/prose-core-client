@@ -8,7 +8,6 @@ use std::future::Future;
 use anyhow::Result;
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
-use prose_wasm_utils::SendUnlessWasm;
 use xmpp_parsers::data_forms::{DataForm, DataFormType};
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
@@ -16,8 +15,10 @@ use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::muc::MucUser;
 use xmpp_parsers::presence;
-use xmpp_parsers::presence::Presence;
+use xmpp_parsers::presence::{Presence, Show};
 use xmpp_parsers::stanza_error::StanzaError;
+
+use prose_wasm_utils::SendUnlessWasm;
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
@@ -133,8 +134,11 @@ impl MUC {
         &self,
         room_jid: &FullJid,
         password: Option<&str>,
+        show: Option<Show>,
+        caps: Option<xmpp_parsers::caps::Caps>,
     ) -> Result<RoomOccupancy, RequestError> {
-        self.send_presence_to_room(&room_jid, password).await
+        self.send_presence_to_room(&room_jid, password, show, caps)
+            .await
     }
 
     /// Exits a room.
@@ -150,9 +154,13 @@ impl MUC {
     pub async fn create_instant_room(
         &self,
         room_jid: &FullJid,
+        show: Option<Show>,
+        caps: Option<xmpp_parsers::caps::Caps>,
     ) -> Result<RoomOccupancy, RequestError> {
         // https://xmpp.org/extensions/xep-0045.html#createroom
-        let occupancy = self.send_presence_to_room(&room_jid, None).await?;
+        let occupancy = self
+            .send_presence_to_room(&room_jid, None, show, caps)
+            .await?;
 
         // If the room existed already we don't need to proceed…
         if !occupancy.user.status.contains(&Status::RoomHasBeenCreated) {
@@ -180,13 +188,17 @@ impl MUC {
     pub async fn create_reserved_room<T>(
         &self,
         room_jid: &FullJid,
+        show: Option<Show>,
+        caps: Option<xmpp_parsers::caps::Caps>,
         handler: impl FnOnce(DataForm) -> T,
     ) -> Result<RoomOccupancy, RequestError>
     where
         T: Future<Output = Result<RoomConfigResponse>> + SendUnlessWasm + 'static,
     {
         // https://xmpp.org/extensions/xep-0045.html#createroom
-        let occupancy = self.send_presence_to_room(&room_jid, None).await?;
+        let occupancy = self
+            .send_presence_to_room(&room_jid, None, show, caps)
+            .await?;
 
         // If the room existed already we don't need to proceed…
         if !occupancy.user.status.contains(&Status::RoomHasBeenCreated) {
@@ -396,14 +408,21 @@ impl MUC {
         &self,
         room_jid: &FullJid,
         password: Option<&str>,
+        show: Option<Show>,
+        caps: Option<xmpp_parsers::caps::Caps>,
     ) -> Result<RoomOccupancy, RequestError> {
-        let presence = Presence::new(presence::Type::None)
+        let mut presence = Presence::new(presence::Type::None)
             .with_to(room_jid.clone())
             .with_payloads(vec![Element::builder("x", ns::MUC)
                 .append_all(
                     password.map(|password| Element::builder("password", ns::MUC).append(password)),
                 )
                 .build()]);
+        presence.show = show;
+
+        if let Some(caps) = caps {
+            presence.add_payload(caps)
+        }
 
         let (mut self_presence, presences) = self
             .ctx

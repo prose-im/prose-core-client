@@ -10,6 +10,7 @@ use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::muc::user::{Affiliation, Status};
 use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
+use crate::domain::general::models::Capabilities;
 use prose_xmpp::mods::muc::RoomConfigResponse;
 use prose_xmpp::{mods, RequestError};
 
@@ -19,6 +20,7 @@ use crate::domain::rooms::models::{
 };
 use crate::domain::rooms::services::RoomManagementService;
 use crate::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
+use crate::dtos::Availability;
 use crate::infra::xmpp::type_conversions::room_info::RoomInfo;
 use crate::infra::xmpp::XMPPClient;
 
@@ -47,6 +49,8 @@ impl RoomManagementService for XMPPClient {
         occupant_id: &OccupantId,
         room_name: &str,
         spec: RoomSpec,
+        capabilities: &Capabilities,
+        availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
 
@@ -54,6 +58,8 @@ impl RoomManagementService for XMPPClient {
         let occupancy = muc_mod
             .create_reserved_room(
                 occupant_id.as_ref(),
+                Some(availability.try_into()?),
+                Some(capabilities.into()),
                 Box::new(|form| {
                     let spec = spec.clone();
                     let room_name = room_name.to_string();
@@ -103,9 +109,18 @@ impl RoomManagementService for XMPPClient {
         &self,
         occupant_id: &OccupantId,
         password: Option<&str>,
+        capabilities: &Capabilities,
+        availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
-        let occupancy = muc_mod.enter_room(occupant_id.as_ref(), password).await?;
+        let occupancy = muc_mod
+            .enter_room(
+                occupant_id.as_ref(),
+                password,
+                Some(availability.try_into()?),
+                Some(capabilities.into()),
+            )
+            .await?;
 
         // If we accidentally created the room, we'll return an ItemNotFound error since our
         // actual intention was to join an existing room.
