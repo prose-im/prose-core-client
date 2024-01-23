@@ -13,6 +13,8 @@ use crate::app::deps::*;
 use crate::domain::shared::models::{Availability, RoomType};
 use crate::domain::user_info::models::{AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
+use crate::dtos::AccountInfo;
+use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct AccountService {
@@ -25,6 +27,8 @@ pub struct AccountService {
     #[inject]
     ctx: DynAppContext,
     #[inject]
+    client_event_dispatcher: DynClientEventDispatcher,
+    #[inject]
     user_account_service: DynUserAccountService,
     #[inject]
     user_info_repo: DynUserInfoRepository,
@@ -33,6 +37,24 @@ pub struct AccountService {
 }
 
 impl AccountService {
+    pub async fn account_info(&self) -> Result<AccountInfo> {
+        let user_id = self.ctx.connected_id()?.into_user_id();
+        let user_info = self.user_info_repo.get_user_info(&user_id).await?;
+        let account_settings = self.account_settings_repo.get(&user_id).await?;
+        let name = self
+            .user_profile_repo
+            .get_display_name(&user_id)
+            .await?
+            .unwrap_or_else(|| user_id.formatted_username());
+
+        Ok(AccountInfo {
+            id: user_id,
+            name,
+            availability: account_settings.availability,
+            status: user_info.and_then(|info| info.activity),
+        })
+    }
+
     pub async fn set_profile(&self, user_profile: &UserProfile) -> Result<()> {
         self.user_account_service.set_profile(&user_profile).await?;
         self.user_profile_repo
@@ -78,6 +100,10 @@ impl AccountService {
                 Box::new(move |settings| settings.availability = availability),
             )
             .await?;
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::AccountInfoChanged);
+
         Ok(())
     }
 

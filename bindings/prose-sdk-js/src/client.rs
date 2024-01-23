@@ -18,8 +18,8 @@ use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, Stor
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
-    try_user_id_vec_from_string_array, Availability, BareJid, Channel, ChannelsArray, Contact,
-    ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray, UserMetadata, UserProfile,
+    try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
+    Contact, ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray, UserMetadata, UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -233,6 +233,17 @@ impl Client {
             .into_iter()
             .map(Channel::from)
             .collect_into_js_array::<ChannelsArray>())
+    }
+
+    #[wasm_bindgen(js_name = "loadAccountInfo")]
+    pub async fn load_account_info(&self) -> Result<AccountInfo> {
+        Ok(self
+            .client
+            .account
+            .account_info()
+            .await
+            .map_err(WasmError::from)?
+            .into())
     }
 
     /// Creates the direct message or joins it if it already exists and returns the `BareJid`.

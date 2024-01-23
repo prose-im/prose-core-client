@@ -46,6 +46,9 @@ export interface ProseClientDelegate {
 
     /// The avatar of a user changed.
     avatarChanged(client: ProseClient, jid: JID): void
+    
+    /// Infos related to the logged-in user have changed.
+    accountInfoChanged(client: ProseClient): void
 
     /// One or many messages were either received or sent.
     messagesAppended(client: ProseClient, room: Room, messageIDs: string[]): void
@@ -88,6 +91,9 @@ extern "C" {
 
     #[wasm_bindgen(method, catch, js_name = "avatarChanged")]
     fn avatar_changed(this: &JSDelegate, client: Client, jid: BareJid) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "accountInfoChanged")]
+    fn account_info_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "messagesAppended")]
     fn messages_appended(
@@ -211,6 +217,7 @@ impl Delegate {
             ClientEvent::AvatarChanged { id: jid } => {
                 self.inner.avatar_changed(client, jid.into_inner().into())?
             }
+            ClientEvent::AccountInfoChanged => self.inner.account_info_changed(client)?,
             ClientEvent::RoomChanged { room, r#type } => match r#type {
                 ClientRoomEventType::MessagesAppended { message_ids } => self
                     .inner

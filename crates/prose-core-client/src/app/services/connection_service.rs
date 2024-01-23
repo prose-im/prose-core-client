@@ -120,6 +120,9 @@ impl ConnectionService {
                 event: ConnectionEvent::Connect,
             });
 
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::AccountInfoChanged);
+
         Ok(())
     }
 

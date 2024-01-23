@@ -50,6 +50,12 @@ impl From<Availability> for CoreAvailability {
 #[wasm_bindgen]
 pub struct UserStatus(CoreUserStatus);
 
+impl From<CoreUserStatus> for UserStatus {
+    fn from(value: CoreUserStatus) -> Self {
+        UserStatus(value)
+    }
+}
+
 #[wasm_bindgen]
 impl Contact {
     #[wasm_bindgen(getter)]

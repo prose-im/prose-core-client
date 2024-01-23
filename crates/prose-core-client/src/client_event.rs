@@ -23,6 +23,9 @@ pub enum ClientEvent {
     /// The avatar of a user changed.
     AvatarChanged { id: UserId },
 
+    /// Infos related to the logged-in user have changed.
+    AccountInfoChanged,
+
     RoomChanged {
         room: RoomEnvelope,
         r#type: ClientRoomEventType,

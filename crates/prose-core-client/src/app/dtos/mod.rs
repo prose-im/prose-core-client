@@ -5,10 +5,13 @@
 
 pub use url::Url;
 
+pub use account_info::AccountInfo;
 pub use contact::Contact;
 pub use message::{Message, MessageSender};
 pub use sidebar_item::SidebarItem;
 
+#[cfg(any(feature = "debug", feature = "test"))]
+pub use crate::domain::sidebar::models::Bookmark;
 pub use crate::domain::{
     contacts::models::Group,
     general::models::SoftwareVersion,
@@ -22,9 +25,7 @@ pub use crate::domain::{
     user_profiles::models::{Address, UserProfile},
 };
 
-#[cfg(any(feature = "debug", feature = "test"))]
-pub use crate::domain::sidebar::models::Bookmark;
-
+mod account_info;
 mod contact;
 mod message;
 mod sidebar_item;

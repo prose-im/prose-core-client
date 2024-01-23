@@ -9,7 +9,8 @@ use async_trait::async_trait;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository, DynUserProfileRepository,
+    DynAppContext, DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository,
+    DynUserProfileRepository,
 };
 use crate::app::event_handlers::{
     ServerEvent, ServerEventHandler, UserInfoEvent, UserInfoEventType,
@@ -18,6 +19,8 @@ use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct UserStateEventHandler {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
     #[inject]
@@ -48,6 +51,8 @@ impl ServerEventHandler for UserStateEventHandler {
 
 impl UserStateEventHandler {
     async fn handle_user_info_event(&self, event: UserInfoEvent) -> Result<()> {
+        let is_self_event = event.user_id == self.ctx.connected_id()?.into_user_id();
+
         match event.r#type {
             UserInfoEventType::AvatarChanged { metadata } => {
                 self.user_info_repo
@@ -71,6 +76,11 @@ impl UserStateEventHandler {
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ContactChanged { id: event.user_id });
             }
+        }
+
+        if is_self_event {
+            self.client_event_dispatcher
+                .dispatch_event(ClientEvent::AccountInfoChanged)
         }
 
         Ok(())
