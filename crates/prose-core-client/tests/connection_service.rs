@@ -70,7 +70,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
             Box::pin(async {
                 let mut settings = AccountSettings::default();
                 f(&mut settings);
-                assert_eq!(settings.availability, Some(Availability::Available));
+                assert_eq!(settings.availability, Availability::Available);
                 assert_eq!(settings.resource, Some("resource-id".to_string()));
                 Ok(())
             })
@@ -114,7 +114,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 let mut account_settings = AccountSettings::default();
-                account_settings.availability = Some(Availability::DoNotDisturb);
+                account_settings.availability = Availability::DoNotDisturb;
                 account_settings.resource = Some("restored-res".to_string());
                 Ok(account_settings)
             })
@@ -155,7 +155,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
             Box::pin(async {
                 let mut settings = AccountSettings::default();
                 f(&mut settings);
-                assert_eq!(settings.availability, Some(Availability::DoNotDisturb));
+                assert_eq!(settings.availability, Availability::DoNotDisturb);
                 assert_eq!(settings.resource, Some("restored-res".to_string()));
                 Ok(())
             })

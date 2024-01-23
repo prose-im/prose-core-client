@@ -362,8 +362,7 @@ impl RoomsDomainService {
             .account_settings_repo
             .get(&self.ctx.connected_id()?.to_user_id())
             .await?
-            .availability
-            .unwrap_or(Availability::Available);
+            .availability;
         let capabilities = &self.ctx.capabilities;
 
         let info = 'info: loop {
@@ -450,8 +449,7 @@ impl RoomsDomainService {
             .account_settings_repo
             .get(&self.ctx.connected_id()?.to_user_id())
             .await?
-            .availability
-            .unwrap_or(Availability::Available);
+            .availability;
         let capabilities = &self.ctx.capabilities;
 
         let result = match request {

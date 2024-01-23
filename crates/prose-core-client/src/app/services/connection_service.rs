@@ -14,7 +14,6 @@ use crate::app::deps::{
 };
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
-use crate::domain::shared::models::Availability;
 use crate::dtos::UserId;
 use crate::ClientEvent;
 
@@ -50,7 +49,7 @@ impl ConnectionService {
         let resource = settings
             .resource
             .unwrap_or_else(|| self.short_id_provider.new_id());
-        let availability = settings.availability.unwrap_or(Availability::Available);
+        let availability = settings.availability;
 
         let full_jid = jid
             .with_resource(&resource)
@@ -108,7 +107,7 @@ impl ConnectionService {
                 jid,
                 Box::new(move |settings| {
                     settings.resource = Some(resource);
-                    settings.availability = Some(availability);
+                    settings.availability = availability;
                 }),
             )
             .await

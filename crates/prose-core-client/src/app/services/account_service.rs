@@ -75,7 +75,7 @@ impl AccountService {
         self.account_settings_repo
             .update(
                 &self.ctx.connected_id()?.to_user_id(),
-                Box::new(move |settings| settings.availability = Some(availability)),
+                Box::new(move |settings| settings.availability = availability),
             )
             .await?;
         Ok(())

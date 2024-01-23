@@ -25,13 +25,13 @@ async fn test_save_and_load_account_settings() -> Result<()> {
     repo.update(
         &user_id!("a@prose.org"),
         Box::new(|settings: &mut AccountSettings| {
-            settings.availability = Some(Availability::Away);
+            settings.availability = Availability::Away;
         }),
     )
     .await?;
 
     let expected_settings = AccountSettings {
-        availability: Some(Availability::Away),
+        availability: Availability::Away,
         resource: None,
     };
     assert_ne!(expected_settings, AccountSettings::default());

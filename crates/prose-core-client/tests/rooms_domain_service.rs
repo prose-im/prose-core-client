@@ -63,7 +63,7 @@ async fn test_joins_room() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(AccountSettings {
-                    availability: Some(Availability::DoNotDisturb),
+                    availability: Availability::DoNotDisturb,
                     resource: None,
                 })
             })
@@ -417,7 +417,7 @@ async fn test_creates_group() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(AccountSettings {
-                    availability: Some(Availability::Away),
+                    availability: Availability::Away,
                     resource: None,
                 })
             })
@@ -853,7 +853,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(AccountSettings {
-                    availability: Some(Availability::DoNotDisturb),
+                    availability: Availability::DoNotDisturb,
                     resource: None,
                 })
             })

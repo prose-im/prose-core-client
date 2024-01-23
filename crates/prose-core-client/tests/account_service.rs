@@ -44,7 +44,7 @@ async fn test_set_availability_updates_settings() -> Result<()> {
             Box::pin(async {
                 let mut settings = AccountSettings::default();
                 f(&mut settings);
-                assert_eq!(settings.availability, Some(Availability::Away));
+                assert_eq!(settings.availability, Availability::Away);
                 Ok(())
             })
         });
