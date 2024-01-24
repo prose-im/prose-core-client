@@ -47,16 +47,16 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
             Box::pin(async {
                 Ok(vec![
                     MessageBuilder::new_with_index(1)
-                        .set_from(&jid!("a@prose.org"))
+                        .set_from(user_id!("a@prose.org"))
                         .build_message_like(),
                     MessageBuilder::new_with_index(2)
-                        .set_from(&jid!("room@conference.prose.org/b"))
+                        .set_from(occupant_id!("room@conference.prose.org/b"))
                         .build_message_like(),
                     MessageBuilder::new_with_index(3)
-                        .set_from(&jid!("c@prose.org"))
+                        .set_from(user_id!("c@prose.org"))
                         .build_message_like(),
                     MessageBuilder::new_with_index(4)
-                        .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                        .set_from(occupant_id!("room@conference.prose.org/denise_doe"))
                         .build_message_like(),
                 ])
             })
@@ -73,19 +73,19 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
         .await?,
         vec![
             MessageBuilder::new_with_index(1)
-                .set_from(&jid!("a@prose.org"))
+                .set_from(user_id!("a@prose.org"))
                 .set_from_name("Aron Doe")
                 .build_message_dto(),
             MessageBuilder::new_with_index(2)
-                .set_from(&jid!("room@conference.prose.org/b"))
+                .set_from(occupant_id!("room@conference.prose.org/b"))
                 .set_from_name("Bernhard Doe")
                 .build_message_dto(),
             MessageBuilder::new_with_index(3)
-                .set_from(&jid!("c@prose.org"))
+                .set_from(user_id!("c@prose.org"))
                 .set_from_name("Carl Doe")
                 .build_message_dto(),
             MessageBuilder::new_with_index(4)
-                .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                .set_from(occupant_id!("room@conference.prose.org/denise_doe"))
                 .set_from_name("Denise Doe")
                 .build_message_dto(),
         ]
@@ -124,7 +124,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                 Ok((
                     vec![
                         MessageBuilder::new_with_index(1)
-                            .set_from(&jid!("room@conference.prose.org/a"))
+                            .set_from(occupant_id!("room@conference.prose.org/a"))
                             .build_archived_message(
                                 "q1",
                                 Some(MucUser {
@@ -134,10 +134,10 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                                 }),
                             ),
                         MessageBuilder::new_with_index(2)
-                            .set_from(&jid!("room@conference.prose.org/b"))
+                            .set_from(occupant_id!("room@conference.prose.org/b"))
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(3)
-                            .set_from(&jid!("room@conference.prose.org/c"))
+                            .set_from(occupant_id!("room@conference.prose.org/c"))
                             .build_archived_message(
                                 "q1",
                                 Some(MucUser {
@@ -147,7 +147,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                                 }),
                             ),
                         MessageBuilder::new_with_index(4)
-                            .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                            .set_from(occupant_id!("room@conference.prose.org/denise_doe"))
                             .build_archived_message("q1", None),
                     ],
                     Fin {
@@ -174,19 +174,19 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         room.load_latest_messages().await?,
         vec![
             MessageBuilder::new_with_index(1)
-                .set_from(&jid!("a@prose.org"))
+                .set_from(user_id!("a@prose.org"))
                 .set_from_name("Aron Doe")
                 .build_message_dto(),
             MessageBuilder::new_with_index(2)
-                .set_from(&jid!("room@conference.prose.org/b"))
+                .set_from(occupant_id!("room@conference.prose.org/b"))
                 .set_from_name("Bernhard Doe")
                 .build_message_dto(),
             MessageBuilder::new_with_index(3)
-                .set_from(&jid!("c@prose.org"))
+                .set_from(user_id!("c@prose.org"))
                 .set_from_name("Carl Doe")
                 .build_message_dto(),
             MessageBuilder::new_with_index(4)
-                .set_from(&jid!("room@conference.prose.org/denise_doe"))
+                .set_from(occupant_id!("room@conference.prose.org/denise_doe"))
                 .set_from_name("Denise Doe")
                 .build_message_dto(),
         ]
@@ -204,7 +204,7 @@ async fn test_toggle_reaction() -> Result<()> {
             Ok(vec![
                 MessageBuilder::new_with_index(1).build_message_like(),
                 MessageBuilder::new_with_index(2)
-                    .set_from(&mock_data::account_jid().into())
+                    .set_from(mock_data::account_jid().into_user_id())
                     .build_message_like_with_payload(
                         1,
                         MessageLikePayload::Reaction {
@@ -212,7 +212,7 @@ async fn test_toggle_reaction() -> Result<()> {
                         },
                     ),
                 MessageBuilder::new_with_index(3)
-                    .set_from(&mock_data::account_jid().into())
+                    .set_from(mock_data::account_jid().into_user_id())
                     .build_message_like_with_payload(
                         1,
                         MessageLikePayload::Reaction {

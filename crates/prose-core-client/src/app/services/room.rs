@@ -287,16 +287,14 @@ impl<Kind> Room<Kind> {
 
         let jid = participant
             .as_ref()
-            .and_then(|p| p.1.clone().map(|id| id.into_inner()))
-            .unwrap_or_else(|| match id {
-                ParticipantId::User(user_id) => user_id.clone().into_inner(),
-                ParticipantId::Occupant(occupant_id) => {
-                    occupant_id.clone().into_inner().into_bare()
-                }
+            .and_then(|p| p.1.clone())
+            .or_else(|| match id {
+                ParticipantId::User(user_id) => Some(user_id.clone()),
+                ParticipantId::Occupant(_) => None,
             });
 
         if let Some(name) = participant.as_ref().and_then(|p| p.0.clone()) {
-            return MessageSender { jid, name };
+            return MessageSender { id: jid, name };
         }
 
         let real_id = participant.and_then(|p| p.1).or_else(|| id.to_user_id());
@@ -308,7 +306,7 @@ impl<Kind> Room<Kind> {
                 .await
                 .unwrap_or_default()
             {
-                return MessageSender { jid, name };
+                return MessageSender { id: jid, name };
             }
         }
 
@@ -316,7 +314,7 @@ impl<Kind> Room<Kind> {
             ParticipantId::User(id) => id.formatted_username(),
             ParticipantId::Occupant(id) => id.formatted_nickname(),
         };
-        MessageSender { jid, name }
+        MessageSender { id: jid, name }
     }
 }
 

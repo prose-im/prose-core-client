@@ -42,11 +42,6 @@ impl Message {
         self.0.stanza_id.as_ref().map(|id| id.to_string())
     }
 
-    #[wasm_bindgen(getter, js_name = "from")]
-    pub fn from_(&self) -> String {
-        self.0.from.jid.to_string()
-    }
-
     #[wasm_bindgen(getter, js_name = "user")]
     pub fn user(&self) -> MessageSender {
         MessageSender(self.0.from.clone())
@@ -108,8 +103,8 @@ impl Reaction {
 #[wasm_bindgen]
 impl MessageSender {
     #[wasm_bindgen(getter, js_name = "jid")]
-    pub fn jid(&self) -> String {
-        self.0.jid.to_string()
+    pub fn jid(&self) -> Option<BareJid> {
+        self.0.id.as_ref().map(|id| id.clone().into_inner().into())
     }
 
     #[wasm_bindgen(getter, js_name = "name")]

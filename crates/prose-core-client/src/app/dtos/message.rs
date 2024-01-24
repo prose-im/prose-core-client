@@ -4,9 +4,8 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use chrono::{DateTime, Utc};
-use jid::BareJid;
 
-use crate::dtos::{MessageId, Reaction, StanzaId};
+use crate::dtos::{MessageId, Reaction, StanzaId, UserId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
@@ -23,6 +22,6 @@ pub struct Message {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageSender {
-    pub jid: BareJid,
+    pub id: Option<UserId>,
     pub name: String,
 }

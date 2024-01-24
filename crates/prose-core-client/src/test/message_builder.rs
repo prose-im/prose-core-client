@@ -6,7 +6,7 @@
 use std::str::FromStr;
 
 use chrono::{DateTime, Duration, Utc};
-use jid::{BareJid, Jid};
+use jid::BareJid;
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::{date, mam, Element};
@@ -19,6 +19,7 @@ use prose_xmpp::test::BareJidTestAdditions;
 use crate::domain::messaging::models::{
     Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
 };
+use crate::domain::shared::models::UserEndpointId;
 use crate::dtos::{Message as MessageDTO, MessageSender};
 use crate::test::mock_data;
 
@@ -34,7 +35,7 @@ where
 pub struct MessageBuilder {
     id: MessageId,
     stanza_id: Option<StanzaId>,
-    from: Jid,
+    from: UserEndpointId,
     from_name: Option<String>,
     to: BareJid,
     body: String,
@@ -56,7 +57,7 @@ impl MessageBuilder {
         MessageBuilder {
             id: Self::id_for_index(idx),
             stanza_id: Some(format!("res-{}", idx).into()),
-            from: Jid::Bare(BareJid::ours()),
+            from: UserEndpointId::User(BareJid::ours().into()),
             from_name: None,
             to: BareJid::theirs(),
             body: format!("Message {}", idx).to_string(),
@@ -73,8 +74,8 @@ impl MessageBuilder {
         self
     }
 
-    pub fn set_from(mut self, from: &Jid) -> Self {
-        self.from = from.clone();
+    pub fn set_from(mut self, from: impl Into<UserEndpointId>) -> Self {
+        self.from = from.into();
         self
     }
 
@@ -89,7 +90,7 @@ impl MessageBuilder {
         Message {
             id: Some(self.id),
             stanza_id: self.stanza_id,
-            from: self.from,
+            from: self.from.into_jid(),
             body: self.body,
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
@@ -104,7 +105,7 @@ impl MessageBuilder {
             id: Some(self.id),
             stanza_id: self.stanza_id,
             from: MessageSender {
-                jid: self.from.into_bare(),
+                id: self.from.to_user_id(),
                 name: self
                     .from_name
                     .expect("You must set a name when building a MessageDTO"),
@@ -124,7 +125,7 @@ impl MessageBuilder {
             stanza_id: self.stanza_id,
             target: None,
             to: Some(self.to),
-            from: self.from,
+            from: self.from.into_jid(),
             timestamp: self.timestamp,
             payload: MessageLikePayload::Message { body: self.body },
         }
@@ -140,7 +141,7 @@ impl MessageBuilder {
             stanza_id: self.stanza_id,
             target: Some(Self::id_for_index(target)),
             to: Some(self.to),
-            from: self.from,
+            from: self.from.into_jid(),
             timestamp: self.timestamp,
             payload,
         }
@@ -174,7 +175,7 @@ impl MessageBuilder {
             .set_id(self.id.as_ref().into())
             .set_type(MessageType::Chat)
             .set_to(self.to)
-            .set_from(self.from)
+            .set_from(self.from.into_jid())
             .set_body(self.body);
 
         if let Some(muc_user) = muc_user {

@@ -568,7 +568,13 @@ impl Display for MessageEnvelope {
                 .as_ref()
                 .map(|id| id.clone().into_inner())
                 .unwrap_or("<no-id>".to_string()),
-            self.0.from.jid.to_string().truncate_to(20),
+            self.0
+                .from
+                .id
+                .as_ref()
+                .map(|id| id.to_string())
+                .unwrap_or("<unknown jid>".to_string())
+                .truncate_to(20),
             self.0.body
         )
     }

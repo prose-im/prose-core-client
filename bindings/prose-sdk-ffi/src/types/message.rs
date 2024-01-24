@@ -21,7 +21,7 @@ pub struct Reaction {
 pub struct Message {
     pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
-    pub from: JID,
+    pub from: Option<JID>,
     pub body: String,
     pub timestamp: DateTime,
     pub is_read: bool,
@@ -35,7 +35,7 @@ impl From<ProseMessage> for Message {
         Message {
             id: value.id,
             stanza_id: value.stanza_id,
-            from: value.from.jid.into(),
+            from: value.from.id.map(|id| id.into_inner().into()),
             body: value.body,
             timestamp: value.timestamp,
             is_read: value.is_read,

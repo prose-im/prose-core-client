@@ -11,7 +11,6 @@ use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::MessageBuilder;
 use prose_core_client::{room_id, user_id};
-use prose_xmpp::jid;
 
 use crate::tests::{async_test, store};
 
@@ -42,7 +41,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(3)
-        .set_from(&jid!("b@prose.org"))
+        .set_from(user_id!("b@prose.org"))
         .build_reaction_to(1, &["🍿".into(), "📼".into()]);
 
     repo.append(&room_id, &[&message1, &message2]).await?;
@@ -71,11 +70,11 @@ async fn test_load_messages_targeting() -> Result<()> {
     let message3 = MessageBuilder::new_with_index(3)
         .build_message_like_with_payload(1, MessageLikePayload::Retraction {});
     let message4 = MessageBuilder::new_with_index(4)
-        .set_from(&jid!("b@prose.org"))
+        .set_from(user_id!("b@prose.org"))
         .build_reaction_to(2, &["🍿".into(), "📼".into()]);
     let message5 = MessageBuilder::new_with_index(5).build_message_like();
     let message6 = MessageBuilder::new_with_index(6)
-        .set_from(&jid!("c@prose.org"))
+        .set_from(user_id!("c@prose.org"))
         .build_reaction_to(2, &["🍕".into()]);
     let message7 = MessageBuilder::new_with_index(7)
         .build_message_like_with_payload(5, MessageLikePayload::ReadReceipt);

@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use super::{OccupantId, ParticipantId, RoomId, UserId, UserOrResourceId, UserResourceId};
+use jid::Jid;
 
 // Represents any id a user can be identified by.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -50,6 +51,14 @@ impl UserEndpointId {
         match self {
             UserEndpointId::Occupant(_) => true,
             UserEndpointId::User(_) | UserEndpointId::UserResource(_) => false,
+        }
+    }
+
+    pub fn into_jid(self) -> Jid {
+        match self {
+            UserEndpointId::User(id) => Jid::Bare(id.into_inner()),
+            UserEndpointId::UserResource(id) => Jid::Full(id.into_inner()),
+            UserEndpointId::Occupant(id) => Jid::Full(id.into_inner()),
         }
     }
 }
