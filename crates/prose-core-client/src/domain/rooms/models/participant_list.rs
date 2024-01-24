@@ -245,8 +245,13 @@ impl ParticipantList {
         self.participants_map.get(id)
     }
 
+    /// Returns an iterator over the contained key-value pairs.
+    pub fn iter(&self) -> impl Iterator<Item = (&ParticipantId, &Participant)> {
+        self.participants_map.iter()
+    }
+
     /// Returns an iterator over the contained participants.
-    pub fn iter(&self) -> impl Iterator<Item = &Participant> {
+    pub fn values(&self) -> impl Iterator<Item = &Participant> {
         self.participants_map.values()
     }
 

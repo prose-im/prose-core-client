@@ -5,7 +5,7 @@
 
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, PartialEq, Clone, Default, PartialOrd, Eq, Ord)]
+#[derive(Debug, PartialEq, Clone, Default, PartialOrd, Eq, Ord, Copy)]
 pub enum RoomAffiliation {
     /// A user who has been banned from this room.
     Outcast,

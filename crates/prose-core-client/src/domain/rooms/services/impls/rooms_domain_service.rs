@@ -198,7 +198,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 let current_user = self.ctx.connected_id()?.to_user_id();
                 let member_ids = room
                     .participants()
-                    .iter()
+                    .values()
                     .filter_map(|p| {
                         if p.affiliation >= RoomAffiliation::Member {
                             return p.real_id.clone();
