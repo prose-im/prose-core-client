@@ -3,6 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+#![feature(trait_upcasting)]
+
 use std::sync::{Arc, OnceLock};
 
 use anyhow::{format_err, Result};
