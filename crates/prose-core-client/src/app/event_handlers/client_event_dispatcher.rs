@@ -5,6 +5,8 @@
 
 use std::sync::{OnceLock, Weak};
 
+use tracing::debug;
+
 use crate::app::deps::DynRoomFactory;
 use crate::app::event_handlers::ClientEventDispatcherTrait;
 use crate::client::ClientInner;
@@ -57,6 +59,7 @@ impl ClientEventDispatcherTrait for ClientEventDispatcher {
             return;
         };
 
+        debug!(event = ?event, "Dispatching event");
         delegate.handle_event(client_inner.into(), event)
     }
 
@@ -83,6 +86,8 @@ impl ClientEventDispatcherTrait for ClientEventDispatcher {
             .room_factory
             .get()
             .expect("RoomFactory was not set on ClientEventDispatcher");
+
+        debug!(room_id = %room.room_id, event = ?event, "Dispatching room event");
 
         delegate.handle_event(
             client_inner.into(),

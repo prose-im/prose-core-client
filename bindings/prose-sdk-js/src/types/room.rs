@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use js_sys::Array;
-use tracing::info;
+use tracing::debug;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
@@ -243,7 +243,7 @@ macro_rules! base_room_impl {
 
             #[wasm_bindgen(js_name = "sendMessage")]
             pub async fn send_message(&self, body: String) -> Result<()> {
-                info!("Sending message…");
+                debug!("Sending message…");
                 self.room
                     .send_message(body)
                     .await
@@ -280,6 +280,7 @@ macro_rules! base_room_impl {
 
             #[wasm_bindgen(js_name = "loadLatestMessages")]
             pub async fn load_latest_messages(&self) -> Result<MessagesArray> {
+                debug!(room_id = self.id(), "loadLatestMessages");
                 let messages = self
                     .room
                     .load_latest_messages()
@@ -305,6 +306,12 @@ macro_rules! base_room_impl {
                     .load_messages_with_ids(&message_id_refs)
                     .await
                     .map_err(WasmError::from)?;
+
+                debug!(
+                    room_id = self.id(),
+                    messages = ?messages,
+                    "loadMessagesWithIDs"
+                );
 
                 Ok(messages.into())
             }
