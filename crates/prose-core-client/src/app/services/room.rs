@@ -260,12 +260,7 @@ impl<Kind> Room<Kind> {
                 Jid::Bare(id) => ParticipantId::User(id.clone().into()),
                 Jid::Full(id) => ParticipantId::Occupant(id.clone().into()),
             };
-            let name = self.resolve_user_name(&participant_id).await;
-
-            let from = MessageSender {
-                jid: message.from.into_bare(),
-                name,
-            };
+            let from = self.resolve_message_sender(&participant_id).await;
 
             message_dtos.push(MessageDTO {
                 id: message.id,
@@ -283,15 +278,25 @@ impl<Kind> Room<Kind> {
         message_dtos
     }
 
-    async fn resolve_user_name(&self, id: &ParticipantId) -> String {
+    async fn resolve_message_sender(&self, id: &ParticipantId) -> MessageSender {
         let participant = self
             .data
             .participants()
             .get(id)
             .map(|p| (p.name.clone(), p.real_id.clone()));
 
+        let jid = participant
+            .as_ref()
+            .and_then(|p| p.1.clone().map(|id| id.into_inner()))
+            .unwrap_or_else(|| match id {
+                ParticipantId::User(user_id) => user_id.clone().into_inner(),
+                ParticipantId::Occupant(occupant_id) => {
+                    occupant_id.clone().into_inner().into_bare()
+                }
+            });
+
         if let Some(name) = participant.as_ref().and_then(|p| p.0.clone()) {
-            return name;
+            return MessageSender { jid, name };
         }
 
         let real_id = participant.and_then(|p| p.1).or_else(|| id.to_user_id());
@@ -303,14 +308,15 @@ impl<Kind> Room<Kind> {
                 .await
                 .unwrap_or_default()
             {
-                return name;
+                return MessageSender { jid, name };
             }
         }
 
-        match id {
+        let name = match id {
             ParticipantId::User(id) => id.formatted_username(),
             ParticipantId::Occupant(id) => id.formatted_nickname(),
-        }
+        };
+        MessageSender { jid, name }
     }
 }
 
