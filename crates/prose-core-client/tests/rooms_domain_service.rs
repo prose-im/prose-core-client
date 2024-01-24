@@ -543,7 +543,7 @@ async fn test_creates_group() -> Result<()> {
                 let room = Room::mock_connecting_room(group_jid.clone(), "hash-1");
 
                 let room = handler(room.clone());
-                let mut members = room.participants().iter().cloned().collect::<Vec<_>>();
+                let mut members = room.participants().values().cloned().collect::<Vec<_>>();
                 members.sort_by_key(|p| p.real_id.as_ref().unwrap().clone());
 
                 assert_eq!(

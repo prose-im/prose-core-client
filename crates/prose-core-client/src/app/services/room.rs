@@ -147,24 +147,7 @@ impl<Kind> Room<Kind> {
         self.data
             .participants()
             .iter()
-            .map(|(id, participant)| {
-                let name = participant.name.clone().unwrap_or_else(|| match id {
-                    ParticipantId::User(id) => id.formatted_username(),
-                    ParticipantId::Occupant(id) => participant
-                        .real_id
-                        .as_ref()
-                        .map(|real_id| real_id.formatted_username())
-                        .unwrap_or_else(|| id.formatted_nickname()),
-                });
-
-                ParticipantInfo {
-                    id: participant.real_id.clone(),
-                    name,
-                    is_self: participant.is_self,
-                    availability: participant.availability,
-                    affiliation: participant.affiliation,
-                }
-            })
+            .map(ParticipantInfo::from)
             .collect()
     }
 }

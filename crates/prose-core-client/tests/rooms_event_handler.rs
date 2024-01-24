@@ -231,7 +231,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
         .await?;
 
     assert_eq!(
-        room.participants().iter().cloned().collect::<Vec<_>>(),
+        room.participants().values().cloned().collect::<Vec<_>>(),
         vec![Participant {
             real_id: None,
             anon_occupant_id: None,
