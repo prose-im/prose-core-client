@@ -18,8 +18,8 @@ pub use crate::domain::{
     messaging::models::{Emoji, MessageId, Reaction, StanzaId},
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        Availability, OccupantId, ParticipantInfo, RoomId, UserBasicInfo, UserId, UserPresenceInfo,
-        UserResourceId,
+        Availability, OccupantId, ParticipantId, ParticipantInfo, RoomId, UserBasicInfo, UserId,
+        UserPresenceInfo, UserResourceId,
     },
     user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},
     user_profiles::models::{Address, UserProfile},

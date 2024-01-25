@@ -17,9 +17,12 @@ impl SenderId {
     }
 }
 
-impl From<Jid> for SenderId {
-    fn from(value: Jid) -> Self {
-        SenderId(value)
+impl<T> From<T> for SenderId
+where
+    T: Into<Jid>,
+{
+    fn from(value: T) -> Self {
+        SenderId(value.into())
     }
 }
 

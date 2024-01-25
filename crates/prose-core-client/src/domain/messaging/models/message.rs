@@ -5,12 +5,11 @@
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use jid::Jid;
 use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
 
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::ParticipantId;
 
 use super::{MessageLike, MessageLikePayload};
 
@@ -21,14 +20,14 @@ id_string!(Emoji);
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Reaction {
     pub emoji: Emoji,
-    pub from: Vec<UserId>,
+    pub from: Vec<ParticipantId>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
-    pub from: Jid,
+    pub from: ParticipantId,
     pub body: String,
     pub timestamp: DateTime<Utc>,
     pub is_read: bool,
@@ -38,7 +37,7 @@ pub struct Message {
 }
 
 impl Message {
-    pub fn toggle_reaction(&mut self, user_id: &UserId, emoji: Emoji) {
+    pub fn toggle_reaction(&mut self, user_id: &ParticipantId, emoji: Emoji) {
         let Some(reaction) = self
             .reactions
             .iter_mut()
@@ -60,7 +59,7 @@ impl Message {
 
     pub fn reactions_from<'a, 'b: 'a>(
         &'a self,
-        user_id: &'b UserId,
+        user_id: &'b ParticipantId,
     ) -> impl Iterator<Item = &'a Emoji> {
         self.reactions
             .iter()
@@ -84,7 +83,7 @@ impl Message {
                     let message = Message {
                         id: message_id.into_original_id(),
                         stanza_id: msg.stanza_id,
-                        from: msg.from,
+                        from: msg.from.into(),
                         body,
                         timestamp: msg.timestamp.into(),
                         is_read: false,
@@ -116,7 +115,7 @@ impl Message {
                 MessageLikePayload::ReadReceipt => message.is_read = true,
                 MessageLikePayload::Message { .. } => unreachable!(),
                 MessageLikePayload::Reaction { mut emojis } => {
-                    let modifier_from = UserId::from(modifier.from.to_bare());
+                    let modifier_from = ParticipantId::from(modifier.from);
 
                     // Iterate over all existing reactions
                     'outer: for reaction in &mut message.reactions {
@@ -171,9 +170,10 @@ impl Message {
 mod tests {
     use chrono::{TimeZone, Utc};
 
-    use prose_xmpp::{bare, jid};
+    use prose_xmpp::bare;
 
     use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
+    use crate::domain::shared::models::UserId;
     use crate::test::MessageBuilder;
     use crate::user_id;
 
@@ -184,55 +184,61 @@ mod tests {
         let mut message = MessageBuilder::new_with_index(1).build_message();
         assert!(message.reactions.is_empty());
 
-        message.toggle_reaction(&user_id!("a@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("a@prose.org").into(), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![Reaction {
                 emoji: "🎉".into(),
-                from: vec![user_id!("a@prose.org")]
+                from: vec![user_id!("a@prose.org").into()]
             }]
         );
 
-        message.toggle_reaction(&user_id!("b@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("b@prose.org").into(), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![Reaction {
                 emoji: "🎉".into(),
-                from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")]
+                from: vec![
+                    user_id!("a@prose.org").into(),
+                    user_id!("b@prose.org").into()
+                ]
             }]
         );
 
-        message.toggle_reaction(&user_id!("b@prose.org"), "✅".into());
+        message.toggle_reaction(&user_id!("b@prose.org").into(), "✅".into());
         assert_eq!(
             message.reactions,
             vec![
                 Reaction {
                     emoji: "🎉".into(),
-                    from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")]
+                    from: vec![
+                        user_id!("a@prose.org").into(),
+                        user_id!("b@prose.org").into()
+                    ]
                 },
                 Reaction {
                     emoji: "✅".into(),
-                    from: vec![user_id!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org").into()]
                 }
             ]
         );
 
-        message.toggle_reaction(&user_id!("a@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("a@prose.org").into(), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![
                 Reaction {
                     emoji: "🎉".into(),
-                    from: vec![user_id!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org").into()]
                 },
                 Reaction {
                     emoji: "✅".into(),
-                    from: vec![user_id!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org").into()]
                 }
             ]
         );
 
-        message.toggle_reaction(&user_id!("b@prose.org"), "🎉".into());
+        message.toggle_reaction(&user_id!("b@prose.org").into(), "🎉".into());
         assert_eq!(
             message.reactions,
             vec![
@@ -242,7 +248,7 @@ mod tests {
                 },
                 Reaction {
                     emoji: "✅".into(),
-                    from: vec![user_id!("b@prose.org")]
+                    from: vec![user_id!("b@prose.org").into()]
                 }
             ]
         );
@@ -254,24 +260,27 @@ mod tests {
         message.reactions = vec![
             Reaction {
                 emoji: "🎉".into(),
-                from: vec![user_id!("a@prose.org"), user_id!("b@prose.org")],
+                from: vec![
+                    user_id!("a@prose.org").into(),
+                    user_id!("b@prose.org").into(),
+                ],
             },
             Reaction {
                 emoji: "✅".into(),
-                from: vec![user_id!("b@prose.org")],
+                from: vec![user_id!("b@prose.org").into()],
             },
         ];
 
         assert_eq!(
             message
-                .reactions_from(&user_id!("a@prose.org"))
+                .reactions_from(&user_id!("a@prose.org").into())
                 .cloned()
                 .collect::<Vec<Emoji>>(),
             vec!["🎉".into()]
         );
         assert_eq!(
             message
-                .reactions_from(&user_id!("b@prose.org"))
+                .reactions_from(&user_id!("b@prose.org").into())
                 .cloned()
                 .collect::<Vec<Emoji>>(),
             vec!["🎉".into(), "✅".into()]
@@ -286,7 +295,7 @@ mod tests {
                 stanza_id: None,
                 target: None,
                 to: Some(bare!("a@prose.org")),
-                from: jid!("b@prose.org"),
+                from: user_id!("b@prose.org").into(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
                     .unwrap()
@@ -300,7 +309,7 @@ mod tests {
                 stanza_id: None,
                 target: Some("1".into()),
                 to: Some(bare!("a@prose.org")),
-                from: jid!("b@prose.org"),
+                from: user_id!("b@prose.org").into(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 01)
                     .unwrap()
@@ -314,7 +323,7 @@ mod tests {
                 stanza_id: None,
                 target: Some("1".into()),
                 to: Some(bare!("a@prose.org")),
-                from: jid!("c@prose.org"),
+                from: user_id!("c@prose.org").into(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 02)
                     .unwrap()
@@ -328,7 +337,7 @@ mod tests {
                 stanza_id: None,
                 target: Some("1".into()),
                 to: Some(bare!("a@prose.org")),
-                from: jid!("b@prose.org"),
+                from: user_id!("b@prose.org").into(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 03)
                     .unwrap()
@@ -342,7 +351,7 @@ mod tests {
                 stanza_id: None,
                 target: Some("1".into()),
                 to: Some(bare!("a@prose.org")),
-                from: jid!("b@prose.org"),
+                from: user_id!("b@prose.org").into(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 04)
                     .unwrap()
@@ -359,7 +368,7 @@ mod tests {
             Message {
                 id: Some("1".into()),
                 stanza_id: None,
-                from: jid!("b@prose.org"),
+                from: user_id!("b@prose.org").into(),
                 body: "Hello World".to_string(),
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
@@ -371,15 +380,15 @@ mod tests {
                 reactions: vec![
                     Reaction {
                         emoji: "👍".into(),
-                        from: vec![user_id!("c@prose.org")]
+                        from: vec![user_id!("c@prose.org").into()]
                     },
                     Reaction {
                         emoji: "📼".into(),
-                        from: vec![user_id!("b@prose.org")]
+                        from: vec![user_id!("b@prose.org").into()]
                     },
                     Reaction {
                         emoji: "🍿".into(),
-                        from: vec![user_id!("b@prose.org")]
+                        from: vec![user_id!("b@prose.org").into()]
                     }
                 ],
             }

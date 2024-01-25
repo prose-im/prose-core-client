@@ -47,7 +47,7 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
 
     let inner_versions_changed = versions_changed.clone();
-    let store = Store::open(driver, 12, move |event| {
+    let store = Store::open(driver, 14, move |event| {
         let tx = &event.tx;
 
         inner_versions_changed.store(true, Ordering::Relaxed);
@@ -60,6 +60,14 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, UserProfileRecord>(&tx)?;
             #[cfg(target_arch = "wasm32")]
             create_collection::<D, crate::infra::avatars::AvatarRecord>(&tx)?;
+        }
+
+        if event.old_version < 13 {
+            tx.delete_collection(MessagesRecord::collection())?;
+        }
+
+        if event.old_version < 14 {
+            create_collection::<D, MessagesRecord>(&tx)?;
         }
 
         Ok(())

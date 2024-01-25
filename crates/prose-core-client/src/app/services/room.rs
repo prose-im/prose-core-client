@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 use anyhow::{format_err, Result};
 use chrono::Duration;
-use jid::Jid;
 use tracing::{debug, info};
 
 use crate::app::deps::{
@@ -166,7 +165,7 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
-        let user_jid = self.ctx.connected_id()?.to_user_id();
+        let user_jid = ParticipantId::from(self.ctx.connected_id()?.to_user_id());
         let messages = self.message_repo.get(&self.data.room_id, &id).await?;
 
         let mut message = Message::reducing_messages(messages)
@@ -256,11 +255,7 @@ impl<Kind> Room<Kind> {
         let mut message_dtos = Vec::with_capacity(messages.len());
 
         for message in messages {
-            let participant_id = match &message.from {
-                Jid::Bare(id) => ParticipantId::User(id.clone().into()),
-                Jid::Full(id) => ParticipantId::Occupant(id.clone().into()),
-            };
-            let from = self.resolve_message_sender(&participant_id).await;
+            let from = self.resolve_message_sender(&message.from).await;
 
             message_dtos.push(MessageDTO {
                 id: message.id,
@@ -279,25 +274,26 @@ impl<Kind> Room<Kind> {
     }
 
     async fn resolve_message_sender(&self, id: &ParticipantId) -> MessageSender {
-        let participant = self
+        let (name, mut real_id) = self
             .data
             .participants()
-            .get(id)
-            .map(|p| (p.name.clone(), p.real_id.clone()));
+            .get(&id.clone().into())
+            .map(|p| (p.name.clone(), p.real_id.clone()))
+            .unwrap_or_else(|| (None, None));
 
-        let jid = participant
-            .as_ref()
-            .and_then(|p| p.1.clone())
-            .or_else(|| match id {
-                ParticipantId::User(user_id) => Some(user_id.clone()),
-                ParticipantId::Occupant(_) => None,
-            });
+        real_id = real_id.or_else(|| id.to_user_id());
 
-        if let Some(name) = participant.as_ref().and_then(|p| p.0.clone()) {
-            return MessageSender { id: jid, name };
+        let sender_id = real_id
+            .clone()
+            .map(ParticipantId::from)
+            .unwrap_or_else(|| id.clone());
+
+        if let Some(name) = name {
+            return MessageSender {
+                id: sender_id,
+                name,
+            };
         }
-
-        let real_id = participant.and_then(|p| p.1).or_else(|| id.to_user_id());
 
         if let Some(real_id) = real_id {
             if let Some(name) = self
@@ -306,7 +302,10 @@ impl<Kind> Room<Kind> {
                 .await
                 .unwrap_or_default()
             {
-                return MessageSender { id: jid, name };
+                return MessageSender {
+                    id: sender_id,
+                    name,
+                };
             }
         }
 
@@ -314,7 +313,10 @@ impl<Kind> Room<Kind> {
             ParticipantId::User(id) => id.formatted_username(),
             ParticipantId::Occupant(id) => id.formatted_nickname(),
         };
-        MessageSender { id: jid, name }
+        MessageSender {
+            id: sender_id,
+            name,
+        }
     }
 }
 

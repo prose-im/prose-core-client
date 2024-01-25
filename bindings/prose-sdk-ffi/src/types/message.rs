@@ -3,18 +3,20 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::types::JID;
 use chrono::{DateTime as ChronoDateTime, Utc};
+
 use prose_core_client::dtos::{
     Emoji, Message as ProseMessage, MessageId, Reaction as ProseReaction, StanzaId,
 };
+
+use crate::types::JID;
 
 pub type DateTime = ChronoDateTime<Utc>;
 
 #[derive(uniffi::Record)]
 pub struct Reaction {
     pub emoji: Emoji,
-    pub from: Vec<JID>,
+    pub from: Vec<String>,
 }
 
 #[derive(uniffi::Record)]
@@ -35,7 +37,7 @@ impl From<ProseMessage> for Message {
         Message {
             id: value.id,
             stanza_id: value.stanza_id,
-            from: value.from.id.map(|id| id.into_inner().into()),
+            from: value.from.id.to_user_id().map(|id| id.into_inner().into()),
             body: value.body,
             timestamp: value.timestamp,
             is_read: value.is_read,
@@ -53,7 +55,7 @@ impl From<ProseReaction> for Reaction {
             from: value
                 .from
                 .into_iter()
-                .map(|id| id.into_inner().into())
+                .map(|id| id.to_opaque_identifier())
                 .collect(),
         }
     }

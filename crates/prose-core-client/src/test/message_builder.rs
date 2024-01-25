@@ -19,8 +19,7 @@ use prose_xmpp::test::BareJidTestAdditions;
 use crate::domain::messaging::models::{
     Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
 };
-use crate::domain::shared::models::UserEndpointId;
-use crate::dtos::{Message as MessageDTO, MessageSender};
+use crate::dtos::{Message as MessageDTO, MessageSender, ParticipantId};
 use crate::test::mock_data;
 
 impl<T> From<T> for MessageLikeId
@@ -35,7 +34,7 @@ where
 pub struct MessageBuilder {
     id: MessageId,
     stanza_id: Option<StanzaId>,
-    from: UserEndpointId,
+    from: ParticipantId,
     from_name: Option<String>,
     to: BareJid,
     body: String,
@@ -57,7 +56,7 @@ impl MessageBuilder {
         MessageBuilder {
             id: Self::id_for_index(idx),
             stanza_id: Some(format!("res-{}", idx).into()),
-            from: UserEndpointId::User(BareJid::ours().into()),
+            from: ParticipantId::User(BareJid::ours().into()),
             from_name: None,
             to: BareJid::theirs(),
             body: format!("Message {}", idx).to_string(),
@@ -74,7 +73,7 @@ impl MessageBuilder {
         self
     }
 
-    pub fn set_from(mut self, from: impl Into<UserEndpointId>) -> Self {
+    pub fn set_from(mut self, from: impl Into<ParticipantId>) -> Self {
         self.from = from.into();
         self
     }
@@ -90,7 +89,7 @@ impl MessageBuilder {
         Message {
             id: Some(self.id),
             stanza_id: self.stanza_id,
-            from: self.from.into_jid(),
+            from: self.from,
             body: self.body,
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
@@ -105,7 +104,7 @@ impl MessageBuilder {
             id: Some(self.id),
             stanza_id: self.stanza_id,
             from: MessageSender {
-                id: self.from.to_user_id(),
+                id: self.from,
                 name: self
                     .from_name
                     .expect("You must set a name when building a MessageDTO"),
@@ -125,7 +124,7 @@ impl MessageBuilder {
             stanza_id: self.stanza_id,
             target: None,
             to: Some(self.to),
-            from: self.from.into_jid(),
+            from: self.from,
             timestamp: self.timestamp,
             payload: MessageLikePayload::Message { body: self.body },
         }
@@ -141,7 +140,7 @@ impl MessageBuilder {
             stanza_id: self.stanza_id,
             target: Some(Self::id_for_index(target)),
             to: Some(self.to),
-            from: self.from.into_jid(),
+            from: self.from,
             timestamp: self.timestamp,
             payload,
         }
@@ -173,9 +172,12 @@ impl MessageBuilder {
     ) -> ArchivedMessage {
         let mut message = prose_xmpp::stanza::Message::new()
             .set_id(self.id.as_ref().into())
-            .set_type(MessageType::Chat)
+            .set_type(match self.from {
+                ParticipantId::User(_) => MessageType::Chat,
+                ParticipantId::Occupant(_) => MessageType::Groupchat,
+            })
             .set_to(self.to)
-            .set_from(self.from.into_jid())
+            .set_from(self.from)
             .set_body(self.body);
 
         if let Some(muc_user) = muc_user {

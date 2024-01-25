@@ -7,10 +7,12 @@ use std::fmt::{Debug, Display, Formatter};
 
 use jid::{FullJid, Jid};
 use minidom::IntoAttributeValue;
+use serde::{Deserialize, Serialize};
 
 use super::UserId;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 /// Represents a unique XMPP user identifier including the specific resource part.
 pub struct UserResourceId(FullJid);
 

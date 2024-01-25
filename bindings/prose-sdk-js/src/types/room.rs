@@ -280,12 +280,13 @@ macro_rules! base_room_impl {
 
             #[wasm_bindgen(js_name = "loadLatestMessages")]
             pub async fn load_latest_messages(&self) -> Result<MessagesArray> {
-                debug!(room_id = self.id(), "loadLatestMessages");
                 let messages = self
                     .room
                     .load_latest_messages()
                     .await
                     .map_err(WasmError::from)?;
+
+                debug!(room_id = self.id(), messages = ?messages, "loadLatestMessages");
 
                 Ok(messages.into())
             }

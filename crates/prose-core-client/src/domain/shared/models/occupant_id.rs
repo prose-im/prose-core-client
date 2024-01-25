@@ -7,11 +7,13 @@ use std::fmt::{Debug, Display, Formatter};
 
 use jid::FullJid;
 use minidom::IntoAttributeValue;
+use serde::{Deserialize, Serialize};
 
 use crate::dtos::RoomId;
 use crate::util::StringExt;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 /// Represents the identifier of a user within a Multi-User Chat (MUC) room, combining the
 /// room's JID with the user's unique nickname in that room.
 pub struct OccupantId(FullJid);

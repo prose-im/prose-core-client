@@ -3,8 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use super::{OccupantId, ParticipantId, RoomId, UserId, UserOrResourceId, UserResourceId};
 use jid::Jid;
+
+use super::{OccupantId, ParticipantId, RoomId, UserId, UserOrResourceId, UserResourceId};
 
 // Represents any id a user can be identified by.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

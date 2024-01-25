@@ -7,9 +7,9 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos;
 
-use crate::types::IntoJSArray;
+use crate::types::{BareJid, IntoJSArray};
 
-use super::{BareJid, BareJidArray, ReactionsArray};
+use super::{BareJidArray, ReactionsArray};
 
 #[wasm_bindgen]
 pub struct Message(dtos::Message);
@@ -19,7 +19,7 @@ pub struct Reaction {
     #[wasm_bindgen(skip)]
     pub emoji: String,
     #[wasm_bindgen(skip)]
-    pub from: Vec<BareJid>,
+    pub from: Vec<String>,
 }
 
 #[wasm_bindgen]
@@ -40,6 +40,11 @@ impl Message {
     #[wasm_bindgen(getter, js_name = "archiveId")]
     pub fn stanza_id(&self) -> Option<String> {
         self.0.stanza_id.as_ref().map(|id| id.to_string())
+    }
+
+    #[wasm_bindgen(getter, js_name = "from")]
+    pub fn from_(&self) -> String {
+        self.0.from.id.to_opaque_identifier()
     }
 
     #[wasm_bindgen(getter, js_name = "user")]
@@ -102,11 +107,23 @@ impl Reaction {
 
 #[wasm_bindgen]
 impl MessageSender {
+    /// An opaque ID to identify the message sender. Should be used to group messages of
+    /// the same sender.
     #[wasm_bindgen(getter, js_name = "jid")]
-    pub fn jid(&self) -> Option<BareJid> {
-        self.0.id.as_ref().map(|id| id.clone().into_inner().into())
+    pub fn sender_id(&self) -> String {
+        self.0.id.to_opaque_identifier()
     }
 
+    /// The real ID of the message sender, if available.
+    #[wasm_bindgen(getter, js_name = "userID")]
+    pub fn user_id(&self) -> Option<BareJid> {
+        match &self.0.id {
+            dtos::ParticipantId::User(id) => Some(id.clone().into_inner().into()),
+            dtos::ParticipantId::Occupant(_) => None,
+        }
+    }
+
+    /// The name of the message sender.
     #[wasm_bindgen(getter, js_name = "name")]
     pub fn name(&self) -> String {
         self.0.name.clone()
@@ -126,7 +143,7 @@ impl From<dtos::Reaction> for Reaction {
             from: value
                 .from
                 .into_iter()
-                .map(|id| id.into_inner().into())
+                .map(|id| id.to_opaque_identifier())
                 .collect(),
         }
     }

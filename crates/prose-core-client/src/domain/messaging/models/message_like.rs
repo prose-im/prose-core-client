@@ -8,11 +8,13 @@ use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{mam, stanza_id, Forwarded, Message};
 
+use crate::domain::shared::models::{OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 
 use super::{MessageId, StanzaId, StanzaParseError};
@@ -32,7 +34,7 @@ pub struct MessageLike {
     pub stanza_id: Option<StanzaId>,
     pub target: Option<MessageId>,
     pub to: Option<BareJid>,
-    pub from: Jid,
+    pub from: ParticipantId,
     pub timestamp: DateTime<Utc>,
     pub payload: Payload,
 }
@@ -277,18 +279,31 @@ impl TryFrom<&Message> for TargetedPayload {
 
 trait MessageExt {
     /// Returns either the real jid from a muc user or the original `from` value.
-    fn resolved_from(&self) -> Result<Jid, StanzaParseError>;
+    fn resolved_from(&self) -> Result<ParticipantId, StanzaParseError>;
 }
 
 impl MessageExt for Message {
-    fn resolved_from(&self) -> Result<Jid, StanzaParseError> {
-        if let Some(muc_user) = &self.muc_user() {
-            if let Some(jid) = &muc_user.jid {
-                return Ok(jid.clone());
+    fn resolved_from(&self) -> Result<ParticipantId, StanzaParseError> {
+        let Some(from) = &self.from else {
+            return Err(StanzaParseError::missing_attribute("from"));
+        };
+
+        match self.type_ {
+            MessageType::Groupchat => {
+                if let Some(muc_user) = &self.muc_user() {
+                    if let Some(jid) = &muc_user.jid {
+                        return Ok(ParticipantId::User(jid.to_bare().into()));
+                    }
+                }
+                let Jid::Full(from) = from else {
+                    return Err(StanzaParseError::ParseError {
+                        error: "Expected `from` attribute to contain FullJid for groupchat message"
+                            .to_string(),
+                    });
+                };
+                Ok(ParticipantId::Occupant(OccupantId::from(from.clone())))
             }
+            _ => Ok(ParticipantId::User(UserId::from(from.to_bare()))),
         }
-        self.from
-            .clone()
-            .ok_or(StanzaParseError::missing_attribute("from"))
     }
 }

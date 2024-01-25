@@ -5,7 +5,8 @@
 
 use chrono::{DateTime, Utc};
 
-use crate::dtos::{MessageId, Reaction, StanzaId, UserId};
+use crate::domain::shared::models::ParticipantId;
+use crate::dtos::{MessageId, Reaction, StanzaId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
@@ -22,6 +23,6 @@ pub struct Message {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageSender {
-    pub id: Option<UserId>,
+    pub id: ParticipantId,
     pub name: String,
 }

@@ -47,8 +47,8 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     repo.append(&room_id, &[&message1, &message2]).await?;
 
     let mut message = MessageBuilder::new_with_index(1).build_message();
-    message.toggle_reaction(&user_id!("b@prose.org"), "🍿".into());
-    message.toggle_reaction(&user_id!("b@prose.org"), "📼".into());
+    message.toggle_reaction(&user_id!("b@prose.org").into(), "🍿".into());
+    message.toggle_reaction(&user_id!("b@prose.org").into(), "📼".into());
 
     assert_eq!(
         repo.get_all(&room_id, &[&MessageBuilder::id_for_index(1)])
