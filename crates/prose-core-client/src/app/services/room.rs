@@ -239,10 +239,7 @@ impl<Kind> Room<Kind> {
 
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo
-            .append(
-                &self.data.room_id,
-                messages.iter().collect::<Vec<_>>().as_slice(),
-            )
+            .append(&self.data.room_id, messages.as_slice())
             .await?;
 
         Ok(self.reduce_messages_and_add_sender(messages).await)

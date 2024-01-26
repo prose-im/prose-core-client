@@ -86,14 +86,14 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(messages)
     }
 
-    async fn append(&self, _room_id: &RoomId, messages: &[&MessageLike]) -> Result<()> {
+    async fn append(&self, _room_id: &RoomId, messages: &[MessageLike]) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[MessagesRecord::collection()])
             .await?;
         let collection = tx.writeable_collection(MessagesRecord::collection())?;
         for message in messages {
-            collection.put_entity(*message)?;
+            collection.put_entity(message)?;
         }
         tx.commit().await?;
         Ok(())

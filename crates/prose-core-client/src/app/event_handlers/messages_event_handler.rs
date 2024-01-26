@@ -175,7 +175,10 @@ impl MessagesEventHandler {
         };
 
         debug!("Caching received message…");
-        self.messages_repo.append(&room_id, &[&message]).await?;
+        let messages = [message];
+        self.messages_repo.append(&room_id, &messages).await?;
+
+        let [message] = messages;
 
         self.client_event_dispatcher
             .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
@@ -194,7 +197,7 @@ impl MessagesEventHandler {
         Ok(())
     }
 
-    pub async fn handle_sent_message(&self, message: Message) -> Result<()> {
+    async fn handle_sent_message(&self, mut message: Message) -> Result<()> {
         let Some(to) = &message.to else {
             error!("Sent message to unknown recipient.");
             return Ok(());
@@ -207,13 +210,21 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
+        // For the purpose of parsing our sent message into a `MessageLike` let's treat it as
+        // a regular 'chat' message. This way the 'from' attribute will be parsed into
+        // a ParticipantId::User instead of a ParticipantId::Occupant which is what we want.
+        // Otherwise the ParticipantId::Occupant would contain our (real) FullJid, not our JID in
+        // the room.
+        message.type_ = MessageType::Chat;
         let message = MessageLike::try_from(TimestampedMessage {
             message,
             timestamp: self.time_provider.now(),
         })?;
 
         debug!("Caching sent message…");
-        self.messages_repo.append(&to, &[&message]).await?;
+        let messages = [message];
+        self.messages_repo.append(&to, &messages).await?;
+        let [message] = messages;
 
         self.client_event_dispatcher
             .dispatch_room_event(room, ClientRoomEventType::from(&message));

@@ -21,8 +21,8 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
     let room_id = room_id!("a@prose.org");
     let message = MessageBuilder::new_with_index(123).build_message_like();
 
-    repo.append(&room_id, &[&message]).await?;
-    repo.append(&room_id, &[&message]).await?;
+    repo.append(&room_id, &[message.clone()]).await?;
+    repo.append(&room_id, &[message.clone()]).await?;
 
     assert_eq!(
         repo.get_all(&room_id, &[&message.id.clone().into_original_id().unwrap()])
@@ -44,7 +44,9 @@ async fn test_loads_message_with_reactions() -> Result<()> {
         .set_from(user_id!("b@prose.org"))
         .build_reaction_to(1, &["🍿".into(), "📼".into()]);
 
-    repo.append(&room_id, &[&message1, &message2]).await?;
+    let messages = vec![message1, message2];
+
+    repo.append(&room_id, messages.as_slice()).await?;
 
     let mut message = MessageBuilder::new_with_index(1).build_message();
     message.toggle_reaction(&user_id!("b@prose.org").into(), "🍿".into());
@@ -53,7 +55,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     assert_eq!(
         repo.get_all(&room_id, &[&MessageBuilder::id_for_index(1)])
             .await?,
-        vec![message1, message2]
+        messages
     );
 
     Ok(())
@@ -79,13 +81,11 @@ async fn test_load_messages_targeting() -> Result<()> {
     let message7 = MessageBuilder::new_with_index(7)
         .build_message_like_with_payload(5, MessageLikePayload::ReadReceipt);
 
-    repo.append(
-        &room_id,
-        &[
-            &message1, &message2, &message3, &message4, &message5, &message6, &message7,
-        ],
-    )
-    .await?;
+    let messages = vec![
+        message1, message2, message3, message4, message5, message6, message7,
+    ];
+
+    repo.append(&room_id, messages.as_slice()).await?;
 
     assert_eq!(
         repo.get_all(
@@ -97,7 +97,7 @@ async fn test_load_messages_targeting() -> Result<()> {
             ]
         )
         .await?,
-        vec![message1, message2, message3, message4, message5, message6, message7]
+        messages
     );
 
     Ok(())
