@@ -280,8 +280,8 @@ impl Client {
             .into())
     }
 
-    /// Creates the public channel or joins it if one with the same name already exists and
-    /// returns the `BareJid`.
+    /// Creates the public channel and returns the `BareJid` of the created room. Fails if another
+    /// channel with the same name exists.
     #[wasm_bindgen(js_name = "createPublicChannel")]
     pub async fn create_public_channel(&self, channel_name: &str) -> Result<BareJid> {
         Ok(self
