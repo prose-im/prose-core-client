@@ -7,6 +7,6 @@ use crate::domain::shared::models::RoomId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PublicRoomInfo {
-    pub jid: RoomId,
+    pub id: RoomId,
     pub name: Option<String>,
 }

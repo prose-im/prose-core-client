@@ -235,6 +235,18 @@ impl Client {
             .collect_into_js_array::<ChannelsArray>())
     }
 
+    /// Returns the `BareJid` of the public room with `name` if one exists.
+    #[wasm_bindgen(js_name = "findPublicChannelByName")]
+    pub async fn find_public_channel_by_name(&self, name: &str) -> Result<Option<BareJid>> {
+        Ok(self
+            .client
+            .rooms
+            .find_public_channel_by_name(name)
+            .await
+            .map_err(WasmError::from)?
+            .map(|room_id| room_id.into_inner().into()))
+    }
+
     #[wasm_bindgen(js_name = "loadAccountInfo")]
     pub async fn load_account_info(&self) -> Result<AccountInfo> {
         Ok(self

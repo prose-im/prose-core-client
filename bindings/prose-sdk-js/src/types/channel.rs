@@ -31,11 +31,11 @@ impl Channel {
 impl From<PublicRoomInfo> for Channel {
     fn from(value: PublicRoomInfo) -> Self {
         Channel {
-            jid: value.jid.clone().into_inner().into(),
+            jid: value.id.clone().into_inner().into(),
             name: value
                 .name
-                .or(value.jid.node_str().map(|n| n.to_string()))
-                .unwrap_or(value.jid.to_string()),
+                .or(value.id.node_str().map(|n| n.to_string()))
+                .unwrap_or(value.id.to_string()),
         }
     }
 }

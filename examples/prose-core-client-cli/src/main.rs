@@ -230,7 +230,7 @@ impl From<muc::Room> for JidWithName {
 impl From<PublicRoomInfo> for JidWithName {
     fn from(value: PublicRoomInfo) -> Self {
         Self {
-            jid: value.jid.into_inner(),
+            jid: value.id.into_inner(),
             name: value.name.as_deref().unwrap_or("<untitled>").to_string(),
         }
     }
@@ -882,7 +882,7 @@ async fn main() -> Result<()> {
             }
             Selection::JoinPublicRoom => {
                 let room = select_public_channel(&client).await?;
-                client.rooms.join_room(&room.jid, None).await?;
+                client.rooms.join_room(&room.id, None).await?;
             }
             Selection::JoinRoomByJid => {
                 let jid = prompt_bare_jid(None);

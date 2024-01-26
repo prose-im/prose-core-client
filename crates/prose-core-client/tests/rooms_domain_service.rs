@@ -363,7 +363,7 @@ async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: room_id!("room@conference.prose.org"),
+                    id: room_id!("room@conference.prose.org"),
                     name: Some("new channel".to_string()),
                 }])
             })
@@ -732,7 +732,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: room_id!("room@conference.prose.org"),
+                    id: room_id!("room@conference.prose.org"),
                     name: Some("Old Channel".to_string()),
                 }])
             })
@@ -1081,7 +1081,7 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(vec![PublicRoomInfo {
-                    jid: room_id!("room@conference.prose.org"),
+                    id: room_id!("room@conference.prose.org"),
                     name: Some("new channel".to_string()),
                 }])
             })

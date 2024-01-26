@@ -44,6 +44,19 @@ impl RoomsService {
             .await?)
     }
 
+    pub async fn find_public_channel_by_name(&self, name: &str) -> Result<Option<RoomId>> {
+        let rooms = self
+            .room_management_service
+            .load_public_rooms(&self.ctx.muc_service()?)
+            .await?;
+
+        let needle = name.to_lowercase();
+        Ok(rooms
+            .into_iter()
+            .find(|r| r.name.as_ref().map(|name| name.to_lowercase()).as_ref() == Some(&needle))
+            .map(|room| room.id))
+    }
+
     pub async fn start_conversation(&self, participants: &[UserId]) -> Result<RoomId> {
         if participants.is_empty() {
             bail!("You need at least one participant to start a conversation")
