@@ -64,6 +64,13 @@ impl MessageLikeId {
         }
         return Some(self.0);
     }
+
+    pub fn original_id(&self) -> Option<&MessageId> {
+        if self.0.as_ref().starts_with("!!") {
+            return None;
+        }
+        return Some(&self.0);
+    }
 }
 
 impl std::str::FromStr for MessageLikeId {

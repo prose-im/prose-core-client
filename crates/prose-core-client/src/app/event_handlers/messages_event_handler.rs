@@ -174,14 +174,32 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
+        let is_message_update = if let Some(message_id) = message.id.original_id() {
+            self.messages_repo
+                .contains(message_id)
+                .await
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
         debug!("Caching received message…");
         let messages = [message];
         self.messages_repo.append(&room_id, &messages).await?;
 
         let [message] = messages;
 
-        self.client_event_dispatcher
-            .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
+        if is_message_update {
+            self.client_event_dispatcher.dispatch_room_event(
+                room.clone(),
+                ClientRoomEventType::MessagesUpdated {
+                    message_ids: vec![message.id.id().clone()],
+                },
+            )
+        } else {
+            self.client_event_dispatcher
+                .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
+        }
 
         // Don't send delivery receipts for carbons or anything other than a regular message.
         if message_is_carbon || !message.payload.is_message() {

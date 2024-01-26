@@ -86,6 +86,16 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(messages)
     }
 
+    async fn contains(&self, id: &MessageId) -> Result<bool> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessagesRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessagesRecord::collection())?;
+        let flag = collection.contains_key(id).await?;
+        Ok(flag)
+    }
+
     async fn append(&self, _room_id: &RoomId, messages: &[MessageLike]) -> Result<()> {
         let tx = self
             .store
