@@ -19,7 +19,8 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
-    Contact, ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray, UserMetadata, UserProfile,
+    ConnectionError, Contact, ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray,
+    UserMetadata, UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -186,7 +187,11 @@ impl Client {
         Ok(client)
     }
 
-    pub async fn connect(&self, jid: &BareJid, password: &str) -> Result<()> {
+    pub async fn connect(
+        &self,
+        jid: &BareJid,
+        password: &str,
+    ) -> std::result::Result<(), ConnectionError> {
         self.client.connect(&jid.into(), password).await?;
         Ok(())
     }

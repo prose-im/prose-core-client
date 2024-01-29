@@ -16,13 +16,14 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::DomException;
 
-use crate::client::ClientConfig;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
     Connector as ConnectorTrait,
 };
 
+use crate::client::ClientConfig;
+use crate::types::ConnectionErrorType;
 use crate::util::Interval;
 
 #[wasm_bindgen(typescript_custom_section)]
@@ -58,11 +59,7 @@ extern "C" {
     fn set_event_handler(this: &JSConnection, handlers: EventHandler);
 
     #[wasm_bindgen(method, catch)]
-    async fn connect(
-        this: &JSConnection,
-        jid: String,
-        password: String,
-    ) -> Result<(), DomException>;
+    async fn connect(this: &JSConnection, jid: String, password: String) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method)]
     fn disconnect(this: &JSConnection);
@@ -131,10 +128,23 @@ impl ConnectorTrait for Connector {
             handler: event_handler,
         };
         client.set_event_handler(event_handler);
-        client
-            .connect(jid.to_string(), password.to_string())
-            .await
-            .map_err(|err| JSConnectionError::from(err))?;
+        let result = client.connect(jid.to_string(), password.to_string()).await;
+
+        if let Err(err) = result {
+            let Some(code) = err.as_f64().map(|code| code as i32) else {
+                return Err(ConnectionError::Generic {
+                    msg: "strophe.js connector returned an invalid error code.".to_string(),
+                });
+            };
+
+            let Ok(error_type) = ConnectionErrorType::try_from(code) else {
+                return Err(ConnectionError::Generic {
+                    msg: "strophe.js connector returned an invalid error code.".to_string(),
+                });
+            };
+
+            return Err(ConnectionError::from(error_type));
+        }
 
         Ok(Box::new(Connection {
             client,
@@ -204,14 +214,6 @@ impl EventHandler {
 pub enum JSConnectionError {
     #[error("DomException {name}: {message}")]
     DomException { name: String, message: String },
-}
-
-impl From<JSConnectionError> for ConnectionError {
-    fn from(value: JSConnectionError) -> Self {
-        ConnectionError::Generic {
-            msg: value.to_string(),
-        }
-    }
 }
 
 impl From<DomException> for JSConnectionError {

@@ -5,6 +5,7 @@
 
 pub use account_info::AccountInfo;
 pub use channel::{Channel, ChannelsArray};
+pub use connection_error::{ConnectionError, ConnectionErrorType};
 pub use contact::{Availability, Contact};
 pub use jid::BareJid;
 pub use js_array::*;
@@ -17,6 +18,7 @@ pub use user_profile::UserProfile;
 
 mod account_info;
 mod channel;
+mod connection_error;
 mod contact;
 mod jid;
 mod js_array;
