@@ -37,6 +37,12 @@ impl ContactsService for XMPPClient {
         roster_mod.subscribe_to_presence(jid).await?;
         Ok(())
     }
+
+    async fn remove_contact(&self, jid: &BareJid) -> Result<()> {
+        let roster_mod = self.client.get_mod::<mods::Roster>();
+        roster_mod.remove_contact(jid).await?;
+        Ok(())
+    }
 }
 
 impl From<(&BareJid, Item)> for Contact {

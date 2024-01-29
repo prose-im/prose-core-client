@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use jid::BareJid;
-use minidom::Element;
+use minidom::{Element, IntoAttributeValue};
 use xmpp_parsers::iq::{Iq, IqGetPayload, IqSetPayload};
 use xmpp_parsers::presence::{Presence, Type};
 
@@ -80,6 +80,24 @@ impl Roster {
                     jid: jid.clone(),
                     name: name.map(ToString::to_string),
                     group: group.map(ToString::to_string),
+                    subscription: None,
+                }),
+            },
+        );
+        self.ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
+    pub async fn remove_contact(&self, jid: &BareJid) -> Result<()> {
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            Query {
+                query_id: self.ctx.generate_id(),
+                item: Some(Item {
+                    jid: jid.clone(),
+                    name: None,
+                    group: None,
+                    subscription: Some(Subscription::Remove),
                 }),
             },
         );
@@ -147,6 +165,7 @@ struct Item {
     jid: BareJid,
     name: Option<String>,
     group: Option<String>,
+    subscription: Option<Subscription>,
 }
 
 impl From<Item> for Element {
@@ -154,11 +173,25 @@ impl From<Item> for Element {
         Element::builder("item", ns::ROSTER)
             .attr("jid", value.jid)
             .attr("name", value.name)
+            .attr("subscription", value.subscription)
             .append_all(
                 value
                     .group
                     .map(|group| Element::builder("group", ns::ROSTER).append(group)),
             )
             .build()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Subscription {
+    Remove,
+}
+
+impl IntoAttributeValue for Subscription {
+    fn into_attribute_value(self) -> Option<String> {
+        match self {
+            Subscription::Remove => Some("remove".to_string()),
+        }
     }
 }

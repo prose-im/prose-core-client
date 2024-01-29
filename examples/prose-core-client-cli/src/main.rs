@@ -726,6 +726,8 @@ enum Selection {
     LoadContacts,
     #[strum(serialize = "Add contact")]
     AddContact,
+    #[strum(serialize = "Remove contact")]
+    RemoveContact,
     #[strum(serialize = "Send message to contact or room")]
     SendMessageToRoom,
     #[strum(serialize = "Send message to anyhow")]
@@ -817,6 +819,13 @@ async fn main() -> Result<()> {
             Selection::AddContact => {
                 let jid = prompt_bare_jid(None);
                 client.contacts.add_contact(&jid).await?;
+            }
+            Selection::RemoveContact => {
+                let contact = select_contact(&client).await?;
+                client
+                    .contacts
+                    .remove_contact(&contact.into_inner())
+                    .await?;
             }
             Selection::SendMessageToRoom => {
                 send_message(&client).await?;

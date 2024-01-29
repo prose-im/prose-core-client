@@ -17,4 +17,5 @@ use crate::domain::contacts::models::Contact;
 pub trait ContactsService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_contacts(&self, account_jid: &BareJid) -> Result<Vec<Contact>>;
     async fn add_contact(&self, jid: &BareJid) -> Result<()>;
+    async fn remove_contact(&self, jid: &BareJid) -> Result<()>;
 }

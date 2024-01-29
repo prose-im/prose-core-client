@@ -49,6 +49,10 @@ impl ContactsService {
     pub async fn add_contact(&self, jid: &BareJid) -> Result<()> {
         self.contacts_service.add_contact(jid).await
     }
+
+    pub async fn remove_contact(&self, jid: &BareJid) -> Result<()> {
+        self.contacts_service.remove_contact(jid).await
+    }
 }
 
 impl ContactsService {

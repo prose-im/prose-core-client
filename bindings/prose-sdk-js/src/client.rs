@@ -384,6 +384,17 @@ impl Client {
             .map_err(WasmError::from)?)
     }
 
+    /// Removes a contact from the roster
+    #[wasm_bindgen(js_name = "removeContact")]
+    pub async fn remove_contact(&self, jid: &BareJid) -> Result<()> {
+        Ok(self
+            .client
+            .contacts
+            .remove_contact(&jid.into())
+            .await
+            .map_err(WasmError::from)?)
+    }
+
     #[wasm_bindgen(js_name = "loadContacts")]
     pub async fn load_contacts(&self) -> Result<ContactsArray> {
         Ok(self
