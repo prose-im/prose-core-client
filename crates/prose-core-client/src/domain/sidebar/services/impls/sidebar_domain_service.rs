@@ -244,10 +244,25 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         &self,
         request: CreateOrEnterRoomRequest,
     ) -> Result<RoomId> {
-        let room = self
+        let result = self
             .rooms_domain_service
             .create_or_join_room(request, RoomSidebarState::InSidebar)
-            .await?;
+            .await;
+
+        let room = match result {
+            Ok(room) => room,
+            Err(RoomError::RoomIsAlreadyConnected(room_id)) => {
+                let Some(room) = self.connected_rooms_repo.get(&room_id) else {
+                    return Err(format_err!("Failed to join room. Please try again."));
+                };
+                if room.sidebar_state().is_in_sidebar() {
+                    return Ok(room_id);
+                }
+                room.set_sidebar_state(RoomSidebarState::InSidebar);
+                room
+            }
+            Err(error) => return Err(error.into()),
+        };
 
         self.save_bookmark_for_room(&room).await;
 
