@@ -5,16 +5,15 @@
 
 use anyhow::Result;
 use jid::BareJid;
-use minidom::{Element, IntoAttributeValue};
-use xmpp_parsers::iq::{Iq, IqGetPayload, IqSetPayload};
+use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::{Presence, Type};
+use xmpp_parsers::roster::{Group, Item, Roster as Query, Subscription};
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::roster::Event::PresenceSubscriptionRequest;
 use crate::mods::Module;
-use crate::ns;
-use crate::util::{ElementExt, RequestError};
+use crate::util::RequestError;
 
 #[derive(Default, Clone)]
 pub struct Roster {
@@ -55,7 +54,10 @@ impl Roster {
             .ctx
             .send_iq(Iq::from_get(
                 self.ctx.generate_id(),
-                Query::new(self.ctx.generate_id()),
+                Query {
+                    ver: None,
+                    items: vec![],
+                },
             ))
             .await?;
 
@@ -75,13 +77,16 @@ impl Roster {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             Query {
-                query_id: self.ctx.generate_id(),
-                item: Some(Item {
+                ver: None,
+                items: vec![Item {
                     jid: jid.clone(),
                     name: name.map(ToString::to_string),
-                    group: group.map(ToString::to_string),
-                    subscription: None,
-                }),
+                    subscription: Default::default(),
+                    ask: Default::default(),
+                    groups: group
+                        .map(|group| vec![Group(group.to_string())])
+                        .unwrap_or_else(|| vec![]),
+                }],
             },
         );
         self.ctx.send_iq(iq).await?;
@@ -92,13 +97,14 @@ impl Roster {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             Query {
-                query_id: self.ctx.generate_id(),
-                item: Some(Item {
+                ver: None,
+                items: vec![Item {
                     jid: jid.clone(),
                     name: None,
-                    group: None,
-                    subscription: Some(Subscription::Remove),
-                }),
+                    subscription: Subscription::Remove,
+                    ask: Default::default(),
+                    groups: vec![],
+                }],
             },
         );
         self.ctx.send_iq(iq).await?;
@@ -121,77 +127,5 @@ impl Roster {
         self.ctx
             .send_stanza(Presence::new(Type::Unsubscribed).with_to(from.clone()))?;
         Ok(())
-    }
-}
-
-struct Query {
-    query_id: String,
-    item: Option<Item>,
-}
-
-impl Query {
-    fn new(query_id: impl Into<String>) -> Self {
-        Query {
-            query_id: query_id.into(),
-            item: None,
-        }
-    }
-}
-
-impl From<Query> for Element {
-    fn from(value: Query) -> Self {
-        Element::builder("query", ns::ROSTER)
-            .attr("queryid", value.query_id)
-            .append_all(value.item)
-            .build()
-    }
-}
-
-impl TryFrom<Element> for Query {
-    type Error = anyhow::Error;
-
-    fn try_from(value: Element) -> Result<Self, Self::Error> {
-        Ok(Query {
-            query_id: value.attr_req("queryid")?.to_string(),
-            item: None,
-        })
-    }
-}
-
-impl IqGetPayload for Query {}
-impl IqSetPayload for Query {}
-
-struct Item {
-    jid: BareJid,
-    name: Option<String>,
-    group: Option<String>,
-    subscription: Option<Subscription>,
-}
-
-impl From<Item> for Element {
-    fn from(value: Item) -> Self {
-        Element::builder("item", ns::ROSTER)
-            .attr("jid", value.jid)
-            .attr("name", value.name)
-            .attr("subscription", value.subscription)
-            .append_all(
-                value
-                    .group
-                    .map(|group| Element::builder("group", ns::ROSTER).append(group)),
-            )
-            .build()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Subscription {
-    Remove,
-}
-
-impl IntoAttributeValue for Subscription {
-    fn into_attribute_value(self) -> Option<String> {
-        match self {
-            Subscription::Remove => Some("remove".to_string()),
-        }
     }
 }
