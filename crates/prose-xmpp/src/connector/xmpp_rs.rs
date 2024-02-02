@@ -16,6 +16,7 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio::{task, time};
+use tokio_xmpp::starttls::ServerConfig;
 use tokio_xmpp::{AsyncClient, Error, Event, Packet};
 use tracing::error;
 
@@ -44,7 +45,7 @@ impl ConnectorTrait for Connector {
         async fn connect(
             jid: &FullJid,
             password: impl Into<String>,
-        ) -> Result<AsyncClient, ConnectionError> {
+        ) -> Result<AsyncClient<ServerConfig>, ConnectionError> {
             let mut client = AsyncClient::new(jid.clone(), password);
             client.set_reconnect(false);
 
@@ -83,7 +84,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    fn new(client: AsyncClient, event_handler: ConnectionEventHandler) -> Self {
+    fn new(client: AsyncClient<ServerConfig>, event_handler: ConnectionEventHandler) -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         let sender = Arc::new(tx);
