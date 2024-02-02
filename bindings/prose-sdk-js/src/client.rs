@@ -409,6 +409,9 @@ impl Client {
             .collect_into_js_array::<ContactsArray>())
     }
 
+    /// Requests a presence subscription from `jid`. Note that happens automatically when you
+    /// call `add_contact`. This method can be useful though when our user needs to re-request
+    /// the presence subscription in case the contact hasn't reacted in a while.
     #[wasm_bindgen(js_name = "requestPresenceSubscription")]
     pub async fn request_presence_sub(&self, jid: &BareJid) -> Result<()> {
         self.client
@@ -419,6 +422,7 @@ impl Client {
         Ok(())
     }
 
+    /// Loads pending presence subscription requests.
     #[wasm_bindgen(js_name = "loadPresenceSubscriptionRequests")]
     pub async fn load_presence_sub_requests(&self) -> Result<PresenceSubRequestArray> {
         Ok(self
@@ -432,6 +436,7 @@ impl Client {
             .collect_into_js_array::<PresenceSubRequestArray>())
     }
 
+    /// Approves the presence subscription request identified by `id`.
     #[wasm_bindgen(js_name = "approvePresenceSubscriptionRequest")]
     pub async fn approve_presence_sub_request(&self, id: &PresenceSubRequestId) -> Result<()> {
         self.client
@@ -442,6 +447,7 @@ impl Client {
         Ok(())
     }
 
+    /// Denies the presence subscription request identified by `id`.
     #[wasm_bindgen(js_name = "denyPresenceSubscriptionRequest")]
     pub async fn deny_presence_sub_request(&self, id: &PresenceSubRequestId) -> Result<()> {
         self.client
