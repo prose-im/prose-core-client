@@ -5,13 +5,11 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tracing::info;
 
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{DynAppContext, DynRequestHandlingService, DynTimeProvider};
 use crate::app::event_handlers::{RequestEvent, RequestEventType, ServerEvent, ServerEventHandler};
-use crate::domain::general::services::SubscriptionResponse;
 
 /// Handles various server requests.
 #[derive(InjectDependencies)]
@@ -79,18 +77,6 @@ impl RequestsEventHandler {
                         &event.sender_id,
                         &event.request_id,
                         &self.ctx.software_version,
-                    )
-                    .await?;
-            }
-            RequestEventType::PresenceSubscription => {
-                info!(
-                    "Approving presence subscription request from {}…",
-                    event.sender_id
-                );
-                self.request_handling_service
-                    .respond_to_presence_subscription_request(
-                        &event.sender_id,
-                        SubscriptionResponse::Approve,
                     )
                     .await?;
             }

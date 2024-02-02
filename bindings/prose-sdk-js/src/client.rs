@@ -19,8 +19,9 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
-    ConnectionError, Contact, ContactsArray, IntoJSArray, SidebarItem, SidebarItemsArray,
-    UserMetadata, UserProfile,
+    ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
+    PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UserBasicInfo,
+    UserBasicInfoArray, UserMetadata, UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -378,7 +379,7 @@ impl Client {
     pub async fn add_contact(&self, jid: &BareJid) -> Result<()> {
         Ok(self
             .client
-            .contacts
+            .contact_list
             .add_contact(&jid.into())
             .await
             .map_err(WasmError::from)?)
@@ -389,7 +390,7 @@ impl Client {
     pub async fn remove_contact(&self, jid: &BareJid) -> Result<()> {
         Ok(self
             .client
-            .contacts
+            .contact_list
             .remove_contact(&jid.into())
             .await
             .map_err(WasmError::from)?)
@@ -399,13 +400,56 @@ impl Client {
     pub async fn load_contacts(&self) -> Result<ContactsArray> {
         Ok(self
             .client
-            .contacts
+            .contact_list
             .load_contacts()
             .await
             .map_err(WasmError::from)?
             .into_iter()
             .map(|c| JsValue::from(Contact::from(c)))
             .collect_into_js_array::<ContactsArray>())
+    }
+
+    #[wasm_bindgen(js_name = "requestPresenceSubscription")]
+    pub async fn request_presence_sub(&self, jid: &BareJid) -> Result<()> {
+        self.client
+            .contact_list
+            .request_presence_sub(&jid.into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "loadPresenceSubscriptionRequests")]
+    pub async fn load_presence_sub_requests(&self) -> Result<PresenceSubRequestArray> {
+        Ok(self
+            .client
+            .contact_list
+            .load_presence_sub_requests()
+            .await
+            .map_err(WasmError::from)?
+            .into_iter()
+            .map(PresenceSubRequest::from)
+            .collect_into_js_array::<PresenceSubRequestArray>())
+    }
+
+    #[wasm_bindgen(js_name = "approvePresenceSubscriptionRequest")]
+    pub async fn approve_presence_sub_request(&self, id: &PresenceSubRequestId) -> Result<()> {
+        self.client
+            .contact_list
+            .approve_presence_sub_request(id.as_ref())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "denyPresenceSubscriptionRequest")]
+    pub async fn deny_presence_sub_request(&self, id: &PresenceSubRequestId) -> Result<()> {
+        self.client
+            .contact_list
+            .deny_presence_sub_request(id.as_ref())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
     }
 
     /// XEP-0084: User Avatar
@@ -494,6 +538,50 @@ impl Client {
         self.client
             .account
             .set_availability(availability.into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "loadBlockList")]
+    pub async fn load_block_list(&self) -> Result<UserBasicInfoArray> {
+        let block_list = self
+            .client
+            .block_list
+            .load_block_list()
+            .await
+            .map_err(WasmError::from)?
+            .into_iter()
+            .map(UserBasicInfo::from)
+            .collect_into_js_array::<UserBasicInfoArray>();
+        Ok(block_list)
+    }
+
+    #[wasm_bindgen(js_name = "blockUser")]
+    pub async fn block_user(&self, jid: &BareJid) -> Result<()> {
+        self.client
+            .block_list
+            .block_user(&jid.into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "unblockUser")]
+    pub async fn unblock_user(&self, jid: &BareJid) -> Result<()> {
+        self.client
+            .block_list
+            .unblock_user(&jid.into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "clearBlockList")]
+    pub async fn clear_block_list(&self) -> Result<()> {
+        self.client
+            .block_list
+            .clear_block_list()
             .await
             .map_err(WasmError::from)?;
         Ok(())

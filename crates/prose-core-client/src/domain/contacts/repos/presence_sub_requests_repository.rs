@@ -8,13 +8,17 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::contacts::models::Contact;
 use crate::domain::shared::models::UserId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait ContactsRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get_all(&self, account_jid: &UserId) -> Result<Vec<Contact>>;
+pub trait PresenceSubRequestsRepository: SendUnlessWasm + SyncUnlessWasm {
+    async fn get_all(&self) -> Result<Vec<UserId>>;
+    /// Returns whether the value was newly inserted.
+    async fn set(&self, user_id: &UserId) -> Result<bool>;
+    /// Returns whether the value was present.
+    async fn delete(&self, user_id: &UserId) -> Result<bool>;
+
     async fn clear_cache(&self) -> Result<()>;
 }

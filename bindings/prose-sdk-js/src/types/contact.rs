@@ -5,7 +5,7 @@
 
 use prose_core_client::dtos::{
     Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
-    UserStatus as CoreUserStatus,
+    PresenceSubscription as CorePresenceSubscription, UserStatus as CoreUserStatus,
 };
 use wasm_bindgen::prelude::*;
 
@@ -30,10 +30,23 @@ pub enum Availability {
 }
 
 #[wasm_bindgen]
+pub enum PresenceSubscription {
+    /// We have requested to subscribe to the contact's presence, but they haven't approved yet.
+    Requested = 0,
+    /// Both we and the contact are subscribed to each other's presence.
+    Mutual = 1,
+    /// The contact is subscribed to our presence, so they can see our status.
+    TheyFollow = 2,
+    /// We are subscribed to the contact's presence, so we can see their status.
+    WeFollow = 3,
+    /// There is no presence subscription between us and the contact.
+    None = 4,
+}
+
+#[wasm_bindgen]
 pub enum Group {
-    Favorite = 0,
-    Team = 1,
-    Other = 2,
+    Team = 0,
+    Other = 1,
 }
 
 impl From<Availability> for CoreAvailability {
@@ -86,6 +99,11 @@ impl Contact {
         self.0.group.clone().into()
     }
 
+    #[wasm_bindgen(getter, js_name = "presenceSubscription")]
+    pub fn presence_subscription(&self) -> PresenceSubscription {
+        self.0.presence_subscription.into()
+    }
+
     // pub avatar: Option<String>,
 }
 
@@ -124,9 +142,20 @@ impl From<CoreAvailability> for Availability {
 impl From<CoreGroup> for Group {
     fn from(value: CoreGroup) -> Self {
         match value {
-            CoreGroup::Favorite => Group::Favorite,
             CoreGroup::Team => Group::Team,
             CoreGroup::Other => Group::Other,
+        }
+    }
+}
+
+impl From<CorePresenceSubscription> for PresenceSubscription {
+    fn from(value: CorePresenceSubscription) -> Self {
+        match value {
+            CorePresenceSubscription::Requested => PresenceSubscription::Requested,
+            CorePresenceSubscription::Mutual => PresenceSubscription::Mutual,
+            CorePresenceSubscription::TheyFollow => PresenceSubscription::TheyFollow,
+            CorePresenceSubscription::WeFollow => PresenceSubscription::WeFollow,
+            CorePresenceSubscription::None => PresenceSubscription::None,
         }
     }
 }

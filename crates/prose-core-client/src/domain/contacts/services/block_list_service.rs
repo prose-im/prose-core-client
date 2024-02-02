@@ -5,17 +5,17 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::contacts::models::Contact;
+use crate::dtos::UserId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
-pub trait ContactsService: SendUnlessWasm + SyncUnlessWasm {
-    async fn load_contacts(&self, account_jid: &BareJid) -> Result<Vec<Contact>>;
-    async fn add_contact(&self, jid: &BareJid) -> Result<()>;
-    async fn remove_contact(&self, jid: &BareJid) -> Result<()>;
+pub trait BlockListService: SendUnlessWasm + SyncUnlessWasm {
+    async fn load_block_list(&self) -> Result<Vec<UserId>>;
+    async fn block_user(&self, user_id: &UserId) -> Result<()>;
+    async fn unblock_user(&self, user_id: &UserId) -> Result<()>;
+    async fn clear_block_list(&self) -> Result<()>;
 }

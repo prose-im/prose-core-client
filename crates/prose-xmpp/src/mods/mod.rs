@@ -11,6 +11,7 @@ use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::Presence;
 use xmpp_parsers::pubsub::PubSubEvent;
 
+pub use block_list::BlockList;
 pub use bookmark::Bookmark;
 pub use bookmark2::Bookmark as Bookmark2;
 pub use caps::Caps;
@@ -28,6 +29,7 @@ use crate::client::ModuleContext;
 use crate::stanza::{Message, PubSubMessage};
 use crate::util::XMPPElement;
 
+pub mod block_list;
 pub mod bookmark;
 pub mod bookmark2;
 pub mod caps;

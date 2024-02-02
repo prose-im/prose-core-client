@@ -20,6 +20,15 @@ pub enum ClientEvent {
     /// Infos about a contact have changed.
     ContactChanged { id: UserId },
 
+    /// Contacts were added, removed or their subscription status changed.
+    ContactListChanged,
+
+    /// A presence subscription request was either added or removed.
+    PresenceSubRequestsChanged,
+
+    /// A user was blocked or unblocked.
+    BlockListChanged,
+
     /// The avatar of a user changed.
     AvatarChanged { id: UserId },
 

@@ -11,11 +11,12 @@ use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider}
 
 use crate::app::deps::{AppContext, AppDependencies};
 use crate::app::event_handlers::{
-    BookmarksEventHandler, ClientEventDispatcher, ConnectionEventHandler, MessagesEventHandler,
-    RequestsEventHandler, RoomsEventHandler, ServerEventHandlerQueue, UserStateEventHandler,
+    BlockListEventHandler, BookmarksEventHandler, ClientEventDispatcher, ConnectionEventHandler,
+    ContactListEventHandler, MessagesEventHandler, RequestsEventHandler, RoomsEventHandler,
+    ServerEventHandlerQueue, UserStateEventHandler,
 };
 use crate::app::services::{
-    AccountService, ConnectionService, ContactsService, RoomsService, UserDataService,
+    AccountService, ConnectionService, ContactListService, RoomsService, UserDataService,
 };
 use crate::client::ClientInner;
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
@@ -23,7 +24,7 @@ use crate::infra::avatars::AvatarCache;
 use crate::infra::general::NanoIDProvider;
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
-use crate::services::{CacheService, SidebarService};
+use crate::services::{BlockListService, CacheService, SidebarService};
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedStore {}
@@ -188,18 +189,21 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             Box::new(MessagesEventHandler::from(&dependencies)),
             Box::new(RoomsEventHandler::from(&dependencies)),
             Box::new(BookmarksEventHandler::from(&dependencies)),
+            Box::new(ContactListEventHandler::from(&dependencies)),
+            Box::new(BlockListEventHandler::from(&dependencies)),
         ]);
 
         let client_inner = Arc::new(ClientInner {
             connection: ConnectionService::from(&dependencies),
             account: AccountService::from(&dependencies),
-            contacts: ContactsService::from(&dependencies),
+            contact_list: ContactListService::from(&dependencies),
             #[cfg(feature = "debug")]
             debug: crate::services::DebugService::new(xmpp_client.clone()),
             rooms: RoomsService::from(&dependencies),
             sidebar: SidebarService::from(&dependencies),
             user_data: UserDataService::from(&dependencies),
             cache: CacheService::from(&dependencies),
+            block_list: BlockListService::from(&dependencies),
         });
 
         event_dispatcher.set_client_inner(Arc::downgrade(&client_inner));

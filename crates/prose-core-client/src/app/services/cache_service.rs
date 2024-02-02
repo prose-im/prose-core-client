@@ -3,8 +3,8 @@ use anyhow::Result;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAccountSettingsRepository, DynAvatarRepository, DynContactsRepository, DynDraftsRepository,
-    DynMessagesRepository, DynSidebarDomainService, DynUserInfoRepository,
+    DynAccountSettingsRepository, DynAvatarRepository, DynContactListDomainService,
+    DynDraftsRepository, DynMessagesRepository, DynSidebarDomainService, DynUserInfoRepository,
     DynUserProfileRepository,
 };
 
@@ -15,7 +15,7 @@ pub struct CacheService {
     #[inject]
     avatar_repo: DynAvatarRepository,
     #[inject]
-    contacts_repo: DynContactsRepository,
+    contact_list_domain_service: DynContactListDomainService,
     #[inject]
     drafts_repo: DynDraftsRepository,
     #[inject]
@@ -32,7 +32,7 @@ impl CacheService {
     pub async fn clear_cache(&self) -> Result<()> {
         self.account_settings_repo.clear_cache().await?;
         self.avatar_repo.clear_cache().await?;
-        self.contacts_repo.clear_cache().await?;
+        self.contact_list_domain_service.clear_cache().await?;
         self.drafts_repo.clear_cache().await?;
         self.messages_repo.clear_cache().await?;
         self.sidebar_domain_service.clear_cache().await?;

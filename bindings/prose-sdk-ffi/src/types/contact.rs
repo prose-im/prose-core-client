@@ -10,7 +10,6 @@ use prose_core_client::dtos::{
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Group {
-    Favorite,
     Team,
     Other,
 }
@@ -39,7 +38,6 @@ impl From<CoreContact> for Contact {
 impl From<CoreGroup> for Group {
     fn from(value: CoreGroup) -> Self {
         match value {
-            CoreGroup::Favorite => Group::Favorite,
             CoreGroup::Team => Group::Team,
             CoreGroup::Other => Group::Other,
         }

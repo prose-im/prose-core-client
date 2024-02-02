@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 mod connection_event_parser;
+mod contact_list_event_parser;
 mod message_event_parser;
 mod request_event_parser;
 mod room_event_parser;

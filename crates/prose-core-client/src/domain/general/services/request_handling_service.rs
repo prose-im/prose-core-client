@@ -12,12 +12,6 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 use crate::domain::shared::models::{RequestId, SenderId};
 
-#[derive(Debug, PartialEq)]
-pub enum SubscriptionResponse {
-    Approve,
-    Deny,
-}
-
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
@@ -50,11 +44,5 @@ pub trait RequestHandlingService: SendUnlessWasm + SyncUnlessWasm {
         to: &SenderId,
         id: &RequestId,
         last_active_seconds_ago: u64,
-    ) -> Result<()>;
-
-    async fn respond_to_presence_subscription_request(
-        &self,
-        to: &SenderId,
-        response: SubscriptionResponse,
     ) -> Result<()>;
 }

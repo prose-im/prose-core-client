@@ -11,8 +11,12 @@ use crate::app::deps::app_context::AppContext;
 use crate::app::event_handlers::ClientEventDispatcherTrait;
 use crate::domain::account::services::UserAccountService;
 use crate::domain::connection::services::ConnectionService;
-use crate::domain::contacts::repos::ContactsRepository;
-use crate::domain::contacts::services::ContactsService;
+use crate::domain::contacts::repos::{
+    BlockListRepository, ContactListRepository, PresenceSubRequestsRepository,
+};
+use crate::domain::contacts::services::{
+    BlockListDomainService, BlockListService, ContactListDomainService, ContactListService,
+};
 use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
 use crate::domain::messaging::services::{
@@ -33,18 +37,24 @@ use crate::domain::user_profiles::services::UserProfileService;
 pub type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
 pub type DynAppContext = Arc<AppContext>;
 pub type DynAvatarRepository = Arc<dyn AvatarRepository>;
+pub type DynBlockListDomainService = Arc<dyn BlockListDomainService>;
+pub type DynBlockListRepository = Arc<dyn BlockListRepository>;
+pub type DynBlockListService = Arc<dyn BlockListService>;
 pub type DynBookmarksService = Arc<dyn BookmarksService>;
 pub type DynClientEventDispatcher = Arc<dyn ClientEventDispatcherTrait>;
 pub type DynConnectedRoomsReadOnlyRepository = Arc<dyn ConnectedRoomsReadOnlyRepository>;
 pub type DynConnectedRoomsRepository = Arc<dyn ConnectedRoomsRepository>;
 pub type DynConnectionService = Arc<dyn ConnectionService>;
-pub type DynContactsRepository = Arc<dyn ContactsRepository>;
-pub type DynContactsService = Arc<dyn ContactsService>;
+pub type DynContactListDomainService = Arc<dyn ContactListDomainService>;
+pub type DynContactListRepository = Arc<dyn ContactListRepository>;
+pub type DynContactListService = Arc<dyn ContactListService>;
 pub type DynDraftsRepository = Arc<dyn DraftsRepository>;
 pub type DynIDProvider = Arc<dyn IDProvider>;
 pub type DynMessageArchiveService = Arc<dyn MessageArchiveService>;
+pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 pub type DynMessagesRepository = Arc<dyn MessagesRepository>;
 pub type DynMessagingService = Arc<dyn MessagingService>;
+pub type DynPresenceSubRequestsRepository = Arc<dyn PresenceSubRequestsRepository>;
 pub type DynRequestHandlingService = Arc<dyn RequestHandlingService>;
 pub type DynRoomAttributesService = Arc<dyn RoomAttributesService>;
 pub type DynRoomFactory = RoomFactory;
@@ -58,16 +68,15 @@ pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
 pub type DynUserProfileService = Arc<dyn UserProfileService>;
-pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 
 pub struct AppDependencies {
     pub account_settings_repo: DynAccountSettingsRepository,
     pub avatar_repo: DynAvatarRepository,
+    pub block_list_domain_service: DynBlockListDomainService,
     pub client_event_dispatcher: DynClientEventDispatcher,
     pub connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     pub connection_service: DynConnectionService,
-    pub contacts_repo: DynContactsRepository,
-    pub contacts_service: DynContactsService,
+    pub contact_list_domain_service: DynContactListDomainService,
     pub ctx: DynAppContext,
     pub drafts_repo: DynDraftsRepository,
     pub id_provider: DynIDProvider,

@@ -12,6 +12,10 @@ use crate::app::deps::{
     AppContext, AppDependencies, DynClientEventDispatcher, DynIDProvider, DynTimeProvider,
 };
 use crate::app::services::RoomInner;
+use crate::domain::contacts::services::impls::{
+    BlockListDomainService, BlockListDomainServiceDependencies, ContactListDomainService,
+    ContactListDomainServiceDependencies,
+};
 use crate::domain::messaging::services::impls::{
     MessageMigrationDomainService, MessageMigrationDomainServiceDependencies,
 };
@@ -21,7 +25,9 @@ use crate::domain::sidebar::services::impls::{
     SidebarDomainService, SidebarDomainServiceDependencies,
 };
 use crate::infra::avatars::AvatarCache;
-use crate::infra::contacts::CachingContactsRepository;
+use crate::infra::contacts::{
+    CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
+};
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessagesRecord,
 };
@@ -156,6 +162,27 @@ impl From<PlatformDependencies> for AppDependencies {
             sidebar_domain_service_dependencies,
         ));
 
+        let contact_list_domain_service_dependencies = ContactListDomainServiceDependencies {
+            client_event_dispatcher: client_event_dispatcher.clone(),
+            contact_list_repo: Arc::new(CachingContactsRepository::new(d.xmpp.clone())),
+            contact_list_service: d.xmpp.clone(),
+            presence_sub_requests_repo: Arc::new(PresenceSubRequestsRepository::new()),
+        };
+
+        let contact_list_domain_service = Arc::new(ContactListDomainService::from(
+            contact_list_domain_service_dependencies,
+        ));
+
+        let block_list_domain_service_dependencies = BlockListDomainServiceDependencies {
+            block_list_repo: Arc::new(CachingBlockListRepository::new(d.xmpp.clone())),
+            block_list_service: d.xmpp.clone(),
+            client_event_dispatcher: client_event_dispatcher.clone(),
+        };
+
+        let block_list_domain_service = Arc::new(BlockListDomainService::from(
+            block_list_domain_service_dependencies,
+        ));
+
         let room_factory = {
             let client_event_dispatcher = client_event_dispatcher.clone();
             let ctx = ctx.clone();
@@ -188,11 +215,11 @@ impl From<PlatformDependencies> for AppDependencies {
         Self {
             account_settings_repo,
             avatar_repo: Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache)),
+            block_list_domain_service,
             client_event_dispatcher,
             connected_rooms_repo,
             connection_service: d.xmpp.clone(),
-            contacts_repo: Arc::new(CachingContactsRepository::new(d.xmpp.clone())),
-            contacts_service: d.xmpp.clone(),
+            contact_list_domain_service,
             ctx,
             drafts_repo,
             request_handling_service: d.xmpp.clone(),

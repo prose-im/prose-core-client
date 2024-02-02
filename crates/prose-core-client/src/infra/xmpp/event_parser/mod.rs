@@ -8,21 +8,25 @@ use jid::Jid;
 use minidom::Element;
 use tracing::info;
 use xmpp_parsers::message::MessageType;
+use xmpp_parsers::roster::Subscription;
 
 use message::parse_message;
 use prose_xmpp::{
-    client::Event as XMPPClientEvent, mods::caps::Event as XMPPCapsEvent,
-    mods::chat::Event as XMPPChatEvent, mods::muc::Event as XMPPMUCEvent,
-    mods::ping::Event as XMPPPingEvent, mods::profile::Event as XMPPProfileEvent,
-    mods::roster::Event as XMPPRosterEvent, mods::status::Event as XMPPStatusEvent, Event,
+    client::Event as XMPPClientEvent, mods::block_list::Event as XMPPBlockListEvent,
+    mods::caps::Event as XMPPCapsEvent, mods::chat::Event as XMPPChatEvent,
+    mods::muc::Event as XMPPMUCEvent, mods::ping::Event as XMPPPingEvent,
+    mods::profile::Event as XMPPProfileEvent, mods::roster::Event as XMPPRosterEvent,
+    mods::status::Event as XMPPStatusEvent, Event,
 };
 
 use crate::app::event_handlers::{
-    ConnectionEvent, MessageEvent, MessageEventType, OccupantEvent, RequestEvent, RequestEventType,
-    RoomEvent, RoomEventType, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
+    BlockListEvent, BlockListEventType, ConnectionEvent, ContactListEvent, ContactListEventType,
+    MessageEvent, MessageEventType, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
+    RoomEventType, ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent,
     UserResourceEventType, UserStatusEvent, UserStatusEventType,
 };
 use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
+use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::rooms::models::ComposeState;
 use crate::domain::shared::models::{CapabilitiesId, RequestId, SenderId, UserEndpointId};
 use crate::dtos::{RoomId, UserId, UserResourceId};
@@ -37,6 +41,7 @@ pub fn parse_xmpp_event(event: XMPPEvent) -> Result<Vec<ServerEvent>> {
     let mut ctx = Context::default();
 
     match event {
+        Event::BlockList(event) => parse_block_list_event(&mut ctx, event)?,
         Event::Bookmark(_) => {
             // TODO: Handle changed bookmarks?
         }
@@ -115,6 +120,28 @@ fn parse_status_event(ctx: &mut Context, event: XMPPStatusEvent) -> Result<()> {
             },
         }),
     };
+    Ok(())
+}
+
+fn parse_block_list_event(ctx: &mut Context, event: XMPPBlockListEvent) -> Result<()> {
+    // We're converting the JIDs into UserIds (BareJids) since we only support blocking
+    // BareJids for now.
+    match event {
+        XMPPBlockListEvent::UserBlocked { jid } => ctx.push_event(BlockListEvent {
+            r#type: BlockListEventType::UserBlocked {
+                user_id: UserId::from(jid.into_bare()),
+            },
+        }),
+        XMPPBlockListEvent::UserUnblocked { jid } => ctx.push_event(BlockListEvent {
+            r#type: BlockListEventType::UserUnblocked {
+                user_id: UserId::from(jid.into_bare()),
+            },
+        }),
+        XMPPBlockListEvent::BlockListCleared => ctx.push_event(BlockListEvent {
+            r#type: BlockListEventType::BlockListCleared,
+        }),
+    }
+
     Ok(())
 }
 
@@ -256,11 +283,23 @@ fn parse_client_event(ctx: &mut Context, event: XMPPClientEvent) -> Result<()> {
 
 fn parse_roster_event(ctx: &mut Context, event: XMPPRosterEvent) -> Result<()> {
     match event {
-        XMPPRosterEvent::PresenceSubscriptionRequest { from } => ctx.push_event(RequestEvent {
-            sender_id: SenderId::from(Jid::Bare(from)),
-            request_id: RequestId::from("".to_string()),
-            r#type: RequestEventType::PresenceSubscription,
+        XMPPRosterEvent::PresenceSubscriptionRequest { from } => ctx.push_event(ContactListEvent {
+            contact_id: UserId::from(from),
+            r#type: ContactListEventType::PresenceSubscriptionRequested,
         }),
+        XMPPRosterEvent::RosterItemChanged { item } => {
+            let event_type = match &item.subscription {
+                Subscription::Remove => ContactListEventType::ContactRemoved,
+                _ => ContactListEventType::ContactAddedOrPresenceSubscriptionUpdated {
+                    subscription: PresenceSubscription::from(&item),
+                },
+            };
+
+            ctx.push_event(ContactListEvent {
+                contact_id: UserId::from(item.jid),
+                r#type: event_type,
+            })
+        }
     }
 
     Ok(())
@@ -342,5 +381,15 @@ impl From<MessageEvent> for ServerEvent {
 impl From<SidebarBookmarkEvent> for ServerEvent {
     fn from(value: SidebarBookmarkEvent) -> Self {
         Self::SidebarBookmark(value)
+    }
+}
+impl From<ContactListEvent> for ServerEvent {
+    fn from(value: ContactListEvent) -> Self {
+        Self::ContactList(value)
+    }
+}
+impl From<BlockListEvent> for ServerEvent {
+    fn from(value: BlockListEvent) -> Self {
+        Self::BlockList(value)
     }
 }

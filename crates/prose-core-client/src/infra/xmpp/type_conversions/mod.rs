@@ -7,6 +7,7 @@ pub(crate) mod availability;
 pub(crate) mod bookmark;
 pub(crate) mod caps;
 pub(crate) mod compose_state;
+mod contact;
 pub(crate) mod presence;
 pub(crate) mod room_affiliation;
 pub(crate) mod room_info;

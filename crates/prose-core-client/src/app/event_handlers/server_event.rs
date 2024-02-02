@@ -5,6 +5,7 @@
 
 use prose_xmpp::ConnectionError;
 
+use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::sidebar::models::Bookmark;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
@@ -18,7 +19,12 @@ use crate::domain::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerEvent {
+    /// Events about modifications to the block list.
+    BlockList(BlockListEvent),
+    /// Event related to the connection status.
     Connection(ConnectionEvent),
+    /// Events that are related to contacts.
+    ContactList(ContactListEvent),
     /// Events that affect the status of a user within a conversation or globally.
     UserStatus(UserStatusEvent),
     /// Events that affect the information about the user globally.
@@ -101,7 +107,6 @@ pub enum RequestEventType {
     LastActivity,
     Capabilities { id: CapabilitiesId },
     SoftwareVersion,
-    PresenceSubscription,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -172,4 +177,33 @@ pub enum SidebarBookmarkEvent {
     AddedOrUpdated { bookmarks: Vec<Bookmark> },
     Deleted { ids: Vec<RoomId> },
     Purged,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContactListEventType {
+    /// The contact was either added to our contact list or the presence subscription to or from
+    /// the contact changed.
+    ContactAddedOrPresenceSubscriptionUpdated { subscription: PresenceSubscription },
+    /// The contact was removed from our contact list.
+    ContactRemoved,
+    /// The contact requested to subscribe to our presence.
+    PresenceSubscriptionRequested,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ContactListEvent {
+    pub contact_id: UserId,
+    pub r#type: ContactListEventType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockListEventType {
+    UserBlocked { user_id: UserId },
+    UserUnblocked { user_id: UserId },
+    BlockListCleared,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BlockListEvent {
+    pub r#type: BlockListEventType,
 }

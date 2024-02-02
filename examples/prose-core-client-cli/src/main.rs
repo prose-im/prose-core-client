@@ -22,7 +22,7 @@ use url::Url;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
     Address, Bookmark, Contact, Message, ParticipantInfo, PublicRoomInfo, RoomId, SidebarItem,
-    UserId,
+    UserBasicInfo, UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
@@ -308,7 +308,7 @@ impl Display for ParticipantEnvelope {
 
 #[allow(dead_code)]
 async fn select_contact(client: &Client) -> Result<UserId> {
-    let contacts = client.contacts.load_contacts().await?.into_iter();
+    let contacts = client.contact_list.load_contacts().await?.into_iter();
     Ok(
         select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
             .id
@@ -318,7 +318,7 @@ async fn select_contact(client: &Client) -> Result<UserId> {
 
 async fn select_multiple_contacts(client: &Client) -> Result<Vec<UserId>> {
     let contacts = client
-        .contacts
+        .contact_list
         .load_contacts()
         .await?
         .into_iter()
@@ -518,7 +518,7 @@ async fn update_user_profile(client: &Client, id: UserId) -> Result<()> {
 }
 
 async fn load_contacts(client: &Client) -> Result<()> {
-    let contacts = client.contacts.load_contacts().await?;
+    let contacts = client.contact_list.load_contacts().await?;
 
     for contact in contacts {
         println!(
@@ -527,8 +527,13 @@ async fn load_contacts(client: &Client) -> Result<()> {
     Name: {}
     Availability: {:?}
     Group: {:?}
+    PresenceSubscription: {:?}
     "#,
-            contact.id, contact.name, contact.availability, contact.group,
+            contact.id,
+            contact.name,
+            contact.availability,
+            contact.group,
+            contact.presence_subscription
         );
     }
 
@@ -553,6 +558,14 @@ async fn load_messages(client: &Client) -> Result<()> {
     }
 
     Ok(())
+}
+
+struct UserBasicInfoEnvelope(UserBasicInfo);
+
+impl Display for UserBasicInfoEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.0.name, self.0.id)
+    }
 }
 
 struct MessageEnvelope(Message);
@@ -728,6 +741,16 @@ enum Selection {
     AddContact,
     #[strum(serialize = "Remove contact")]
     RemoveContact,
+    #[strum(serialize = "Load Block List")]
+    LoadBlockList,
+    #[strum(serialize = "Block User")]
+    BlockUser,
+    #[strum(serialize = "Unblock User")]
+    UnblockUser,
+    #[strum(serialize = "Clear Block List")]
+    ClearBlockList,
+    #[strum(serialize = "List presence subscription requests")]
+    ListPresenceSubRequests,
     #[strum(serialize = "Send message to contact or room")]
     SendMessageToRoom,
     #[strum(serialize = "Send message to anyhow")]
@@ -818,14 +841,81 @@ async fn main() -> Result<()> {
             }
             Selection::AddContact => {
                 let jid = prompt_bare_jid(None);
-                client.contacts.add_contact(&jid).await?;
+                client.contact_list.add_contact(&jid.into()).await?;
             }
             Selection::RemoveContact => {
                 let contact = select_contact(&client).await?;
-                client
-                    .contacts
-                    .remove_contact(&contact.into_inner())
-                    .await?;
+                client.contact_list.remove_contact(&contact).await?;
+            }
+            Selection::LoadBlockList => {
+                let blocked_users = client.block_list.load_block_list().await?;
+                if blocked_users.is_empty() {
+                    println!("Block List is empty");
+                    continue;
+                }
+
+                for blocked_user in blocked_users {
+                    println!("{}", UserBasicInfoEnvelope(blocked_user))
+                }
+            }
+            Selection::BlockUser => {
+                let jid = prompt_bare_jid(None);
+                client.block_list.block_user(&jid.into()).await?;
+            }
+            Selection::UnblockUser => {
+                let blocked_users = client.block_list.load_block_list().await?;
+                let user =
+                    select_item_from_list(blocked_users, |u| UserBasicInfoEnvelope(u.clone()));
+                client.block_list.unblock_user(&user.id).await?;
+            }
+            Selection::ClearBlockList => {
+                client.block_list.clear_block_list().await?;
+            }
+            Selection::ListPresenceSubRequests => {
+                let requests = client.contact_list.load_presence_sub_requests().await?;
+                if requests.is_empty() {
+                    println!("No pending presence subscriptions.");
+                    continue;
+                }
+
+                let req =
+                    select_item_from_list(requests, |req| format!("{} ({})", req.name, req.id));
+
+                enum Response {
+                    Approve,
+                    Deny,
+                    Cancel,
+                }
+
+                impl Display for Response {
+                    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                        f.write_str(match self {
+                            Response::Approve => "Approve",
+                            Response::Deny => "Deny",
+                            Response::Cancel => "Cancel",
+                        })
+                    }
+                }
+
+                let response = select_item_from_list(
+                    [Response::Approve, Response::Deny, Response::Cancel],
+                    |r| r.to_string(),
+                );
+                match response {
+                    Response::Approve => {
+                        client
+                            .contact_list
+                            .approve_presence_sub_request(&req.id)
+                            .await?
+                    }
+                    Response::Deny => {
+                        client
+                            .contact_list
+                            .deny_presence_sub_request(&req.id)
+                            .await?
+                    }
+                    Response::Cancel => {}
+                }
             }
             Selection::SendMessageToRoom => {
                 send_message(&client).await?;

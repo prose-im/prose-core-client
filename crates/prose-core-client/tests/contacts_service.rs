@@ -6,38 +6,39 @@
 use anyhow::Result;
 
 use prose_core_client::app::dtos::Contact as ContactDTO;
-use prose_core_client::app::services::ContactsService;
-use prose_core_client::domain::contacts::models::{Contact, Group};
+use prose_core_client::app::services::ContactListService;
+use prose_core_client::domain::contacts::models::{Contact, PresenceSubscription};
 use prose_core_client::domain::shared::models::{Availability, UserId};
 use prose_core_client::domain::user_info::models::UserInfo;
 use prose_core_client::domain::user_profiles::models::UserProfile;
+use prose_core_client::dtos::Group;
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::user_id;
 
 #[tokio::test]
 async fn test_assembles_contact_dto() -> Result<()> {
     let mut deps = MockAppDependencies::default();
-    deps.contacts_repo.expect_get_all().times(1).returning(|_| {
-        Box::pin(async {
-            Ok(vec![
-                Contact {
-                    id: user_id!("a@prose.org"),
-                    name: None,
-                    group: Group::Favorite,
-                },
-                Contact {
-                    id: user_id!("b@prose.org"),
-                    name: Some("Contact B".to_string()),
-                    group: Group::Team,
-                },
-                Contact {
-                    id: user_id!("john.doe@prose.org"),
-                    name: None,
-                    group: Group::Team,
-                },
-            ])
-        })
-    });
+    deps.contact_list_domain_service
+        .expect_load_contacts()
+        .times(1)
+        .returning(|| {
+            Box::pin(async {
+                Ok(vec![
+                    Contact {
+                        id: user_id!("a@prose.org"),
+                        presence_subscription: PresenceSubscription::Mutual,
+                    },
+                    Contact {
+                        id: user_id!("b@prose.org"),
+                        presence_subscription: PresenceSubscription::WeFollow,
+                    },
+                    Contact {
+                        id: user_id!("john.doe@prose.org"),
+                        presence_subscription: PresenceSubscription::TheyFollow,
+                    },
+                ])
+            })
+        });
 
     deps.user_info_repo
         .expect_get_user_info()
@@ -82,7 +83,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
             Box::pin(async move { Ok(Some(profile)) })
         });
 
-    let service = ContactsService::from(&deps.into_deps());
+    let service = ContactListService::from(&deps.into_deps());
 
     let contacts = service.load_contacts().await?;
     assert_eq!(
@@ -93,7 +94,8 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 name: "First Last".to_string(),
                 availability: Availability::Available,
                 status: None,
-                group: Group::Favorite,
+                group: Group::Team,
+                presence_subscription: PresenceSubscription::Mutual,
             },
             ContactDTO {
                 id: user_id!("b@prose.org"),
@@ -101,6 +103,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 availability: Availability::Available,
                 status: None,
                 group: Group::Team,
+                presence_subscription: PresenceSubscription::WeFollow,
             },
             ContactDTO {
                 id: user_id!("john.doe@prose.org"),
@@ -108,6 +111,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 availability: Availability::Unavailable,
                 status: None,
                 group: Group::Team,
+                presence_subscription: PresenceSubscription::TheyFollow,
             }
         ]
     );

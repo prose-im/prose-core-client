@@ -7,10 +7,11 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
-use prose_core_client::domain::contacts::models::{Contact, Group};
-use prose_core_client::domain::contacts::repos::ContactsRepository;
-use prose_core_client::domain::contacts::services::mocks::MockContactsService;
+use prose_core_client::domain::contacts::models::Contact;
+use prose_core_client::domain::contacts::repos::ContactListRepository;
+use prose_core_client::domain::contacts::services::mocks::MockContactListService;
 use prose_core_client::domain::shared::models::UserId;
+use prose_core_client::dtos::PresenceSubscription;
 use prose_core_client::infra::contacts::CachingContactsRepository;
 use prose_core_client::user_id;
 
@@ -21,35 +22,27 @@ async fn test_loads_and_caches_contacts() -> Result<()> {
     let contacts = vec![
         Contact {
             id: user_id!("a@prose.org"),
-            name: None,
-            group: Group::Favorite,
+            presence_subscription: PresenceSubscription::Requested,
         },
         Contact {
             id: user_id!("b@prose.org"),
-            name: None,
-            group: Group::Team,
+            presence_subscription: PresenceSubscription::Requested,
         },
     ];
 
     let service = {
         let contacts = contacts.clone();
-        let mut service = MockContactsService::new();
+        let mut service = MockContactListService::new();
         service
             .expect_load_contacts()
             .times(1)
-            .return_once(|_| Box::pin(async move { Ok(contacts) }));
+            .return_once(|| Box::pin(async move { Ok(contacts) }));
         service
     };
 
     let repo = CachingContactsRepository::new(Arc::new(service));
-    assert_eq!(
-        repo.get_all(&user_id!("account@prose.org")).await?,
-        contacts
-    );
-    assert_eq!(
-        repo.get_all(&user_id!("account@prose.org")).await?,
-        contacts
-    );
+    assert_eq!(repo.get_all().await?, contacts);
+    assert_eq!(repo.get_all().await?, contacts);
 
     Ok(())
 }

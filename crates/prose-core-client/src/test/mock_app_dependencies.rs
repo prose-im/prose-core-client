@@ -25,8 +25,9 @@ use crate::app::services::RoomInner;
 use crate::domain::account::services::mocks::MockUserAccountService;
 use crate::domain::connection::models::{ConnectionProperties, ServerFeatures};
 use crate::domain::connection::services::mocks::MockConnectionService;
-use crate::domain::contacts::repos::mocks::MockContactsRepository;
-use crate::domain::contacts::services::mocks::MockContactsService;
+use crate::domain::contacts::services::mocks::{
+    MockBlockListDomainService, MockContactListDomainService,
+};
 use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
 use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
@@ -86,12 +87,12 @@ impl Default for AppContext {
 pub struct MockAppDependencies {
     pub account_settings_repo: MockAccountSettingsRepository,
     pub avatar_repo: MockAvatarRepository,
+    pub block_list_domain_service: MockBlockListDomainService,
     pub bookmarks_service: MockBookmarksService,
     pub client_event_dispatcher: MockClientEventDispatcherTrait,
     pub connected_rooms_repo: MockConnectedRoomsReadOnlyRepository,
     pub connection_service: MockConnectionService,
-    pub contacts_repo: MockContactsRepository,
-    pub contacts_service: MockContactsService,
+    pub contact_list_domain_service: MockContactListDomainService,
     pub ctx: AppContext,
     pub drafts_repo: MockDraftsRepository,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"id\"))"))]
@@ -172,11 +173,10 @@ impl From<MockAppDependencies> for AppDependencies {
         AppDependencies {
             account_settings_repo: Arc::new(mock.account_settings_repo),
             avatar_repo: Arc::new(mock.avatar_repo),
+            block_list_domain_service: Arc::new(mock.block_list_domain_service),
             client_event_dispatcher,
             connected_rooms_repo,
             connection_service: Arc::new(mock.connection_service),
-            contacts_repo: Arc::new(mock.contacts_repo),
-            contacts_service: Arc::new(mock.contacts_service),
             ctx,
             drafts_repo,
             id_provider: mock.id_provider,
@@ -197,6 +197,7 @@ impl From<MockAppDependencies> for AppDependencies {
             user_info_service: Arc::new(mock.user_info_service),
             user_profile_repo,
             user_profile_service: Arc::new(mock.user_profile_service),
+            contact_list_domain_service: Arc::new(mock.contact_list_domain_service),
         }
     }
 }

@@ -92,7 +92,7 @@ impl Client {
     }
 
     pub async fn load_contacts(&self) -> Result<Vec<Contact>, ClientError> {
-        let items = self.client().await?.contacts.load_contacts().await?;
+        let items = self.client().await?.contact_list.load_contacts().await?;
         Ok(items.into_iter().map(Into::into).collect())
     }
 

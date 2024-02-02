@@ -42,6 +42,10 @@ impl UserId {
         };
         node.capitalized_display_name()
     }
+
+    pub fn is_same_domain(&self, other: &UserId) -> bool {
+        self.0.domain() == other.0.domain()
+    }
 }
 
 impl From<BareJid> for UserId {

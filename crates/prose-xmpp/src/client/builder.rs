@@ -53,6 +53,7 @@ impl ClientBuilder {
         .add_mod(mods::Profile::default())
         .add_mod(mods::PubSub::default())
         .add_mod(mods::Roster::default())
+        .add_mod(mods::BlockList::default())
     }
 
     pub fn set_connector_provider(self, connector_provider: ConnectorProvider) -> Self {

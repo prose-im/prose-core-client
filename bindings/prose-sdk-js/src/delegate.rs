@@ -67,6 +67,15 @@ export interface ProseClientDelegate {
     
     /// A user in `conversation` started or stopped typing.
     composingUsersChanged(client: ProseClient, room: Room): void
+    
+    /// The contact list has changed.
+    contactListChanged(client: ProseClient): void
+    
+    /// The list of presence subscription requests has changed.
+    presenceSubscriptionRequestsChanged(client: ProseClient): void
+    
+    /// The block list has changed.
+    blockListChanged(client: ProseClient): void
 }
 "#;
 
@@ -141,6 +150,15 @@ extern "C" {
         client: Client,
         room: JsValue,
     ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "contactListChanged")]
+    fn contact_list_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "presenceSubscriptionRequestsChanged")]
+    fn presence_sub_requests_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "blockListChanged")]
+    fn block_list_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 }
 
 #[wasm_bindgen(getter_with_clone)]
@@ -247,6 +265,11 @@ impl Delegate {
                     .inner
                     .room_participants_changed(client, room.into_js_value())?,
             },
+            ClientEvent::ContactListChanged => self.inner.contact_list_changed(client)?,
+            ClientEvent::PresenceSubRequestsChanged => {
+                self.inner.presence_sub_requests_changed(client)?
+            }
+            ClientEvent::BlockListChanged => self.inner.block_list_changed(client)?,
         }
         Ok(())
     }

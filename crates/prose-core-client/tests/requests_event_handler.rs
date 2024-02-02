@@ -13,7 +13,6 @@ use prose_core_client::app::event_handlers::{
     RequestEvent, RequestEventType, RequestsEventHandler, ServerEvent, ServerEventHandler,
 };
 use prose_core_client::domain::general::models::{Capabilities, Feature};
-use prose_core_client::domain::general::services::SubscriptionResponse;
 use prose_core_client::domain::shared::models::{CapabilitiesId, RequestId, SenderId};
 use prose_core_client::dtos::SoftwareVersion;
 use prose_core_client::sender_id;
@@ -169,36 +168,6 @@ async fn test_handles_disco_request() -> Result<()> {
             r#type: RequestEventType::Capabilities {
                 id: CapabilitiesId::from("caps-id"),
             },
-        }))
-        .await?;
-
-    Ok(())
-}
-
-#[tokio::test]
-async fn test_handles_presence_subscription_request() -> Result<()> {
-    let mut deps = MockAppDependencies::default();
-    deps.ctx.capabilities = Capabilities::new(
-        "My Client",
-        "https://example.com",
-        vec![Feature::Name(ns::ROSTER)],
-    );
-
-    deps.request_handling_service
-        .expect_respond_to_presence_subscription_request()
-        .once()
-        .with(
-            predicate::eq(sender_id!("sender@prose.org")),
-            predicate::eq(SubscriptionResponse::Approve),
-        )
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
-
-    let event_handler = RequestsEventHandler::from(&deps.into_deps());
-    event_handler
-        .handle_event(ServerEvent::Request(RequestEvent {
-            sender_id: sender_id!("sender@prose.org"),
-            request_id: RequestId::from(""),
-            r#type: RequestEventType::PresenceSubscription,
         }))
         .await?;
 

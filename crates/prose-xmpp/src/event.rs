@@ -7,6 +7,7 @@ use crate::{client, mods};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
+    BlockList(mods::block_list::Event),
     Bookmark(mods::bookmark::Event),
     Bookmark2(mods::bookmark2::Event),
     Caps(mods::caps::Event),

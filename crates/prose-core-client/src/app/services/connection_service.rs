@@ -9,8 +9,9 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{ConnectionError, IDProvider};
 
 use crate::app::deps::{
-    DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher, DynConnectionService,
-    DynIDProvider, DynUserAccountService,
+    DynAccountSettingsRepository, DynAppContext, DynBlockListDomainService,
+    DynClientEventDispatcher, DynConnectionService, DynContactListDomainService, DynIDProvider,
+    DynUserAccountService,
 };
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
@@ -19,6 +20,10 @@ use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct ConnectionService {
+    #[inject]
+    block_list_domain_service: DynBlockListDomainService,
+    #[inject]
+    contact_list_domain_service: DynContactListDomainService,
     #[inject]
     ctx: DynAppContext,
     #[inject]
@@ -72,6 +77,9 @@ impl ConnectionService {
             }
         }
 
+        // https://xmpp.org/rfcs/rfc6121.html#roster-login
+        _ = self.contact_list_domain_service.load_contacts().await;
+
         self.user_account_service
             .set_availability(None, &self.ctx.capabilities, availability)
             .await
@@ -114,6 +122,8 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
+
+        _ = self.block_list_domain_service.load_block_list().await;
 
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::ConnectionStatusChanged {

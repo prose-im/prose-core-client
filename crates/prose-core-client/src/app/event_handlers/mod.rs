@@ -6,9 +6,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
+pub use block_list_event_handler::BlockListEventHandler;
 pub use bookmarks_event_handler::BookmarksEventHandler;
 pub use client_event_dispatcher::ClientEventDispatcher;
 pub use connection_event_handler::ConnectionEventHandler;
+pub use contact_list_event_handler::ContactListEventHandler;
 pub use event_handler_queue::ServerEventHandlerQueue;
 pub use messages_event_handler::MessagesEventHandler;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
@@ -21,9 +23,11 @@ pub use user_state_event_handler::UserStateEventHandler;
 use crate::domain::rooms::models::Room;
 use crate::{ClientEvent, ClientRoomEventType};
 
+mod block_list_event_handler;
 mod bookmarks_event_handler;
 mod client_event_dispatcher;
 mod connection_event_handler;
+mod contact_list_event_handler;
 mod event_handler_queue;
 mod messages_event_handler;
 mod requests_event_handler;

@@ -141,26 +141,3 @@ async fn test_software_version() -> Result<()> {
 
     Ok(())
 }
-
-#[mt_test]
-async fn test_presence_subscription() -> Result<()> {
-    // https://xmpp.org/rfcs/rfc6121.html#sub-request
-
-    let events = parse_xml(
-        r#"
-        <presence xmlns="jabber:client" from="user@prose.org" type="subscribe" />
-        "#,
-    )
-    .await?;
-
-    assert_eq!(
-        events,
-        vec![ServerEvent::Request(RequestEvent {
-            request_id: RequestId::from(""),
-            sender_id: sender_id!("user@prose.org"),
-            r#type: RequestEventType::PresenceSubscription,
-        })]
-    );
-
-    Ok(())
-}

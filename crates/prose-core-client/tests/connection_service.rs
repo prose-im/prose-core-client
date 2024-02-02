@@ -36,6 +36,10 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
             predicate::eq("my-password"),
         )
         .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
+    deps.contact_list_domain_service
+        .expect_load_contacts()
+        .once()
+        .return_once(|| Box::pin(async { Ok(vec![]) }));
     deps.connection_service
         .expect_set_message_carbons_enabled()
         .once()
@@ -75,6 +79,10 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
                 Ok(())
             })
         });
+    deps.block_list_domain_service
+        .expect_load_block_list()
+        .once()
+        .return_once(|| Box::pin(async { Ok(vec![]) }));
     deps.client_event_dispatcher
         .expect_dispatch_event()
         .once()
@@ -133,6 +141,10 @@ async fn test_restores_availability_and_resource() -> Result<()> {
             predicate::always(),
         )
         .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
+    deps.contact_list_domain_service
+        .expect_load_contacts()
+        .once()
+        .return_once(|| Box::pin(async { Ok(vec![]) }));
     deps.connection_service
         .expect_set_message_carbons_enabled()
         .once()
@@ -166,6 +178,10 @@ async fn test_restores_availability_and_resource() -> Result<()> {
                 Ok(())
             })
         });
+    deps.block_list_domain_service
+        .expect_load_block_list()
+        .once()
+        .return_once(|| Box::pin(async { Ok(vec![]) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()

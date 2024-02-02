@@ -12,7 +12,7 @@ use xmpp_parsers::version::VersionResult;
 use prose_xmpp::mods;
 
 use crate::domain::general::models::{Capabilities, Feature, Identity, SoftwareVersion};
-use crate::domain::general::services::{RequestHandlingService, SubscriptionResponse};
+use crate::domain::general::services::RequestHandlingService;
 use crate::domain::shared::models::{RequestId, SenderId};
 use crate::infra::xmpp::XMPPClient;
 
@@ -86,29 +86,6 @@ impl RequestHandlingService for XMPPClient {
                 id.as_ref(),
             )
             .await?;
-        Ok(())
-    }
-
-    async fn respond_to_presence_subscription_request(
-        &self,
-        to: &SenderId,
-        response: SubscriptionResponse,
-    ) -> anyhow::Result<()> {
-        let roster_mod = self.client.get_mod::<mods::Roster>();
-
-        match response {
-            SubscriptionResponse::Approve => {
-                roster_mod
-                    .approve_presence_subscription_request(&to.clone().into_inner().into_bare())
-                    .await?
-            }
-            SubscriptionResponse::Deny => {
-                roster_mod
-                    .deny_presence_subscription_request(&to.clone().into_inner().into_bare())
-                    .await?
-            }
-        }
-
         Ok(())
     }
 }
