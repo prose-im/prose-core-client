@@ -549,6 +549,7 @@ impl Client {
         Ok(())
     }
 
+    /// Returns the list of blocked users.
     #[wasm_bindgen(js_name = "loadBlockList")]
     pub async fn load_block_list(&self) -> Result<UserBasicInfoArray> {
         let block_list = self
@@ -563,6 +564,7 @@ impl Client {
         Ok(block_list)
     }
 
+    /// Blocks the user identified by `jid`.
     #[wasm_bindgen(js_name = "blockUser")]
     pub async fn block_user(&self, jid: &BareJid) -> Result<()> {
         self.client
@@ -573,6 +575,7 @@ impl Client {
         Ok(())
     }
 
+    /// Unblocks the user identified by `jid`.
     #[wasm_bindgen(js_name = "unblockUser")]
     pub async fn unblock_user(&self, jid: &BareJid) -> Result<()> {
         self.client
@@ -583,6 +586,7 @@ impl Client {
         Ok(())
     }
 
+    /// Removes all users from the block list.
     #[wasm_bindgen(js_name = "clearBlockList")]
     pub async fn clear_block_list(&self) -> Result<()> {
         self.client
