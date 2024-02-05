@@ -128,8 +128,9 @@ impl ContactListService {
             .unwrap_or_default();
         let name = build_contact_name(&user_id, &profile);
         PresenceSubRequest {
-            id: user_id.into(),
+            id: user_id.clone().into(),
             name,
+            user_id,
         }
     }
 }

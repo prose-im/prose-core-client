@@ -5,6 +5,7 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
+use crate::types::BareJid;
 use prose_core_client::dtos::{
     PresenceSubRequest as CorePresenceSubRequest, PresenceSubRequestId as CorePresenceSubRequestId,
 };
@@ -25,6 +26,11 @@ impl PresenceSubRequest {
     #[wasm_bindgen(getter)]
     pub fn name(&self) -> String {
         self.0.name.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn jid(&self) -> BareJid {
+        self.0.user_id.clone().into_inner().into()
     }
 }
 

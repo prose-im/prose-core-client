@@ -10,6 +10,7 @@ use crate::dtos::UserId;
 pub struct PresenceSubRequest {
     pub id: PresenceSubRequestId,
     pub name: String,
+    pub user_id: UserId,
 }
 
 #[derive(Debug, PartialEq, Clone)]
