@@ -39,6 +39,7 @@ uuid = { workspace = true }
 xmpp-parsers = { workspace = true }
 mockall = { version = "0.12.1", optional = true }
 derivative = { version = "2.2", optional = true }
+tokio = { workspace = true, features = ["sync"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { workspace = true, features = ["serde"] }
@@ -46,8 +47,6 @@ either = { version = "1.8" }
 image = {version = "0.24.5" }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
-# Test
-tokio = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { workspace = true, features = ["serde"] }
@@ -58,5 +57,5 @@ uniffi = { workspace = true, features = ["build"] }
 [features]
 debug = []
 default = []
-test = ["prose-xmpp/test", "dep:tokio", "tokio/macros", "dep:mockall", "dep:derivative"]
+test = ["prose-xmpp/test", "tokio/macros", "dep:mockall", "dep:derivative"]
 trace-stanzas = ["prose-xmpp/trace-stanzas"]

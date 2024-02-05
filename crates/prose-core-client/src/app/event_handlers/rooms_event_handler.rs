@@ -288,7 +288,7 @@ impl RoomsEventHandler {
 
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ContactChanged {
-                        id: id.to_user_id(),
+                        ids: vec![id.to_user_id()],
                     });
 
                 if room_changed {

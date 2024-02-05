@@ -11,8 +11,8 @@ use prose_core_client::{ClientDelegate, ClientEvent, ClientRoomEventType, Connec
 use prose_xmpp::ConnectionError;
 
 use crate::client::Client;
-use crate::types::BareJid;
-use crate::types::RoomEnvelopeExt;
+use crate::types::{BareJid, BareJidArray};
+use crate::types::{IntoJSArray, RoomEnvelopeExt};
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
@@ -42,10 +42,10 @@ export interface ProseClientDelegate {
     composingUsersChanged(client: ProseClient, room: Room): void
 
     /// Infos about a contact have changed.
-    contactChanged(client: ProseClient, jid: JID): void
+    contactChanged(client: ProseClient, ids: JID[]): void
 
     /// The avatar of a user changed.
-    avatarChanged(client: ProseClient, jid: JID): void
+    avatarChanged(client: ProseClient, ids: JID[]): void
     
     /// Infos related to the logged-in user have changed.
     accountInfoChanged(client: ProseClient): void
@@ -105,10 +105,15 @@ extern "C" {
     fn sidebar_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "contactChanged")]
-    fn contact_changed(this: &JSDelegate, client: Client, jid: BareJid) -> Result<(), JsValue>;
+    fn contact_changed(
+        this: &JSDelegate,
+        client: Client,
+        jids: BareJidArray,
+    ) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "avatarChanged")]
-    fn avatar_changed(this: &JSDelegate, client: Client, jid: BareJid) -> Result<(), JsValue>;
+    fn avatar_changed(this: &JSDelegate, client: Client, jids: BareJidArray)
+        -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "accountInfoChanged")]
     fn account_info_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
@@ -238,12 +243,18 @@ impl Delegate {
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
             ClientEvent::SidebarChanged => self.inner.sidebar_changed(client)?,
-            ClientEvent::ContactChanged { id: jid } => self
-                .inner
-                .contact_changed(client, jid.into_inner().into())?,
-            ClientEvent::AvatarChanged { id: jid } => {
-                self.inner.avatar_changed(client, jid.into_inner().into())?
-            }
+            ClientEvent::ContactChanged { ids } => self.inner.contact_changed(
+                client,
+                ids.into_iter()
+                    .map(|id| BareJid::from(id.into_inner()))
+                    .collect_into_js_array::<BareJidArray>(),
+            )?,
+            ClientEvent::AvatarChanged { ids } => self.inner.avatar_changed(
+                client,
+                ids.into_iter()
+                    .map(|id| BareJid::from(id.into_inner()))
+                    .collect_into_js_array::<BareJidArray>(),
+            )?,
             ClientEvent::AccountInfoChanged => self.inner.account_info_changed(client)?,
             ClientEvent::RoomChanged { room, r#type } => match r#type {
                 ClientRoomEventType::MessagesAppended { message_ids } => self

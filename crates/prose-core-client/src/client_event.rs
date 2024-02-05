@@ -18,7 +18,7 @@ pub enum ClientEvent {
     SidebarChanged,
 
     /// Infos about a contact have changed.
-    ContactChanged { id: UserId },
+    ContactChanged { ids: Vec<UserId> },
 
     /// Contacts were added, removed or their subscription status changed.
     ContactListChanged,
@@ -30,7 +30,7 @@ pub enum ClientEvent {
     BlockListChanged,
 
     /// The avatar of a user changed.
-    AvatarChanged { id: UserId },
+    AvatarChanged { ids: Vec<UserId> },
 
     /// Infos related to the logged-in user have changed.
     AccountInfoChanged,

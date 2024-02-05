@@ -571,7 +571,7 @@ async fn test_handles_user_presence() -> Result<()> {
         .expect_dispatch_event()
         .once()
         .with(predicate::eq(ClientEvent::ContactChanged {
-            id: user_id!("sender@prose.org"),
+            ids: vec![user_id!("sender@prose.org")],
         }))
         .return_once(|_| ());
 
@@ -688,7 +688,7 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
         .expect_dispatch_event()
         .once()
         .with(predicate::eq(ClientEvent::ContactChanged {
-            id: user_id!("sender@prose.org"),
+            ids: vec![user_id!("sender@prose.org")],
         }))
         .return_once(|_| ());
 

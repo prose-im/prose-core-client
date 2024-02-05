@@ -62,19 +62,25 @@ impl UserStateEventHandler {
                     .precache_avatar_image(&event.user_id, &metadata.to_info())
                     .await?;
                 self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::AvatarChanged { id: event.user_id });
+                    .dispatch_event(ClientEvent::AvatarChanged {
+                        ids: vec![event.user_id],
+                    });
             }
             UserInfoEventType::ProfileChanged { profile } => {
                 self.user_profile_repo.set(&event.user_id, &profile).await?;
                 self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::ContactChanged { id: event.user_id });
+                    .dispatch_event(ClientEvent::ContactChanged {
+                        ids: vec![event.user_id],
+                    });
             }
             UserInfoEventType::StatusChanged { status } => {
                 self.user_info_repo
                     .set_user_activity(&event.user_id, status.as_ref())
                     .await?;
                 self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::ContactChanged { id: event.user_id });
+                    .dispatch_event(ClientEvent::ContactChanged {
+                        ids: vec![event.user_id],
+                    });
             }
         }
 

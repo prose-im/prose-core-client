@@ -7,8 +7,12 @@ use std::future::Future;
 use std::pin::Pin;
 
 pub use future_ext::ProseFutureExt;
+pub use receiver_stream::ReceiverStream;
+pub use stream_ext::ProseStreamExt;
 
 mod future_ext;
+mod receiver_stream;
+mod stream_ext;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub trait SendUnlessWasm: Send {}
