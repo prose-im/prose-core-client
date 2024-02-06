@@ -1,4 +1,12 @@
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'bindings/prose-sdk-js/Cargo.toml'
+  pull_request:
+    branches:
+      - '**'
 
 name: Test and Build
 
