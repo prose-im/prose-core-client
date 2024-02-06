@@ -3,7 +3,7 @@ on: [push, pull_request]
 name: Test and Build
 
 jobs:
-  test:
+  test-native:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,9 +17,6 @@ jobs:
           target: wasm32-unknown-unknown
           components: rustfmt
           override: true
-
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
 
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version && sqlite3 --version
@@ -40,9 +37,6 @@ jobs:
       - name: Build crates
         run: cargo build
 
-      - name: Build prose-sdk-js
-        run: cargo build --package prose-sdk-js --target wasm32-unknown-unknown
-
       - name: Build prose-sdk-ffi
         run: cargo build --package prose-sdk-ffi
 
@@ -57,6 +51,40 @@ jobs:
 
       - name: Run store integration tests
         run: cargo test --package prose-store-integration-tests
+
+  test-wasm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          target: wasm32-unknown-unknown
+          components: rustfmt
+          override: true
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Verify versions
+        run: rustc --version && rustup --version && cargo --version
+
+      - name: Cache build context
+        id: cache-cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: test-${{ runner.os }}-cargo
+
+      - name: Build prose-sdk-js
+        run: cargo build --package prose-sdk-js --target wasm32-unknown-unknown
 
       - name: Run Wasm core-client integration tests
         run: cargo xtask ci wasm
