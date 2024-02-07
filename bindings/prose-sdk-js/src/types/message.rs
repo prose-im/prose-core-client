@@ -23,6 +23,12 @@ pub struct Reaction {
 }
 
 #[wasm_bindgen]
+pub struct MessageMetadata {
+    #[wasm_bindgen(js_name = "isEdited")]
+    pub is_edited: bool,
+}
+
+#[wasm_bindgen]
 pub struct MessageSender(dtos::MessageSender);
 
 #[wasm_bindgen]
@@ -75,8 +81,10 @@ impl Message {
         self.body()
     }
     #[wasm_bindgen(getter)]
-    pub fn metas(&self) -> Option<String> {
-        None
+    pub fn meta(&self) -> MessageMetadata {
+        MessageMetadata {
+            is_edited: self.0.is_edited,
+        }
     }
 
     #[wasm_bindgen(getter)]
