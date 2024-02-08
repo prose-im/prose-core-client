@@ -24,7 +24,7 @@ use crate::infra::avatars::AvatarCache;
 use crate::infra::general::NanoIDProvider;
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
-use crate::services::{BlockListService, CacheService, SidebarService};
+use crate::services::{BlockListService, CacheService, SidebarService, UploadService};
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedStore {}
@@ -201,6 +201,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             debug: crate::services::DebugService::new(xmpp_client.clone()),
             rooms: RoomsService::from(&dependencies),
             sidebar: SidebarService::from(&dependencies),
+            uploads: UploadService::from(&dependencies),
             user_data: UserDataService::from(&dependencies),
             cache: CacheService::from(&dependencies),
             block_list: BlockListService::from(&dependencies),

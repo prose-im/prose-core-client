@@ -234,6 +234,7 @@ impl From<PlatformDependencies> for AppDependencies {
             short_id_provider: d.short_id_provider,
             sidebar_domain_service,
             time_provider,
+            upload_service: d.xmpp.clone(),
             user_account_service: d.xmpp.clone(),
             user_info_repo,
             user_info_service: d.xmpp.clone(),

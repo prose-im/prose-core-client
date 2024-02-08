@@ -29,6 +29,7 @@ use crate::domain::rooms::services::{
 };
 use crate::domain::settings::repos::AccountSettingsRepository;
 use crate::domain::sidebar::services::{BookmarksService, SidebarDomainService};
+use crate::domain::uploads::services::UploadService;
 use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
 use crate::domain::user_info::services::UserInfoService;
 use crate::domain::user_profiles::repos::UserProfileRepository;
@@ -63,6 +64,7 @@ pub type DynRoomParticipationService = Arc<dyn RoomParticipationService>;
 pub type DynRoomsDomainService = Arc<dyn RoomsDomainService>;
 pub type DynSidebarDomainService = Arc<dyn SidebarDomainService>;
 pub type DynTimeProvider = Arc<dyn TimeProvider>;
+pub type DynUploadService = Arc<dyn UploadService>;
 pub type DynUserAccountService = Arc<dyn UserAccountService>;
 pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
@@ -92,6 +94,7 @@ pub struct AppDependencies {
     pub short_id_provider: DynIDProvider,
     pub sidebar_domain_service: DynSidebarDomainService,
     pub time_provider: DynTimeProvider,
+    pub upload_service: DynUploadService,
     pub user_account_service: DynUserAccountService,
     pub user_info_repo: DynUserInfoRepository,
     pub user_info_service: DynUserInfoService,

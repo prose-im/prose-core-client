@@ -15,6 +15,7 @@ pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Roo
 pub use room_envelope::RoomEnvelope;
 pub use rooms_service::RoomsService;
 pub use sidebar_service::SidebarService;
+pub use upload_service::UploadService;
 pub use user_data_service::UserDataService;
 
 mod account_service;
@@ -28,4 +29,5 @@ mod room;
 mod room_envelope;
 mod rooms_service;
 mod sidebar_service;
+mod upload_service;
 mod user_data_service;

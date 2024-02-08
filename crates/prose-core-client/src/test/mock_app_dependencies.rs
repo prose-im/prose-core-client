@@ -46,6 +46,7 @@ use crate::domain::rooms::services::RoomFactory;
 use crate::domain::settings::repos::mocks::MockAccountSettingsRepository;
 use crate::domain::sidebar::services::impls::SidebarDomainServiceDependencies;
 use crate::domain::sidebar::services::mocks::{MockBookmarksService, MockSidebarDomainService};
+use crate::domain::uploads::services::mocks::MockUploadService;
 use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoRepository};
 use crate::domain::user_info::services::mocks::MockUserInfoService;
 use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
@@ -111,6 +112,7 @@ pub struct MockAppDependencies {
     pub sidebar_domain_service: MockSidebarDomainService,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
+    pub upload_service: MockUploadService,
     pub user_account_service: MockUserAccountService,
     pub user_info_repo: MockUserInfoRepository,
     pub user_info_service: MockUserInfoService,
@@ -193,6 +195,7 @@ impl From<MockAppDependencies> for AppDependencies {
             short_id_provider: mock.short_id_provider,
             sidebar_domain_service,
             time_provider: mock.time_provider,
+            upload_service: Arc::new(mock.upload_service),
             user_account_service: Arc::new(mock.user_account_service),
             user_info_repo: Arc::new(mock.user_info_repo),
             user_info_service: Arc::new(mock.user_info_service),

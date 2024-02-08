@@ -15,7 +15,7 @@ use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore}
 use crate::domain::shared::models::UserId;
 use crate::services::{
     AccountService, BlockListService, CacheService, ConnectionService, ContactListService,
-    RoomsService, SidebarService, UserDataService,
+    RoomsService, SidebarService, UploadService, UserDataService,
 };
 use crate::ClientEvent;
 
@@ -43,6 +43,7 @@ pub struct ClientInner {
     pub debug: crate::services::DebugService,
     pub rooms: RoomsService,
     pub sidebar: SidebarService,
+    pub uploads: UploadService,
     pub user_data: UserDataService,
     pub(crate) connection: ConnectionService,
 }

@@ -22,6 +22,7 @@ pub use crate::domain::{
         Availability, OccupantId, ParticipantId, ParticipantInfo, RoomId, UserBasicInfo, UserId,
         UserPresenceInfo, UserResourceId,
     },
+    uploads::models::{UploadHeader, UploadSlot},
     user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},
     user_profiles::models::{Address, UserProfile},
 };
