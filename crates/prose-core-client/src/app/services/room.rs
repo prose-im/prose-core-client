@@ -226,16 +226,15 @@ impl<Kind> Room<Kind> {
     pub async fn load_latest_messages(&self) -> Result<Vec<MessageDTO>> {
         debug!("Loading messages from server…");
 
-        let result = self
+        let (messages, _) = self
             .message_archive_service
             .load_messages(&self.data.room_id, &self.data.r#type, None, None)
             .await?;
 
-        let messages = result
-            .0
+        let messages = messages
             .iter()
-            .map(|msg| MessageLike::try_from(msg))
-            .collect::<Result<Vec<_>, _>>()?;
+            .filter_map(|msg| MessageLike::try_from(msg).ok())
+            .collect::<Vec<_>>();
 
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo

@@ -203,7 +203,7 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
         }
         XMPPCapsEvent::Caps { from, caps } => {
             let Jid::Full(from) = from else {
-                bail!("Expected FullJid in caps element")
+                bail!("Expected FullJid in caps element. Found '{from}' instead.")
             };
 
             ctx.push_event(UserResourceEvent {

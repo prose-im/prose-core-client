@@ -7,6 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Utc};
 use jid::{BareJid, Jid};
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use uuid::Uuid;
 use xmpp_parsers::message::MessageType;
 
@@ -280,6 +281,7 @@ impl TryFrom<&Message> for TargetedPayload {
             });
         }
 
+        error!("Failed to parse message {:?}", message);
         Err(MessageLikeError::NoPayload.into())
     }
 }
