@@ -152,6 +152,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                     ],
                     Fin {
                         complete: Default::default(),
+                        queryid: None,
                         set: SetResult {
                             first: None,
                             first_index: None,

@@ -7,6 +7,7 @@ use std::future::Future;
 
 use anyhow::Result;
 use jid::BareJid;
+use tracing::error;
 use xmpp_parsers::data_forms::{DataForm, DataFormType, Field};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::rsm::SetQuery;
@@ -62,6 +63,7 @@ impl MAM {
                     before,
                     index: None,
                 }),
+                flip_page: false,
             },
         );
 
@@ -98,6 +100,7 @@ impl MAM {
                     before,
                     index: None,
                 }),
+                flip_page: false,
             },
         )
         .with_to(room_id.clone().into());
@@ -138,8 +141,12 @@ impl RequestFuture<MAMFutureState, (Vec<mam::ArchivedMessage>, mam::Fin)> {
                         return Ok(ElementReducerPoll::Pending);
                     };
 
-                    let Ok(fin) = mam::Fin::try_from(payload.clone()) else {
-                        return Err(RequestError::UnexpectedResponse);
+                    let fin = match mam::Fin::try_from(payload.clone()) {
+                        Ok(fin) => fin,
+                        Err(err) => {
+                            error!("Failed to parse MAM fin element. {}", err.to_string());
+                            return Err(RequestError::UnexpectedResponse);
+                        }
                     };
 
                     state.fin = Some(fin);
