@@ -5,7 +5,14 @@
 
 use jid::BareJid;
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ServerFeatures {
     pub muc_service: Option<BareJid>,
+    pub http_upload_service: Option<HttpUploadService>,
+}
+
+#[derive(Debug, Clone)]
+pub struct HttpUploadService {
+    pub host: BareJid,
+    pub max_file_size: u64,
 }

@@ -9,7 +9,7 @@ use anyhow::Result;
 use jid::BareJid;
 use parking_lot::RwLock;
 
-use crate::domain::connection::models::ConnectionProperties;
+use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 use crate::dtos::UserResourceId;
 
@@ -48,6 +48,16 @@ impl AppContext {
             .as_ref()
             .and_then(|p| p.server_features.muc_service.clone())
             .ok_or(anyhow::anyhow!("Server does not support MUC (XEP-0045)"))
+    }
+
+    pub fn http_upload_service(&self) -> Result<HttpUploadService> {
+        self.connection_properties
+            .read()
+            .as_ref()
+            .and_then(|p| p.server_features.http_upload_service.clone())
+            .ok_or(anyhow::anyhow!(
+                "Server does not support HTTP uploads (XEP-0363)"
+            ))
     }
 }
 

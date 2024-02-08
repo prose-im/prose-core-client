@@ -6,10 +6,11 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
+use std::u64;
 
-use prose_xmpp::{mods, ConnectionError};
+use prose_xmpp::{mods, ns, ConnectionError};
 
-use crate::domain::connection::models::ServerFeatures;
+use crate::domain::connection::models::{HttpUploadService, ServerFeatures};
 use crate::domain::connection::services::ConnectionService;
 use crate::dtos::UserResourceId;
 use crate::infra::xmpp::XMPPClient;
@@ -39,17 +40,40 @@ impl ConnectionService for XMPPClient {
         for item in disco_items.items {
             let info = caps.query_disco_info(item.jid.clone(), None).await?;
 
-            if info
-                .identities
-                .iter()
-                .find(|ident| ident.category == "conference")
-                .is_none()
-            {
+            let Some(identity) = info.identities.first() else {
                 continue;
-            }
+            };
 
-            server_features.muc_service = Some(item.jid.into_bare());
-            break;
+            match identity.category.as_str() {
+                "conference" if info.features.iter().find(|f| f.var == ns::MUC).is_some() => {
+                    server_features.muc_service = Some(item.jid.into_bare())
+                }
+                "store"
+                    if info
+                        .features
+                        .iter()
+                        .find(|f| f.var == ns::HTTP_UPLOAD)
+                        .is_some() =>
+                {
+                    let max_file_size = info
+                        .extensions
+                        .iter()
+                        .find(|form| form.form_type.as_deref() == Some(ns::HTTP_UPLOAD))
+                        .and_then(|form| {
+                            form.fields
+                                .iter()
+                                .find(|field| field.var.as_deref() == Some("max-file-size"))
+                        })
+                        .and_then(|field| field.values.first())
+                        .and_then(|value| value.parse::<u64>().ok());
+
+                    server_features.http_upload_service = Some(HttpUploadService {
+                        host: item.jid.into_bare(),
+                        max_file_size: max_file_size.unwrap_or(u64::MAX),
+                    });
+                }
+                _ => continue,
+            }
         }
 
         Ok(server_features)

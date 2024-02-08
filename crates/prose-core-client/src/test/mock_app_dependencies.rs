@@ -73,6 +73,7 @@ impl Default for AppContext {
                 connected_jid: mock_account_jid(),
                 server_features: ServerFeatures {
                     muc_service: Some(mock_muc_service()),
+                    http_upload_service: None,
                 },
             })),
             capabilities: Capabilities::new("Prose", "https://prose.org", vec![]),

@@ -718,6 +718,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: ServerFeatures {
             muc_service: Some(bare!("conference.prose.org")),
+            http_upload_service: None,
         },
     });
 
