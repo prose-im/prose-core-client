@@ -6,7 +6,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
-use std::u64;
 
 use prose_xmpp::{mods, ns, ConnectionError};
 
