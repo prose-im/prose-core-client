@@ -133,6 +133,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
                 Feature::Name(ns::LAST_ACTIVITY),
                 Feature::Name(ns::MAM),
                 Feature::Name(ns::MESSAGE_CORRECT),
+                Feature::Name(ns::OUT_OF_BAND_DATA),
                 Feature::Name(ns::PING),
                 Feature::Name(ns::PUBSUB),
                 Feature::Name(ns::PUBSUB_EVENT),
@@ -145,13 +146,13 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
                 Feature::Name(ns::USER_ACTIVITY),
                 Feature::Name(ns::VCARD4),
                 Feature::Name(ns::VERSION),
+                Feature::Notify(crate::infra::xmpp::type_conversions::bookmark::ns::PROSE_BOOKMARK),
                 Feature::Notify(ns::AVATAR_METADATA),
                 Feature::Notify(ns::BOOKMARKS),
                 Feature::Notify(ns::BOOKMARKS2),
                 Feature::Notify(ns::PUBSUB),
                 Feature::Notify(ns::USER_ACTIVITY),
                 Feature::Notify(ns::VCARD4),
-                Feature::Notify(crate::infra::xmpp::type_conversions::bookmark::ns::PROSE_BOOKMARK),
             ],
         );
 

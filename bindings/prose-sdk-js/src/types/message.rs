@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos;
 
-use crate::types::{BareJid, IntoJSArray};
+use crate::types::{AttachmentsArray, BareJid, IntoJSArray};
 
 use super::{BareJidArray, ReactionsArray};
 
@@ -30,6 +30,46 @@ pub struct MessageMetadata {
 
 #[wasm_bindgen]
 pub struct MessageSender(dtos::MessageSender);
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct Attachment {
+    #[wasm_bindgen(skip)]
+    pub url: String,
+    #[wasm_bindgen(skip)]
+    pub description: Option<String>,
+}
+
+#[wasm_bindgen]
+impl Attachment {
+    #[wasm_bindgen(constructor)]
+    pub fn new(url: String) -> Self {
+        Self {
+            url,
+            description: None,
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn url(&self) -> String {
+        self.url.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_url(&mut self, url: String) {
+        self.url = url;
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn description(&self) -> Option<String> {
+        self.description.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_description(&mut self, description: Option<String>) {
+        self.description = description;
+    }
+}
 
 #[wasm_bindgen]
 impl Message {
@@ -95,6 +135,15 @@ impl Message {
             .map(|r| Reaction::from(r.clone()))
             .collect_into_js_array::<ReactionsArray>()
     }
+
+    #[wasm_bindgen(getter)]
+    pub fn attachments(&self) -> AttachmentsArray {
+        self.0
+            .attachments
+            .iter()
+            .map(|a| Attachment::from(a.clone()))
+            .collect_into_js_array::<AttachmentsArray>()
+    }
 }
 
 #[wasm_bindgen]
@@ -153,6 +202,15 @@ impl From<dtos::Reaction> for Reaction {
                 .into_iter()
                 .map(|id| id.to_opaque_identifier())
                 .collect(),
+        }
+    }
+}
+
+impl From<dtos::Attachment> for Attachment {
+    fn from(value: dtos::Attachment) -> Self {
+        Self {
+            url: value.url.to_string(),
+            description: value.description,
         }
     }
 }

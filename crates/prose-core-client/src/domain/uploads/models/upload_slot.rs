@@ -3,11 +3,13 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use url::Url;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct UploadSlot {
-    pub upload_url: String,
+    pub upload_url: Url,
     pub upload_headers: Vec<UploadHeader>,
-    pub download_url: String,
+    pub download_url: Url,
 }
 
 #[derive(Debug, Clone, PartialEq)]

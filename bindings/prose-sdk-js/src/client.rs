@@ -20,8 +20,8 @@ use crate::delegate::{Delegate, JSDelegate};
 use crate::types::{
     try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
     ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
-    PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UserBasicInfo,
-    UserBasicInfoArray, UserMetadata, UserProfile,
+    PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UploadSlot,
+    UserBasicInfo, UserBasicInfoArray, UserMetadata, UserProfile,
 };
 
 type Result<T, E = JsError> = std::result::Result<T, E>;
@@ -595,6 +595,18 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(())
+    }
+
+    /// Request a slot for uploading a file to attach it to a message.
+    #[wasm_bindgen(js_name = "requestUploadSlot")]
+    pub async fn request_upload_slot(&self, file_name: &str, file_size: u64) -> Result<UploadSlot> {
+        let slot = self
+            .client
+            .uploads
+            .request_upload_slot(file_name, file_size)
+            .await
+            .map_err(WasmError::from)?;
+        Ok(slot.into())
     }
 }
 

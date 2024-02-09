@@ -193,6 +193,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         timestamp: Utc.with_ymd_and_hms(2023, 09, 11, 0, 0, 0).unwrap(),
         payload: MessageLikePayload::Message {
             body: "Hello World".to_string(),
+            attachments: vec![],
         },
     };
 

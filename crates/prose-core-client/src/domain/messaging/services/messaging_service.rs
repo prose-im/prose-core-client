@@ -10,7 +10,7 @@ use jid::BareJid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
-use crate::domain::messaging::models::{Emoji, MessageId};
+use crate::domain::messaging::models::{Emoji, MessageId, SendMessageRequest};
 use crate::domain::shared::models::{RoomId, RoomType};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -21,7 +21,7 @@ pub trait MessagingService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         room_jid: &BareJid,
         room_type: &RoomType,
-        body: String,
+        request: SendMessageRequest,
     ) -> Result<()>;
 
     async fn update_message(
@@ -29,7 +29,7 @@ pub trait MessagingService: SendUnlessWasm + SyncUnlessWasm {
         room_jid: &BareJid,
         room_type: &RoomType,
         message_id: &MessageId,
-        body: String,
+        body: SendMessageRequest,
     ) -> Result<()>;
 
     async fn retract_message(

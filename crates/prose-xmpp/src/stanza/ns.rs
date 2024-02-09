@@ -54,3 +54,6 @@ pub const DIRECT_MUC_INVITATIONS: &str = "jabber:x:conference";
 
 /// XEP-0421: Anonymous unique occupant identifiers for MUCs
 pub const OCCUPANT_ID: &str = "urn:xmpp:occupant-id:0";
+
+/// XEP-0066: Out of Band Data
+pub const OUT_OF_BAND_DATA: &str = "jabber:x:oob";

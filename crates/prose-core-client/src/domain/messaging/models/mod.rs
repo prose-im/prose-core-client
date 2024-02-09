@@ -8,7 +8,9 @@ pub use message::{Emoji, Message, MessageId, Reaction, StanzaId};
 pub use message_like::{
     MessageLike, MessageLikeError, MessageLikeId, Payload as MessageLikePayload, TimestampedMessage,
 };
+pub use send_message_request::{Attachment, SendMessageRequest};
 
 mod error;
 mod message;
 mod message_like;
+mod send_message_request;

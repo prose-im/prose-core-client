@@ -17,6 +17,7 @@ use xmpp_parsers::stanza_error::StanzaError;
 use prose_utils::id_string;
 
 use crate::ns;
+use crate::stanza::http_upload::OOB;
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::muc_invite::MucInvite;
 use crate::stanza::message::muc_user::MucUser;
@@ -148,6 +149,24 @@ impl Message {
 
     pub fn muc_invite(&self) -> Option<MucInvite> {
         self.typed_payload("x", ns::MUC_USER)
+    }
+
+    pub fn oob_attachments(&self) -> Vec<OOB> {
+        self.payloads
+            .iter()
+            .filter_map(|payload| {
+                if !payload.is("x", ns::OUT_OF_BAND_DATA) {
+                    return None;
+                }
+
+                let Ok(oob) = OOB::try_from(payload.clone()) else {
+                    error!("Failed to parse oob payload {}.", String::from(payload));
+                    return None;
+                };
+
+                Some(oob)
+            })
+            .collect()
     }
 }
 

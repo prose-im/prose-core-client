@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::path::Path;
-
 use anyhow::{format_err, Result};
 use mime_guess::mime;
 
@@ -41,15 +39,5 @@ impl UploadService {
             .await?;
 
         Ok(slot)
-    }
-
-    pub async fn request_upload_slot_for_file(&self, path: impl AsRef<Path>) -> Result<UploadSlot> {
-        let path = path.as_ref();
-        let Some(path_str) = path.file_name().and_then(|f| f.to_str()) else {
-            return Err(format_err!("Invalid filepath."));
-        };
-        let metadata = path.metadata()?;
-
-        self.request_upload_slot(path_str, metadata.len()).await
     }
 }

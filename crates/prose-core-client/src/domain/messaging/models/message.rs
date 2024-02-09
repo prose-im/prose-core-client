@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use prose_utils::id_string;
 
 use crate::domain::shared::models::ParticipantId;
+use crate::dtos::Attachment;
 
 use super::{MessageLike, MessageLikePayload};
 
@@ -34,6 +35,7 @@ pub struct Message {
     pub is_edited: bool,
     pub is_delivered: bool,
     pub reactions: Vec<Reaction>,
+    pub attachments: Vec<Attachment>,
 }
 
 impl Message {
@@ -77,7 +79,7 @@ impl Message {
 
         for msg in messages.into_iter() {
             match msg.payload {
-                MessageLikePayload::Message { body } => {
+                MessageLikePayload::Message { body, attachments } => {
                     let message_id = msg.id.clone();
 
                     let message = Message {
@@ -90,6 +92,7 @@ impl Message {
                         is_edited: false,
                         is_delivered: false,
                         reactions: vec![],
+                        attachments,
                     };
                     messages_map.insert(msg.id.id().clone(), Some(message));
                 }
@@ -107,9 +110,10 @@ impl Message {
             };
 
             match modifier.payload {
-                MessageLikePayload::Correction { body } => {
+                MessageLikePayload::Correction { body, attachments } => {
                     message.body = body;
-                    message.is_edited = true
+                    message.is_edited = true;
+                    message.attachments = attachments;
                 }
                 MessageLikePayload::DeliveryReceipt => message.is_delivered = true,
                 MessageLikePayload::ReadReceipt => message.is_read = true,
@@ -302,6 +306,7 @@ mod tests {
                     .into(),
                 payload: MessageLikePayload::Message {
                     body: String::from("Hello World"),
+                    attachments: vec![],
                 },
             },
             MessageLike {
@@ -391,6 +396,7 @@ mod tests {
                         from: vec![user_id!("b@prose.org").into()]
                     }
                 ],
+                attachments: vec![],
             }
         )
     }

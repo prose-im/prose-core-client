@@ -16,7 +16,7 @@ use prose_core_client::services::{
 use crate::client::WasmError;
 use crate::types::{
     try_user_id_vec_from_string_array, MessagesArray, ParticipantInfo, ParticipantInfoArray,
-    StringArray, UserBasicInfo, UserBasicInfoArray,
+    SendMessageRequest, StringArray, UserBasicInfo, UserBasicInfoArray,
 };
 
 use super::IntoJSArray;
@@ -242,19 +242,19 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(js_name = "sendMessage")]
-            pub async fn send_message(&self, body: String) -> Result<()> {
+            pub async fn send_message(&self, request: SendMessageRequest) -> Result<()> {
                 debug!("Sending message…");
                 self.room
-                    .send_message(body)
+                    .send_message(request.try_into().map_err(WasmError::from)?)
                     .await
                     .map_err(WasmError::from)?;
                 Ok(())
             }
 
             #[wasm_bindgen(js_name = "updateMessage")]
-            pub async fn update_message(&self, message_id: &str, body: String) -> Result<()> {
+            pub async fn update_message(&self, message_id: &str, request: SendMessageRequest) -> Result<()> {
                 self.room
-                    .update_message(message_id.into(), body)
+                    .update_message(message_id.into(), request.try_into().map_err(WasmError::from)?)
                     .await
                     .map_err(WasmError::from)?;
                 Ok(())

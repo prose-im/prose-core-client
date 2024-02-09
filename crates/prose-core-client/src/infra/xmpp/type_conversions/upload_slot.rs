@@ -7,10 +7,12 @@ use xmpp_parsers::http_upload::{Header, SlotResult};
 
 use crate::domain::uploads::models::{UploadHeader, UploadSlot};
 
-impl From<SlotResult> for UploadSlot {
-    fn from(value: SlotResult) -> Self {
-        Self {
-            upload_url: value.put.url,
+impl TryFrom<SlotResult> for UploadSlot {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SlotResult) -> Result<Self, Self::Error> {
+        Ok(Self {
+            upload_url: value.put.url.parse()?,
             upload_headers: value
                 .put
                 .headers
@@ -21,7 +23,7 @@ impl From<SlotResult> for UploadSlot {
                     Header::Expires(value) => UploadHeader::new("expires", value),
                 })
                 .collect(),
-            download_url: value.get.url,
-        }
+            download_url: value.get.url.parse()?,
+        })
     }
 }

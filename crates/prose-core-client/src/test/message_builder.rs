@@ -96,6 +96,7 @@ impl MessageBuilder {
             is_edited: self.is_edited,
             is_delivered: self.is_delivered,
             reactions: self.reactions,
+            attachments: vec![],
         }
     }
 
@@ -115,6 +116,7 @@ impl MessageBuilder {
             is_edited: self.is_edited,
             is_delivered: self.is_delivered,
             reactions: self.reactions,
+            attachments: vec![],
         }
     }
 
@@ -126,7 +128,10 @@ impl MessageBuilder {
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
-            payload: MessageLikePayload::Message { body: self.body },
+            payload: MessageLikePayload::Message {
+                body: self.body,
+                attachments: vec![],
+            },
         }
     }
 

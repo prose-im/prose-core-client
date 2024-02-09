@@ -28,6 +28,12 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "Contact[]")]
     pub type ContactsArray;
+
+    #[wasm_bindgen(typescript_type = "Attachment[]")]
+    pub type AttachmentsArray;
+
+    #[wasm_bindgen(typescript_type = "UploadHeader[]")]
+    pub type UploadHeadersArray;
 }
 
 impl From<Vec<prose_core_client::dtos::Message>> for MessagesArray {

@@ -21,7 +21,9 @@ use crate::app::deps::{
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
-use crate::dtos::{Message as MessageDTO, MessageSender, RoomState, UserBasicInfo, UserId};
+use crate::dtos::{
+    Message as MessageDTO, MessageSender, RoomState, SendMessageRequest, UserBasicInfo, UserId,
+};
 use crate::{ClientEvent, ClientRoomEventType};
 
 pub struct Room<Kind> {
@@ -152,15 +154,15 @@ impl<Kind> Room<Kind> {
 }
 
 impl<Kind> Room<Kind> {
-    pub async fn send_message(&self, body: impl Into<String>) -> Result<()> {
+    pub async fn send_message(&self, request: SendMessageRequest) -> Result<()> {
         self.messaging_service
-            .send_message(&self.data.room_id, &self.data.r#type, body.into())
+            .send_message(&self.data.room_id, &self.data.r#type, request)
             .await
     }
 
-    pub async fn update_message(&self, id: MessageId, body: impl Into<String>) -> Result<()> {
+    pub async fn update_message(&self, id: MessageId, request: SendMessageRequest) -> Result<()> {
         self.messaging_service
-            .update_message(&self.data.room_id, &self.data.r#type, &id, body.into())
+            .update_message(&self.data.room_id, &self.data.r#type, &id, request)
             .await
     }
 
@@ -263,6 +265,7 @@ impl<Kind> Room<Kind> {
                 is_edited: message.is_edited,
                 is_delivered: message.is_delivered,
                 reactions: message.reactions,
+                attachments: message.attachments,
             });
         }
 

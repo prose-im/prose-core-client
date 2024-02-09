@@ -7,22 +7,24 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs};
 
-use anyhow::Result;
+use anyhow::{anyhow, format_err, Result};
 use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
+use tokio::fs::File;
 use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Bookmark, Contact, Message, ParticipantInfo, PublicRoomInfo, RoomId, SidebarItem,
-    UserBasicInfo, UserId,
+    Address, Attachment, Bookmark, Contact, Message, ParticipantInfo, PublicRoomInfo, RoomId,
+    SendMessageRequest, SidebarItem, UserBasicInfo, UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
@@ -421,11 +423,14 @@ async fn load_avatar(client: &Client, jid: &UserId) -> Result<()> {
     Ok(())
 }
 
-async fn save_avatar(client: &Client) -> Result<()> {
+fn select_file(prompt: &str) -> Option<PathBuf> {
     let path = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Path to image file")
+        .with_prompt(prompt)
         .validate_with({
             |input: &String| {
+                if input.is_empty() {
+                    return Ok(());
+                }
                 if Path::new(input.trim()).exists() {
                     Ok(())
                 } else {
@@ -433,15 +438,62 @@ async fn save_avatar(client: &Client) -> Result<()> {
                 }
             }
         })
+        .allow_empty(true)
         .interact_text()
         .unwrap();
 
-    client
-        .account
-        .set_avatar_from_url(Path::new(path.trim()))
+    if path.is_empty() {
+        return None;
+    }
+
+    Some(Path::new(path.trim()).to_path_buf())
+}
+
+async fn save_avatar(client: &Client) -> Result<()> {
+    let Some(file) = select_file("Path to image file (Press enter to cancel)") else {
+        return Ok(());
+    };
+    client.account.set_avatar_from_url(&file).await?;
+    Ok(())
+}
+
+async fn upload_file(client: &Client, path: impl AsRef<Path>) -> Result<Url> {
+    let path = path.as_ref();
+    let Some(path_str) = path.file_name().and_then(|f| f.to_str()) else {
+        return Err(format_err!("Invalid filepath."));
+    };
+    let metadata = path.metadata()?;
+
+    println!("Requesting upload slot…");
+    let slot = client
+        .uploads
+        .request_upload_slot(path_str, metadata.len())
         .await?;
 
-    Ok(())
+    let mut headers = HeaderMap::new();
+    for header in &slot.upload_headers {
+        headers.insert(
+            HeaderName::try_from(header.name.clone())?,
+            HeaderValue::try_from(header.value.clone())?,
+        );
+    }
+    headers.insert(CONTENT_LENGTH, metadata.len().into());
+
+    let file = File::open(path).await?;
+
+    println!("Uploading file…");
+    let response = reqwest::Client::new()
+        .put(slot.upload_url)
+        .headers(headers)
+        .body(file)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        return Err(anyhow!("Server returned status {}", response.status()));
+    }
+
+    Ok(slot.download_url)
 }
 
 async fn load_user_profile(client: &Client, jid: &UserId) -> Result<()> {
@@ -574,7 +626,7 @@ impl Display for MessageEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} | {:<36} | {:<20} | {}",
+            "{} | {:<36} | {:<20} | {} attachments | {}",
             self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
             self.0
                 .id
@@ -582,6 +634,7 @@ impl Display for MessageEnvelope {
                 .map(|id| id.clone().into_inner())
                 .unwrap_or("<no-id>".to_string()),
             self.0.from.id.to_opaque_identifier().truncate_to(20),
+            self.0.attachments.len(),
             self.0.body
         )
     }
@@ -592,14 +645,28 @@ async fn send_message(client: &Client) -> Result<()> {
         return Ok(());
     };
 
-    let body = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt("Enter message")
-        .default(String::from("Hello World!"))
-        .allow_empty(false)
+    let body: String = Input::with_theme(&ColorfulTheme::default())
+        .with_prompt("Enter message (leave empty to send a file without a message)")
+        .allow_empty(true)
         .interact_text()
         .unwrap();
 
-    room.to_generic_room().send_message(body).await
+    let mut request = SendMessageRequest {
+        body: body.is_empty().then_some(body),
+        attachments: vec![],
+    };
+
+    while let Some(file) = select_file("Path to attachment (Press enter to skip)") {
+        let download_url = upload_file(client, &file).await?;
+
+        request.attachments.push(Attachment {
+            url: download_url,
+            description: None,
+        });
+    }
+
+    println!("Sending message…");
+    room.to_generic_room().send_message(request).await
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -937,7 +1004,12 @@ async fn main() -> Result<()> {
                     .allow_empty(false)
                     .interact_text()
                     .unwrap();
-                room.to_generic_room().send_message(body).await?;
+                room.to_generic_room()
+                    .send_message(SendMessageRequest {
+                        body: Some(body),
+                        attachments: vec![],
+                    })
+                    .await?;
             }
             Selection::LoadMessages => {
                 load_messages(&client).await?;

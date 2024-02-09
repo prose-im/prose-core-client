@@ -11,12 +11,14 @@ use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods;
+use prose_xmpp::stanza::http_upload::OOB;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
+use prose_xmpp::stanza::Message;
 
 use crate::domain::messaging::models::{Emoji, MessageId, StanzaParseError};
 use crate::domain::messaging::services::MessagingService;
 use crate::domain::shared::models::RoomType;
-use crate::dtos::RoomId;
+use crate::dtos::{RoomId, SendMessageRequest};
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -26,15 +28,30 @@ impl MessagingService for XMPPClient {
         &self,
         room_jid: &BareJid,
         room_type: &RoomType,
-        body: String,
+        request: SendMessageRequest,
     ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
-        chat.send_message(
-            room_jid.clone(),
-            body,
-            &room_type.message_type(),
-            Some(ChatState::Active),
-        )
+
+        let from = self.connected_jid().ok_or(anyhow::anyhow!(
+            "Failed to read the user's JID since the client is not connected."
+        ))?;
+
+        let mut message = Message::new()
+            .set_type(room_type.message_type())
+            .set_id(self.generate_id().into())
+            .set_from(from)
+            .set_to(room_jid.clone())
+            .set_body(request.body.unwrap_or_default())
+            .set_chat_state(Some(ChatState::Active))
+            .set_markable();
+
+        for attachment in request.attachments {
+            message.payloads.push(OOB::from(attachment).into())
+        }
+
+        chat.send_raw_message(message)?;
+
+        Ok(())
     }
 
     async fn update_message(
@@ -42,15 +59,28 @@ impl MessagingService for XMPPClient {
         room_jid: &BareJid,
         room_type: &RoomType,
         message_id: &MessageId,
-        body: String,
+        request: SendMessageRequest,
     ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
-        chat.update_message(
-            message_id.as_ref().into(),
-            room_jid.clone(),
-            body,
-            &room_type.message_type(),
-        )
+
+        let from = self.connected_jid().ok_or(anyhow::anyhow!(
+            "Failed to read the user's JID since the client is not connected."
+        ))?;
+
+        let mut message = Message::new()
+            .set_type(room_type.message_type())
+            .set_id(self.generate_id().into())
+            .set_from(from)
+            .set_to(room_jid.clone())
+            .set_body(request.body.unwrap_or_default())
+            .set_replace(message_id.clone().into_inner().into());
+
+        for attachment in request.attachments {
+            message.payloads.push(OOB::from(attachment).into())
+        }
+
+        chat.send_raw_message(message)?;
+        Ok(())
     }
 
     async fn retract_message(

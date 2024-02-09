@@ -27,6 +27,6 @@ impl UploadService for XMPPClient {
         let slot_result = upload_mod
             .request_slot(upload_service, file_name, file_size, Some(content_type))
             .await?;
-        Ok(slot_result.into())
+        Ok(slot_result.try_into()?)
     }
 }

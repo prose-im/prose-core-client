@@ -16,7 +16,7 @@ pub use crate::domain::sidebar::models::Bookmark;
 pub use crate::domain::{
     contacts::models::PresenceSubscription,
     general::models::SoftwareVersion,
-    messaging::models::{Emoji, MessageId, Reaction, StanzaId},
+    messaging::models::{Attachment, Emoji, MessageId, Reaction, SendMessageRequest, StanzaId},
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
         Availability, OccupantId, ParticipantId, ParticipantInfo, RoomId, UserBasicInfo, UserId,

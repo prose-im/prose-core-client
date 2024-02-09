@@ -15,6 +15,7 @@ use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{mam, stanza_id, Forwarded, Message};
 
+use crate::domain::messaging::models::Attachment;
 use crate::domain::shared::models::{OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 
@@ -91,11 +92,19 @@ impl ToString for MessageLikeId {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum Payload {
-    Correction { body: String },
+    Correction {
+        body: String,
+        attachments: Vec<Attachment>,
+    },
     DeliveryReceipt,
     ReadReceipt,
-    Message { body: String },
-    Reaction { emojis: Vec<message::Emoji> },
+    Message {
+        body: String,
+        attachments: Vec<Attachment>,
+    },
+    Reaction {
+        emojis: Vec<message::Emoji>,
+    },
     Retraction,
 }
 
@@ -227,6 +236,7 @@ impl TryFrom<&Message> for TargetedPayload {
                 target: None,
                 payload: Payload::Message {
                     body: format!("Error: {}", error.to_string()),
+                    attachments: vec![],
                 },
             });
         }
@@ -254,6 +264,12 @@ impl TryFrom<&Message> for TargetedPayload {
                 target: Some(replace_id),
                 payload: Payload::Correction {
                     body: body.to_string(),
+                    attachments: message
+                        .oob_attachments()
+                        .iter()
+                        .cloned()
+                        .map(TryFrom::try_from)
+                        .collect::<Result<Vec<_>, _>>()?,
                 },
             });
         }
@@ -277,6 +293,12 @@ impl TryFrom<&Message> for TargetedPayload {
                 target: None,
                 payload: Payload::Message {
                     body: body.to_string(),
+                    attachments: message
+                        .oob_attachments()
+                        .iter()
+                        .cloned()
+                        .map(TryFrom::try_from)
+                        .collect::<Result<Vec<_>, _>>()?,
                 },
             });
         }
