@@ -52,8 +52,8 @@ export interface RoomBase {
     readonly name: string;
     readonly participants: ParticipantInfo[];
 
-    sendMessage(body: string): Promise<void>;
-    updateMessage(messageID: string, body: string): Promise<void>;
+    sendMessage(request: SendMessageRequest): Promise<void>;
+    updateMessage(messageID: string, request: SendMessageRequest): Promise<void>;
     retractMessage(messageID: string): Promise<void>;
     toggleReactionToMessage(id: string, emoji: string): Promise<void>;
     

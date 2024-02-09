@@ -15,7 +15,9 @@ use crate::types::{Attachment, AttachmentsArray, IntoJSArray};
 
 #[wasm_bindgen]
 pub struct SendMessageRequest {
+    /// The body of the message.
     body: Option<String>,
+    /// The URLs of the files to attach to the message.
     attachments: Vec<Attachment>,
 }
 

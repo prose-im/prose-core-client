@@ -12,6 +12,7 @@ use crate::types::{IntoJSArray, UploadHeadersArray};
 #[wasm_bindgen]
 pub struct UploadSlot {
     upload_url: String,
+    /// Set these headers on your PUT request when uploading.
     upload_headers: Vec<UploadHeader>,
     download_url: String,
 }
