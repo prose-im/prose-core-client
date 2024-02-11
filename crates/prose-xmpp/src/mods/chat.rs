@@ -116,12 +116,14 @@ impl Chat {
             .set_body(body)
             .set_chat_state(chat_state)
             .set_markable();
-        self.send_raw_message(stanza)
+        self.send_raw_message(stanza, true)
     }
 
-    pub fn send_raw_message(&self, message: Message) -> Result<()> {
-        self.ctx
-            .schedule_event(ClientEvent::Chat(Event::Sent(message.clone())));
+    pub fn send_raw_message(&self, message: Message, schedule_event: bool) -> Result<()> {
+        if schedule_event {
+            self.ctx
+                .schedule_event(ClientEvent::Chat(Event::Sent(message.clone())));
+        }
         self.ctx.send_stanza(message)?;
         Ok(())
     }
@@ -140,7 +142,7 @@ impl Chat {
             .set_to(to)
             .set_body(body)
             .set_replace(id);
-        self.send_raw_message(stanza)
+        self.send_raw_message(stanza, true)
     }
 
     pub fn send_chat_state(
@@ -176,7 +178,7 @@ impl Chat {
                 reactions: reactions.into_iter().collect(),
             })
             .set_store(true);
-        self.send_raw_message(stanza)
+        self.send_raw_message(stanza, true)
     }
 
     // https://xmpp.org/extensions/xep-0424.html
@@ -198,7 +200,7 @@ impl Chat {
           subjects: vec![],
           bodies: vec![],
         });
-        self.send_raw_message(stanza)
+        self.send_raw_message(stanza, true)
     }
 
     pub fn set_message_carbons_enabled(&self, enabled: bool) -> Result<()> {
@@ -224,6 +226,6 @@ impl Chat {
             .set_from(self.ctx.full_jid().clone())
             .set_to(to)
             .set_received_marker(Received { id });
-        self.send_raw_message(stanza)
+        self.send_raw_message(stanza, true)
     }
 }

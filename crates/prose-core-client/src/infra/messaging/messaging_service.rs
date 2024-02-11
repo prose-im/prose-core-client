@@ -49,7 +49,7 @@ impl MessagingService for XMPPClient {
             message.payloads.push(OOB::from(attachment).into())
         }
 
-        chat.send_raw_message(message)?;
+        chat.send_raw_message(message, true)?;
 
         Ok(())
     }
@@ -79,7 +79,7 @@ impl MessagingService for XMPPClient {
             message.payloads.push(OOB::from(attachment).into())
         }
 
-        chat.send_raw_message(message)?;
+        chat.send_raw_message(message, true)?;
         Ok(())
     }
 
@@ -180,7 +180,7 @@ impl MessagingService for XMPPClient {
             });
 
         let chat = self.client.get_mod::<mods::Chat>();
-        chat.send_raw_message(message)?;
+        chat.send_raw_message(message, false)?;
 
         Ok(())
     }
