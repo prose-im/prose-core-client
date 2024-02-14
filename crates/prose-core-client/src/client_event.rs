@@ -3,13 +3,15 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::fmt::{Debug, Formatter};
+
 use prose_xmpp::ConnectionError;
 
 use crate::app::services::RoomEnvelope;
 use crate::domain::messaging::models::MessageId;
 use crate::domain::shared::models::UserId;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ClientEvent {
     /// The status of the connection has changed.
     ConnectionStatusChanged { event: ConnectionEvent },
@@ -66,4 +68,33 @@ pub enum ClientRoomEventType {
 pub enum ConnectionEvent {
     Connect,
     Disconnect { error: Option<ConnectionError> },
+}
+
+impl Debug for ClientEvent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ClientEvent::ConnectionStatusChanged { event } => f
+                .debug_struct("ConnectionStatusChanged")
+                .field("event", &event)
+                .finish(),
+            ClientEvent::SidebarChanged => f.debug_struct("SidebarChanged").finish(),
+            ClientEvent::ContactChanged { ids } => {
+                f.debug_struct("ContactChanged").field("ids", &ids).finish()
+            }
+            ClientEvent::ContactListChanged => f.debug_struct("ContactListChanged").finish(),
+            ClientEvent::PresenceSubRequestsChanged => {
+                f.debug_struct("PresenceSubRequestsChanged").finish()
+            }
+            ClientEvent::BlockListChanged => f.debug_struct("BlockListChanged").finish(),
+            ClientEvent::AvatarChanged { ids } => {
+                f.debug_struct("AvatarChanged").field("ids", &ids).finish()
+            }
+            ClientEvent::AccountInfoChanged => f.debug_struct("AccountInfoChanged").finish(),
+            ClientEvent::RoomChanged { room, r#type } => f
+                .debug_struct("RoomChanged")
+                .field("room", &room.to_generic_room().jid())
+                .field("type", &r#type)
+                .finish(),
+        }
+    }
 }
