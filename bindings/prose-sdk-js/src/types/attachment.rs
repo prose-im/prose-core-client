@@ -80,7 +80,7 @@ impl Attachment {
         thumbnail: Thumbnail,
     ) -> Self {
         Self {
-            r#type: AttachmentType::Audio,
+            r#type: AttachmentType::Video,
             metadata,
             duration: Some(duration),
             thumbnail: Some(thumbnail),
@@ -91,7 +91,7 @@ impl Attachment {
     #[wasm_bindgen(js_name = "fileAttachment")]
     pub fn file_attachment(metadata: AttachmentMetadata) -> Self {
         Self {
-            r#type: AttachmentType::Audio,
+            r#type: AttachmentType::File,
             metadata,
             duration: None,
             thumbnail: None,
