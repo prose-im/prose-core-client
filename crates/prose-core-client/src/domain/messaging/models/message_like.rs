@@ -5,19 +5,19 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use jid::{BareJid, Jid};
+use jid::BareJid;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use uuid::Uuid;
-use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{mam, stanza_id, Forwarded, Message};
 
 use crate::domain::messaging::models::Attachment;
-use crate::domain::shared::models::{OccupantId, ParticipantId, UserId};
+use crate::domain::shared::models::ParticipantId;
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
+use crate::infra::xmpp::util::MessageExt;
 
 use super::{MessageId, StanzaId, StanzaParseError};
 
@@ -264,12 +264,7 @@ impl TryFrom<&Message> for TargetedPayload {
                 target: Some(replace_id),
                 payload: Payload::Correction {
                     body: body.to_string(),
-                    attachments: message
-                        .oob_attachments()
-                        .iter()
-                        .cloned()
-                        .map(TryFrom::try_from)
-                        .collect::<Result<Vec<_>, _>>()?,
+                    attachments: message.attachments(),
                 },
             });
         }
@@ -293,48 +288,12 @@ impl TryFrom<&Message> for TargetedPayload {
                 target: None,
                 payload: Payload::Message {
                     body: body.to_string(),
-                    attachments: message
-                        .oob_attachments()
-                        .iter()
-                        .cloned()
-                        .map(TryFrom::try_from)
-                        .collect::<Result<Vec<_>, _>>()?,
+                    attachments: message.attachments(),
                 },
             });
         }
 
         error!("Failed to parse message {:?}", message);
         Err(MessageLikeError::NoPayload.into())
-    }
-}
-
-trait MessageExt {
-    /// Returns either the real jid from a muc user or the original `from` value.
-    fn resolved_from(&self) -> Result<ParticipantId, StanzaParseError>;
-}
-
-impl MessageExt for Message {
-    fn resolved_from(&self) -> Result<ParticipantId, StanzaParseError> {
-        let Some(from) = &self.from else {
-            return Err(StanzaParseError::missing_attribute("from"));
-        };
-
-        match self.type_ {
-            MessageType::Groupchat => {
-                if let Some(muc_user) = &self.muc_user() {
-                    if let Some(jid) = &muc_user.jid {
-                        return Ok(ParticipantId::User(jid.to_bare().into()));
-                    }
-                }
-                let Jid::Full(from) = from else {
-                    return Err(StanzaParseError::ParseError {
-                        error: "Expected `from` attribute to contain FullJid for groupchat message"
-                            .to_string(),
-                    });
-                };
-                Ok(ParticipantId::Occupant(OccupantId::from(from.clone())))
-            }
-            _ => Ok(ParticipantId::User(UserId::from(from.to_bare()))),
-        }
     }
 }

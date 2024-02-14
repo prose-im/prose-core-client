@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
+use mime::Mime;
 
 use prose_xmpp::mods::HttpUpload;
 
@@ -21,11 +22,16 @@ impl UploadService for XMPPClient {
         upload_service: &BareJid,
         file_name: &str,
         file_size: u64,
-        content_type: &str,
+        media_type: &Mime,
     ) -> Result<UploadSlot> {
         let upload_mod = self.client.get_mod::<HttpUpload>();
         let slot_result = upload_mod
-            .request_slot(upload_service, file_name, file_size, Some(content_type))
+            .request_slot(
+                upload_service,
+                file_name,
+                file_size,
+                Some(media_type.as_ref()),
+            )
             .await?;
         Ok(slot_result.try_into()?)
     }

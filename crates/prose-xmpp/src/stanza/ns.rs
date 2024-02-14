@@ -57,3 +57,18 @@ pub const OCCUPANT_ID: &str = "urn:xmpp:occupant-id:0";
 
 /// XEP-0066: Out of Band Data
 pub const OUT_OF_BAND_DATA: &str = "jabber:x:oob";
+
+/// XEP-0264: Jingle Content Thumbnails
+pub const JINGLE_THUMBS: &str = "urn:xmpp:thumbs:1";
+
+/// XEP-0372: References
+pub const REFERENCE: &str = "urn:xmpp:reference:0";
+
+/// XEP-0385: Stateless Inline Media Sharing (SIMS)
+pub const SIMS: &str = "urn:xmpp:sims:1";
+
+/// XEP-0234: Jingle File Transfer (as used by Movim)
+pub const JINGLE_FT_4: &str = "urn:xmpp:jingle:apps:file-transfer:4";
+
+/// Audio Duration in seconds
+pub const PROSE_AUDIO_DURATION: &str = "https://prose.org/protocol/audio-duration";

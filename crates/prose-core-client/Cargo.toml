@@ -20,6 +20,7 @@ futures = { workspace = true }
 indexmap = "2.0.0"
 itertools = { workspace = true }
 jid = { workspace = true, features = ["serde"] }
+mime = { workspace = true }
 mime_guess = { version = "2.0", default-features = false }
 minidom = { workspace = true }
 mockall = { version = "0.12.1", optional = true }

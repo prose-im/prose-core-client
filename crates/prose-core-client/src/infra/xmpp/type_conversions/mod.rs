@@ -14,5 +14,6 @@ pub(crate) mod room_affiliation;
 pub(crate) mod room_info;
 pub(crate) mod room_spec;
 pub(crate) mod stanza_error;
+pub(crate) mod thumbnail;
 pub(crate) mod upload_slot;
 pub(crate) mod user_activity;

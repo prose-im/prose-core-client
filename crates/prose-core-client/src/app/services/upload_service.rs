@@ -29,15 +29,22 @@ impl UploadService {
             ));
         }
 
-        let content_type = mime_guess::from_path(file_name)
+        let media_type = mime_guess::from_path(file_name)
             .first()
             .unwrap_or(mime::APPLICATION_OCTET_STREAM);
 
         let slot = self
             .upload_service
-            .request_upload_slot(&service.host, file_name, file_size, content_type.as_ref())
+            .request_upload_slot(&service.host, file_name, file_size, &media_type)
             .await?;
 
-        Ok(slot)
+        Ok(UploadSlot {
+            upload_url: slot.upload_url,
+            upload_headers: slot.upload_headers,
+            download_url: slot.download_url,
+            file_name: file_name.to_string(),
+            media_type,
+            file_size,
+        })
     }
 }

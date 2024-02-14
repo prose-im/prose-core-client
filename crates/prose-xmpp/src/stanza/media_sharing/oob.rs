@@ -5,6 +5,7 @@
 
 use anyhow::anyhow;
 use minidom::Element;
+use xmpp_parsers::message::MessagePayload;
 
 use crate::{ns, ElementExt};
 
@@ -46,6 +47,8 @@ impl From<OOB> for Element {
             .build()
     }
 }
+
+impl MessagePayload for OOB {}
 
 #[cfg(test)]
 mod tests {

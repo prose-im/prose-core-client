@@ -17,7 +17,7 @@ use xmpp_parsers::stanza_error::StanzaError;
 use prose_utils::id_string;
 
 use crate::ns;
-use crate::stanza::http_upload::OOB;
+use crate::stanza::media_sharing::{MediaShare, OOB};
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::muc_invite::MucInvite;
 use crate::stanza::message::muc_user::MucUser;
@@ -152,19 +152,36 @@ impl Message {
     }
 
     pub fn oob_attachments(&self) -> Vec<OOB> {
+        self.typed_payload_vec("x", ns::OUT_OF_BAND_DATA)
+    }
+
+    pub fn media_shares(&self) -> Vec<MediaShare> {
         self.payloads
             .iter()
-            .filter_map(|payload| {
-                if !payload.is("x", ns::OUT_OF_BAND_DATA) {
+            .filter_map(|elem| {
+                if !elem.is("reference", ns::REFERENCE) || elem.attr("type") != Some("data") {
                     return None;
                 }
 
-                let Ok(oob) = OOB::try_from(payload.clone()) else {
-                    error!("Failed to parse oob payload {}.", String::from(payload));
+                let Some(child) = elem.children().into_iter().next() else {
                     return None;
                 };
 
-                Some(oob)
+                if !child.is("media-sharing", ns::SIMS) {
+                    return None;
+                }
+
+                match MediaShare::try_from(child.clone()) {
+                    Ok(share) => Some(share),
+                    Err(err) => {
+                        println!(
+                            "Failed to parse 'media-share' {}. {}",
+                            String::from(elem),
+                            err.to_string()
+                        );
+                        None
+                    }
+                }
             })
             .collect()
     }
@@ -173,6 +190,24 @@ impl Message {
 impl Message {
     fn typed_payload<P: MessagePayload>(&self, name: &str, ns: &str) -> Option<P> {
         self.typed_payload_with_predicate(|p| p.is(name, ns))
+    }
+
+    fn typed_payload_vec<P: MessagePayload>(&self, name: &str, ns: &str) -> Vec<P> {
+        self.payloads
+            .iter()
+            .filter_map(|elem| {
+                if !elem.is(name, ns) {
+                    return None;
+                }
+
+                let Ok(payload) = P::try_from(elem.clone()) else {
+                    error!("Failed to parse {name} {}.", String::from(elem));
+                    return None;
+                };
+
+                Some(payload)
+            })
+            .collect()
     }
 
     fn typed_payload_with_predicate<P: MessagePayload, F>(&self, predicate: F) -> Option<P>

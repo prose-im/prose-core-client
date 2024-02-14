@@ -11,7 +11,6 @@ use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods;
-use prose_xmpp::stanza::http_upload::OOB;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::Message;
 
@@ -19,6 +18,7 @@ use crate::domain::messaging::models::{Emoji, MessageId, StanzaParseError};
 use crate::domain::messaging::services::MessagingService;
 use crate::domain::shared::models::RoomType;
 use crate::dtos::{RoomId, SendMessageRequest};
+use crate::infra::xmpp::util::MessageExt;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -44,10 +44,7 @@ impl MessagingService for XMPPClient {
             .set_body(request.body.unwrap_or_default())
             .set_chat_state(Some(ChatState::Active))
             .set_markable();
-
-        for attachment in request.attachments {
-            message.payloads.push(OOB::from(attachment).into())
-        }
+        message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
 
@@ -74,10 +71,7 @@ impl MessagingService for XMPPClient {
             .set_to(room_jid.clone())
             .set_body(request.body.unwrap_or_default())
             .set_replace(message_id.clone().into_inner().into());
-
-        for attachment in request.attachments {
-            message.payloads.push(OOB::from(attachment).into())
-        }
+        message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
         Ok(())

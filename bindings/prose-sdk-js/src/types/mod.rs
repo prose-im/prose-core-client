@@ -4,12 +4,13 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use account_info::AccountInfo;
+pub use attachment::{Attachment, Thumbnail};
 pub use channel::{Channel, ChannelsArray};
 pub use connection_error::{ConnectionError, ConnectionErrorType};
 pub use contact::{Availability, Contact};
 pub use jid::BareJid;
 pub use js_array::*;
-pub use message::{Attachment, Message};
+pub use message::Message;
 pub use presence_sub_request::{PresenceSubRequest, PresenceSubRequestArray, PresenceSubRequestId};
 pub use room::RoomEnvelopeExt;
 pub use send_message_request::SendMessageRequest;
@@ -20,6 +21,7 @@ pub use user_metadata::UserMetadata;
 pub use user_profile::UserProfile;
 
 mod account_info;
+mod attachment;
 mod channel;
 mod connection_error;
 mod contact;

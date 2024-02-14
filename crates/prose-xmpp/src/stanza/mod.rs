@@ -14,11 +14,12 @@ pub use vcard::VCard4;
 
 pub mod avatar;
 pub mod conference_bookmark;
-pub mod http_upload;
 pub mod last_activity;
+pub mod media_sharing;
 pub mod message;
 pub mod muc;
 pub mod ns;
 pub mod pubsub;
+pub mod references;
 pub mod user_activity;
 pub mod vcard;

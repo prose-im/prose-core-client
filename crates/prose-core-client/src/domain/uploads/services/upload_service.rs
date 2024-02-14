@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
+use mime::Mime;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
@@ -20,6 +21,6 @@ pub trait UploadService: SendUnlessWasm + SyncUnlessWasm {
         upload_service: &BareJid,
         file_name: &str,
         file_size: u64,
-        content_type: &str,
+        media_type: &Mime,
     ) -> Result<UploadSlot>;
 }

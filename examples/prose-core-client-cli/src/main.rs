@@ -23,8 +23,8 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, Bookmark, Contact, Message, ParticipantInfo, PublicRoomInfo, RoomId,
-    SendMessageRequest, SidebarItem, UserBasicInfo, UserId,
+    Address, Attachment, AttachmentType, Bookmark, Contact, Message, ParticipantInfo,
+    PublicRoomInfo, RoomId, SendMessageRequest, SidebarItem, UploadSlot, UserBasicInfo, UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::services::RoomEnvelope;
@@ -457,7 +457,7 @@ async fn save_avatar(client: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn upload_file(client: &Client, path: impl AsRef<Path>) -> Result<Url> {
+async fn upload_file(client: &Client, path: impl AsRef<Path>) -> Result<UploadSlot> {
     let path = path.as_ref();
     let Some(path_str) = path.file_name().and_then(|f| f.to_str()) else {
         return Err(format_err!("Invalid filepath."));
@@ -483,7 +483,7 @@ async fn upload_file(client: &Client, path: impl AsRef<Path>) -> Result<Url> {
 
     println!("Uploading file…");
     let response = reqwest::Client::new()
-        .put(slot.upload_url)
+        .put(slot.upload_url.clone())
         .headers(headers)
         .body(file)
         .send()
@@ -493,7 +493,7 @@ async fn upload_file(client: &Client, path: impl AsRef<Path>) -> Result<Url> {
         return Err(anyhow!("Server returned status {}", response.status()));
     }
 
-    Ok(slot.download_url)
+    Ok(slot)
 }
 
 async fn load_user_profile(client: &Client, jid: &UserId) -> Result<()> {
@@ -652,16 +652,19 @@ async fn send_message(client: &Client) -> Result<()> {
         .unwrap();
 
     let mut request = SendMessageRequest {
-        body: body.is_empty().then_some(body),
+        body: (!body.is_empty()).then_some(body),
         attachments: vec![],
     };
 
     while let Some(file) = select_file("Path to attachment (Press enter to skip)") {
-        let download_url = upload_file(client, &file).await?;
+        let slot = upload_file(client, &file).await?;
 
         request.attachments.push(Attachment {
-            url: download_url,
-            description: None,
+            r#type: AttachmentType::File,
+            url: slot.download_url,
+            media_type: slot.media_type,
+            file_name: slot.file_name,
+            file_size: Some(slot.file_size),
         });
     }
 
