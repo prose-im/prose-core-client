@@ -12,6 +12,7 @@ pub(crate) mod contact;
 pub(crate) mod presence;
 pub(crate) mod room_affiliation;
 pub(crate) mod room_info;
+pub(crate) mod room_session_participant;
 pub(crate) mod room_spec;
 pub(crate) mod stanza_error;
 pub(crate) mod thumbnail;

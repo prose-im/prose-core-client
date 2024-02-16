@@ -39,6 +39,11 @@ impl MucUser {
         self
     }
 
+    pub fn with_item(mut self, item: Item) -> Self {
+        self.items.push(item);
+        self
+    }
+
     pub fn with_items(mut self, items: impl IntoIterator<Item = Item>) -> Self {
         self.items = items.into_iter().collect();
         self

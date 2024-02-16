@@ -22,6 +22,7 @@ use crate::domain::rooms::services::RoomManagementService;
 use crate::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
 use crate::dtos::Availability;
 use crate::infra::xmpp::type_conversions::room_info::RoomInfo;
+use crate::infra::xmpp::util::RoomOccupancyExt;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -101,6 +102,7 @@ impl RoomManagementService for XMPPClient {
             },
             user_nickname,
             members,
+            participants: occupancy.participants(),
             room_has_been_created,
         })
     }
@@ -148,6 +150,7 @@ impl RoomManagementService for XMPPClient {
             config: room_config,
             user_nickname,
             members,
+            participants: occupancy.participants(),
             room_has_been_created: false,
         })
     }

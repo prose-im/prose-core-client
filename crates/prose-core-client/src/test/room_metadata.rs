@@ -44,6 +44,7 @@ impl RoomSessionInfo {
             },
             user_nickname: mock_data::account_jid().username().to_string(),
             members: vec![],
+            participants: vec![],
             room_has_been_created: true,
         }
     }

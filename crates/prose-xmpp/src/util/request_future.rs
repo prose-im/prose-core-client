@@ -23,7 +23,8 @@ pub(crate) enum ElementReducerPoll {
     Ready,
 }
 
-type ElementReducer<T> = fn(&mut T, &XMPPElement) -> Result<ElementReducerPoll, RequestError>;
+type ElementReducer<T> =
+    Box<dyn Fn(&mut T, &XMPPElement) -> Result<ElementReducerPoll, RequestError> + Send>;
 type ResultTransformer<T, U> = fn(T) -> U;
 
 pub(crate) struct RequestFuture<T: Send, U> {
@@ -68,16 +69,19 @@ impl RequestFuture<IQReducerState, Option<Element>> {
 }
 
 impl<T: Send, U> RequestFuture<T, U> {
-    pub fn new(
+    pub fn new<R>(
         identifier: impl Into<String>,
         initial_value: T,
-        reducer: ElementReducer<T>,
+        reducer: R,
         transformer: ResultTransformer<T, U>,
-    ) -> Self {
+    ) -> Self
+    where
+        R: Fn(&mut T, &XMPPElement) -> Result<ElementReducerPoll, RequestError> + Send + 'static,
+    {
         RequestFuture {
             state: Arc::new(Mutex::new(ReducerFutureState {
                 identifier: identifier.into(),
-                reducer,
+                reducer: Box::new(reducer),
                 transformer,
                 value: Some(initial_value),
                 result: None,
@@ -90,7 +94,7 @@ impl<T: Send, U> RequestFuture<T, U> {
         RequestFuture {
             state: Arc::new(Mutex::new(ReducerFutureState {
                 identifier: "".to_string(),
-                reducer: |_, _| unreachable!(),
+                reducer: Box::new(|_, _| unreachable!()),
                 transformer: |_| unreachable!(),
                 value: None,
                 result: Some(Err(err)),

@@ -754,8 +754,13 @@ impl RoomsDomainService {
             let room_name = room_name;
             Box::new(move |room| {
                 // Convert the temporary room to its final form…
-                let room =
-                    room.by_resolving_with_info(room_name, room_description, room_info, members);
+                let room = room.by_resolving_with_info(
+                    room_name,
+                    room_description,
+                    room_info,
+                    members,
+                    info.participants,
+                );
                 room
             })
         }) else {

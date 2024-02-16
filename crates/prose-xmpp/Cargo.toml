@@ -22,6 +22,7 @@ insta = { workspace = true, features = ["json"], optional = true }
 jid = { workspace = true }
 minidom = { workspace = true }
 parking_lot = { workspace = true }
+prose-proc-macros = { path = "../prose-proc-macros" }
 prose-utils = { path = "../prose-utils" }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 serde = { workspace = true, features = ["derive"] }
@@ -31,6 +32,9 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 xmpp-parsers = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics", "js"] }

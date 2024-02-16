@@ -165,6 +165,7 @@ async fn test_joins_room() -> Result<()> {
                                 affiliation: RoomAffiliation::Member,
                             },
                         ],
+                        participants: vec![],
                         room_has_been_created: false,
                     })
                 })
@@ -1268,6 +1269,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
                             affiliation: RoomAffiliation::Member,
                         },
                     ],
+                    participants: vec![],
                     room_has_been_created: false,
                 })
             })

@@ -16,9 +16,10 @@ use crate::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, UserStatusEvent,
     UserStatusEventType,
 };
-use crate::domain::shared::models::{AnonOccupantId, OccupantId, UserEndpointId};
+use crate::domain::shared::models::{OccupantId, UserEndpointId};
 use crate::dtos::{Availability, RoomId, UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::{missing_attribute, missing_element, Context};
+use crate::infra::xmpp::util::PresenceExt;
 
 pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
     let Some(from) = presence.from.clone() else {
@@ -85,12 +86,7 @@ fn parse_muc_presence(
     }
 
     let occupant_id = OccupantId::from(from);
-    let anon_occupant_id = presence
-        .payloads
-        .iter()
-        .find(|p| p.is("occupant-id", ns::OCCUPANT_ID))
-        .and_then(|e| e.attr("id"))
-        .map(|id| AnonOccupantId::from(id.to_string()));
+    let anon_occupant_id = presence.anon_occupant_id();
     let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
 
     ctx.push_event(UserStatusEvent {

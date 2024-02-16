@@ -23,7 +23,7 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, AttachmentType, Bookmark, Contact, Message, ParticipantInfo,
+    Address, Attachment, AttachmentType, Availability, Bookmark, Contact, Message, ParticipantInfo,
     PublicRoomInfo, RoomId, SendMessageRequest, SidebarItem, UploadSlot, UserBasicInfo, UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
@@ -801,6 +801,8 @@ enum Selection {
     UpdateUserProfile,
     #[strum(serialize = "Delete profile")]
     DeleteUserProfile,
+    #[strum(serialize = "Set Availability")]
+    SetAvailability,
     #[strum(serialize = "Load avatar")]
     LoadUserAvatar,
     #[strum(serialize = "Save avatar")]
@@ -898,6 +900,17 @@ async fn main() -> Result<()> {
             }
             Selection::DeleteUserProfile => {
                 client.account.delete_profile().await?;
+            }
+            Selection::SetAvailability => {
+                let availability = select_item_from_list(
+                    vec![
+                        Availability::Available,
+                        Availability::Away,
+                        Availability::DoNotDisturb,
+                    ],
+                    |a| a.to_string(),
+                );
+                client.account.set_availability(availability).await?;
             }
             Selection::LoadUserAvatar => {
                 let jid = prompt_bare_jid(&jid);
