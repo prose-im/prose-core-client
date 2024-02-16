@@ -6,14 +6,13 @@
 use anyhow::bail;
 use jid::Jid;
 use xmpp_parsers::muc::user::Status;
-use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::rooms::models::RoomSessionParticipant;
-use crate::dtos::{Availability, OccupantId, UserId};
+use crate::dtos::{OccupantId, UserId};
 use crate::infra::xmpp::util::PresenceExt;
 
 impl TryFrom<Presence> for RoomSessionParticipant {
@@ -21,6 +20,7 @@ impl TryFrom<Presence> for RoomSessionParticipant {
 
     fn try_from(value: Presence) -> Result<Self, Self::Error> {
         let anon_occupant_id = value.anon_occupant_id();
+        let availability = value.availability();
 
         let Some(Jid::Full(from)) = value.from else {
             bail!("Expected FullJid in MUC presence.")
@@ -41,10 +41,6 @@ impl TryFrom<Presence> for RoomSessionParticipant {
             bail!("Missing 'item' element in MUC presence");
         };
 
-        let availability = Availability::from((
-            (value.type_ != presence::Type::None).then_some(value.type_.clone()),
-            value.show.clone(),
-        ));
         let occupant_id = OccupantId::from(from);
         let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
 

@@ -6,7 +6,6 @@
 use anyhow::{bail, Result};
 use jid::Jid;
 use xmpp_parsers::muc::user::Status;
-use xmpp_parsers::presence;
 use xmpp_parsers::presence::Presence;
 
 use prose_xmpp::ns;
@@ -26,10 +25,7 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
         return missing_attribute(ctx, "from", presence);
     };
 
-    let availability = Availability::from((
-        (presence.type_ != presence::Type::None).then_some(presence.type_.clone()),
-        presence.show.clone(),
-    ));
+    let availability = presence.availability();
 
     if let Some(muc_user) = presence
         .payloads
