@@ -147,7 +147,7 @@ impl ClientInner {
     }
 
     fn handle_stanza(ctx: &ModuleContextInner, mods: &ModuleLookup, stanza: Element) {
-        let elem = match XMPPElement::try_from_element(stanza) {
+        let element = match XMPPElement::try_from_element(stanza) {
             Ok(None) => return,
             Ok(Some(elem)) => elem,
             Err(err) => {
@@ -156,34 +156,46 @@ impl ClientInner {
             }
         };
 
-        let mut wakers = Vec::<Waker>::new();
+        let Some(element) = Self::visit_futures_with_element(ctx, element) else {
+            return;
+        };
+
+        for (_, m) in mods.iter() {
+            if let Err(err) = m.read().handle_element(&element) {
+                error!("Encountered error in module {}", err);
+            }
+        }
+    }
+
+    fn visit_futures_with_element(
+        ctx: &ModuleContextInner,
+        mut element: XMPPElement,
+    ) -> Option<XMPPElement> {
         let mut idx = 0;
         let mut pending_futures = ctx.mod_futures.lock();
 
         while idx < pending_futures.len() {
-            let poll = pending_futures[idx].state.lock().handle_element(&elem);
+            let poll = pending_futures[idx].state.lock().handle_element(element);
 
             match poll {
-                ModuleFuturePoll::Pending => idx += 1,
+                ModuleFuturePoll::Pending(Some(e)) => {
+                    idx += 1;
+                    element = e;
+                }
+                ModuleFuturePoll::Pending(None) => return None,
                 ModuleFuturePoll::Ready(waker) => {
                     pending_futures.remove(idx);
+
                     if let Some(waker) = waker {
-                        wakers.push(waker)
+                        waker.wake()
                     }
+
+                    return None;
                 }
             }
         }
-        drop(pending_futures);
 
-        for (_, m) in mods.iter() {
-            if let Err(err) = m.read().handle_element(&elem) {
-                error!("Encountered error in module {}", err);
-            }
-        }
-
-        for waker in wakers {
-            waker.wake()
-        }
+        return Some(element);
     }
 
     fn purge_expired_futures(ctx: &ModuleContextInner) {

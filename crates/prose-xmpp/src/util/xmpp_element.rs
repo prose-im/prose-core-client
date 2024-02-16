@@ -62,6 +62,30 @@ impl From<XMPPElement> for Element {
     }
 }
 
+impl From<Presence> for XMPPElement {
+    fn from(value: Presence) -> Self {
+        Self::Presence(value)
+    }
+}
+
+impl From<Message> for XMPPElement {
+    fn from(value: Message) -> Self {
+        Self::Message(value)
+    }
+}
+
+impl From<Iq> for XMPPElement {
+    fn from(value: Iq) -> Self {
+        Self::IQ(value)
+    }
+}
+
+impl From<PubSubMessage> for XMPPElement {
+    fn from(value: PubSubMessage) -> Self {
+        Self::PubSubMessage(value)
+    }
+}
+
 impl From<XMPPElement> for String {
     fn from(elem: XMPPElement) -> String {
         String::from(&Element::from(elem))

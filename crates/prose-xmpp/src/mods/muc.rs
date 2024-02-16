@@ -479,12 +479,12 @@ impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>, Vec<Message>, Option
                 match element {
                     XMPPElement::Presence(presence) => {
                         let Some(Jid::Full(from)) = &presence.from else {
-                            return Ok(ElementReducerPoll::Pending);
+                            return Ok(ElementReducerPoll::Pending(Some(presence.into())));
                         };
 
                         // Make sure that the presence is actually sent by our room…
                         if from.to_bare() != room_bare_jid {
-                            return Ok(ElementReducerPoll::Pending);
+                            return Ok(ElementReducerPoll::Pending(Some(presence.into())));
                         }
 
                         // Is that the self-presence or somebody else's?
@@ -516,14 +516,14 @@ impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>, Vec<Message>, Option
                             state.presences.push(presence.clone());
                         }
 
-                        Ok(ElementReducerPoll::Pending)
+                        Ok(ElementReducerPoll::Pending(None))
                     }
                     XMPPElement::Message(message) => {
                         // Make sure that the message is actually sent by our room…
                         if message.from.as_ref().map(|jid| jid.to_bare()).as_ref()
                             != Some(&room_bare_jid)
                         {
-                            return Ok(ElementReducerPoll::Pending);
+                            return Ok(ElementReducerPoll::Pending(Some(message.into())));
                         }
 
                         if let Some(subject) = message.subject() {
@@ -533,10 +533,10 @@ impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>, Vec<Message>, Option
                         }
 
                         state.message_history.push(message.clone());
-                        Ok(ElementReducerPoll::Pending)
+                        Ok(ElementReducerPoll::Pending(None))
                     }
                     XMPPElement::IQ(_) | XMPPElement::PubSubMessage(_) => {
-                        Ok(ElementReducerPoll::Pending)
+                        Ok(ElementReducerPoll::Pending(Some(element)))
                     }
                 }
             },

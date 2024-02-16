@@ -19,12 +19,12 @@ use crate::util::request_error::RequestError;
 use crate::util::XMPPElement;
 
 pub(crate) enum ElementReducerPoll {
-    Pending,
+    Pending(Option<XMPPElement>),
     Ready,
 }
 
 type ElementReducer<T> =
-    Box<dyn Fn(&mut T, &XMPPElement) -> Result<ElementReducerPoll, RequestError> + Send>;
+    Box<dyn Fn(&mut T, XMPPElement) -> Result<ElementReducerPoll, RequestError> + Send>;
 type ResultTransformer<T, U> = fn(T) -> U;
 
 pub(crate) struct RequestFuture<T: Send, U> {
@@ -46,17 +46,22 @@ impl RequestFuture<IQReducerState, Option<Element>> {
                 element: None,
             },
             |state, element| {
-                let XMPPElement::IQ(iq) = element else {
-                    return Ok(ElementReducerPoll::Pending);
+                let iq = match element {
+                    XMPPElement::IQ(iq) => iq,
+                    XMPPElement::PubSubMessage(_)
+                    | XMPPElement::Message(_)
+                    | XMPPElement::Presence(_) => {
+                        return Ok(ElementReducerPoll::Pending(Some(element)))
+                    }
                 };
 
                 if iq.id != state.request_id {
-                    return Ok(ElementReducerPoll::Pending);
+                    return Ok(ElementReducerPoll::Pending(Some(iq.into())));
                 }
 
-                match &iq.payload {
+                match iq.payload {
                     IqType::Result(payload) => {
-                        state.element = payload.clone();
+                        state.element = payload;
                         Ok(ElementReducerPoll::Ready)
                     }
                     IqType::Error(err) => Err(RequestError::XMPP { err: err.clone() }),
@@ -76,7 +81,7 @@ impl<T: Send, U> RequestFuture<T, U> {
         transformer: ResultTransformer<T, U>,
     ) -> Self
     where
-        R: Fn(&mut T, &XMPPElement) -> Result<ElementReducerPoll, RequestError> + Send + 'static,
+        R: Fn(&mut T, XMPPElement) -> Result<ElementReducerPoll, RequestError> + Send + 'static,
     {
         RequestFuture {
             state: Arc::new(Mutex::new(ReducerFutureState {
@@ -114,7 +119,7 @@ pub(crate) struct ReducerFutureState<T, U> {
 }
 
 impl<T: Send, U> ModuleFutureState for ReducerFutureState<T, U> {
-    fn handle_element(&mut self, element: &XMPPElement) -> ModuleFuturePoll {
+    fn handle_element(&mut self, element: XMPPElement) -> ModuleFuturePoll {
         if self.result.is_some() {
             return ModuleFuturePoll::Ready(self.waker.take());
         }
@@ -135,7 +140,7 @@ impl<T: Send, U> ModuleFutureState for ReducerFutureState<T, U> {
                 self.result = Some(Ok(()));
                 ModuleFuturePoll::Ready(self.waker.take())
             }
-            Ok(ElementReducerPoll::Pending) => ModuleFuturePoll::Pending,
+            Ok(ElementReducerPoll::Pending(element)) => ModuleFuturePoll::Pending(element),
         }
     }
 

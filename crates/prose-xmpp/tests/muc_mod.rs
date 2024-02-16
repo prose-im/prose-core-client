@@ -3,11 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::str::FromStr;
+
 use anyhow::Result;
 use jid::BareJid;
 use minidom::Element;
 use pretty_assertions::assert_eq;
-use std::str::FromStr;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::{Affiliation, Item, Role, Status};
 use xmpp_parsers::occupant_id::OccupantId;
@@ -112,7 +113,7 @@ async fn test_collects_presences_and_message_history() -> Result<()> {
         occupancy,
     );
 
-    //assert!(sent_events.read().is_empty());
+    assert!(sent_events.read().is_empty());
 
     Ok(())
 }
@@ -120,7 +121,10 @@ async fn test_collects_presences_and_message_history() -> Result<()> {
 #[mt_test]
 async fn test_handles_empty_subject() -> Result<()> {
     let ConnectedClient {
-        connection, client, ..
+        connection,
+        client,
+        sent_events,
+        ..
     } = Client::connected_client().await?;
 
     let self_presence = Presence::new(Default::default())
@@ -182,7 +186,7 @@ async fn test_handles_empty_subject() -> Result<()> {
         occupancy,
     );
 
-    //assert!(sent_events.read().is_empty());
+    assert!(sent_events.read().is_empty());
 
     Ok(())
 }
