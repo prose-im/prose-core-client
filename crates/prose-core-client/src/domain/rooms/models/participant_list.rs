@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 
@@ -11,7 +11,7 @@ use crate::domain::shared::models::{
     AnonOccupantId, Availability, ParticipantId, UserBasicInfo, UserId,
 };
 
-use super::{ComposeState, RoomAffiliation};
+use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ParticipantList {
@@ -61,6 +61,67 @@ impl ParticipantList {
                     compose_state_updated: Default::default(),
                 },
             )]),
+        }
+    }
+
+    pub fn new(
+        members: impl IntoIterator<Item = RegisteredMember>,
+        participants: impl IntoIterator<Item = RoomSessionParticipant>,
+    ) -> Self {
+        let mut anon_occupant_id_to_participant_id_map = HashMap::new();
+        let mut participants_map = HashMap::new();
+        let mut real_to_occupant_id_map = HashMap::new();
+
+        for p in participants {
+            if let Some(real_id) = &p.real_id {
+                real_to_occupant_id_map.insert(real_id.clone(), p.id.clone());
+            }
+
+            let id = ParticipantId::Occupant(p.id);
+
+            if let Some(anon_id) = &p.anon_id {
+                anon_occupant_id_to_participant_id_map.insert(anon_id.clone(), id.clone());
+            }
+
+            let participant = Participant {
+                real_id: p.real_id,
+                anon_occupant_id: p.anon_id,
+                name: None,
+                is_self: p.is_self,
+                affiliation: p.affiliation,
+                availability: p.availability,
+                compose_state: ComposeState::Idle,
+                compose_state_updated: Default::default(),
+            };
+
+            participants_map.insert(id, participant);
+        }
+
+        for member in members {
+            let participant_id = real_to_occupant_id_map
+                .get(&member.user_id)
+                .cloned()
+                .map(ParticipantId::Occupant)
+                .unwrap_or_else(|| ParticipantId::User(member.user_id.clone()));
+
+            participants_map
+                .entry(participant_id)
+                .and_modify(|p| p.name = member.name.clone())
+                .or_insert_with(|| Participant {
+                    real_id: Some(member.user_id),
+                    anon_occupant_id: None,
+                    name: member.name,
+                    is_self: member.is_self,
+                    affiliation: member.affiliation,
+                    availability: Availability::Unavailable,
+                    compose_state: ComposeState::Idle,
+                    compose_state_updated: Default::default(),
+                });
+        }
+
+        Self {
+            anon_occupant_id_to_participant_id_map,
+            participants_map,
         }
     }
 
@@ -197,41 +258,6 @@ impl ParticipantList {
         if let Some(anon_occupant_id) = anon_occupant_id {
             self.anon_occupant_id_to_participant_id_map
                 .insert(anon_occupant_id.clone(), id.clone());
-        }
-    }
-
-    pub fn set_registered_members(&mut self, members: impl IntoIterator<Item = RegisteredMember>) {
-        let members = members.into_iter().collect::<Vec<RegisteredMember>>();
-
-        let known_member_ids = self
-            .participants_map
-            .iter()
-            .filter_map(|(_, p)| p.real_id.clone())
-            .collect::<HashSet<UserId>>();
-
-        for member in members {
-            if known_member_ids.contains(&member.user_id) {
-                continue;
-            }
-
-            let participant_id = ParticipantId::User(member.user_id.clone());
-
-            if self.participants_map.contains_key(&participant_id) {
-                continue;
-            }
-
-            let participant = Participant {
-                real_id: Some(member.user_id),
-                anon_occupant_id: None,
-                name: member.name,
-                is_self: member.is_self,
-                affiliation: member.affiliation,
-                availability: Default::default(),
-                compose_state: Default::default(),
-                compose_state_updated: Default::default(),
-            };
-
-            self.participants_map.insert(participant_id, participant);
         }
     }
 
@@ -467,42 +493,32 @@ mod tests {
     #[test]
     fn test_registered_members_in_muc_room() {
         // Start with a fresh state…
-        let mut list = ParticipantList::default();
-
-        // Assume that a registered member is online and we've received their presence when
-        // connecting to the room.
-        list.set_availability(
-            &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
-            false,
-            &Availability::Available,
-        );
-        list.set_affiliation(
-            &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
-            false,
-            &RoomAffiliation::Member,
-        );
-        list.set_ids_and_name(
-            &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
-            Some(&user_id!("a@prose.org")),
-            None,
-            Some("User A"),
-        );
-
-        // Additionally we've loaded the other registered member.
-        list.set_registered_members(vec![
-            RegisteredMember {
-                user_id: user_id!("a@prose.org"),
-                affiliation: RoomAffiliation::Member,
-                name: Some("User A".to_string()),
+        let mut list = ParticipantList::new(
+            vec![
+                RegisteredMember {
+                    user_id: user_id!("a@prose.org"),
+                    affiliation: RoomAffiliation::Member,
+                    name: Some("User A".to_string()),
+                    is_self: false,
+                },
+                RegisteredMember {
+                    user_id: user_id!("b@prose.org"),
+                    affiliation: RoomAffiliation::Member,
+                    name: Some("User B".to_string()),
+                    is_self: false,
+                },
+            ],
+            // Assume that a registered member is online and we've received their presence when
+            // connecting to the room.
+            vec![RoomSessionParticipant {
+                id: occupant_id!("room@conference.prose.org/a"),
                 is_self: false,
-            },
-            RegisteredMember {
-                user_id: user_id!("b@prose.org"),
+                anon_id: None,
+                real_id: Some(user_id!("a@prose.org")),
                 affiliation: RoomAffiliation::Member,
-                name: Some("User B".to_string()),
-                is_self: false,
-            },
-        ]);
+                availability: Availability::Available,
+            }],
+        );
 
         assert_eq!(
             list.participants_map,

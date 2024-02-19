@@ -5,20 +5,17 @@
 
 #![feature(trait_upcasting)]
 
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 use anyhow::{format_err, Result};
 use mockall::{predicate, Sequence};
 use parking_lot::Mutex;
+use pretty_assertions::assert_eq;
 
-use prose_core_client::app::event_handlers::{
-    OccupantEvent, OccupantEventType, RoomsEventHandler, ServerEvent, ServerEventHandler,
-    UserStatusEvent, UserStatusEventType,
-};
 use prose_core_client::domain::connection::models::{ConnectionProperties, ServerFeatures};
 use prose_core_client::domain::rooms::models::{
     RegisteredMember, Room, RoomAffiliation, RoomConfig, RoomError, RoomInfo, RoomSessionInfo,
-    RoomSessionMember, RoomSidebarState, RoomSpec,
+    RoomSessionMember, RoomSessionParticipant, RoomSidebarState, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
@@ -32,20 +29,15 @@ use prose_core_client::dtos::{
     Availability, Bookmark, Participant, ParticipantInfo, PublicRoomInfo, RoomState, UserId,
     UserInfo, UserProfile,
 };
-use prose_core_client::test::{mock_data, MockAppDependencies, MockRoomsDomainServiceDependencies};
+use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
 use prose_core_client::{occupant_id, room_id, user_id, user_resource_id};
 use prose_xmpp::bare;
 use prose_xmpp::test::IncrementingIDProvider;
 
 #[tokio::test]
 async fn test_joins_room() -> Result<()> {
-    // This test simulates the process of joining a room. It also simulates the received presence
-    // events from online occupants and sends these to the RoomsEventHandler to make sure that
-    // we don't have duplicate participants afterwards (registered members & occupants).
-
     let mut deps = MockRoomsDomainServiceDependencies::default();
     let mut seq = Sequence::new();
-    let event_handler = Arc::new(OnceLock::<RoomsEventHandler>::new());
 
     let room = Arc::new(Mutex::new(Room::connecting(
         &room_id!("room@conf.prose.org"),
@@ -85,110 +77,66 @@ async fn test_joins_room() -> Result<()> {
         .with(predicate::eq(room.lock().clone()))
         .return_once(|_| Ok(()));
 
-    let events = vec![
-        ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@conf.prose.org/user1#3dea7f2").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 0,
-            },
-        }),
-        ServerEvent::Occupant(OccupantEvent {
-            occupant_id: occupant_id!("room@conf.prose.org/user1#3dea7f2"),
-            anon_occupant_id: None,
-            real_id: Some(user_id!("user1@prose.org")),
-            is_self: true,
-            r#type: OccupantEventType::AffiliationChanged {
-                affiliation: RoomAffiliation::Owner,
-            },
-        }),
-        ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@conf.prose.org/user2#fdbda94").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 0,
-            },
-        }),
-        ServerEvent::Occupant(OccupantEvent {
-            occupant_id: occupant_id!("room@conf.prose.org/user2#fdbda94"),
-            anon_occupant_id: None,
-            real_id: Some(user_id!("user2@prose.org")),
-            is_self: false,
-            r#type: OccupantEventType::AffiliationChanged {
-                affiliation: RoomAffiliation::Member,
-            },
-        }),
-    ];
-
-    {
-        let event_handler = event_handler.clone();
-        deps.room_management_service
-            .expect_join_room()
-            .once()
-            .in_sequence(&mut seq)
-            .with(
-                predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
-                predicate::always(),
-                predicate::eq(deps.ctx.capabilities.clone()),
-                predicate::eq(Availability::DoNotDisturb),
-            )
-            .return_once(|_, _, _, _| {
-                Box::pin(async move {
-                    let event_handler = event_handler.get().unwrap();
-
-                    for event in events {
-                        event_handler
-                            .handle_event(event)
-                            .await
-                            .expect("Unexpected error");
-                    }
-
-                    Ok(RoomSessionInfo {
-                        room_id: room_id!("room@conf.prose.org"),
-                        config: RoomConfig {
-                            room_name: Some("Room Name".to_string()),
-                            room_description: None,
-                            room_type: RoomType::PrivateChannel,
+    deps.room_management_service
+        .expect_join_room()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
+            predicate::always(),
+            predicate::eq(deps.ctx.capabilities.clone()),
+            predicate::eq(Availability::DoNotDisturb),
+        )
+        .return_once(|_, _, _, _| {
+            Box::pin(async move {
+                Ok(RoomSessionInfo {
+                    room_id: room_id!("room@conf.prose.org"),
+                    config: RoomConfig {
+                        room_name: Some("Room Name".to_string()),
+                        room_description: None,
+                        room_type: RoomType::PrivateChannel,
+                    },
+                    user_nickname: "user#3dea7f2".to_string(),
+                    members: vec![
+                        RoomSessionMember {
+                            id: user_id!("user1@prose.org"),
+                            affiliation: RoomAffiliation::Owner,
                         },
-                        user_nickname: "user#3dea7f2".to_string(),
-                        members: vec![
-                            RoomSessionMember {
-                                id: user_id!("user1@prose.org"),
-                                affiliation: RoomAffiliation::Owner,
-                            },
-                            RoomSessionMember {
-                                id: user_id!("user2@prose.org"),
-                                affiliation: RoomAffiliation::Member,
-                            },
-                            RoomSessionMember {
-                                id: user_id!("user3@prose.org"),
-                                affiliation: RoomAffiliation::Member,
-                            },
-                        ],
-                        participants: vec![],
-                        room_has_been_created: false,
-                    })
+                        RoomSessionMember {
+                            id: user_id!("user2@prose.org"),
+                            affiliation: RoomAffiliation::Member,
+                        },
+                        RoomSessionMember {
+                            id: user_id!("user3@prose.org"),
+                            affiliation: RoomAffiliation::Member,
+                        },
+                    ],
+                    participants: vec![
+                        RoomSessionParticipant {
+                            id: occupant_id!("room@conf.prose.org/user1#3dea7f2"),
+                            is_self: true,
+                            anon_id: None,
+                            real_id: Some(user_id!("user1@prose.org")),
+                            affiliation: RoomAffiliation::Owner,
+                            availability: Availability::Available,
+                        },
+                        RoomSessionParticipant {
+                            id: occupant_id!("room@conf.prose.org/user2#fdbda94"),
+                            is_self: false,
+                            anon_id: None,
+                            real_id: Some(user_id!("user2@prose.org")),
+                            affiliation: RoomAffiliation::Member,
+                            availability: Availability::Available,
+                        },
+                    ],
+                    room_has_been_created: false,
                 })
-            });
-    }
-
-    {
-        let room = room.clone();
-        deps.connected_rooms_repo
-            .expect_get()
-            .times(6)
-            .with(predicate::eq(room_id!("room@conf.prose.org")))
-            .returning(move |_| Some(room.lock().clone()));
-    }
-
-    deps.client_event_dispatcher
-        .expect_dispatch_room_event()
-        .times(6)
-        .returning(|_, _| ());
+            })
+        });
 
     deps.user_profile_repo
         .expect_get_display_name()
-        .times(6)
+        .times(3)
         .with(predicate::in_iter([
             user_id!("user1@prose.org"),
             user_id!("user2@prose.org"),
@@ -216,24 +164,7 @@ async fn test_joins_room() -> Result<()> {
             });
     }
 
-    let rooms_deps = deps.into_deps();
-    let service = Arc::new(RoomsDomainService::from(rooms_deps.clone()));
-
-    let mut deps = MockAppDependencies::default().into_deps();
-    deps.rooms_domain_service = service.clone();
-    deps.client_event_dispatcher = rooms_deps.client_event_dispatcher.clone();
-    deps.connected_rooms_repo = rooms_deps.connected_rooms_repo.clone();
-    deps.ctx = rooms_deps.ctx.clone();
-    deps.id_provider = rooms_deps.id_provider.clone();
-    deps.room_attributes_service = rooms_deps.room_attributes_service.clone();
-    deps.room_management_service = rooms_deps.room_management_service.clone();
-    deps.room_participation_service = rooms_deps.room_participation_service.clone();
-    deps.user_profile_repo = rooms_deps.user_profile_repo.clone();
-
-    event_handler
-        .set(RoomsEventHandler::from(&deps))
-        .map_err(|_| ())
-        .unwrap();
+    let service = Arc::new(RoomsDomainService::from(deps.into_deps()));
 
     service
         .create_or_join_room(
@@ -255,7 +186,6 @@ async fn test_joins_room() -> Result<()> {
     participants.sort_by_key(|p| p.name.clone());
 
     assert_eq!(
-        participants,
         vec![
             ParticipantInfo {
                 id: Some(user_id!("user1@prose.org")),
@@ -278,72 +208,8 @@ async fn test_joins_room() -> Result<()> {
                 availability: Availability::Unavailable,
                 affiliation: RoomAffiliation::Member
             }
-        ]
-    );
-
-    // Now simulate user3 coming online…
-
-    let events = vec![
-        ServerEvent::UserStatus(UserStatusEvent {
-            user_id: occupant_id!("room@conf.prose.org/user3#dXNlcjNAcHJvc2Uub3Jn").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 0,
-            },
-        }),
-        ServerEvent::Occupant(OccupantEvent {
-            occupant_id: occupant_id!("room@conf.prose.org/user3#dXNlcjNAcHJvc2Uub3Jn"),
-            anon_occupant_id: None,
-            real_id: Some(user_id!("user3@prose.org")),
-            is_self: false,
-            r#type: OccupantEventType::AffiliationChanged {
-                affiliation: RoomAffiliation::Member,
-            },
-        }),
-    ];
-
-    let event_handler = event_handler.get().unwrap();
-
-    for event in events {
-        event_handler
-            .handle_event(event)
-            .await
-            .expect("Unexpected error");
-    }
-
-    let mut participants = room
-        .lock()
-        .participants()
-        .iter()
-        .map(ParticipantInfo::from)
-        .collect::<Vec<_>>();
-    participants.sort_by_key(|p| p.name.clone());
-
-    assert_eq!(
-        participants,
-        vec![
-            ParticipantInfo {
-                id: Some(user_id!("user1@prose.org")),
-                name: "User1".to_string(),
-                is_self: true,
-                availability: Availability::Available,
-                affiliation: RoomAffiliation::Owner
-            },
-            ParticipantInfo {
-                id: Some(user_id!("user2@prose.org")),
-                name: "User2".to_string(),
-                is_self: false,
-                availability: Availability::Available,
-                affiliation: RoomAffiliation::Member
-            },
-            ParticipantInfo {
-                id: Some(user_id!("user3@prose.org")),
-                name: "User3".to_string(),
-                is_self: false,
-                availability: Availability::Available,
-                affiliation: RoomAffiliation::Member
-            }
-        ]
+        ],
+        participants
     );
 
     Ok(())

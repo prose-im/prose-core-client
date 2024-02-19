@@ -11,7 +11,7 @@ use parking_lot::{
 };
 
 use crate::domain::rooms::models::{ParticipantList, RegisteredMember, RoomSessionParticipant};
-use crate::domain::shared::models::{Availability, ParticipantId, RoomId, RoomType, UserId};
+use crate::domain::shared::models::{Availability, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::OccupantId;
 
@@ -212,26 +212,8 @@ impl Room {
         let mut details = self.inner.details.read().clone();
         details.name = name;
         details.description = description;
-        details.participants.set_registered_members(members);
+        details.participants = ParticipantList::new(members, participants);
         details.state = RoomState::Connected;
-
-        for participant in participants {
-            let participant_id = participant
-                .real_id
-                .map(ParticipantId::User)
-                .unwrap_or_else(|| ParticipantId::Occupant(participant.id));
-
-            details.participants.set_availability(
-                &participant_id,
-                participant.is_self,
-                &participant.availability,
-            );
-            details.participants.set_affiliation(
-                &participant_id,
-                participant.is_self,
-                &participant.affiliation,
-            )
-        }
 
         Self::new(info, details)
     }

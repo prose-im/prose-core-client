@@ -6,7 +6,8 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::rooms::models::{
-    ComposeState, RegisteredMember, Room, RoomAffiliation, RoomInfo, RoomSidebarState,
+    ComposeState, ParticipantList, RegisteredMember, Room, RoomAffiliation, RoomInfo,
+    RoomSidebarState,
 };
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
 use crate::dtos::{Availability, Participant, RoomState, UserId};
@@ -67,7 +68,7 @@ impl Room {
     }
 
     pub fn with_members(self, members: impl IntoIterator<Item = RegisteredMember>) -> Self {
-        self.participants_mut().set_registered_members(members);
+        *self.participants_mut() = ParticipantList::new(members, []);
         self
     }
 
