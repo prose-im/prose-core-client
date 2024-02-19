@@ -115,9 +115,7 @@ impl Connection {
                         Event::Stanza(stanza) => {
                             #[cfg(feature = "trace-stanzas")]
                             tracing::info!(direction = "IN", "{}", String::from(&stanza));
-
-                            let fut = (event_handler)(&conn, ConnectionEvent::Stanza(stanza));
-                            task::spawn(async move { fut.await });
+                            (event_handler)(&conn, ConnectionEvent::Stanza(stanza)).await;
                         }
                     }
                 }
