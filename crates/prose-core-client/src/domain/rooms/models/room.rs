@@ -203,6 +203,7 @@ impl Room {
         &self,
         name: Option<String>,
         description: Option<String>,
+        topic: Option<String>,
         info: RoomInfo,
         members: Vec<RegisteredMember>,
         participants: Vec<RoomSessionParticipant>,
@@ -212,6 +213,7 @@ impl Room {
         let mut details = self.inner.details.read().clone();
         details.name = name;
         details.description = description;
+        details.topic = topic;
         details.participants = ParticipantList::new(members, participants);
         details.state = RoomState::Connected;
 

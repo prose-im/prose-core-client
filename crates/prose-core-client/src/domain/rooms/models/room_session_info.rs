@@ -13,6 +13,7 @@ use crate::domain::shared::models::{
 pub struct RoomSessionInfo {
     pub room_id: RoomId,
     pub config: RoomConfig,
+    pub topic: Option<String>,
     pub user_nickname: String,
     pub members: Vec<RoomSessionMember>,
     pub participants: Vec<RoomSessionParticipant>,

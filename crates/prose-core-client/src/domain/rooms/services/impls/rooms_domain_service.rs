@@ -725,6 +725,7 @@ impl RoomsDomainService {
         // taken already.
         let room_name = info.config.room_name;
         let room_description = info.config.room_description;
+        let room_topic = info.topic;
         let current_user_id = self.ctx.connected_id()?.into_user_id();
 
         let mut members = Vec::with_capacity(info.members.len());
@@ -757,6 +758,7 @@ impl RoomsDomainService {
                 let room = room.by_resolving_with_info(
                     room_name,
                     room_description,
+                    room_topic,
                     room_info,
                     members,
                     info.participants,

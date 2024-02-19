@@ -92,6 +92,7 @@ impl RoomManagementService for XMPPClient {
         }
 
         let members = self.load_room_members(&room_jid).await?;
+        let participants = occupancy.participants();
 
         Ok(RoomSessionInfo {
             room_id: room_jid,
@@ -100,9 +101,10 @@ impl RoomManagementService for XMPPClient {
                 room_description: room_info.description,
                 room_type: spec.room_type(),
             },
+            topic: occupancy.subject,
             user_nickname,
             members,
-            participants: occupancy.participants(),
+            participants,
             room_has_been_created,
         })
     }
@@ -144,13 +146,15 @@ impl RoomManagementService for XMPPClient {
         let room_jid = occupant_id.room_id();
         let room_config = self.load_room_config(&room_jid).await?;
         let members = self.load_room_members(&room_jid).await?;
+        let participants = occupancy.participants();
 
         Ok(RoomSessionInfo {
             room_id: room_jid,
             config: room_config,
+            topic: occupancy.subject,
             user_nickname,
             members,
-            participants: occupancy.participants(),
+            participants,
             room_has_been_created: false,
         })
     }

@@ -96,6 +96,7 @@ async fn test_joins_room() -> Result<()> {
                         room_description: None,
                         room_type: RoomType::PrivateChannel,
                     },
+                    topic: Some("The Room Topic".to_string()),
                     user_nickname: "user#3dea7f2".to_string(),
                     members: vec![
                         RoomSessionMember {
@@ -176,6 +177,8 @@ async fn test_joins_room() -> Result<()> {
             RoomSidebarState::InSidebar,
         )
         .await?;
+
+    assert_eq!(Some("The Room Topic".to_string()), room.lock().topic());
 
     let mut participants = room
         .lock()
@@ -1124,6 +1127,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
                         room_description: None,
                         room_type: RoomType::PublicChannel,
                     },
+                    topic: None,
                     user_nickname: "user#3dea7f2".to_string(),
                     members: vec![
                         RoomSessionMember {
