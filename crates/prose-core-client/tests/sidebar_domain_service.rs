@@ -1366,6 +1366,51 @@ async fn test_updates_sidebar_state_of_already_joined_room_if_needed() -> Result
 }
 
 #[tokio::test]
+async fn test_updates_sidebar_state_of_already_joined_group_if_needed() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    deps.rooms_domain_service
+        .expect_create_or_join_room()
+        .once()
+        .return_once(|_, _| {
+            Box::pin(async move {
+                // Room is connected but not in sidebar
+                Ok(Room::group(room_id!("group@conf.prose.org"))
+                    .with_sidebar_state(RoomSidebarState::NotInSidebar))
+            })
+        });
+
+    deps.bookmarks_service
+        .expect_save_bookmark()
+        .once()
+        .with(predicate::eq(
+            Bookmark::try_from(
+                &Room::group(room_id!("group@conf.prose.org"))
+                    .with_sidebar_state(RoomSidebarState::InSidebar),
+            )
+            .unwrap(),
+        ))
+        .return_once(|_| Box::pin(async move { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .once()
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .return_once(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+    service
+        .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
+            room_id: room_id!("group@conf.prose.org"),
+            password: None,
+            behavior: JoinRoomBehavior::user_initiated(),
+        })
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_does_not_update_sidebar_state_of_already_joined_room_if_not_needed() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 

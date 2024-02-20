@@ -264,6 +264,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             Err(error) => return Err(error.into()),
         };
 
+        // If the room already existed and was silently returned by the RoomsDomainService, make
+        // sure that it actually is configured to show up in the sidebar…
+        if !room.sidebar_state().is_in_sidebar() {
+            room.set_sidebar_state(RoomSidebarState::InSidebar);
+        }
+
         self.save_bookmark_for_room(&room).await;
 
         self.client_event_dispatcher
