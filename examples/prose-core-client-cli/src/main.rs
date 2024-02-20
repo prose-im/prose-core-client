@@ -843,6 +843,8 @@ enum Selection {
     JoinPublicRoom,
     #[strum(serialize = "Join room by JID")]
     JoinRoomByJid,
+    #[strum(serialize = "Leave room")]
+    LeaveRoom,
     #[strum(serialize = "Destroy public room")]
     DestroyPublicRoom,
     #[strum(serialize = "Destroy connected room")]
@@ -1074,6 +1076,15 @@ async fn main() -> Result<()> {
             Selection::JoinRoomByJid => {
                 let jid = prompt_bare_jid(None);
                 client.rooms.join_room(&jid.into(), None).await?;
+            }
+            Selection::LeaveRoom => {
+                let Some(room) = select_sidebar_item(&client).await? else {
+                    continue;
+                };
+                client
+                    .sidebar
+                    .remove_from_sidebar(room.room.to_generic_room().jid())
+                    .await?;
             }
             Selection::DestroyPublicRoom => {
                 let rooms = client
