@@ -7,13 +7,18 @@ publish = false
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 chrono = { workspace = true }
 jid = { workspace = true }
+minidom = { workspace = true }
 parking_lot = { workspace = true }
+pretty_assertions = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client", features = ["test"] }
+prose-proc-macros = { path = "../../crates/prose-proc-macros" }
 prose-store = { path = "../../crates/prose-store" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 tempfile = { workspace = true }
+xml-rs = "0.8"
 xmpp-parsers = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
