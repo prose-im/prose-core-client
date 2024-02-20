@@ -6,8 +6,7 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use prose_core_client::dtos::SidebarItem as SidebarItemDTO;
-use prose_core_client::services::RoomEnvelope;
+use prose_core_client::dtos::{RoomEnvelope, SidebarItem as SidebarItemDTO};
 use prose_core_client::Client;
 
 use crate::client::WasmError;

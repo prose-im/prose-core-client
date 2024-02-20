@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use super::room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
+use crate::services::room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
 
 #[derive(Debug, PartialEq)]
 pub enum RoomEnvelope {

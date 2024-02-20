@@ -8,8 +8,7 @@ use std::str::FromStr;
 
 use pretty_assertions::assert_eq;
 
-use prose_core_client::dtos::RoomId;
-use prose_core_client::services::RoomEnvelope;
+use prose_core_client::dtos::{RoomEnvelope, RoomId};
 use prose_core_client::test::ConstantTimeProvider;
 use prose_core_client::{Client, ClientDelegate, ClientEvent, FsAvatarCache};
 use prose_xmpp::test::IncrementingIDProvider;

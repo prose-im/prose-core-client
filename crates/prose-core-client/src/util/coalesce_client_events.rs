@@ -5,7 +5,7 @@
 
 use std::cmp::Ordering;
 
-use crate::services::RoomEnvelope;
+use crate::dtos::RoomEnvelope;
 use crate::{ClientEvent, ClientRoomEventType};
 
 pub fn coalesce_client_events(events: &mut Vec<ClientEvent>) {

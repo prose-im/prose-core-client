@@ -5,7 +5,7 @@
 
 use std::fmt::{Debug, Formatter};
 
-use crate::services::RoomEnvelope;
+use crate::dtos::RoomEnvelope;
 
 #[derive(Clone, PartialEq)]
 pub struct SidebarItem {

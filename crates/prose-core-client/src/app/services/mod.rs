@@ -12,7 +12,6 @@ pub use contact_list_service::ContactListService;
 pub use debug_service::DebugService;
 pub(crate) use room::RoomInner;
 pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
-pub use room_envelope::RoomEnvelope;
 pub use rooms_service::RoomsService;
 pub use sidebar_service::SidebarService;
 pub use upload_service::UploadService;
@@ -25,8 +24,7 @@ mod connection_service;
 mod contact_list_service;
 #[cfg(feature = "debug")]
 mod debug_service;
-mod room;
-mod room_envelope;
+pub(crate) mod room;
 mod rooms_service;
 mod sidebar_service;
 mod upload_service;

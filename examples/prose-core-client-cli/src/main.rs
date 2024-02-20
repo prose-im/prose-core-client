@@ -24,10 +24,10 @@ use url::Url;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
     Address, Attachment, AttachmentType, Availability, Bookmark, Contact, Message, ParticipantInfo,
-    PublicRoomInfo, RoomId, SendMessageRequest, SidebarItem, UploadSlot, UserBasicInfo, UserId,
+    PublicRoomInfo, RoomEnvelope, RoomId, SendMessageRequest, SidebarItem, UploadSlot,
+    UserBasicInfo, UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
-use prose_core_client::services::RoomEnvelope;
 use prose_core_client::{
     open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, SqliteDriver,
 };

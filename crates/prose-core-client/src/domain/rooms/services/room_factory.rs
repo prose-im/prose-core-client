@@ -5,7 +5,8 @@
 
 use std::sync::Arc;
 
-use crate::app::services::{RoomEnvelope, RoomInner};
+use crate::app::dtos::RoomEnvelope;
+use crate::app::services::RoomInner;
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::RoomType;
 

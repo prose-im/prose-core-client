@@ -7,7 +7,7 @@ use std::fmt::{Debug, Formatter};
 
 use prose_xmpp::ConnectionError;
 
-use crate::app::services::RoomEnvelope;
+use crate::app::dtos::RoomEnvelope;
 use crate::domain::messaging::models::MessageId;
 use crate::domain::shared::models::UserId;
 

@@ -8,9 +8,9 @@ use tracing::debug;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use prose_core_client::dtos::{MessageId, RoomState as SdkRoomState};
+use prose_core_client::dtos::{MessageId, RoomEnvelope, RoomState as SdkRoomState};
 use prose_core_client::services::{
-    DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom, RoomEnvelope,
+    DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
 };
 
 use crate::client::WasmError;
