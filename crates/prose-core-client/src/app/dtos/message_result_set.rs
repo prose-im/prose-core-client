@@ -5,7 +5,7 @@
 
 use super::Message;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct MessageResultSet {
     pub messages: Vec<Message>,
     /// Are there more messages or is this the last page?
