@@ -9,6 +9,7 @@ use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::time::Duration;
 use std::{env, fs};
 
 use anyhow::{anyhow, format_err, Result};
@@ -24,7 +25,7 @@ use url::Url;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
     Address, Attachment, AttachmentType, Availability, Bookmark, Contact, Message, ParticipantInfo,
-    PublicRoomInfo, RoomEnvelope, RoomId, SendMessageRequest, SidebarItem, UploadSlot,
+    PublicRoomInfo, RoomEnvelope, RoomId, SendMessageRequest, SidebarItem, StanzaId, UploadSlot,
     UserBasicInfo, UserId,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
@@ -597,16 +598,31 @@ async fn load_messages(client: &Client) -> Result<()> {
         return Ok(());
     };
 
-    let messages = match room {
-        RoomEnvelope::DirectMessage(room) => room.load_latest_messages().await?,
-        RoomEnvelope::Group(room) => room.load_latest_messages().await?,
-        RoomEnvelope::PrivateChannel(room) => room.load_latest_messages().await?,
-        RoomEnvelope::PublicChannel(room) => room.load_latest_messages().await?,
-        RoomEnvelope::Generic(room) => room.load_latest_messages().await?,
-    };
+    let mut stanza_id: Option<StanzaId> = None;
 
-    for message in messages {
-        println!("{}", MessageEnvelope(message));
+    let room = room.to_generic_room();
+
+    loop {
+        let messages = if let Some(stanza_id) = &stanza_id {
+            room.load_messages_before(stanza_id).await
+        } else {
+            room.load_latest_messages().await
+        }?;
+
+        let is_last_page = messages.is_last;
+
+        stanza_id = messages
+            .messages
+            .first()
+            .and_then(|id| id.stanza_id.clone());
+
+        for message in messages.into_iter().rev() {
+            println!("{}", MessageEnvelope(message));
+        }
+
+        if is_last_page {
+            break;
+        }
     }
 
     Ok(())
@@ -825,6 +841,8 @@ enum Selection {
     ListPresenceSubRequests,
     #[strum(serialize = "Send message to contact or room")]
     SendMessageToRoom,
+    #[strum(serialize = "Send continuous messages to a room")]
+    SendContinuousMessagesToRoom,
     #[strum(serialize = "Send message to anyhow")]
     SendMessageToAnyone,
     #[strum(serialize = "Load messages")]
@@ -1004,6 +1022,24 @@ async fn main() -> Result<()> {
             }
             Selection::SendMessageToRoom => {
                 send_message(&client).await?;
+            }
+            Selection::SendContinuousMessagesToRoom => {
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+
+                let mut idx = 1;
+
+                loop {
+                    room.to_generic_room()
+                        .send_message(SendMessageRequest {
+                            body: Some(format!("Message {idx}")),
+                            attachments: vec![],
+                        })
+                        .await?;
+                    idx += 1;
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+                }
             }
             Selection::SendMessageToAnyone => {
                 let jid = prompt_bare_jid(None);

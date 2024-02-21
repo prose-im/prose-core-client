@@ -16,7 +16,7 @@ use crate::domain::messaging::services::MessageArchiveService;
 use crate::domain::shared::models::RoomType;
 use crate::infra::xmpp::XMPPClient;
 
-const MESSAGE_PAGE_SIZE: u32 = 50;
+const MESSAGE_PAGE_SIZE: u32 = 100;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]

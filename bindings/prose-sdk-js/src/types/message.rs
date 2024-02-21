@@ -6,10 +6,20 @@
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos;
+use prose_core_client::dtos::StanzaId;
 
 use crate::types::{Attachment, AttachmentsArray, BareJid, IntoJSArray};
 
 use super::{BareJidArray, ReactionsArray};
+
+#[wasm_bindgen]
+pub struct ArchiveID(StanzaId);
+
+impl AsRef<StanzaId> for ArchiveID {
+    fn as_ref(&self) -> &StanzaId {
+        &self.0
+    }
+}
 
 #[wasm_bindgen]
 pub struct Message(dtos::Message);
@@ -44,8 +54,8 @@ impl Message {
     }
 
     #[wasm_bindgen(getter, js_name = "archiveId")]
-    pub fn stanza_id(&self) -> Option<String> {
-        self.0.stanza_id.as_ref().map(|id| id.to_string())
+    pub fn stanza_id(&self) -> Option<ArchiveID> {
+        self.0.stanza_id.as_ref().map(|id| ArchiveID(id.clone()))
     }
 
     #[wasm_bindgen(getter, js_name = "from")]

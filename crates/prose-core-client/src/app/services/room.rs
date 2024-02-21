@@ -11,6 +11,7 @@ use std::sync::Arc;
 use anyhow::{format_err, Result};
 use chrono::Duration;
 use tracing::{debug, info};
+use xmpp_parsers::mam::Complete;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
@@ -22,7 +23,8 @@ use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{
-    Message as MessageDTO, MessageSender, RoomState, SendMessageRequest, UserBasicInfo, UserId,
+    Message as MessageDTO, MessageResultSet, MessageSender, RoomState, SendMessageRequest,
+    StanzaId, UserBasicInfo, UserId,
 };
 use crate::{ClientEvent, ClientRoomEventType};
 
@@ -225,12 +227,22 @@ impl<Kind> Room<Kind> {
         self.drafts_repo.get(&self.data.room_id).await
     }
 
-    pub async fn load_latest_messages(&self) -> Result<Vec<MessageDTO>> {
-        debug!("Loading messages from server…");
+    pub async fn load_latest_messages(&self) -> Result<MessageResultSet> {
+        debug!("Loading latest messages from server…");
+        self.load_messages(None).await
+    }
 
-        let (messages, _) = self
+    pub async fn load_messages_before(&self, stanza_id: &StanzaId) -> Result<MessageResultSet> {
+        debug!("Loading latest messages before '{stanza_id}' from server…");
+        self.load_messages(Some(stanza_id)).await
+    }
+}
+
+impl<Kind> Room<Kind> {
+    async fn load_messages(&self, before: Option<&StanzaId>) -> Result<MessageResultSet> {
+        let (messages, fin) = self
             .message_archive_service
-            .load_messages(&self.data.room_id, &self.data.r#type, None, None)
+            .load_messages(&self.data.room_id, &self.data.r#type, before, None)
             .await?;
 
         let messages = messages
@@ -243,11 +255,14 @@ impl<Kind> Room<Kind> {
             .append(&self.data.room_id, messages.as_slice())
             .await?;
 
-        Ok(self.reduce_messages_and_add_sender(messages).await)
-    }
-}
+        let result_set = MessageResultSet {
+            messages: self.reduce_messages_and_add_sender(messages).await,
+            is_last: fin.complete == Complete::True,
+        };
 
-impl<Kind> Room<Kind> {
+        Ok(result_set)
+    }
+
     async fn reduce_messages_and_add_sender(&self, messages: Vec<MessageLike>) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
         let mut message_dtos = Vec::with_capacity(messages.len());
