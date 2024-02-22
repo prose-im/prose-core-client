@@ -6,7 +6,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;
-use xmpp_parsers::mam::Fin;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
@@ -14,15 +13,22 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use crate::domain::messaging::models::StanzaId;
 use crate::domain::shared::models::RoomType;
 
+pub struct MessagePage {
+    pub messages: Vec<ArchivedMessage>,
+    pub is_last: bool,
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait MessageArchiveService: SendUnlessWasm + SyncUnlessWasm {
+    /// Returns requested messages in the order from oldest to newest.
     async fn load_messages(
         &self,
         room_jid: &BareJid,
         room_type: &RoomType,
         before: Option<&StanzaId>,
         after: Option<&StanzaId>,
-    ) -> Result<(Vec<ArchivedMessage>, Fin)>;
+        batch_size: u32,
+    ) -> Result<MessagePage>;
 }

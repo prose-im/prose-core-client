@@ -70,7 +70,9 @@ async fn test_load_messages_targeting() -> Result<()> {
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(2).build_message_like();
     let message3 = MessageBuilder::new_with_index(3)
-        .build_message_like_with_payload(1, MessageLikePayload::Retraction {});
+        .set_target_message_idx(1)
+        .set_payload(MessageLikePayload::Retraction {})
+        .build_message_like();
     let message4 = MessageBuilder::new_with_index(4)
         .set_from(user_id!("b@prose.org"))
         .build_reaction_to(2, &["🍿".into(), "📼".into()]);
@@ -79,7 +81,9 @@ async fn test_load_messages_targeting() -> Result<()> {
         .set_from(user_id!("c@prose.org"))
         .build_reaction_to(2, &["🍕".into()]);
     let message7 = MessageBuilder::new_with_index(7)
-        .build_message_like_with_payload(5, MessageLikePayload::ReadReceipt);
+        .set_target_message_idx(5)
+        .set_payload(MessageLikePayload::ReadReceipt)
+        .build_message_like();
 
     let messages = vec![
         message1, message2, message3, message4, message5, message6, message7,

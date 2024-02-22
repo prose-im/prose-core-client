@@ -15,6 +15,12 @@ use super::{BareJidArray, ReactionsArray};
 #[wasm_bindgen]
 pub struct ArchiveID(StanzaId);
 
+impl From<StanzaId> for ArchiveID {
+    fn from(value: StanzaId) -> Self {
+        Self(value)
+    }
+}
+
 impl AsRef<StanzaId> for ArchiveID {
     fn as_ref(&self) -> &StanzaId {
         &self.0

@@ -13,11 +13,19 @@ use crate::domain::connection::models::{ConnectionProperties, HttpUploadService}
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 use crate::dtos::UserResourceId;
 
+pub struct AppConfig {
+    /// The number of messages to return in a MessageResultSet.
+    pub message_page_size: u32,
+    /// The maximum number of pages to fetch when trying to fill a MessageResultSet.
+    pub max_message_pages_to_load: u32,
+}
+
 pub struct AppContext {
     pub connection_properties: RwLock<Option<ConnectionProperties>>,
     pub capabilities: Capabilities,
     pub software_version: SoftwareVersion,
     pub is_observing_rooms: AtomicBool,
+    pub config: AppConfig,
 }
 
 impl AppContext {
@@ -27,6 +35,16 @@ impl AppContext {
             capabilities,
             software_version,
             is_observing_rooms: Default::default(),
+            config: Default::default(),
+        }
+    }
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            message_page_size: 100,
+            max_message_pages_to_load: 5,
         }
     }
 }

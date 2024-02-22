@@ -11,7 +11,6 @@ use std::sync::Arc;
 use anyhow::{format_err, Result};
 use chrono::Duration;
 use tracing::{debug, info};
-use xmpp_parsers::mam::Complete;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
@@ -240,15 +239,47 @@ impl<Kind> Room<Kind> {
 
 impl<Kind> Room<Kind> {
     async fn load_messages(&self, before: Option<&StanzaId>) -> Result<MessageResultSet> {
-        let (messages, fin) = self
-            .message_archive_service
-            .load_messages(&self.data.room_id, &self.data.r#type, before, None)
-            .await?;
+        let message_page_size = self.ctx.config.message_page_size;
+        let max_message_pages_to_load = self.ctx.config.max_message_pages_to_load as usize;
 
-        let messages = messages
-            .iter()
-            .filter_map(|msg| MessageLike::try_from(msg).ok())
-            .collect::<Vec<_>>();
+        let mut messages = vec![];
+        let mut last_message_id: Option<StanzaId> = before.cloned();
+        let mut num_text_messages = 0;
+        let mut loaded_pages = 0;
+
+        while num_text_messages < message_page_size && loaded_pages < max_message_pages_to_load {
+            let page = self
+                .message_archive_service
+                .load_messages(
+                    &self.data.room_id,
+                    &self.data.r#type,
+                    last_message_id.as_ref(),
+                    None,
+                    message_page_size,
+                )
+                .await?;
+
+            last_message_id = page.messages.first().map(|m| StanzaId::from(m.id.as_ref()));
+
+            for archive_message in page.messages.into_iter().rev() {
+                let Ok(parsed_message) = MessageLike::try_from(&archive_message) else {
+                    continue;
+                };
+
+                if parsed_message.payload.is_message() {
+                    num_text_messages += 1;
+                }
+
+                messages.push(parsed_message)
+            }
+
+            loaded_pages += 1;
+
+            if page.is_last {
+                last_message_id = None;
+                break;
+            }
+        }
 
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo
@@ -256,14 +287,19 @@ impl<Kind> Room<Kind> {
             .await?;
 
         let result_set = MessageResultSet {
-            messages: self.reduce_messages_and_add_sender(messages).await,
-            is_last: fin.complete == Complete::True,
+            messages: self
+                .reduce_messages_and_add_sender(messages.into_iter().rev())
+                .await,
+            last_message_id,
         };
 
         Ok(result_set)
     }
 
-    async fn reduce_messages_and_add_sender(&self, messages: Vec<MessageLike>) -> Vec<MessageDTO> {
+    async fn reduce_messages_and_add_sender(
+        &self,
+        messages: impl IntoIterator<Item = MessageLike>,
+    ) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
         let mut message_dtos = Vec::with_capacity(messages.len());
 

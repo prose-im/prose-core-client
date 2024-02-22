@@ -4,12 +4,15 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use super::Message;
+use crate::dtos::StanzaId;
 
 #[derive(Debug, PartialEq)]
 pub struct MessageResultSet {
+    /// The requested messages in the order from oldest to newest.
     pub messages: Vec<Message>,
-    /// Are there more messages or is this the last page?
-    pub is_last: bool,
+    /// Can be used to load more messages. `last_message_id` might not be contained in `messages`.
+    /// If not set there are no more messages to load.
+    pub last_message_id: Option<StanzaId>,
 }
 
 impl IntoIterator for MessageResultSet {

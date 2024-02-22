@@ -5,14 +5,15 @@
 
 use anyhow::Result;
 use mockall::predicate;
-use xmpp_parsers::mam::{Complete, Fin};
-use xmpp_parsers::rsm::SetResult;
+use pretty_assertions::assert_eq;
+use std::iter;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
+use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
-use prose_core_client::dtos::{MessageResultSet, Participant};
+use prose_core_client::dtos::{MessageResultSet, Participant, Reaction};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{occupant_id, room_id, user_id};
 use prose_xmpp::stanza::message::MucUser;
@@ -119,10 +120,10 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async {
-                Ok((
-                    vec![
+                Ok(MessagePage {
+                    messages: vec![
                         MessageBuilder::new_with_index(1)
                             .set_from(occupant_id!("room@conference.prose.org/a"))
                             .build_archived_message(
@@ -150,17 +151,8 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                             .set_from(occupant_id!("room@conference.prose.org/denise_doe"))
                             .build_archived_message("q1", None),
                     ],
-                    Fin {
-                        complete: Complete::True,
-                        queryid: None,
-                        set: SetResult {
-                            first: None,
-                            first_index: None,
-                            last: None,
-                            count: None,
-                        },
-                    },
-                ))
+                    is_last: true,
+                })
             })
         });
 
@@ -192,7 +184,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
                     .set_from_name("Denise Doe")
                     .build_message_dto(),
             ],
-            is_last: true
+            last_message_id: None
         }
     );
 
@@ -209,20 +201,18 @@ async fn test_toggle_reaction() -> Result<()> {
                 MessageBuilder::new_with_index(1).build_message_like(),
                 MessageBuilder::new_with_index(2)
                     .set_from(mock_data::account_jid().into_user_id())
-                    .build_message_like_with_payload(
-                        1,
-                        MessageLikePayload::Reaction {
-                            emojis: vec!["🍻".into()],
-                        },
-                    ),
+                    .set_target_message_idx(1)
+                    .set_payload(MessageLikePayload::Reaction {
+                        emojis: vec!["🍻".into()],
+                    })
+                    .build_message_like(),
                 MessageBuilder::new_with_index(3)
                     .set_from(mock_data::account_jid().into_user_id())
-                    .build_message_like_with_payload(
-                        1,
-                        MessageLikePayload::Reaction {
-                            emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
-                        },
-                    ),
+                    .set_target_message_idx(1)
+                    .set_payload(MessageLikePayload::Reaction {
+                        emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
+                    })
+                    .build_message_like(),
             ])
         })
     });
@@ -266,6 +256,359 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         .to_generic_room();
 
     room.set_name("New Name").await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_fills_result_set_when_loading_messages() -> Result<()> {
+    let mut deps = MockRoomFactoryDependencies::default();
+
+    deps.ctx.config.message_page_size = 5;
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, page_size| {
+            assert_eq!(5, page_size);
+            assert!(before.is_none());
+
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: vec![
+                        MessageBuilder::new_with_index(100)
+                            .set_from(user_id!("b@prose.org"))
+                            .set_target_message_idx(90)
+                            .set_payload(MessageLikePayload::Reaction {
+                                emojis: vec!["✅".into()],
+                            })
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(101)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_payload(MessageLikePayload::Message {
+                                body: "Message 101".to_string(),
+                                attachments: vec![],
+                            })
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(102)
+                            .set_from(user_id!("b@prose.org"))
+                            .set_payload(MessageLikePayload::Message {
+                                body: "Message 102".to_string(),
+                                attachments: vec![],
+                            })
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(103)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_target_message_idx(101)
+                            .set_payload(MessageLikePayload::Reaction {
+                                emojis: vec!["🍕".into()],
+                            })
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(104)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_target_message_idx(102)
+                            .set_payload(MessageLikePayload::Reaction {
+                                emojis: vec!["🎉".into()],
+                            })
+                            .build_archived_message("q1", None),
+                    ],
+                    is_last: false,
+                })
+            })
+        });
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, page_size| {
+            assert_eq!(5, page_size);
+            assert_eq!(Some(&MessageBuilder::stanza_id_for_index(100)), before);
+
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: vec![
+                        MessageBuilder::new_with_index(90)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_payload(MessageLikePayload::Message {
+                                body: "Message 90".to_string(),
+                                attachments: vec![],
+                            })
+                            .build_archived_message("q2", None),
+                        MessageBuilder::new_with_index(91)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_target_message_idx(90)
+                            .set_payload(MessageLikePayload::Reaction {
+                                emojis: vec!["✅".into()],
+                            })
+                            .build_archived_message("q2", None),
+                        MessageBuilder::new_with_index(92)
+                            .set_from(user_id!("b@prose.org"))
+                            .set_payload(MessageLikePayload::Message {
+                                body: "Message 92".to_string(),
+                                attachments: vec![],
+                            })
+                            .build_archived_message("q2", None),
+                        MessageBuilder::new_with_index(93)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_payload(MessageLikePayload::Message {
+                                body: "Message 93".to_string(),
+                                attachments: vec![],
+                            })
+                            .build_archived_message("q2", None),
+                        MessageBuilder::new_with_index(94)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_payload(MessageLikePayload::Message {
+                                body: "Message 94".to_string(),
+                                attachments: vec![],
+                            })
+                            .build_archived_message("q2", None),
+                    ],
+                    is_last: true,
+                })
+            })
+        });
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .returning(|_| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
+        .expect_append()
+        .returning(|_, _| Box::pin(async { Ok(()) }));
+
+    let room = RoomFactory::from(deps)
+        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .to_generic_room();
+
+    let result = room.load_latest_messages().await?;
+
+    assert_eq!(None, result.last_message_id.as_ref().map(|id| id.as_ref()));
+
+    assert_eq!(
+        vec![
+            MessageBuilder::new_with_index(90)
+                .set_from(user_id!("a@prose.org"))
+                .set_from_name("A")
+                .set_payload(MessageLikePayload::Message {
+                    body: "Message 90".to_string(),
+                    attachments: vec![],
+                })
+                .set_reactions([Reaction {
+                    emoji: "✅".into(),
+                    from: vec![
+                        user_id!("a@prose.org").into(),
+                        user_id!("b@prose.org").into(),
+                    ]
+                },])
+                .build_message_dto(),
+            MessageBuilder::new_with_index(92)
+                .set_from(user_id!("b@prose.org"))
+                .set_from_name("B")
+                .set_payload(MessageLikePayload::Message {
+                    body: "Message 92".to_string(),
+                    attachments: vec![],
+                })
+                .build_message_dto(),
+            MessageBuilder::new_with_index(93)
+                .set_from(user_id!("a@prose.org"))
+                .set_from_name("A")
+                .set_payload(MessageLikePayload::Message {
+                    body: "Message 93".to_string(),
+                    attachments: vec![],
+                })
+                .build_message_dto(),
+            MessageBuilder::new_with_index(94)
+                .set_from(user_id!("a@prose.org"))
+                .set_from_name("A")
+                .set_payload(MessageLikePayload::Message {
+                    body: "Message 94".to_string(),
+                    attachments: vec![],
+                })
+                .build_message_dto(),
+            MessageBuilder::new_with_index(101)
+                .set_from(user_id!("a@prose.org"))
+                .set_from_name("A")
+                .set_payload(MessageLikePayload::Message {
+                    body: "Message 101".to_string(),
+                    attachments: vec![],
+                })
+                .set_reactions([Reaction {
+                    emoji: "🍕".into(),
+                    from: vec![user_id!("a@prose.org").into()]
+                }])
+                .build_message_dto(),
+            MessageBuilder::new_with_index(102)
+                .set_from(user_id!("b@prose.org"))
+                .set_from_name("B")
+                .set_payload(MessageLikePayload::Message {
+                    body: "Message 102".to_string(),
+                    attachments: vec![],
+                })
+                .set_reactions([Reaction {
+                    emoji: "🎉".into(),
+                    from: vec![user_id!("a@prose.org").into(),]
+                }])
+                .build_message_dto()
+        ],
+        result.messages
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
+    let mut deps = MockRoomFactoryDependencies::default();
+
+    deps.ctx.config.message_page_size = 5;
+    deps.ctx.config.max_message_pages_to_load = 2;
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, page_size| {
+            assert_eq!(5, page_size);
+            assert_eq!(None, before);
+
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: (96..=99)
+                        .into_iter()
+                        .map(|idx| {
+                            MessageBuilder::new_with_index(idx)
+                                .set_target_message_idx(1001)
+                                .set_payload(MessageLikePayload::Reaction { emojis: vec![] })
+                                .build_archived_message("q1", None)
+                        })
+                        .chain(iter::once(
+                            MessageBuilder::new_with_index(100)
+                                .set_from(user_id!("a@prose.org"))
+                                .set_payload(MessageLikePayload::Message {
+                                    body: "Message 100".to_string(),
+                                    attachments: vec![],
+                                })
+                                .build_archived_message("q1", None),
+                        ))
+                        .collect(),
+                    is_last: false,
+                })
+            })
+        });
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, page_size| {
+            assert_eq!(5, page_size);
+            assert_eq!(Some(&MessageBuilder::stanza_id_for_index(96)), before);
+
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: (91..=95)
+                        .into_iter()
+                        .map(|idx| {
+                            MessageBuilder::new_with_index(idx)
+                                .set_target_message_idx(1001)
+                                .set_payload(MessageLikePayload::Reaction { emojis: vec![] })
+                                .build_archived_message("q1", None)
+                        })
+                        .collect(),
+                    is_last: false,
+                })
+            })
+        });
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .returning(|_| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
+        .expect_append()
+        .returning(|_, _| Box::pin(async { Ok(()) }));
+
+    let room = RoomFactory::from(deps)
+        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .to_generic_room();
+
+    let result = room.load_latest_messages().await?;
+
+    assert_eq!(
+        Some(MessageBuilder::stanza_id_for_index(91).as_ref()),
+        result.last_message_id.as_ref().map(|id| id.as_ref())
+    );
+
+    assert_eq!(
+        vec![MessageBuilder::new_with_index(100)
+            .set_from(user_id!("a@prose.org"))
+            .set_from_name("A")
+            .set_payload(MessageLikePayload::Message {
+                body: "Message 100".to_string(),
+                attachments: vec![],
+            })
+            .build_message_dto()],
+        result.messages
+    );
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_stops_at_last_page() -> Result<()> {
+    let mut deps = MockRoomFactoryDependencies::default();
+
+    deps.ctx.config.message_page_size = 100;
+    deps.ctx.config.max_message_pages_to_load = 100;
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, page_size| {
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: (96..=100)
+                        .into_iter()
+                        .map(|idx| {
+                            MessageBuilder::new_with_index(idx).build_archived_message("q1", None)
+                        })
+                        .collect(),
+                    is_last: false,
+                })
+            })
+        });
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, page_size| {
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: (93..=95)
+                        .into_iter()
+                        .map(|idx| {
+                            MessageBuilder::new_with_index(idx).build_archived_message("q1", None)
+                        })
+                        .collect(),
+                    is_last: true,
+                })
+            })
+        });
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .returning(|_| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
+        .expect_append()
+        .returning(|_, _| Box::pin(async { Ok(()) }));
+
+    let room = RoomFactory::from(deps)
+        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .to_generic_room();
+
+    let result = room.load_latest_messages().await?;
+
+    assert_eq!(None, result.last_message_id.as_ref().map(|id| id.as_ref()));
+    assert_eq!(8, result.messages.len());
 
     Ok(())
 }

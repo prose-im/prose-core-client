@@ -74,7 +74,14 @@ fn select_command() -> Selection {
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("What do you want to do?")
         .default(0)
-        .items(&options[..])
+        .items(
+            options
+                .iter()
+                .enumerate()
+                .map(|(idx, o)| format!("{}. {}", idx + 1, o))
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
         .interact()
         .ok();
 
@@ -609,18 +616,13 @@ async fn load_messages(client: &Client) -> Result<()> {
             room.load_latest_messages().await
         }?;
 
-        let is_last_page = messages.is_last;
-
-        stanza_id = messages
-            .messages
-            .first()
-            .and_then(|id| id.stanza_id.clone());
+        stanza_id = messages.last_message_id.clone();
 
         for message in messages.into_iter().rev() {
             println!("{}", MessageEnvelope(message));
         }
 
-        if is_last_page {
+        if stanza_id.is_none() {
             break;
         }
     }

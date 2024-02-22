@@ -13,7 +13,7 @@ use xmpp_parsers::{date, mam, Element};
 
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
-use prose_xmpp::stanza::message::{Forwarded, MucUser};
+use prose_xmpp::stanza::message::{Forwarded, MucUser, Reactions};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
@@ -37,7 +37,8 @@ pub struct MessageBuilder {
     from: ParticipantId,
     from_name: Option<String>,
     to: BareJid,
-    body: String,
+    target_message_idx: Option<u32>,
+    payload: MessageLikePayload,
     timestamp: DateTime<Utc>,
     is_read: bool,
     is_edited: bool,
@@ -49,17 +50,25 @@ impl MessageBuilder {
     pub fn id_for_index(idx: u32) -> MessageId {
         format!("msg-{}", idx).into()
     }
+
+    pub fn stanza_id_for_index(idx: u32) -> StanzaId {
+        format!("res-{}", idx).into()
+    }
 }
 
 impl MessageBuilder {
     pub fn new_with_index(idx: u32) -> Self {
         MessageBuilder {
             id: Self::id_for_index(idx),
-            stanza_id: Some(format!("res-{}", idx).into()),
+            stanza_id: Some(Self::stanza_id_for_index(idx)),
             from: ParticipantId::User(BareJid::ours().into()),
             from_name: None,
             to: BareJid::theirs(),
-            body: format!("Message {}", idx).to_string(),
+            target_message_idx: None,
+            payload: MessageLikePayload::Message {
+                body: format!("Message {}", idx),
+                attachments: vec![],
+            },
             timestamp: mock_data::reference_date() + Duration::minutes(idx.into()),
             is_read: false,
             is_edited: false,
@@ -82,15 +91,34 @@ impl MessageBuilder {
         self.from_name = Some(name.into());
         self
     }
+
+    pub fn set_payload(mut self, payload: MessageLikePayload) -> Self {
+        self.payload = payload;
+        self
+    }
+
+    pub fn set_target_message_idx(mut self, idx: u32) -> Self {
+        self.target_message_idx = Some(idx);
+        self
+    }
+
+    pub fn set_reactions(mut self, reactions: impl IntoIterator<Item = Reaction>) -> Self {
+        self.reactions = reactions.into_iter().collect();
+        self
+    }
 }
 
 impl MessageBuilder {
     pub fn build_message(self) -> Message {
+        let MessageLikePayload::Message { body, .. } = self.payload else {
+            panic!("Cannot build Message from {:?}", self.payload);
+        };
+
         Message {
             id: Some(self.id),
             stanza_id: self.stanza_id,
             from: self.from,
-            body: self.body,
+            body,
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
             is_edited: self.is_edited,
@@ -101,6 +129,10 @@ impl MessageBuilder {
     }
 
     pub fn build_message_dto(self) -> MessageDTO {
+        let MessageLikePayload::Message { body, .. } = self.payload else {
+            panic!("Cannot build MessageDTO from {:?}", self.payload);
+        };
+
         MessageDTO {
             id: Some(self.id),
             stanza_id: self.stanza_id,
@@ -110,7 +142,7 @@ impl MessageBuilder {
                     .from_name
                     .expect("You must set a name when building a MessageDTO"),
             },
-            body: self.body,
+            body,
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
             is_edited: self.is_edited,
@@ -124,40 +156,20 @@ impl MessageBuilder {
         MessageLike {
             id: MessageLikeId::new(Some(self.id)),
             stanza_id: self.stanza_id,
-            target: None,
+            target: self.target_message_idx.map(Self::id_for_index),
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
-            payload: MessageLikePayload::Message {
-                body: self.body,
-                attachments: vec![],
-            },
-        }
-    }
-
-    pub fn build_message_like_with_payload(
-        self,
-        target: u32,
-        payload: MessageLikePayload,
-    ) -> MessageLike {
-        MessageLike {
-            id: MessageLikeId::new(Some(self.id)),
-            stanza_id: self.stanza_id,
-            target: Some(Self::id_for_index(target)),
-            to: Some(self.to),
-            from: self.from,
-            timestamp: self.timestamp,
-            payload,
+            payload: self.payload,
         }
     }
 
     pub fn build_reaction_to(self, target: u32, emoji: &[message::Emoji]) -> MessageLike {
-        self.build_message_like_with_payload(
-            target,
-            MessageLikePayload::Reaction {
+        self.set_target_message_idx(target)
+            .set_payload(MessageLikePayload::Reaction {
                 emojis: emoji.iter().cloned().collect(),
-            },
-        )
+            })
+            .build_message_like()
     }
 
     pub fn build_mam_message(
@@ -182,8 +194,27 @@ impl MessageBuilder {
                 ParticipantId::Occupant(_) => MessageType::Groupchat,
             })
             .set_to(self.to)
-            .set_from(self.from)
-            .set_body(self.body);
+            .set_from(self.from);
+
+        match self.payload {
+            MessageLikePayload::Message { body, .. } => message = message.set_body(body),
+            MessageLikePayload::Reaction { emojis } => {
+                message = message.set_message_reactions(Reactions {
+                    id: Self::id_for_index(
+                        self.target_message_idx.expect("Missing target_message_idx"),
+                    )
+                    .as_ref()
+                    .into(),
+                    reactions: emojis.into_iter().map(Into::into).collect(),
+                })
+            }
+            MessageLikePayload::Retraction
+            | MessageLikePayload::Correction { .. }
+            | MessageLikePayload::DeliveryReceipt
+            | MessageLikePayload::ReadReceipt => {
+                panic!("Cannot build ArchivedMessage from {:?}", self.payload)
+            }
+        }
 
         if let Some(muc_user) = muc_user {
             message = message.set_muc_user(muc_user);

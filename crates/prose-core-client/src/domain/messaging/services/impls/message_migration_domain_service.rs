@@ -5,12 +5,12 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use xmpp_parsers::mam::Complete;
 
-use crate::domain::messaging::models::StanzaId;
 use prose_proc_macros::DependenciesStruct;
 
 use crate::app::deps::{DynMessageArchiveService, DynMessagingService};
+use crate::domain::messaging::models::StanzaId;
+use crate::domain::messaging::services::MessagePage;
 use crate::domain::shared::models::{RoomId, RoomType};
 
 use super::super::MessageMigrationDomainService as MessageMigrationDomainServiceTrait;
@@ -34,13 +34,14 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
         let mut first_message_id: Option<StanzaId> = None;
 
         loop {
-            let (messages, sentinel) = self
+            let MessagePage { messages, is_last } = self
                 .message_archive_service
                 .load_messages(
                     &source_room,
                     source_room_type,
                     first_message_id.as_ref(),
                     None,
+                    100,
                 )
                 .await?;
 
@@ -56,7 +57,7 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
                     .await?;
             }
 
-            if sentinel.complete == Complete::True {
+            if is_last {
                 break;
             }
         }

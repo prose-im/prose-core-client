@@ -80,6 +80,7 @@ impl Default for AppContext {
             capabilities: Capabilities::new("Prose", "https://prose.org", vec![]),
             software_version: Default::default(),
             is_observing_rooms: Default::default(),
+            config: Default::default(),
         }
     }
 }
