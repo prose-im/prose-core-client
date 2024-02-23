@@ -562,7 +562,7 @@ async fn test_stops_at_last_page() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, page_size| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: (96..=100)
@@ -579,7 +579,7 @@ async fn test_stops_at_last_page() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, page_size| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: (93..=95)
