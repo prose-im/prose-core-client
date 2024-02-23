@@ -197,7 +197,7 @@ impl<Kind> Room<Kind> {
             .await
     }
 
-    pub async fn load_messages_with_ids(&self, ids: &[&MessageId]) -> Result<Vec<MessageDTO>> {
+    pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<MessageDTO>> {
         let messages = self.message_repo.get_all(&self.data.room_id, ids).await?;
         Ok(self.reduce_messages_and_add_sender(messages).await)
     }

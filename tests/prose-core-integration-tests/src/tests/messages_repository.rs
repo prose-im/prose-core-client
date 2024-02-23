@@ -25,7 +25,7 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
     repo.append(&room_id, &[message.clone()]).await?;
 
     assert_eq!(
-        repo.get_all(&room_id, &[&message.id.clone().into_original_id().unwrap()])
+        repo.get_all(&room_id, &[message.id.clone().into_original_id().unwrap()])
             .await?,
         vec![message]
     );
@@ -53,7 +53,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     message.toggle_reaction(&user_id!("b@prose.org").into(), "📼".into());
 
     assert_eq!(
-        repo.get_all(&room_id, &[&MessageBuilder::id_for_index(1)])
+        repo.get_all(&room_id, &[MessageBuilder::id_for_index(1)])
             .await?,
         messages
     );
@@ -95,9 +95,9 @@ async fn test_load_messages_targeting() -> Result<()> {
         repo.get_all(
             &room_id,
             &[
-                &MessageBuilder::id_for_index(1),
-                &MessageBuilder::id_for_index(2),
-                &MessageBuilder::id_for_index(5)
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2),
+                MessageBuilder::id_for_index(5)
             ]
         )
         .await?,

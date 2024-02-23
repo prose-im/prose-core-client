@@ -18,7 +18,7 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     /// Returns all parts (MessageLike) that make up message with `id`. Sorted chronologically.
     async fn get(&self, room_id: &RoomId, id: &MessageId) -> Result<Vec<MessageLike>>;
     /// Returns all parts (MessageLike) that make up all messages in `ids`. Sorted chronologically.
-    async fn get_all(&self, room_id: &RoomId, ids: &[&MessageId]) -> Result<Vec<MessageLike>>;
+    async fn get_all(&self, room_id: &RoomId, ids: &[MessageId]) -> Result<Vec<MessageLike>>;
     async fn contains(&self, id: &MessageId) -> Result<bool>;
     async fn append(&self, room_id: &RoomId, messages: &[MessageLike]) -> Result<()>;
     async fn clear_cache(&self) -> Result<()>;

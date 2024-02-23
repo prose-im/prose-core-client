@@ -59,10 +59,10 @@ impl KeyType for MessageId {
 #[async_trait]
 impl MessagesRepository for CachingMessageRepository {
     async fn get(&self, room_id: &RoomId, id: &MessageId) -> Result<Vec<MessageLike>> {
-        Ok(self.get_all(room_id, &[id]).await?)
+        Ok(self.get_all(room_id, &[id.clone()]).await?)
     }
 
-    async fn get_all(&self, _room_id: &RoomId, ids: &[&MessageId]) -> Result<Vec<MessageLike>> {
+    async fn get_all(&self, _room_id: &RoomId, ids: &[MessageId]) -> Result<Vec<MessageLike>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessagesRecord::collection()])
@@ -72,7 +72,7 @@ impl MessagesRepository for CachingMessageRepository {
 
         let mut messages: Vec<MessageLike> = vec![];
         for id in ids {
-            if let Some(message) = collection.get(*id).await? {
+            if let Some(message) = collection.get(id).await? {
                 messages.push(message);
             }
             messages.append(

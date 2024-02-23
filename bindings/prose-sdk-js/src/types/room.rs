@@ -315,11 +315,10 @@ macro_rules! base_room_impl {
                     .into_iter()
                     .map(|id| MessageId::from(id))
                     .collect();
-                let message_id_refs = message_ids.iter().collect::<Vec<_>>();
 
                 let messages = self
                     .room
-                    .load_messages_with_ids(&message_id_refs)
+                    .load_messages_with_ids(&message_ids)
                     .await
                     .map_err(WasmError::from)?;
 

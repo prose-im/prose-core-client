@@ -67,9 +67,9 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 
     assert_eq!(
         room.load_messages_with_ids(&[
-            &MessageBuilder::id_for_index(1),
-            &MessageBuilder::id_for_index(2),
-            &MessageBuilder::id_for_index(3)
+            MessageBuilder::id_for_index(1),
+            MessageBuilder::id_for_index(2),
+            MessageBuilder::id_for_index(3)
         ])
         .await?,
         vec![

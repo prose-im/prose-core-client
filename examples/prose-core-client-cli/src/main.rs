@@ -744,10 +744,9 @@ impl Delegate {
 
         match r#type {
             ClientRoomEventType::MessagesAppended { message_ids } => {
-                let message_id_refs = message_ids.iter().collect::<Vec<_>>();
                 let messages = room
                     .to_generic_room()
-                    .load_messages_with_ids(message_id_refs.as_slice())
+                    .load_messages_with_ids(&message_ids)
                     .await?;
                 for message in messages {
                     println!("Received message:\n{}", MessageEnvelope(message));
