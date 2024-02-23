@@ -245,6 +245,7 @@ impl<Kind> Room<Kind> {
         let mut messages = vec![];
         let mut last_message_id: Option<StanzaId> = before.cloned();
         let mut num_text_messages = 0;
+        let mut text_message_ids = vec![];
         let mut loaded_pages = 0;
 
         while num_text_messages < message_page_size && loaded_pages < max_message_pages_to_load {
@@ -261,6 +262,11 @@ impl<Kind> Room<Kind> {
 
             last_message_id = page.messages.first().map(|m| StanzaId::from(m.id.as_ref()));
 
+            // We're potentially loading multiple pages all oldest from newest, i.e.:
+            // Page 1: 4, 5, 6
+            // Page 2: 1, 2, 3
+            // and we want to push them into `messages` in the order 6, 5, 4, 3, 2, 1 which is
+            // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
                 let Ok(parsed_message) = MessageLike::try_from(&archive_message) else {
                     continue;
@@ -268,6 +274,9 @@ impl<Kind> Room<Kind> {
 
                 if parsed_message.payload.is_message() {
                     num_text_messages += 1;
+                    if let Some(message_id) = parsed_message.id.original_id().cloned() {
+                        text_message_ids.push(message_id)
+                    }
                 }
 
                 messages.push(parsed_message)
@@ -281,14 +290,45 @@ impl<Kind> Room<Kind> {
             }
         }
 
+        let later_targeting_earlier_messages = if before.is_some() && !text_message_ids.is_empty() {
+            // We want to only load messages that are newer than our newest message, since we might
+            // have older messages in our cache from previous runs and these could mess up the
+            // order if we'll append them to the end of our array for reducing.
+            // Note that `messages` is currently sorted from newest to oldest.
+            if let Some(newest_message_timestamp) = messages.first().as_ref().map(|m| m.timestamp) {
+                self.message_repo
+                    .get_messages_targeting(
+                        &self.data.room_id,
+                        &text_message_ids,
+                        &newest_message_timestamp,
+                    )
+                    .await?
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        };
+
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo
-            .append(&self.data.room_id, messages.as_slice())
+            .append(&self.data.room_id, &messages)
             .await?;
 
+        // So we have our `messages` in the order from newest to oldest (6, 5, 4, …) and need
+        // them in the order from oldest to newest (1, 2, 3, …) to reduce and return them.
+        // `later_targeting_earlier_messages` is already in the order from oldest to newest and
+        // is guaranteed to only contain messages newer than those in `messages`. So we'll flip
+        // `messages`, chain `later_targeting_earlier_messages` and everything should be fine
+        // and dandy…
         let result_set = MessageResultSet {
             messages: self
-                .reduce_messages_and_add_sender(messages.into_iter().rev())
+                .reduce_messages_and_add_sender(
+                    messages
+                        .into_iter()
+                        .rev()
+                        .chain(later_targeting_earlier_messages.into_iter()),
+                )
                 .await,
             last_message_id,
         };

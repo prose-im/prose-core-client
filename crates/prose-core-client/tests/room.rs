@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use chrono::{TimeZone, Utc};
 use mockall::predicate;
 use pretty_assertions::assert_eq;
 use std::iter;
@@ -13,7 +14,7 @@ use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
-use prose_core_client::dtos::{MessageResultSet, Participant, Reaction};
+use prose_core_client::dtos::{MessageResultSet, Participant, Reaction, StanzaId};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{occupant_id, room_id, user_id};
 use prose_xmpp::stanza::message::MucUser;
@@ -609,6 +610,165 @@ async fn test_stops_at_last_page() -> Result<()> {
 
     assert_eq!(None, result.last_message_id.as_ref().map(|id| id.as_ref()));
     assert_eq!(8, result.messages.len());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
+    let mut deps = MockRoomFactoryDependencies::default();
+    deps.ctx.config.max_message_pages_to_load = 1;
+
+    deps.message_archive_service
+        .expect_load_messages()
+        .once()
+        .return_once(|_, _, before, _, _| {
+            assert!(before.is_some());
+
+            Box::pin(async {
+                Ok(MessagePage {
+                    messages: vec![
+                        MessageBuilder::new_with_index(1)
+                            .set_from(user_id!("user@prose.org"))
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(2)
+                            .set_from(user_id!("user@prose.org"))
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(3)
+                            .set_from(user_id!("user@prose.org"))
+                            .set_target_message_idx(2)
+                            .set_from(user_id!("a@prose.org"))
+                            .set_payload(MessageLikePayload::Reaction {
+                                emojis: vec!["🍕".into()],
+                            })
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(4)
+                            .set_from(user_id!("user@prose.org"))
+                            .build_archived_message("q1", None),
+                        MessageBuilder::new_with_index(5)
+                            .set_from(user_id!("user@prose.org"))
+                            .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
+                            .build_archived_message("q1", None),
+                    ],
+                    is_last: false,
+                })
+            })
+        });
+
+    deps.message_repo
+        .expect_get_messages_targeting()
+        .once()
+        .with(
+            predicate::eq(room_id!("room@conference.prose.org")),
+            predicate::eq(vec![
+                MessageBuilder::id_for_index(5),
+                MessageBuilder::id_for_index(4),
+                MessageBuilder::id_for_index(2),
+                MessageBuilder::id_for_index(1),
+            ]),
+            predicate::eq(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap()),
+        )
+        .return_once(|_, _, _| {
+            Box::pin(async {
+                Ok(vec![
+                    MessageBuilder::new_with_index(6)
+                        .set_from(user_id!("b@prose.org"))
+                        .set_target_message_idx(1)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["🧩".into()],
+                        })
+                        .build_message_like(),
+                    MessageBuilder::new_with_index(7)
+                        .set_from(user_id!("a@prose.org"))
+                        .set_target_message_idx(4)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["🍻".into()],
+                        })
+                        .build_message_like(),
+                    // This should win over message 3 since `get_messages_targeting`
+                    // returns newer messages.
+                    MessageBuilder::new_with_index(8)
+                        .set_from(user_id!("a@prose.org"))
+                        .set_target_message_idx(2)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["🍔".into()],
+                        })
+                        .build_message_like(),
+                    MessageBuilder::new_with_index(9)
+                        .set_from(user_id!("a@prose.org"))
+                        .set_target_message_idx(1)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["❌".into()],
+                        })
+                        .build_message_like(),
+                    // This should win over message 9 since it is newer
+                    MessageBuilder::new_with_index(10)
+                        .set_from(user_id!("a@prose.org"))
+                        .set_target_message_idx(1)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["✅".into()],
+                        })
+                        .build_message_like(),
+                ])
+            })
+        });
+
+    deps.user_profile_repo
+        .expect_get_display_name()
+        .returning(|_| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
+        .expect_append()
+        .returning(|_, _| Box::pin(async { Ok(()) }));
+
+    let room = RoomFactory::from(deps)
+        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .to_generic_room();
+
+    let result = room
+        .load_messages_before(&StanzaId::from("some-stanza-id"))
+        .await?;
+
+    assert_eq!(
+        vec![
+            MessageBuilder::new_with_index(1)
+                .set_from(user_id!("user@prose.org"))
+                .set_from_name("User")
+                .set_reactions([
+                    Reaction {
+                        emoji: "🧩".into(),
+                        from: vec![user_id!("b@prose.org").into()]
+                    },
+                    Reaction {
+                        emoji: "✅".into(),
+                        from: vec![user_id!("a@prose.org").into()]
+                    }
+                ])
+                .build_message_dto(),
+            MessageBuilder::new_with_index(2)
+                .set_from(user_id!("user@prose.org"))
+                .set_from_name("User")
+                .set_reactions([Reaction {
+                    emoji: "🍔".into(),
+                    from: vec![user_id!("a@prose.org").into()]
+                }])
+                .build_message_dto(),
+            MessageBuilder::new_with_index(4)
+                .set_from(user_id!("user@prose.org"))
+                .set_from_name("User")
+                .set_reactions([Reaction {
+                    emoji: "🍻".into(),
+                    from: vec![user_id!("a@prose.org").into()]
+                }])
+                .build_message_dto(),
+            MessageBuilder::new_with_index(5)
+                .set_from(user_id!("user@prose.org"))
+                .set_from_name("User")
+                .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
+                .build_message_dto()
+        ],
+        result.messages
+    );
 
     Ok(())
 }

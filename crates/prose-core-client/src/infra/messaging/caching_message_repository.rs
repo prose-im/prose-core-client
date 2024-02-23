@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
 use prose_store::prelude::*;
 use prose_store::RawKey;
@@ -79,6 +80,37 @@ impl MessagesRepository for CachingMessageRepository {
                 &mut idx
                     .get_all_values(Query::Only((*id).clone()), Default::default(), None)
                     .await?,
+            );
+        }
+
+        messages.sort_by_key(|msg| msg.timestamp);
+        Ok(messages)
+    }
+
+    async fn get_messages_targeting(
+        &self,
+        _room_id: &RoomId,
+        targeted_ids: &[MessageId],
+        newer_than: &DateTime<Utc>,
+    ) -> Result<Vec<MessageLike>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessagesRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessagesRecord::collection())?;
+        let idx = collection.index("target")?;
+
+        let mut messages: Vec<MessageLike> = vec![];
+        for id in targeted_ids {
+            let targeting_messages = idx
+                .get_all_values::<MessageLike>(Query::Only((*id).clone()), Default::default(), None)
+                .await?;
+
+            messages.append(
+                &mut targeting_messages
+                    .into_iter()
+                    .filter(|msg| &msg.timestamp > newer_than)
+                    .collect(),
             );
         }
 

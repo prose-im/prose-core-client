@@ -4,6 +4,8 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use chrono::{DateTime, TimeZone, Utc};
+use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::messaging::repos::MessagesRepository;
@@ -102,6 +104,105 @@ async fn test_load_messages_targeting() -> Result<()> {
         )
         .await?,
         messages
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_load_only_messages_targeting() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = room_id!("a@prose.org");
+
+    let message1 = MessageBuilder::new_with_index(1).build_message_like();
+    let message2 = MessageBuilder::new_with_index(2).build_message_like();
+
+    let message3 = MessageBuilder::new_with_index(3)
+        .set_target_message_idx(1)
+        .set_payload(MessageLikePayload::Retraction {})
+        .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 01, 0, 0, 0).unwrap())
+        .build_message_like();
+    let message4 = MessageBuilder::new_with_index(4)
+        .set_from(user_id!("b@prose.org"))
+        .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
+        .build_reaction_to(1, &["🍿".into(), "📼".into()]);
+    let message5 = MessageBuilder::new_with_index(5).build_message_like();
+    let message6 = MessageBuilder::new_with_index(6)
+        .set_from(user_id!("c@prose.org"))
+        .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
+        .build_reaction_to(2, &["🍕".into()]);
+    let message7 = MessageBuilder::new_with_index(7)
+        .set_target_message_idx(5)
+        .set_payload(MessageLikePayload::ReadReceipt)
+        .build_message_like();
+
+    repo.append(
+        &room_id,
+        &[
+            message1.clone(),
+            message2.clone(),
+            message3.clone(),
+            message4.clone(),
+            message5.clone(),
+            message6.clone(),
+            message7.clone(),
+        ],
+    )
+    .await?;
+
+    assert_eq!(
+        vec![message4, message6],
+        repo.get_messages_targeting(
+            &room_id,
+            &[
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2),
+            ],
+            &Utc.with_ymd_and_hms(2024, 02, 22, 0, 0, 0).unwrap()
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = room_id!("a@prose.org");
+
+    let message1 = MessageBuilder::new_with_index(1)
+        .set_target_message_idx(100)
+        .set_payload(MessageLikePayload::Retraction {})
+        .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 02, 0, 0, 0).unwrap())
+        .build_message_like();
+    let message2 = MessageBuilder::new_with_index(2)
+        .set_target_message_idx(100)
+        .set_payload(MessageLikePayload::Retraction {})
+        .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 03, 0, 0, 0).unwrap())
+        .build_message_like();
+    let message3 = MessageBuilder::new_with_index(3)
+        .set_target_message_idx(100)
+        .set_payload(MessageLikePayload::Retraction {})
+        .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 01, 0, 0, 0).unwrap())
+        .build_message_like();
+
+    repo.append(
+        &room_id,
+        &[message1.clone(), message2.clone(), message3.clone()],
+    )
+    .await?;
+
+    assert_eq!(
+        vec![message3, message1, message2],
+        repo.get_messages_targeting(
+            &room_id,
+            &[MessageBuilder::id_for_index(100),],
+            &DateTime::<Utc>::default()
+        )
+        .await?
     );
 
     Ok(())
