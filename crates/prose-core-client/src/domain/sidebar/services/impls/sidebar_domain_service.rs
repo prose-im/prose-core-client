@@ -311,18 +311,22 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             }
         };
 
+        room.increment_unread_count();
+
         match room.r#type {
             RoomType::DirectMessage => (),
             RoomType::Group => (),
-            _ => return Ok(()),
+            _ => {
+                self.client_event_dispatcher
+                    .dispatch_event(ClientEvent::SidebarChanged);
+                return Ok(());
+            }
         };
 
         if !room.sidebar_state().is_in_sidebar() {
             room.set_sidebar_state(RoomSidebarState::InSidebar);
             self.save_bookmark_for_room(&room).await;
         }
-
-        room.increment_unread_count();
 
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::SidebarChanged);

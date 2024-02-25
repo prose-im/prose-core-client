@@ -573,6 +573,81 @@ async fn test_insert_item_for_received_group_message_if_needed() -> Result<()> {
 }
 
 #[tokio::test]
+async fn test_increases_unread_count() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    let direct_message = Room::for_direct_message(
+        &user_id!("dm@prose.org"),
+        "user",
+        Availability::Available,
+        RoomSidebarState::InSidebar,
+    );
+    let private_channel = Room::private_channel(room_id!("private_channel@conf.prose.org"))
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+    let public_channel = Room::public_channel(room_id!("public_channel@conf.prose.org"))
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+    let group = Room::group(room_id!("group@conf.prose.org"))
+        .with_sidebar_state(RoomSidebarState::InSidebar);
+
+    {
+        let direct_message = direct_message.clone();
+        let private_channel = private_channel.clone();
+        let public_channel = public_channel.clone();
+        let group = group.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .returning(move |room_id| match room_id.to_string().as_str() {
+                "dm@prose.org" => Some(direct_message.clone()),
+                "private_channel@conf.prose.org" => Some(private_channel.clone()),
+                "public_channel@conf.prose.org" => Some(public_channel.clone()),
+                "group@conf.prose.org" => Some(group.clone()),
+                _ => panic!("Unexpected room id"),
+            });
+    }
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .times(4)
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .returning(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+
+    assert_eq!(direct_message.unread_count(), 0);
+    assert_eq!(private_channel.unread_count(), 0);
+    assert_eq!(public_channel.unread_count(), 0);
+    assert_eq!(group.unread_count(), 0);
+
+    service
+        .handle_received_message(&UserEndpointId::User(user_id!("dm@prose.org")))
+        .await?;
+    assert_eq!(direct_message.unread_count(), 1);
+
+    service
+        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
+            "private_channel@conf.prose.org/user"
+        )))
+        .await?;
+    assert_eq!(private_channel.unread_count(), 1);
+
+    service
+        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
+            "public_channel@conf.prose.org/user"
+        )))
+        .await?;
+    assert_eq!(public_channel.unread_count(), 1);
+
+    service
+        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
+            "group@conf.prose.org/user"
+        )))
+        .await?;
+    assert_eq!(group.unread_count(), 1);
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
