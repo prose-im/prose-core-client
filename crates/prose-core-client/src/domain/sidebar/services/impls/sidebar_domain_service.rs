@@ -285,10 +285,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// corresponding bookmark.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn insert_item_for_received_message_if_needed(
-        &self,
-        sender: &UserEndpointId,
-    ) -> Result<()> {
+    async fn handle_received_message(&self, sender: &UserEndpointId) -> Result<()> {
         let room_id = sender.to_room_id();
 
         let room = match sender {
@@ -320,11 +317,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             _ => return Ok(()),
         };
 
-        if room.sidebar_state().is_in_sidebar() {
-            return Ok(());
+        if !room.sidebar_state().is_in_sidebar() {
+            room.set_sidebar_state(RoomSidebarState::InSidebar);
+            self.save_bookmark_for_room(&room).await;
         }
-        room.set_sidebar_state(RoomSidebarState::InSidebar);
-        self.save_bookmark_for_room(&room).await;
+
+        room.increment_unread_count();
 
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::SidebarChanged);

@@ -67,6 +67,8 @@ export interface RoomBase {
     
     saveDraft(message?: string): Promise<void>;
     loadDraft(): Promise<string>;
+    
+    markAsRead(): Promise<void>;
 }
 
 export interface RoomMUC {
@@ -364,6 +366,11 @@ macro_rules! base_room_impl {
             #[wasm_bindgen(js_name = "loadDraft")]
             pub async fn load_draft(&self) -> Result<Option<String>> {
                 Ok(self.room.load_draft().await.map_err(WasmError::from)?)
+            }
+
+            #[wasm_bindgen(js_name = "markAsRead")]
+            pub async fn mark_as_read(&self) -> Result<()> {
+                Ok(self.room.mark_as_read().await.map_err(WasmError::from)?)
             }
         }
     };

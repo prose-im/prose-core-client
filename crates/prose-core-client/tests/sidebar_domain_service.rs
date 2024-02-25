@@ -561,12 +561,13 @@ async fn test_insert_item_for_received_group_message_if_needed() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .insert_item_for_received_message_if_needed(&UserEndpointId::Occupant(occupant_id!(
+        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
             "group@conference.prose.org/user"
         )))
         .await?;
 
     assert_eq!(room.sidebar_state(), RoomSidebarState::InSidebar);
+    assert_eq!(room.unread_count(), 1);
 
     Ok(())
 }
@@ -619,9 +620,9 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .insert_item_for_received_message_if_needed(&UserEndpointId::UserResource(
-            user_resource_id!("contact@prose.org/res"),
-        ))
+        .handle_received_message(&UserEndpointId::UserResource(user_resource_id!(
+            "contact@prose.org/res"
+        )))
         .await?;
 
     Ok(())

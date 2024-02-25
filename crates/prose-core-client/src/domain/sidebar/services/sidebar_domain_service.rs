@@ -53,13 +53,10 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///
     /// If a message is received from a direct message or group that is not currently represented
     /// in the sidebar, this method will insert an item into the sidebar and update the
-    /// corresponding bookmark.
+    /// corresponding bookmark. It will also update the unread count of the affected room.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn insert_item_for_received_message_if_needed(
-        &self,
-        sender: &UserEndpointId,
-    ) -> Result<()>;
+    async fn handle_received_message(&self, sender: &UserEndpointId) -> Result<()>;
 
     /// Destroys the room identified by `room_id` and the associated bookmark.
     /// `ClientEvent::SidebarChanged` will be dispatched after processing.

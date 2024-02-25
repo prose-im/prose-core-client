@@ -158,7 +158,7 @@ impl MessagesEventHandler {
         if message.payload.is_message() {
             match self
                 .sidebar_domain_service
-                .insert_item_for_received_message_if_needed(&from)
+                .handle_received_message(&from)
                 .await
             {
                 Ok(_) => (),

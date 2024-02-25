@@ -31,7 +31,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
     let room = Room::group(room_id!("group@conference.prose.org")).with_name("Group Name");
 
     deps.sidebar_domain_service
-        .expect_insert_item_for_received_message_if_needed()
+        .expect_handle_received_message()
         .once()
         .in_sequence(&mut seq)
         .with(predicate::eq(UserEndpointId::Occupant(occupant_id!(
@@ -104,7 +104,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     let room = Room::direct_message(user_id!("jane.doe@prose.org"), Availability::Unavailable);
 
     deps.sidebar_domain_service
-        .expect_insert_item_for_received_message_if_needed()
+        .expect_handle_received_message()
         .once()
         .in_sequence(&mut seq)
         .with(predicate::eq(UserEndpointId::User(user_id!(
@@ -248,7 +248,7 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
     let room = Room::group(room_id!("user@prose.org"));
 
     deps.sidebar_domain_service
-        .expect_insert_item_for_received_message_if_needed()
+        .expect_handle_received_message()
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     {
@@ -303,7 +303,7 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
     let room = Room::group(room_id!("user@prose.org"));
 
     deps.sidebar_domain_service
-        .expect_insert_item_for_received_message_if_needed()
+        .expect_handle_received_message()
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     {

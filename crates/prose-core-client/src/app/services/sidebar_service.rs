@@ -39,6 +39,7 @@ impl SidebarService {
 
             let is_favorite = room.sidebar_state() == RoomSidebarState::Favorite;
             let id = room.room_id.clone();
+            let unread_count = room.unread_count();
 
             let item_dto = SidebarItemDTO {
                 name: room.name().unwrap_or_else(|| id.to_string()),
@@ -50,7 +51,7 @@ impl SidebarService {
                     .await
                     .unwrap_or_default()
                     .is_some(),
-                unread_count: 0,   // TODO
+                unread_count,
                 mentions_count: 0, // TODO
             };
             item_dtos.push(item_dto)

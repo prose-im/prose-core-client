@@ -77,6 +77,8 @@ pub struct RoomDetails {
     pub sidebar_state: RoomSidebarState,
     /// The state the room is in.
     pub state: RoomState,
+    /// The number of unread messages in this room.
+    pub unread_count: u32,
 }
 
 #[derive(Debug)]
@@ -152,6 +154,19 @@ impl Room {
     pub fn set_state(&self, state: RoomState) {
         self.inner.details.write().state = state
     }
+
+    pub fn unread_count(&self) -> u32 {
+        self.inner.details.read().unread_count
+    }
+
+    pub fn increment_unread_count(&self) {
+        let mut guard = self.inner.details.write();
+        guard.unread_count = guard.unread_count.saturating_add(1);
+    }
+
+    pub fn mark_as_read(&self) {
+        self.inner.details.write().unread_count = 0
+    }
 }
 
 impl Room {
@@ -169,6 +184,7 @@ impl Room {
                 participants: Default::default(),
                 sidebar_state: bookmark.sidebar_state,
                 state: RoomState::Pending,
+                unread_count: 0,
             },
         )
     }
@@ -187,6 +203,7 @@ impl Room {
                 participants: Default::default(),
                 sidebar_state,
                 state: RoomState::Connecting,
+                unread_count: 0,
             },
         )
     }
@@ -256,6 +273,7 @@ impl Room {
                 ),
                 sidebar_state,
                 state: RoomState::Connected,
+                unread_count: 0,
             },
         )
     }
@@ -273,6 +291,7 @@ impl Room {
                 participants: Default::default(),
                 sidebar_state: RoomSidebarState::InSidebar,
                 state: Default::default(),
+                unread_count: 0,
             },
         )
     }
@@ -334,7 +353,8 @@ mod tests {
                         Availability::Available
                     ),
                     sidebar_state: RoomSidebarState::Favorite,
-                    state: RoomState::Connected
+                    state: RoomState::Connected,
+                    unread_count: 0,
                 }
             )
         )

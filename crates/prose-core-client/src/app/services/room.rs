@@ -235,6 +235,13 @@ impl<Kind> Room<Kind> {
         debug!("Loading latest messages before '{stanza_id}' from server…");
         self.load_messages(Some(stanza_id)).await
     }
+
+    pub async fn mark_as_read(&self) -> Result<()> {
+        self.inner.data.mark_as_read();
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+        Ok(())
+    }
 }
 
 impl<Kind> Room<Kind> {
