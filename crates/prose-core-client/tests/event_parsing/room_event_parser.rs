@@ -13,7 +13,7 @@ use prose_core_client::domain::rooms::models::RoomAffiliation;
 use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
-use prose_core_client::{occupant_id, room_id, user_id, user_resource_id};
+use prose_core_client::{muc_id, occupant_id, user_id, user_resource_id};
 use prose_proc_macros::mt_test;
 
 #[mt_test]
@@ -30,7 +30,7 @@ async fn test_room_topic_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org"),
             r#type: RoomEventType::RoomTopicChanged {
                 new_topic: Some("Fire Burn and Cauldron Bubble!".to_string())
             },
@@ -48,7 +48,7 @@ async fn test_room_topic_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::RoomTopicChanged { new_topic: None },
         })]
     );
@@ -77,9 +77,9 @@ async fn test_room_destroyed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::Destroyed {
-                replacement: Some(room_id!("new-room@prose.org"))
+                replacement: Some(muc_id!("new-room@prose.org"))
             },
         })]
     );
@@ -104,7 +104,7 @@ async fn test_room_config_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::RoomConfigChanged,
         })]
     );
@@ -124,7 +124,7 @@ async fn test_room_config_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::RoomConfigChanged,
         })]
     );
@@ -143,7 +143,7 @@ async fn test_room_config_changed() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::RoomConfigChanged,
         })]
     );
@@ -376,7 +376,7 @@ async fn test_received_invite() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::ReceivedInvitation {
                 sender: user_resource_id!("user@prose.org/res"),
                 password: Some("cauldronburn".to_string())
@@ -401,7 +401,7 @@ async fn test_received_invite() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@prose.org"),
+            room_id: muc_id!("room@prose.org").into(),
             r#type: RoomEventType::ReceivedInvitation {
                 sender: user_resource_id!("user@prose.org/res"),
                 password: Some("cauldronburn".to_string())
@@ -430,7 +430,7 @@ async fn test_user_was_invited() -> Result<()> {
     assert_eq!(
         events,
         vec![ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@groups.prose.org"),
+            room_id: muc_id!("room@groups.prose.org").into(),
             r#type: RoomEventType::UserAdded {
                 user_id: user_id!("user2@prose.org"),
                 affiliation: RoomAffiliation::Member,

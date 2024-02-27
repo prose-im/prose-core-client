@@ -5,12 +5,13 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::RoomSpec;
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{RoomId, UserEndpointId};
+use crate::domain::shared::models::{MucId, RoomId, UserEndpointId};
 use crate::domain::sidebar::models::Bookmark;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -60,7 +61,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
 
     /// Destroys the room identified by `room_id` and the associated bookmark.
     /// `ClientEvent::SidebarChanged` will be dispatched after processing.
-    async fn destroy_room(&self, room_id: &RoomId) -> Result<()>;
+    async fn destroy_room(&self, room_id: &MucId) -> Result<()>;
 
     /// Renames the sidebar item identified by `room_id` to `name`.
     ///
@@ -68,7 +69,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   - The corresponding room will be renamed.
     ///   - The corresponding bookmark will be renamed.
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
-    async fn rename_item(&self, room_id: &RoomId, name: &str) -> Result<()>;
+    async fn rename_item(&self, room_id: &MucId, name: &str) -> Result<()>;
 
     /// Toggles the `is_favorite` flag for the sidebar item identified by `room_id`.
     ///
@@ -86,7 +87,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   - `ClientEvent::SidebarChanged` will be dispatched after processing.
     async fn reconfigure_item_with_spec(
         &self,
-        room_id: &RoomId,
+        room_id: &MucId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<()>;
@@ -106,7 +107,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// - Disconnects channels and updates the repository state for each provided JID.
     /// - Bookmarks remain untouched.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_removed_items(&self, room_ids: &[RoomId]) -> Result<()>;
+    async fn handle_removed_items(&self, room_ids: &[BareJid]) -> Result<()>;
 
     /// Disconnects *all* rooms and deletes all sidebar items. Dispatches
     /// a `ClientEvent::SidebarChanged` event after processing.
@@ -123,8 +124,8 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_destroyed_room(
         &self,
-        room_id: &RoomId,
-        alternate_room: Option<RoomId>,
+        room_id: &MucId,
+        alternate_room: Option<MucId>,
     ) -> Result<()>;
 
     /// Handles removal from a room.
@@ -135,7 +136,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     ///
     /// If the removal is permanent, follows the procedure described in `handle_destroyed_room`.
-    async fn handle_removal_from_room(&self, room_id: &RoomId, is_permanent: bool) -> Result<()>;
+    async fn handle_removal_from_room(&self, room_id: &MucId, is_permanent: bool) -> Result<()>;
 
     /// Handles a changed room configuration.
     ///
@@ -143,7 +144,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// - Replaces the connected room if the type of room changed.
     /// - Updates the sidebar & associated bookmark to reflect the updated configuration.
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_changed_room_config(&self, room_id: &RoomId) -> Result<()>;
+    async fn handle_changed_room_config(&self, room_id: &MucId) -> Result<()>;
 
     /// Removes all connected rooms and sidebar items.
     ///

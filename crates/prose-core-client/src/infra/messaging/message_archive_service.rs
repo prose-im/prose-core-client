@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 use xmpp_parsers::mam::Complete;
 
 use prose_xmpp::mods;
@@ -13,7 +12,7 @@ use prose_xmpp::stanza::message::stanza_id;
 
 use crate::domain::messaging::models::StanzaId;
 use crate::domain::messaging::services::{MessageArchiveService, MessagePage};
-use crate::domain::shared::models::RoomType;
+use crate::dtos::RoomId;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -21,8 +20,7 @@ use crate::infra::xmpp::XMPPClient;
 impl MessageArchiveService for XMPPClient {
     async fn load_messages(
         &self,
-        room_jid: &BareJid,
-        room_type: &RoomType,
+        room_id: &RoomId,
         before: Option<&StanzaId>,
         after: Option<&StanzaId>,
         batch_size: u32,
@@ -31,25 +29,19 @@ impl MessageArchiveService for XMPPClient {
         let before: Option<stanza_id::Id> = before.map(|id| id.as_ref().into());
         let after: Option<stanza_id::Id> = after.map(|id| id.as_ref().into());
 
-        let (messages, fin) = match room_type {
-            RoomType::Unknown => {
-                unreachable!("Tried to load messages for a pending room {}", room_jid)
-            }
-            RoomType::DirectMessage => {
+        let (messages, fin) = match room_id {
+            RoomId::User(id) => {
                 mam.load_messages_in_chat(
-                    room_jid,
+                    id.as_ref(),
                     before.as_ref(),
                     after.as_ref(),
                     Some(batch_size as usize),
                 )
                 .await?
             }
-            RoomType::Group
-            | RoomType::PrivateChannel
-            | RoomType::PublicChannel
-            | RoomType::Generic => {
+            RoomId::Muc(id) => {
                 mam.load_messages_in_muc_chat(
-                    room_jid,
+                    id.as_ref(),
                     before.as_ref(),
                     after.as_ref(),
                     Some(batch_size as usize),

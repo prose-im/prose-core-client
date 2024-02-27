@@ -72,24 +72,24 @@ impl TestClient {
     }
 }
 
-impl TestClient {
-    pub async fn get_room(&self, id: impl AsRef<str>) -> RoomEnvelope {
-        let room_id = RoomId::from_str(id.as_ref()).expect("Could not parse room id");
-
-        let Some(item) = self
-            .client
-            .sidebar
-            .sidebar_items()
-            .await
-            .into_iter()
-            .find(|item| item.room.to_generic_room().jid() == &room_id)
-        else {
-            panic!("Could not find connected room with id {room_id}")
-        };
-
-        item.room
-    }
-}
+// impl TestClient {
+//     pub async fn get_room(&self, id: impl AsRef<str>) -> RoomEnvelope {
+//         let room_id = RoomId::from_str(id.as_ref()).expect("Could not parse room id");
+//
+//         let Some(item) = self
+//             .client
+//             .sidebar
+//             .sidebar_items()
+//             .await
+//             .into_iter()
+//             .find(|item| item.room.to_generic_room().jid() == &room_id)
+//         else {
+//             panic!("Could not find connected room with id {room_id}")
+//         };
+//
+//         item.room
+//     }
+// }
 
 impl Deref for TestClient {
     type Target = Client;

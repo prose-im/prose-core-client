@@ -11,6 +11,7 @@ use prose_store::prelude::*;
 use prose_store::Database;
 
 use crate::domain::messaging::repos::DraftsRepository as DomainDraftsRepository;
+use crate::dtos::RoomId;
 
 pub struct DraftsRepository {
     store: Store<PlatformDriver>,
@@ -31,7 +32,7 @@ pub struct DraftsRecord {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl DomainDraftsRepository for DraftsRepository {
-    async fn get(&self, room_id: &BareJid) -> anyhow::Result<Option<String>> {
+    async fn get(&self, room_id: &RoomId) -> Result<Option<String>> {
         let tx = self
             .store
             .transaction_for_reading(&[DraftsRecord::collection()])
@@ -41,7 +42,7 @@ impl DomainDraftsRepository for DraftsRepository {
         Ok(record.and_then(|r| (!r.text.is_empty()).then_some(r.text)))
     }
 
-    async fn set(&self, room_id: &BareJid, draft: Option<&str>) -> anyhow::Result<()> {
+    async fn set(&self, room_id: &RoomId, draft: Option<&str>) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[DraftsRecord::collection()])
@@ -50,7 +51,7 @@ impl DomainDraftsRepository for DraftsRepository {
 
         if let Some(draft) = draft {
             collection.put_entity(&DraftsRecord {
-                id: room_id.clone(),
+                id: room_id.clone().into_bare(),
                 text: draft.to_string(),
             })?;
         } else {

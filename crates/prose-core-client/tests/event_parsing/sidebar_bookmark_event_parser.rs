@@ -7,11 +7,12 @@ use anyhow::Result;
 
 use prose_core_client::app::event_handlers::{ServerEvent, SidebarBookmarkEvent};
 use prose_core_client::domain::rooms::models::RoomSidebarState;
-use prose_core_client::domain::shared::models::RoomId;
+use prose_core_client::domain::shared::models::{MucId, UserId};
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType};
-use prose_core_client::room_id;
 use prose_core_client::test::parse_xml;
+use prose_core_client::{muc_id, user_id};
 use prose_proc_macros::mt_test;
+use prose_xmpp::bare;
 
 #[mt_test]
 async fn test_added_or_updated_items() -> Result<()> {
@@ -45,19 +46,19 @@ async fn test_added_or_updated_items() -> Result<()> {
                 bookmarks: vec![
                     Bookmark {
                         name: "Private Channel".to_string(),
-                        jid: room_id!("pc@conference.prose.org"),
+                        jid: muc_id!("pc@conference.prose.org").into(),
                         r#type: BookmarkType::PrivateChannel,
                         sidebar_state: RoomSidebarState::Favorite
                     },
                     Bookmark {
                         name: "Group".to_string(),
-                        jid: room_id!("group@conference.prose.org"),
+                        jid: muc_id!("group@conference.prose.org").into(),
                         r#type: BookmarkType::Group,
                         sidebar_state: RoomSidebarState::NotInSidebar
                     },
                     Bookmark {
                         name: "Direct Message".to_string(),
-                        jid: room_id!("user@prose.org"),
+                        jid: user_id!("user@prose.org").into(),
                         r#type: BookmarkType::DirectMessage,
                         sidebar_state: RoomSidebarState::InSidebar
                     }
@@ -90,10 +91,7 @@ async fn test_deleted_items() -> Result<()> {
         events,
         vec![ServerEvent::SidebarBookmark(
             SidebarBookmarkEvent::Deleted {
-                ids: vec![
-                    room_id!("pc@conference.prose.org"),
-                    room_id!("user@prose.org"),
-                ]
+                ids: vec![bare!("pc@conference.prose.org"), bare!("user@prose.org"),]
             }
         )]
     );

@@ -122,7 +122,7 @@ fn compare_client_events(event_a: &ClientEvent, event_b: &ClientEvent) -> Orderi
             if room_a.jid() == room_b.jid() {
                 order_key_for_room_event(&type_a).cmp(&order_key_for_room_event(&type_b))
             } else {
-                room_a.jid().cmp(room_b.jid())
+                room_a.jid().as_ref().cmp(room_b.jid().as_ref())
             }
         }
         _ => order_key_for_client_event(event_a).cmp(&order_key_for_client_event(event_b)),

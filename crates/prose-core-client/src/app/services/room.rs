@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use anyhow::{format_err, Result};
+use anyhow::{anyhow, format_err, Result};
 use chrono::Duration;
 use tracing::{debug, info};
 
@@ -20,7 +20,7 @@ use crate::app::deps::{
 };
 use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
-use crate::domain::shared::models::{ParticipantId, ParticipantInfo, RoomId};
+use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{
     Message as MessageDTO, MessageResultSet, MessageSender, RoomState, SendMessageRequest,
     StanzaId, UserBasicInfo, UserId,
@@ -55,6 +55,13 @@ impl HasTopic for Generic {}
 impl HasMutableName for PrivateChannel {}
 impl HasMutableName for PublicChannel {}
 impl HasMutableName for Generic {}
+
+pub trait MucRoom {}
+
+impl MucRoom for Group {}
+impl MucRoom for PrivateChannel {}
+impl MucRoom for PublicChannel {}
+impl MucRoom for Generic {}
 
 pub struct RoomInner {
     pub(crate) data: DomainRoom,
@@ -157,13 +164,13 @@ impl<Kind> Room<Kind> {
 impl<Kind> Room<Kind> {
     pub async fn send_message(&self, request: SendMessageRequest) -> Result<()> {
         self.messaging_service
-            .send_message(&self.data.room_id, &self.data.r#type, request)
+            .send_message(&self.data.room_id, request)
             .await
     }
 
     pub async fn update_message(&self, id: MessageId, request: SendMessageRequest) -> Result<()> {
         self.messaging_service
-            .update_message(&self.data.room_id, &self.data.r#type, &id, request)
+            .update_message(&self.data.room_id, &id, request)
             .await
     }
 
@@ -182,18 +189,13 @@ impl<Kind> Room<Kind> {
             .collect::<Vec<_>>();
 
         self.messaging_service
-            .react_to_message(
-                &self.data.room_id,
-                &self.data.r#type,
-                &id,
-                all_emojis.as_slice(),
-            )
+            .react_to_message(&self.data.room_id, &id, all_emojis.as_slice())
             .await
     }
 
     pub async fn retract_message(&self, id: MessageId) -> Result<()> {
         self.messaging_service
-            .retract_message(&self.data.room_id, &self.data.r#type, &id)
+            .retract_message(&self.data.room_id, &id)
             .await
     }
 
@@ -204,7 +206,7 @@ impl<Kind> Room<Kind> {
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
         self.messaging_service
-            .set_user_is_composing(&self.data.room_id, &self.data.r#type, is_composing)
+            .set_user_is_composing(&self.data.room_id, is_composing)
             .await
     }
 
@@ -260,7 +262,6 @@ impl<Kind> Room<Kind> {
                 .message_archive_service
                 .load_messages(
                     &self.data.room_id,
-                    &self.data.r#type,
                     last_message_id.as_ref(),
                     None,
                     message_page_size,
@@ -435,14 +436,14 @@ impl Room<Group> {
             .collect::<Vec<_>>();
 
         self.participation_service
-            .invite_users_to_room(&self.data.room_id, member_jids.as_slice())
+            .invite_users_to_room(self.muc_id(), member_jids.as_slice())
             .await?;
         Ok(())
     }
 
     pub async fn convert_to_private_channel(&self, name: impl AsRef<str>) -> Result<()> {
         self.sidebar_domain_service
-            .reconfigure_item_with_spec(&self.data.room_id, RoomSpec::PrivateChannel, name.as_ref())
+            .reconfigure_item_with_spec(self.muc_id(), RoomSpec::PrivateChannel, name.as_ref())
             .await?;
         Ok(())
     }
@@ -452,7 +453,7 @@ impl Room<PrivateChannel> {
     pub async fn convert_to_public_channel(&self) -> Result<()> {
         self.sidebar_domain_service
             .reconfigure_item_with_spec(
-                &self.data.room_id,
+                self.muc_id(),
                 RoomSpec::PublicChannel,
                 self.data.name().as_deref().unwrap_or_default(),
             )
@@ -463,7 +464,7 @@ impl Room<PrivateChannel> {
     pub async fn invite_users(&self, users: impl IntoIterator<Item = &UserId>) -> Result<()> {
         let user_jids = users.into_iter().cloned().collect::<Vec<_>>();
         self.participation_service
-            .invite_users_to_room(&self.data.room_id, user_jids.as_slice())
+            .invite_users_to_room(self.muc_id(), user_jids.as_slice())
             .await?;
         Ok(())
     }
@@ -473,7 +474,7 @@ impl Room<PublicChannel> {
     pub async fn convert_to_private_channel(&self) -> Result<()> {
         self.sidebar_domain_service
             .reconfigure_item_with_spec(
-                &self.data.room_id,
+                self.muc_id(),
                 RoomSpec::PrivateChannel,
                 self.data.name().as_deref().unwrap_or_default(),
             )
@@ -486,14 +487,26 @@ impl Room<PublicChannel> {
 
         for user in user_jids.iter() {
             self.participation_service
-                .grant_membership(&self.data.room_id, user)
+                .grant_membership(self.muc_id(), user)
                 .await?;
         }
 
         self.participation_service
-            .invite_users_to_room(&self.data.room_id, user_jids.as_slice())
+            .invite_users_to_room(self.muc_id(), user_jids.as_slice())
             .await?;
         Ok(())
+    }
+}
+
+impl<Kind> Room<Kind>
+where
+    Kind: MucRoom,
+{
+    pub fn muc_id(&self) -> &MucId {
+        self.data
+            .room_id
+            .muc_id()
+            .expect("MucRoom must have RoomId::Muc")
     }
 }
 
@@ -502,8 +515,14 @@ where
     Kind: HasTopic,
 {
     pub async fn set_topic(&self, topic: Option<String>) -> Result<()> {
+        let room_id = self
+            .data
+            .room_id
+            .muc_id()
+            .ok_or_else(|| anyhow!("Cannot set topic on non-MUC room"))?;
+
         self.attributes_service
-            .set_topic(&self.data.room_id, topic.as_deref())
+            .set_topic(room_id, topic.as_deref())
             .await?;
         self.data.set_topic(topic);
 
@@ -516,11 +535,11 @@ where
 
 impl<Kind> Room<Kind>
 where
-    Kind: HasMutableName,
+    Kind: HasMutableName + MucRoom,
 {
     pub async fn set_name(&self, name: impl AsRef<str>) -> Result<()> {
         self.sidebar_domain_service
-            .rename_item(&self.data.room_id, name.as_ref())
+            .rename_item(&self.muc_id(), name.as_ref())
             .await?;
         Ok(())
     }

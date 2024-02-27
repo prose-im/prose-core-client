@@ -73,7 +73,7 @@ impl ServerEventHandler for RoomsEventHandler {
 impl RoomsEventHandler {
     fn get_room(&self, jid: &RoomId) -> Result<Room> {
         self.connected_rooms_repo
-            .get(jid)
+            .get(jid.as_ref())
             .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))
     }
 
@@ -128,7 +128,7 @@ impl RoomsEventHandler {
 
                 if event.is_self {
                     self.sidebar_domain_service
-                        .handle_removal_from_room(&event.occupant_id.room_id(), false)
+                        .handle_removal_from_room(&event.occupant_id.muc_id(), false)
                         .await?;
                 }
 
@@ -139,7 +139,7 @@ impl RoomsEventHandler {
 
                 if event.is_self {
                     self.sidebar_domain_service
-                        .handle_removal_from_room(&event.occupant_id.room_id(), true)
+                        .handle_removal_from_room(&event.occupant_id.muc_id(), true)
                         .await?;
                     // A SidebarChanged event will be sent instead
                     break 'outer false;
@@ -180,7 +180,7 @@ impl RoomsEventHandler {
                     event.room_id, new_topic
                 );
 
-                let room = self.get_room(&event.room_id)?;
+                let room = self.get_room(&RoomId::Muc(event.room_id))?;
                 if room.topic() != new_topic {
                     room.set_topic(new_topic);
                     self.client_event_dispatcher
@@ -214,7 +214,7 @@ impl RoomsEventHandler {
                     reason.as_deref().unwrap_or("<no reason>")
                 );
 
-                let room = self.get_room(&event.room_id)?;
+                let room = self.get_room(&RoomId::Muc(event.room_id))?;
 
                 let name = self.user_profile_repo.get_display_name(&user_id).await?;
                 room.participants_mut()

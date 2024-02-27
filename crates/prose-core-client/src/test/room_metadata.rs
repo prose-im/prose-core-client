@@ -7,7 +7,7 @@ use crate::domain::rooms::models::{
     RoomAffiliation, RoomConfig, RoomSessionInfo, RoomSessionMember,
 };
 use crate::domain::shared::models::RoomType;
-use crate::dtos::{RoomId, UserId};
+use crate::dtos::{MucId, UserId};
 use crate::test::mock_data;
 
 impl RoomSessionMember {
@@ -34,7 +34,7 @@ impl RoomSessionMember {
 }
 
 impl RoomSessionInfo {
-    pub fn new_room(room_jid: impl Into<RoomId>, room_type: RoomType) -> Self {
+    pub fn new_room(room_jid: impl Into<MucId>, room_type: RoomType) -> Self {
         Self {
             room_id: room_jid.into(),
             config: RoomConfig {

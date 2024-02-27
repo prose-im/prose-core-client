@@ -5,13 +5,13 @@
 
 use crate::domain::rooms::models::RoomAffiliation;
 use crate::domain::shared::models::{
-    AnonOccupantId, Availability, OccupantId, RoomId, RoomType, UserId,
+    AnonOccupantId, Availability, MucId, OccupantId, RoomType, UserId,
 };
 
 /// Contains information about a room after creating or joining it.
 #[derive(Debug, PartialEq, Clone)]
 pub struct RoomSessionInfo {
-    pub room_id: RoomId,
+    pub room_id: MucId,
     pub config: RoomConfig,
     pub topic: Option<String>,
     pub user_nickname: String,

@@ -14,7 +14,7 @@ use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::stanza::Message;
 
 use crate::app::event_handlers::{MessageEvent, MessageEventType, RoomEvent, RoomEventType};
-use crate::dtos::RoomId;
+use crate::domain::shared::models::MucId;
 use crate::infra::xmpp::event_parser::{ignore_stanza, missing_attribute, Context};
 
 pub fn parse_message(ctx: &mut Context, message: Message) -> Result<()> {
@@ -38,7 +38,7 @@ pub fn parse_message(ctx: &mut Context, message: Message) -> Result<()> {
 }
 
 fn parse_group_chat_message(ctx: &mut Context, from: Jid, message: Message) -> Result<()> {
-    let from = RoomId::from(from.to_bare());
+    let from = MucId::from(from.to_bare());
 
     if let Some(elem) = &message.payloads.iter().find(|p| p.is("x", ns::MUC_USER)) {
         let muc_user = MucUser::try_from((*elem).clone())?;
@@ -103,7 +103,7 @@ fn parse_normal_message(ctx: &mut Context, from: Jid, message: Message) -> Resul
     };
 
     ctx.push_event(RoomEvent {
-        room_id: RoomId::from(from.into_bare()),
+        room_id: MucId::from(from.into_bare()),
         r#type: RoomEventType::UserAdded {
             user_id: muc_invite.jid.into(),
             affiliation: muc_invite.affiliation.into(),

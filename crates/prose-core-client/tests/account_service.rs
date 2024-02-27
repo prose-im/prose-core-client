@@ -8,11 +8,11 @@ use mockall::predicate;
 
 use prose_core_client::domain::rooms::models::Room;
 use prose_core_client::domain::settings::models::AccountSettings;
-use prose_core_client::domain::shared::models::{OccupantId, RoomId, UserId};
+use prose_core_client::domain::shared::models::{MucId, OccupantId, UserId};
 use prose_core_client::dtos::Availability;
 use prose_core_client::services::AccountService;
 use prose_core_client::test::{mock_data, MockAppDependencies};
-use prose_core_client::{occupant_id, room_id, user_id, ClientEvent};
+use prose_core_client::{muc_id, occupant_id, user_id, ClientEvent};
 
 #[tokio::test]
 async fn test_set_availability_updates_settings() -> Result<()> {
@@ -82,9 +82,9 @@ async fn test_sends_availability_to_all_rooms() -> Result<()> {
             vec![
                 Room::direct_message(user_id!("user@prose.org"), Availability::Available)
                     .with_user_nickname("nick"),
-                Room::private_channel(room_id!("prc@conf.prose.org")).with_user_nickname("nick"),
-                Room::public_channel(room_id!("pc@conf.prose.org")).with_user_nickname("nick"),
-                Room::group(room_id!("group@conf.prose.org")).with_user_nickname("nick"),
+                Room::private_channel(muc_id!("prc@conf.prose.org")).with_user_nickname("nick"),
+                Room::public_channel(muc_id!("pc@conf.prose.org")).with_user_nickname("nick"),
+                Room::group(muc_id!("group@conf.prose.org")).with_user_nickname("nick"),
             ]
         });
 

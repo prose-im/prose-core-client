@@ -12,7 +12,7 @@ use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::MessageBuilder;
-use prose_core_client::{room_id, user_id};
+use prose_core_client::user_id;
 
 use crate::tests::{async_test, store};
 
@@ -20,7 +20,7 @@ use crate::tests::{async_test, store};
 async fn test_can_insert_same_message_twice() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room_id!("a@prose.org");
+    let room_id = RoomId::from(user_id!("a@prose.org"));
     let message = MessageBuilder::new_with_index(123).build_message_like();
 
     repo.append(&room_id, &[message.clone()]).await?;
@@ -39,7 +39,7 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
 async fn test_loads_message_with_reactions() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room_id!("a@prose.org");
+    let room_id = RoomId::from(user_id!("a@prose.org"));
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(3)
@@ -67,7 +67,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
 async fn test_load_messages_targeting() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room_id!("a@prose.org");
+    let room_id = RoomId::from(user_id!("a@prose.org"));
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(2).build_message_like();
@@ -113,7 +113,7 @@ async fn test_load_messages_targeting() -> Result<()> {
 async fn test_load_only_messages_targeting() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room_id!("a@prose.org");
+    let room_id = RoomId::from(user_id!("a@prose.org"));
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(2).build_message_like();
@@ -171,7 +171,7 @@ async fn test_load_only_messages_targeting() -> Result<()> {
 async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
-    let room_id = room_id!("a@prose.org");
+    let room_id = RoomId::from(user_id!("a@prose.org"));
 
     let message1 = MessageBuilder::new_with_index(1)
         .set_target_message_idx(100)

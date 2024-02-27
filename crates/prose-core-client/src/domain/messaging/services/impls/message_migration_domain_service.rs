@@ -11,7 +11,7 @@ use prose_proc_macros::DependenciesStruct;
 use crate::app::deps::{DynMessageArchiveService, DynMessagingService};
 use crate::domain::messaging::models::StanzaId;
 use crate::domain::messaging::services::MessagePage;
-use crate::domain::shared::models::{RoomId, RoomType};
+use crate::domain::shared::models::RoomId;
 
 use super::super::MessageMigrationDomainService as MessageMigrationDomainServiceTrait;
 
@@ -27,22 +27,14 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
     async fn copy_all_messages_from_room(
         &self,
         source_room: &RoomId,
-        source_room_type: &RoomType,
         target_room: &RoomId,
-        target_room_type: &RoomType,
     ) -> Result<()> {
         let mut first_message_id: Option<StanzaId> = None;
 
         loop {
             let MessagePage { messages, is_last } = self
                 .message_archive_service
-                .load_messages(
-                    &source_room,
-                    source_room_type,
-                    first_message_id.as_ref(),
-                    None,
-                    100,
-                )
+                .load_messages(&source_room, first_message_id.as_ref(), None, 100)
                 .await?;
 
             first_message_id = messages
@@ -53,7 +45,7 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
 
             for message in messages {
                 self.messaging_service
-                    .relay_archived_message_to_room(target_room, target_room_type, message)
+                    .relay_archived_message_to_room(target_room, message)
                     .await?;
             }
 

@@ -25,8 +25,8 @@ pub use crate::domain::{
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        Availability, OccupantId, ParticipantId, ParticipantInfo, RoomId, UserBasicInfo, UserId,
-        UserPresenceInfo, UserResourceId,
+        Availability, MucId, OccupantId, ParticipantId, ParticipantInfo, RoomId, UserBasicInfo,
+        UserId, UserPresenceInfo, UserResourceId,
     },
     uploads::models::UploadHeader,
     user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},

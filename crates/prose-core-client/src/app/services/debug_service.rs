@@ -38,7 +38,7 @@ impl DebugService {
 
     pub async fn delete_bookmarks(&self, jids: impl IntoIterator<Item = RoomId>) -> Result<()> {
         for jid in jids.into_iter() {
-            self.client.delete_bookmark(&jid).await?;
+            self.client.delete_bookmark(jid.as_ref()).await?;
         }
         Ok(())
     }

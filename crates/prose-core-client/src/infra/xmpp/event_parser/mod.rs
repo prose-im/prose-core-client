@@ -28,8 +28,8 @@ use crate::app::event_handlers::{
 use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
 use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::rooms::models::ComposeState;
-use crate::domain::shared::models::{CapabilitiesId, RequestId, SenderId, UserEndpointId};
-use crate::dtos::{RoomId, UserId, UserResourceId};
+use crate::domain::shared::models::{CapabilitiesId, MucId, RequestId, SenderId, UserEndpointId};
+use crate::dtos::{UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::presence::parse_presence;
 use crate::infra::xmpp::event_parser::pubsub::parse_pubsub_event;
 
@@ -153,7 +153,7 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
             };
 
             ctx.push_event(RoomEvent {
-                room_id: RoomId::from(invite.jid),
+                room_id: MucId::from(invite.jid),
                 r#type: RoomEventType::ReceivedInvitation {
                     sender: UserResourceId::from(from),
                     password: invite.password,
@@ -174,7 +174,7 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
             };
 
             ctx.push_event(RoomEvent {
-                room_id: RoomId::from(from),
+                room_id: MucId::from(from),
                 r#type: RoomEventType::ReceivedInvitation {
                     sender: UserResourceId::from(sender_jid.clone()),
                     password: invite.password,

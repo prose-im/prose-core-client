@@ -8,7 +8,7 @@ use core::str::FromStr;
 
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::{RoomId, UserId};
+use prose_core_client::dtos::{MucId, UserId};
 
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "JID")]
@@ -91,9 +91,9 @@ impl Display for BareJid {
     }
 }
 
-impl From<BareJid> for RoomId {
+impl From<BareJid> for MucId {
     fn from(value: BareJid) -> Self {
-        RoomId::from(value.0)
+        MucId::from(value.0)
     }
 }
 

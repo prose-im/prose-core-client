@@ -258,7 +258,7 @@ impl Room {
     ) -> Self {
         Self::new(
             RoomInfo {
-                room_id: RoomId::from(contact_id.clone().into_inner()),
+                room_id: RoomId::from(contact_id.clone()),
                 user_nickname: "no_nickname".to_string(),
                 r#type: RoomType::DirectMessage,
             },
@@ -306,9 +306,12 @@ impl Room {
 impl RoomInfo {
     /// Returns the OccupantId of the connected user by appending their nickname to the room's
     /// bare jid.
-    pub fn user_full_jid(&self) -> OccupantId {
-        self.room_id.occupant_id_with_nickname(&self.user_nickname)
-            .expect("The provided JID and user_nickname were invalid and could not be used to form a FullJid.")
+    pub fn occupant_id(&self) -> Option<OccupantId> {
+        match &self.room_id {
+            RoomId::User(_) => None,
+            RoomId::Muc(id) => Some(id.occupant_id_with_nickname(&self.user_nickname)
+                .expect("The provided JID and user_nickname were invalid and could not be used to form a FullJid."))
+        }
     }
 }
 
@@ -322,7 +325,7 @@ impl PartialEq for Room {
 
 #[cfg(test)]
 mod tests {
-    use crate::{room_id, user_id};
+    use crate::user_id;
 
     use super::*;
 
@@ -339,7 +342,7 @@ mod tests {
             internals,
             Room::new(
                 RoomInfo {
-                    room_id: room_id!("contact@prose.org"),
+                    room_id: user_id!("contact@prose.org").into(),
                     user_nickname: "no_nickname".to_string(),
                     r#type: RoomType::DirectMessage,
                 },

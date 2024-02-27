@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use jid::BareJid;
 use minidom::Element;
 use xmpp_parsers::data_forms::{Field, FieldType};
 use xmpp_parsers::pubsub::pubsub::PublishOptions;
@@ -14,7 +15,6 @@ use prose_xmpp::{mods, PublishOptionsExt, RequestError};
 
 use crate::domain::sidebar::models::Bookmark;
 use crate::domain::sidebar::services::BookmarksService;
-use crate::dtos::RoomId;
 use crate::infra::xmpp::type_conversions::bookmark::ns;
 use crate::infra::xmpp::XMPPClient;
 
@@ -60,7 +60,7 @@ impl BookmarksService for XMPPClient {
         Ok(())
     }
 
-    async fn delete_bookmark(&self, jid: &RoomId) -> Result<()> {
+    async fn delete_bookmark(&self, jid: &BareJid) -> Result<()> {
         let pubsub = self.client.get_mod::<mods::PubSub>();
         pubsub
             .delete_items_with_ids(ns::PROSE_BOOKMARK, [jid.to_string()], true)

@@ -15,7 +15,7 @@ use crate::domain::rooms::models::PublicRoomInfo;
 use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomBehavior, CreateRoomType, JoinRoomBehavior,
 };
-use crate::domain::shared::models::{RoomId, UserId};
+use crate::domain::shared::models::{MucId, RoomId, UserId};
 
 #[derive(InjectDependencies)]
 pub struct RoomsService {
@@ -54,7 +54,7 @@ impl RoomsService {
         Ok(rooms
             .into_iter()
             .find(|r| r.name.as_ref().map(|name| name.to_lowercase()).as_ref() == Some(&needle))
-            .map(|room| room.id))
+            .map(|room| room.id.into()))
     }
 
     pub async fn start_conversation(&self, participants: &[UserId]) -> Result<RoomId> {
@@ -70,10 +70,10 @@ impl RoomsService {
         }
     }
 
-    pub async fn join_room(&self, room_jid: &RoomId, password: Option<&str>) -> Result<RoomId> {
+    pub async fn join_room(&self, room_id: &MucId, password: Option<&str>) -> Result<RoomId> {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinRoom {
-                room_id: room_jid.clone(),
+                room_id: room_id.clone(),
                 password: password.map(ToString::to_string),
                 behavior: JoinRoomBehavior::user_initiated(),
             })
@@ -130,8 +130,8 @@ impl RoomsService {
             .await
     }
 
-    pub async fn destroy_room(&self, room_jid: &RoomId) -> Result<()> {
-        self.sidebar_domain_service.destroy_room(room_jid).await?;
+    pub async fn destroy_room(&self, room_id: &MucId) -> Result<()> {
+        self.sidebar_domain_service.destroy_room(room_id).await?;
         Ok(())
     }
 }

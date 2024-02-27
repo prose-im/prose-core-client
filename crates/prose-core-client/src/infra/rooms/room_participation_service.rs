@@ -12,7 +12,8 @@ use prose_xmpp::stanza::muc::{mediated_invite, MediatedInvite};
 
 use crate::domain::rooms::models::RoomError;
 use crate::domain::rooms::services::RoomParticipationService;
-use crate::dtos::{RoomId, UserId};
+use crate::domain::shared::models::MucId;
+use crate::dtos::UserId;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -20,7 +21,7 @@ use crate::infra::xmpp::XMPPClient;
 impl RoomParticipationService for XMPPClient {
     async fn invite_users_to_room(
         &self,
-        room_jid: &RoomId,
+        room_id: &MucId,
         participants: &[UserId],
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
@@ -30,7 +31,7 @@ impl RoomParticipationService for XMPPClient {
         for participant in participants {
             muc_mod
                 .send_mediated_invite(
-                    room_jid,
+                    room_id,
                     MediatedInvite {
                         invites: vec![mediated_invite::Invite {
                             from: None,
@@ -48,13 +49,13 @@ impl RoomParticipationService for XMPPClient {
 
     async fn grant_membership(
         &self,
-        room_jid: &RoomId,
+        room_id: &MucId,
         participant: &UserId,
     ) -> Result<(), RoomError> {
         let muc_mod = self.client.get_mod::<mods::MUC>();
         muc_mod
             .update_user_affiliations(
-                room_jid,
+                room_id,
                 vec![(participant.clone().into_inner(), Affiliation::Member)],
             )
             .await?;

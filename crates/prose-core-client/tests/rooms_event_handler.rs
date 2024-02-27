@@ -21,7 +21,7 @@ use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, RoomFactory,
 };
 use prose_core_client::domain::shared::models::{
-    OccupantId, RoomId, UserId, UserOrResourceId, UserResourceId,
+    MucId, OccupantId, UserId, UserOrResourceId, UserResourceId,
 };
 use prose_core_client::domain::user_info::models::Presence;
 use prose_core_client::dtos::{Availability, Participant, ParticipantInfo, UserBasicInfo};
@@ -29,21 +29,22 @@ use prose_core_client::test::{
     ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
 use prose_core_client::{
-    occupant_id, room_id, user_id, user_resource_id, ClientEvent, ClientRoomEventType,
+    muc_id, occupant_id, user_id, user_resource_id, ClientEvent, ClientRoomEventType,
 };
+use prose_xmpp::bare;
 
 #[tokio::test]
 async fn test_adds_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("room@conference.prose.org"));
+    let room = Room::group(muc_id!("room@conference.prose.org"));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .times(2)
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
 
@@ -114,14 +115,14 @@ async fn test_adds_participant() -> Result<()> {
 async fn test_adds_invited_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::private_channel(room_id!("room@conference.prose.org"));
+    let room = Room::private_channel(muc_id!("room@conference.prose.org"));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
 
@@ -144,7 +145,7 @@ async fn test_adds_invited_participant() -> Result<()> {
 
     event_handler
         .handle_event(ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@conference.prose.org"),
+            room_id: muc_id!("room@conference.prose.org").into(),
             r#type: RoomEventType::UserAdded {
                 user_id: user_id!("user@prose.org"),
                 affiliation: RoomAffiliation::Member,
@@ -175,7 +176,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room =
-        Room::private_channel(room_id!("room@conference.prose.org")).with_participants(vec![(
+        Room::private_channel(muc_id!("room@conference.prose.org")).with_participants(vec![(
             occupant_id!("room@conference.prose.org/a"),
             Participant {
                 real_id: None,
@@ -194,7 +195,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .times(2)
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
 
@@ -251,7 +252,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
 async fn test_handles_kicked_user() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("room@conference.prose.org")).with_participants([(
+    let room = Room::group(muc_id!("room@conference.prose.org")).with_participants([(
         occupant_id!("room@conference.prose.org/nickname"),
         Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
     )]);
@@ -261,7 +262,7 @@ async fn test_handles_kicked_user() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
 
@@ -297,14 +298,14 @@ async fn test_handles_kicked_user() -> Result<()> {
 async fn test_handles_kicked_self() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("room@conference.prose.org"));
+    let room = Room::group(muc_id!("room@conference.prose.org"));
 
     {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
 
@@ -312,7 +313,7 @@ async fn test_handles_kicked_self() -> Result<()> {
         .expect_handle_removal_from_room()
         .once()
         .with(
-            predicate::eq(room_id!("room@conference.prose.org")),
+            predicate::eq(muc_id!("room@conference.prose.org")),
             predicate::eq(true),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
@@ -340,8 +341,8 @@ async fn test_handles_destroyed_room() -> Result<()> {
         .expect_handle_destroyed_room()
         .once()
         .with(
-            predicate::eq(room_id!("group@prose.org")),
-            predicate::eq(Some(room_id!("private-channel@prose.org"))),
+            predicate::eq(muc_id!("group@prose.org")),
+            predicate::eq(Some(muc_id!("private-channel@prose.org"))),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
@@ -349,9 +350,9 @@ async fn test_handles_destroyed_room() -> Result<()> {
 
     event_handler
         .handle_event(ServerEvent::Room(RoomEvent {
-            room_id: room_id!("group@prose.org"),
+            room_id: muc_id!("group@prose.org").into(),
             r#type: RoomEventType::Destroyed {
-                replacement: Some(room_id!("private-channel@prose.org")),
+                replacement: Some(muc_id!("private-channel@prose.org")),
             },
         }))
         .await?;
@@ -363,7 +364,7 @@ async fn test_handles_destroyed_room() -> Result<()> {
 async fn test_handles_compose_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("room@conference.prose.org")).with_participants([(
+    let room = Room::group(muc_id!("room@conference.prose.org")).with_participants([(
         occupant_id!("room@conference.prose.org/nickname"),
         Participant::owner()
             .set_real_id(&user_id!("nickname@prose.org"))
@@ -375,7 +376,7 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
@@ -448,7 +449,7 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room_id!("contact@prose.org")))
+            .with(predicate::eq(bare!("contact@prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
@@ -513,17 +514,17 @@ async fn test_handles_invite() -> Result<()> {
         .expect_insert_item_by_creating_or_joining_room()
         .once()
         .with(predicate::eq(CreateOrEnterRoomRequest::JoinRoom {
-            room_id: room_id!("group@conference.prose.org"),
+            room_id: muc_id!("group@conference.prose.org").into(),
             password: None,
             behavior: JoinRoomBehavior::system_initiated(),
         }))
-        .return_once(|_| Box::pin(async move { Ok(room_id!("group@conference.prose.org")) }));
+        .return_once(|_| Box::pin(async move { Ok(muc_id!("group@conference.prose.org").into()) }));
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
     event_handler
         .handle_event(ServerEvent::Room(RoomEvent {
-            room_id: room_id!("group@conference.prose.org"),
+            room_id: muc_id!("group@conference.prose.org").into(),
             r#type: RoomEventType::ReceivedInvitation {
                 sender: user_resource_id!("user@prose.org/res"),
                 password: None,
@@ -549,7 +550,7 @@ async fn test_handles_user_presence() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(room_id!("sender@prose.org")))
+        .with(predicate::eq(bare!("sender@prose.org")))
         .return_once(move |_| Some(room.clone()));
 
     deps.user_info_repo
@@ -600,7 +601,7 @@ async fn test_handles_user_presence() -> Result<()> {
 async fn test_handles_occupant_presence() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("room@muc.prose.org")).with_participants([(
+    let room = Room::group(muc_id!("room@muc.prose.org")).with_participants([(
         occupant_id!("room@muc.prose.org/nick"),
         Participant::owner()
             .set_real_id(&user_id!("nick@prose.org"))
@@ -612,7 +613,7 @@ async fn test_handles_occupant_presence() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(room_id!("room@muc.prose.org")))
+            .with(predicate::eq(bare!("room@muc.prose.org")))
             .return_once(move |_| Some(room.clone()));
     }
 
@@ -666,7 +667,7 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(room_id!("sender@prose.org")))
+        .with(predicate::eq(bare!("sender@prose.org")))
         .return_once(move |_| None);
 
     deps.user_info_repo
@@ -729,7 +730,7 @@ async fn test_swallows_self_presence() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(room_id!("hello@prose.org")))
+        .with(predicate::eq(bare!("hello@prose.org")))
         .return_once(move |_| Some(room.clone()));
 
     deps.user_info_repo
@@ -766,14 +767,14 @@ async fn test_room_config_changed() -> Result<()> {
     deps.sidebar_domain_service
         .expect_handle_changed_room_config()
         .once()
-        .with(predicate::eq(room_id!("room@conference.prose.org")))
+        .with(predicate::eq(muc_id!("room@conference.prose.org")))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
     event_handler
         .handle_event(ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@conference.prose.org"),
+            room_id: muc_id!("room@conference.prose.org").into(),
             r#type: RoomEventType::RoomConfigChanged,
         }))
         .await?;
@@ -786,7 +787,7 @@ async fn test_room_topic_changed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Room::group(room_id!("room@conference.prose.org")).with_topic(Some("Old Topic"));
+    let room = Room::group(muc_id!("room@conference.prose.org")).with_topic(Some("Old Topic"));
 
     {
         let room = room.clone();
@@ -794,7 +795,7 @@ async fn test_room_topic_changed() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
 
@@ -804,7 +805,7 @@ async fn test_room_topic_changed() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
 
@@ -823,7 +824,7 @@ async fn test_room_topic_changed() -> Result<()> {
     // Should not generate an event since the topic didn't actually change
     event_handler
         .handle_event(ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@conference.prose.org"),
+            room_id: muc_id!("room@conference.prose.org").into(),
             r#type: RoomEventType::RoomTopicChanged {
                 new_topic: Some("Old Topic".to_string()),
             },
@@ -833,7 +834,7 @@ async fn test_room_topic_changed() -> Result<()> {
     // Should fire an event
     event_handler
         .handle_event(ServerEvent::Room(RoomEvent {
-            room_id: room_id!("room@conference.prose.org"),
+            room_id: muc_id!("room@conference.prose.org").into(),
             r#type: RoomEventType::RoomTopicChanged {
                 new_topic: Some("New Topic".to_string()),
             },

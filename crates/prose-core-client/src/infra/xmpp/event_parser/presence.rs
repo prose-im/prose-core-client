@@ -15,8 +15,8 @@ use crate::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, UserStatusEvent,
     UserStatusEventType,
 };
-use crate::domain::shared::models::{OccupantId, UserEndpointId};
-use crate::dtos::{Availability, RoomId, UserId, UserResourceId};
+use crate::domain::shared::models::{MucId, OccupantId, UserEndpointId};
+use crate::dtos::{Availability, UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::{missing_attribute, missing_element, Context};
 use crate::infra::xmpp::util::PresenceExt;
 
@@ -63,7 +63,7 @@ fn parse_muc_presence(
         bail!("Expected FullJid in MUC presence.")
     };
 
-    let room = RoomId::from(from.to_bare());
+    let occupant_id = OccupantId::from(from);
 
     let Some(item) = muc_user.items.first() else {
         return missing_element(ctx, "item", muc_user);
@@ -73,15 +73,14 @@ fn parse_muc_presence(
 
     if let Some(destroy) = muc_user.destroy.take() {
         ctx.push_event(RoomEvent {
-            room_id: room,
+            room_id: occupant_id.muc_id(),
             r#type: RoomEventType::Destroyed {
-                replacement: destroy.jid.map(RoomId::from),
+                replacement: destroy.jid.map(MucId::from),
             },
         });
         return Ok(());
     }
 
-    let occupant_id = OccupantId::from(from);
     let anon_occupant_id = presence.anon_occupant_id();
     let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
 

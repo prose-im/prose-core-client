@@ -3,28 +3,29 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::iter;
+
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
 use mockall::predicate;
 use pretty_assertions::assert_eq;
-use std::iter;
 
 use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
-use prose_core_client::domain::shared::models::{OccupantId, RoomId, RoomType, UserId};
+use prose_core_client::domain::shared::models::{MucId, OccupantId, RoomId, UserId};
 use prose_core_client::dtos::{MessageResultSet, Participant, Reaction, StanzaId};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
-use prose_core_client::{occupant_id, room_id, user_id};
+use prose_core_client::{muc_id, occupant_id, user_id};
+use prose_xmpp::jid;
 use prose_xmpp::stanza::message::MucUser;
-use prose_xmpp::{bare, jid};
 
 #[tokio::test]
 async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = Room::group(room_id!("room@conference.prose.org"))
+    let internals = Room::group(muc_id!("room@conference.prose.org"))
         .with_members([RegisteredMember {
             user_id: user_id!("a@prose.org"),
             name: Some("Aron Doe".to_string()),
@@ -100,7 +101,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    let internals = Room::group(room_id!("room@conference.prose.org"))
+    let internals = Room::group(muc_id!("room@conference.prose.org"))
         .with_members([RegisteredMember {
             user_id: user_id!("a@prose.org"),
             name: Some("Aron Doe".to_string()),
@@ -121,7 +122,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, _, _, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: vec![
@@ -222,14 +223,13 @@ async fn test_toggle_reaction() -> Result<()> {
         .expect_react_to_message()
         .once()
         .with(
-            predicate::eq(bare!("room@conference.prose.org")),
-            predicate::eq(RoomType::Group),
+            predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
             predicate::eq(MessageBuilder::id_for_index(1)),
             predicate::eq(vec!["🍻".into(), "✅".into()]),
         )
-        .return_once(|_, _, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
-    let internals = Room::group(room_id!("room@conference.prose.org"));
+    let internals = Room::group(muc_id!("room@conference.prose.org"));
 
     let room = RoomFactory::from(deps).build(internals).to_generic_room();
 
@@ -247,13 +247,13 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         .expect_rename_item()
         .once()
         .with(
-            predicate::eq(room_id!("room@conference.prose.org")),
+            predicate::eq(muc_id!("room@conference.prose.org")),
             predicate::eq("New Name"),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
-        .build(Room::public_channel(room_id!("room@conference.prose.org")).with_name("Old Name"))
+        .build(Room::public_channel(muc_id!("room@conference.prose.org")).with_name("Old Name"))
         .to_generic_room();
 
     room.set_name("New Name").await?;
@@ -270,7 +270,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, page_size| {
+        .return_once(|_, before, _, page_size| {
             assert_eq!(5, page_size);
             assert!(before.is_none());
 
@@ -321,7 +321,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, page_size| {
+        .return_once(|_, before, _, page_size| {
             assert_eq!(5, page_size);
             assert_eq!(Some(&MessageBuilder::stanza_id_for_index(100)), before);
 
@@ -378,7 +378,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
-        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .build(Room::public_channel(muc_id!("room@conference.prose.org")))
         .to_generic_room();
 
     let result = room.load_latest_messages().await?;
@@ -467,7 +467,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, page_size| {
+        .return_once(|_, before, _, page_size| {
             assert_eq!(5, page_size);
             assert_eq!(None, before);
 
@@ -499,7 +499,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, page_size| {
+        .return_once(|_, before, _, page_size| {
             assert_eq!(5, page_size);
             assert_eq!(Some(&MessageBuilder::stanza_id_for_index(96)), before);
 
@@ -528,7 +528,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
-        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .build(Room::public_channel(muc_id!("room@conference.prose.org")))
         .to_generic_room();
 
     let result = room.load_latest_messages().await?;
@@ -563,7 +563,7 @@ async fn test_stops_at_last_page() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, _, _, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: (96..=100)
@@ -580,7 +580,7 @@ async fn test_stops_at_last_page() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, _, _, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: (93..=95)
@@ -603,7 +603,7 @@ async fn test_stops_at_last_page() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
-        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .build(Room::public_channel(muc_id!("room@conference.prose.org")))
         .to_generic_room();
 
     let result = room.load_latest_messages().await?;
@@ -622,7 +622,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
     deps.message_archive_service
         .expect_load_messages()
         .once()
-        .return_once(|_, _, before, _, _| {
+        .return_once(|_, before, _, _| {
             assert!(before.is_some());
 
             Box::pin(async {
@@ -659,7 +659,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .expect_get_messages_targeting()
         .once()
         .with(
-            predicate::eq(room_id!("room@conference.prose.org")),
+            predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
             predicate::eq(vec![
                 MessageBuilder::id_for_index(5),
                 MessageBuilder::id_for_index(4),
@@ -722,7 +722,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
-        .build(Room::public_channel(room_id!("room@conference.prose.org")))
+        .build(Room::public_channel(muc_id!("room@conference.prose.org")))
         .to_generic_room();
 
     let result = room

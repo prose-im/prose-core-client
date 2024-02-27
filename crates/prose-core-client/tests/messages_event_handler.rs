@@ -16,10 +16,12 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::messaging::models::{MessageLike, MessageLikePayload};
 use prose_core_client::domain::rooms::models::Room;
-use prose_core_client::domain::shared::models::{OccupantId, RoomId, UserEndpointId, UserId};
+use prose_core_client::domain::shared::models::{
+    MucId, OccupantId, RoomId, UserEndpointId, UserId,
+};
 use prose_core_client::dtos::{Availability, MessageId, ParticipantId};
 use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
-use prose_core_client::{occupant_id, room_id, user_id, ClientRoomEventType};
+use prose_core_client::{muc_id, occupant_id, user_id, ClientRoomEventType};
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, full, jid};
 
@@ -28,7 +30,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Room::group(room_id!("group@conference.prose.org")).with_name("Group Name");
+    let room = Room::group(muc_id!("group@conference.prose.org")).with_name("Group Name");
 
     deps.sidebar_domain_service
         .expect_handle_received_message()
@@ -45,7 +47,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(room_id!("group@conference.prose.org")))
+            .with(predicate::eq(bare!("group@conference.prose.org")))
             .return_once(|_| Some(room));
     }
 
@@ -78,7 +80,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
         .expect_send_read_receipt()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
@@ -118,7 +120,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(room_id!("jane.doe@prose.org")))
+            .with(predicate::eq(bare!("jane.doe@prose.org")))
             .return_once(|_| Some(room));
     }
 
@@ -150,7 +152,7 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
         .expect_send_read_receipt()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
@@ -173,7 +175,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
-    let room = Room::group(room_id!("room@conference.prose.org"));
+    let room = Room::group(muc_id!("room@conference.prose.org"));
 
     let sent_message = prose_xmpp::stanza::Message::new()
         .set_type(MessageType::Groupchat)
@@ -205,7 +207,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(room_id!("room@conference.prose.org")))
+            .with(predicate::eq(bare!("room@conference.prose.org")))
             .return_once(|_| Some(room));
     }
 
@@ -214,7 +216,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         .once()
         .in_sequence(&mut seq)
         .with(
-            predicate::eq(room_id!("room@conference.prose.org")),
+            predicate::eq(RoomId::Muc(muc_id!("room@conference.prose.org"))),
             predicate::eq([expected_saved_message]),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
@@ -245,7 +247,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
 async fn test_dispatches_messages_appended_for_new_received_message() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("user@prose.org"));
+    let room = Room::group(muc_id!("user@prose.org"));
 
     deps.sidebar_domain_service
         .expect_handle_received_message()
@@ -279,7 +281,7 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
 
     deps.messaging_service
         .expect_send_read_receipt()
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
@@ -300,7 +302,7 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
 async fn test_dispatches_messages_updated_for_existing_received_message() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(room_id!("user@prose.org"));
+    let room = Room::group(muc_id!("user@prose.org"));
 
     deps.sidebar_domain_service
         .expect_handle_received_message()
@@ -334,7 +336,7 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
 
     deps.messaging_service
         .expect_send_read_receipt()
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler

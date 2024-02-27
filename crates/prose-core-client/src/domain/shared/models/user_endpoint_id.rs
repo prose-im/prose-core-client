@@ -18,9 +18,9 @@ pub enum UserEndpointId {
 impl UserEndpointId {
     pub fn to_room_id(&self) -> RoomId {
         match self {
-            UserEndpointId::User(id) => RoomId::from(id.clone().into_inner()),
-            UserEndpointId::UserResource(id) => RoomId::from(id.to_user_id().into_inner()),
-            UserEndpointId::Occupant(id) => id.room_id(),
+            UserEndpointId::User(id) => RoomId::from(id.clone()),
+            UserEndpointId::UserResource(id) => RoomId::from(id.to_user_id()),
+            UserEndpointId::Occupant(id) => RoomId::from(id.muc_id()),
         }
     }
 

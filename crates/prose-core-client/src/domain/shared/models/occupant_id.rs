@@ -5,6 +5,7 @@
 
 use std::fmt::{Debug, Display, Formatter};
 
+use crate::domain::shared::models::MucId;
 use jid::FullJid;
 use minidom::IntoAttributeValue;
 use serde::{Deserialize, Serialize};
@@ -27,8 +28,12 @@ impl OccupantId {
         self.0.resource_str().capitalized_display_name()
     }
 
-    pub fn room_id(&self) -> RoomId {
+    pub fn muc_id(&self) -> MucId {
         self.0.to_bare().into()
+    }
+
+    pub fn room_id(&self) -> RoomId {
+        RoomId::Muc(self.muc_id())
     }
 
     pub fn into_inner(self) -> FullJid {

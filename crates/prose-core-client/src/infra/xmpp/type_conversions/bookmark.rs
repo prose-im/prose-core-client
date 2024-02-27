@@ -12,8 +12,9 @@ use xmpp_parsers::pubsub::PubSubPayload;
 use crate::domain::rooms::models::RoomSidebarState;
 use prose_xmpp::{ElementExt, ParseError, RequestError};
 
-use crate::domain::shared::models::RoomId;
+use crate::domain::shared::models::{MucId, RoomId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
+use crate::dtos::UserId;
 
 pub mod ns {
     pub const PROSE_BOOKMARK: &str = "https://prose.org/protocol/bookmark";
@@ -34,10 +35,24 @@ impl TryFrom<Element> for Bookmark {
             (false, _) => RoomSidebarState::NotInSidebar,
         };
 
+        let bookmark_type = BookmarkType::from_str(&value.attr_req("type")?)?;
+
+        let room_id = match bookmark_type {
+            BookmarkType::DirectMessage => {
+                RoomId::User(UserId::from(BareJid::from_str(&value.attr_req("jid")?)?))
+            }
+            BookmarkType::Group
+            | BookmarkType::PrivateChannel
+            | BookmarkType::PublicChannel
+            | BookmarkType::Generic => {
+                RoomId::Muc(MucId::from(BareJid::from_str(&value.attr_req("jid")?)?))
+            }
+        };
+
         Ok(Self {
             name: value.attr_req("name")?.to_string(),
-            jid: RoomId::from(BareJid::from_str(&value.attr_req("jid")?)?),
-            r#type: BookmarkType::from_str(&value.attr_req("type")?)?,
+            jid: room_id,
+            r#type: bookmark_type,
             sidebar_state,
         })
     }
@@ -47,7 +62,7 @@ impl From<Bookmark> for Element {
     fn from(value: Bookmark) -> Self {
         Element::builder("bookmark", ns::PROSE_BOOKMARK)
             .attr("name", value.name)
-            .attr("jid", value.jid)
+            .attr("jid", value.jid.into_bare())
             .attr("type", value.r#type)
             .attr(
                 "favorite",

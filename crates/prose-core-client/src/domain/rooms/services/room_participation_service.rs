@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::rooms::models::RoomError;
-use crate::domain::shared::models::{RoomId, UserId};
+use crate::domain::shared::models::{MucId, UserId};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -16,13 +16,13 @@ use crate::domain::shared::models::{RoomId, UserId};
 pub trait RoomParticipationService: SendUnlessWasm + SyncUnlessWasm {
     async fn invite_users_to_room(
         &self,
-        room_jid: &RoomId,
+        room_id: &MucId,
         participants: &[UserId],
     ) -> Result<(), RoomError>;
 
     async fn grant_membership(
         &self,
-        room_jid: &RoomId,
+        room_id: &MucId,
         participant: &UserId,
     ) -> Result<(), RoomError>;
 }

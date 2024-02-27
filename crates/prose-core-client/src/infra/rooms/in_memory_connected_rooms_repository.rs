@@ -7,16 +7,16 @@ use std::collections::HashMap;
 use std::mem;
 
 use anyhow::Result;
+use jid::BareJid;
 use parking_lot::RwLock;
 
 use crate::domain::rooms::models::Room;
 use crate::domain::rooms::repos::{
     ConnectedRoomsReadOnlyRepository, ConnectedRoomsRepository, RoomAlreadyExistsError,
 };
-use crate::domain::shared::models::RoomId;
 
 pub struct InMemoryConnectedRoomsRepository {
-    rooms: RwLock<HashMap<RoomId, Room>>,
+    rooms: RwLock<HashMap<BareJid, Room>>,
 }
 
 impl InMemoryConnectedRoomsRepository {
@@ -28,7 +28,7 @@ impl InMemoryConnectedRoomsRepository {
 }
 
 impl ConnectedRoomsReadOnlyRepository for InMemoryConnectedRoomsRepository {
-    fn get(&self, room_id: &RoomId) -> Option<Room> {
+    fn get(&self, room_id: &BareJid) -> Option<Room> {
         self.rooms.read().get(room_id).cloned()
     }
 
@@ -41,26 +41,26 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
     fn set(&self, room: Room) -> Result<(), RoomAlreadyExistsError> {
         let mut rooms = self.rooms.write();
 
-        if rooms.contains_key(&room.room_id) {
+        if rooms.contains_key(room.room_id.as_ref()) {
             return Err(RoomAlreadyExistsError);
         }
 
-        rooms.insert(room.room_id.clone(), room);
+        rooms.insert(room.room_id.clone().into_bare(), room);
         Ok(())
     }
 
     fn set_or_replace(&self, room: Room) -> Option<Room> {
         let mut rooms = self.rooms.write();
-        rooms.insert(room.room_id.clone(), room)
+        rooms.insert(room.room_id.clone().into_bare(), room)
     }
 
     fn update(
         &self,
-        room_id: &RoomId,
+        room_id: &BareJid,
         block: Box<dyn FnOnce(Room) -> Room + Send>,
     ) -> Option<Room> {
         let mut rooms = self.rooms.write();
-        let Some(room) = rooms.remove(&room_id) else {
+        let Some(room) = rooms.remove(room_id) else {
             return None;
         };
         let modified_room = block(room);
@@ -68,7 +68,7 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         Some(modified_room)
     }
 
-    fn delete(&self, room_id: &RoomId) -> Option<Room> {
+    fn delete(&self, room_id: &BareJid) -> Option<Room> {
         self.rooms.write().remove(room_id)
     }
 

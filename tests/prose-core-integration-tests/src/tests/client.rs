@@ -5,8 +5,8 @@
 
 use anyhow::Result;
 
-use prose_core_client::dtos::{RoomId, SendMessageRequest, UserId};
-use prose_core_client::{room_id, user_id};
+use prose_core_client::dtos::{MucId, UserId};
+use prose_core_client::{muc_id, user_id};
 use prose_proc_macros::mt_test;
 
 use crate::tests::helpers::TestClient;
@@ -351,7 +351,7 @@ async fn test_joins_room() -> Result<()> {
 
     client
         .rooms
-        .join_room(&room_id!("room@conference.prose.org"), None)
+        .join_room(&muc_id!("room@conference.prose.org"), None)
         .await?;
 
     Ok(())

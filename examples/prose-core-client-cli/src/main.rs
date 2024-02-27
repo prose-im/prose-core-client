@@ -215,7 +215,7 @@ impl Display for JidWithName {
 impl From<RoomEnvelope> for JidWithName {
     fn from(value: RoomEnvelope) -> Self {
         Self {
-            jid: value.to_generic_room().jid().clone().into_inner(),
+            jid: value.to_generic_room().jid().clone().into_bare(),
             name: format!(
                 "{} {}",
                 value.kind(),
@@ -258,7 +258,7 @@ impl From<Contact> for JidWithName {
 impl From<SidebarItem> for JidWithName {
     fn from(value: SidebarItem) -> Self {
         Self {
-            jid: value.room.to_generic_room().jid().clone().into_inner(),
+            jid: value.room.to_generic_room().jid().clone().into_bare(),
             name: value.name,
         }
     }
@@ -267,7 +267,7 @@ impl From<SidebarItem> for JidWithName {
 impl From<Bookmark> for JidWithName {
     fn from(value: Bookmark) -> Self {
         Self {
-            jid: value.jid.into_inner(),
+            jid: value.jid.into_bare(),
             name: value.name,
         }
     }
@@ -1155,7 +1155,7 @@ async fn main() -> Result<()> {
                 };
                 client
                     .rooms
-                    .destroy_room(room.to_generic_room().jid())
+                    .destroy_room(room.to_generic_room().muc_id())
                     .await?;
             }
             Selection::ListConnectedRooms => {
@@ -1328,7 +1328,11 @@ async fn main() -> Result<()> {
                 let selected_bookmarks = select_multiple_jids_from_list(bookmarks);
                 client
                     .debug
-                    .delete_bookmarks(selected_bookmarks.into_iter().map(RoomId::from))
+                    .delete_bookmarks(
+                        selected_bookmarks
+                            .into_iter()
+                            .map(|jid| RoomId::Muc(jid.into())),
+                    )
                     .await?;
             }
             Selection::DeleteBookmarksPubSubNode => {

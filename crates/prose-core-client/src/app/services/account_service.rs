@@ -10,7 +10,7 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::*;
-use crate::domain::shared::models::{Availability, RoomType};
+use crate::domain::shared::models::Availability;
 use crate::domain::user_info::models::{AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
 use crate::dtos::AccountInfo;
@@ -77,21 +77,12 @@ impl AccountService {
             .await?;
 
         for room in self.connected_rooms_repo.get_all() {
-            match room.r#type {
-                RoomType::Unknown | RoomType::DirectMessage => {}
-                RoomType::Group
-                | RoomType::PrivateChannel
-                | RoomType::PublicChannel
-                | RoomType::Generic => {
-                    self.user_account_service
-                        .set_availability(
-                            Some(room.user_full_jid()),
-                            &self.ctx.capabilities,
-                            availability,
-                        )
-                        .await?
-                }
-            }
+            let Some(occupant_id) = room.occupant_id() else {
+                continue;
+            };
+            self.user_account_service
+                .set_availability(Some(occupant_id), &self.ctx.capabilities, availability)
+                .await?
         }
 
         self.account_settings_repo

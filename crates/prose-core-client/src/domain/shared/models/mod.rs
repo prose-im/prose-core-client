@@ -6,6 +6,7 @@
 pub use anon_occupant_id::AnonOccupantId;
 pub use availability::Availability;
 pub use capabilities_id::CapabilitiesId;
+pub use muc_id::MucId;
 pub use occupant_id::OccupantId;
 pub use participant_id::ParticipantId;
 pub use request_id::RequestId;
@@ -21,6 +22,7 @@ pub use user_resource_id::UserResourceId;
 mod anon_occupant_id;
 mod availability;
 mod capabilities_id;
+mod muc_id;
 mod occupant_id;
 mod participant_id;
 mod request_id;

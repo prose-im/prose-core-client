@@ -12,7 +12,7 @@ use tracing_subscriber::fmt::format::{FmtSpan, Pretty};
 use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::{RoomId, SoftwareVersion, UserStatus};
+use prose_core_client::dtos::{MucId, SoftwareVersion, UserStatus};
 use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, StoreAvatarCache};
 
 use crate::connector::{Connector, ProseConnectionProvider};
@@ -250,7 +250,7 @@ impl Client {
             .find_public_channel_by_name(name)
             .await
             .map_err(WasmError::from)?
-            .map(|room_id| room_id.into_inner().into()))
+            .map(|room_id| room_id.into_bare().into()))
     }
 
     #[wasm_bindgen(js_name = "loadAccountInfo")]
@@ -277,7 +277,7 @@ impl Client {
             .start_conversation(participants.as_slice())
             .await
             .map_err(WasmError::from)?
-            .into_inner()
+            .into_bare()
             .into())
     }
 
@@ -294,7 +294,7 @@ impl Client {
             .create_room_for_group(participants.as_slice())
             .await
             .map_err(WasmError::from)?
-            .into_inner()
+            .into_bare()
             .into())
     }
 
@@ -308,7 +308,7 @@ impl Client {
             .create_room_for_public_channel(channel_name)
             .await
             .map_err(WasmError::from)?
-            .into_inner()
+            .into_bare()
             .into())
     }
 
@@ -321,7 +321,7 @@ impl Client {
             .create_room_for_private_channel(channel_name)
             .await
             .map_err(WasmError::from)?
-            .into_inner()
+            .into_bare()
             .into())
     }
 
@@ -331,10 +331,10 @@ impl Client {
         Ok(self
             .client
             .rooms
-            .join_room(&RoomId::from(room_jid.clone()), password.as_deref())
+            .join_room(&MucId::from(room_jid.clone()), password.as_deref())
             .await
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?
-            .into_inner()
+            .into_bare()
             .into())
     }
 
@@ -343,7 +343,7 @@ impl Client {
     pub async fn destroy_room(&self, room_jid: &BareJid) -> Result<()> {
         self.client
             .rooms
-            .destroy_room(&RoomId::from(room_jid.clone()))
+            .destroy_room(&MucId::from(room_jid.clone()))
             .await
             .map_err(|err| WasmError::from(anyhow::Error::from(err)))?;
         Ok(())

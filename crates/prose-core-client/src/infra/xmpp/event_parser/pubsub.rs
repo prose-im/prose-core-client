@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use itertools::partition;
+use jid::BareJid;
 use tracing::{info, warn};
 use xmpp_parsers::pubsub::event::Item;
 use xmpp_parsers::pubsub::{ItemId, PubSubEvent};
@@ -12,7 +13,6 @@ use xmpp_parsers::pubsub::{ItemId, PubSubEvent};
 use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
 
 use crate::app::event_handlers::SidebarBookmarkEvent;
-use crate::domain::shared::models::RoomId;
 use crate::domain::sidebar::models::Bookmark;
 use crate::infra::xmpp::event_parser::Context;
 use crate::infra::xmpp::type_conversions::bookmark::ns;
@@ -87,7 +87,7 @@ fn handle_added_or_updated_items(ctx: &mut Context, items: Vec<Item>) -> Result<
 fn handle_retracted_items(ctx: &mut Context, ids: Vec<ItemId>) -> Result<()> {
     let ids = ids
         .into_iter()
-        .map(|id| id.0.parse::<RoomId>())
+        .map(|id| id.0.parse::<BareJid>())
         .collect::<Result<Vec<_>, _>>()?;
 
     ctx.push_event(SidebarBookmarkEvent::Deleted { ids });

@@ -1,6 +1,6 @@
-use prose_core_client::domain::shared::models::RoomId;
+use prose_core_client::domain::shared::models::MucId;
 use prose_core_client::dtos::PublicRoomInfo;
-use prose_core_client::room_id;
+use prose_core_client::muc_id;
 use prose_core_client::services::RoomsService;
 use prose_core_client::test::MockAppDependencies;
 
@@ -14,11 +14,11 @@ async fn test_find_public_channel_by_name() -> anyhow::Result<()> {
             Box::pin(async {
                 Ok(vec![
                     PublicRoomInfo {
-                        id: room_id!("dev-core@muc.prose.org"),
+                        id: muc_id!("dev-core@muc.prose.org").into(),
                         name: Some("Dev-Core".to_string()),
                     },
                     PublicRoomInfo {
-                        id: room_id!("dev-web@muc.prose.org"),
+                        id: muc_id!("dev-web@muc.prose.org").into(),
                         name: Some("dev-web".to_string()),
                     },
                 ])
@@ -29,11 +29,11 @@ async fn test_find_public_channel_by_name() -> anyhow::Result<()> {
 
     assert_eq!(
         service.find_public_channel_by_name("dev-core").await?,
-        Some(room_id!("dev-core@muc.prose.org"))
+        Some(muc_id!("dev-core@muc.prose.org").into())
     );
     assert_eq!(
         service.find_public_channel_by_name("Dev-Web").await?,
-        Some(room_id!("dev-web@muc.prose.org"))
+        Some(muc_id!("dev-web@muc.prose.org").into())
     );
     assert_eq!(service.find_public_channel_by_name("dev-pod").await?, None);
 

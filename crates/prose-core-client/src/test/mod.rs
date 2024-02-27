@@ -47,6 +47,13 @@ macro_rules! user_id {
 }
 
 #[macro_export]
+macro_rules! muc_id {
+    ($jid:expr) => {
+        MucId::from($jid.parse::<jid::BareJid>().unwrap())
+    };
+}
+
+#[macro_export]
 macro_rules! sender_id {
     ($jid:expr) => {
         SenderId::from($jid.parse::<jid::Jid>().unwrap())

@@ -7,7 +7,7 @@ use xmpp_parsers::stanza_error::{DefinedCondition, StanzaError};
 
 use prose_xmpp::RequestError;
 
-use crate::domain::shared::models::RoomId;
+use crate::domain::shared::models::{MucId, RoomId};
 
 #[derive(thiserror::Error, Debug)]
 pub enum RoomError {
@@ -35,7 +35,7 @@ pub enum RoomError {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GoneError {
-    pub new_location: Option<RoomId>,
+    pub new_location: Option<MucId>,
 }
 
 impl RoomError {
@@ -65,7 +65,7 @@ impl RoomError {
         }
 
         Some(GoneError {
-            new_location: new_location.as_ref().and_then(|l| RoomId::from_iri(l).ok()),
+            new_location: new_location.as_ref().and_then(|l| MucId::from_iri(l).ok()),
         })
     }
 

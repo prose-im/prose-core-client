@@ -12,7 +12,7 @@ use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
     PublicRoomInfo, RoomConfig, RoomError, RoomSessionInfo, RoomSpec,
 };
-use crate::domain::shared::models::{OccupantId, RoomId, UserId};
+use crate::domain::shared::models::{MucId, OccupantId, UserId};
 use crate::dtos::Availability;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -43,22 +43,22 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn reconfigure_room(
         &self,
-        room_jid: &RoomId,
+        room_id: &MucId,
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<(), RoomError>;
 
-    async fn load_room_config(&self, room_jid: &RoomId) -> Result<RoomConfig, RoomError>;
+    async fn load_room_config(&self, room_id: &MucId) -> Result<RoomConfig, RoomError>;
 
     async fn exit_room(&self, occupant_id: &OccupantId) -> Result<(), RoomError>;
 
-    async fn set_room_owners(&self, room_jid: &RoomId, users: &[UserId]) -> Result<(), RoomError>;
+    async fn set_room_owners(&self, room_id: &MucId, users: &[UserId]) -> Result<(), RoomError>;
 
-    /// Destroys the room identified by `room_jid`. If specified sets `alternate_room` as
+    /// Destroys the room identified by `room_id`. If specified sets `alternate_room` as
     /// replacement room, so that users will be redirected there.
     async fn destroy_room(
         &self,
-        room_jid: &RoomId,
-        alternate_room: Option<RoomId>,
+        room_id: &MucId,
+        alternate_room: Option<MucId>,
     ) -> Result<(), RoomError>;
 }

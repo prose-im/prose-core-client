@@ -6,8 +6,9 @@
 use anyhow::Result;
 
 use prose_core_client::domain::messaging::repos::DraftsRepository as DomainDraftsRepository;
+use prose_core_client::dtos::{RoomId, UserId};
 use prose_core_client::infra::messaging::DraftsRepository;
-use prose_xmpp::bare;
+use prose_core_client::user_id;
 
 use crate::tests::{async_test, store};
 
@@ -15,8 +16,8 @@ use crate::tests::{async_test, store};
 async fn test_saves_and_loads_draft() -> Result<()> {
     let repo = DraftsRepository::new(store().await?);
 
-    let jid_a = bare!("a@prose.org");
-    let jid_b = bare!("b@prose.org");
+    let jid_a = RoomId::from(user_id!("a@prose.org"));
+    let jid_b = RoomId::from(user_id!("b@prose.org"));
 
     assert_eq!(repo.get(&jid_a).await?, None);
     assert_eq!(repo.get(&jid_b).await?, None);
