@@ -519,9 +519,13 @@ impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>, Vec<Message>, Option
                         Ok(ElementReducerPoll::Pending(None))
                     }
                     XMPPElement::Message(message) => {
-                        // Make sure that the message is actually sent by our room…
+                        // Make sure that the message is actually sent by our room and is
+                        // not a MAM message. Otherwise, we might run into a situation where - when
+                        // a MAM request is performed at the same time as we're connecting to the
+                        // same room - we're consuming all messages from the MAM request.
                         if message.from.as_ref().map(|jid| jid.to_bare()).as_ref()
                             != Some(&room_bare_jid)
+                            || message.is_mam_message()
                         {
                             return Ok(ElementReducerPoll::Pending(Some(message.into())));
                         }
