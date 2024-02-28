@@ -46,7 +46,6 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     #[tracing::instrument(skip(self))]
     async fn populate_sidebar(&self) -> Result<()> {
         let bookmarks = self.bookmarks_service.load_bookmarks().await?;
-        debug_assert!(self.connected_rooms_repo.get_all().is_empty());
         self.extend_items_from_bookmarks(bookmarks).await?;
         Ok(())
     }
