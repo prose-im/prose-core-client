@@ -17,7 +17,7 @@ use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
     DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository, DynMessagesRepository,
-    DynMessagingService, DynSidebarDomainService, DynTimeProvider,
+    DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
@@ -31,8 +31,6 @@ pub struct MessagesEventHandler {
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     messages_repo: DynMessagesRepository,
-    #[inject]
-    messaging_service: DynMessagingService,
     #[inject]
     sidebar_domain_service: DynSidebarDomainService,
     #[inject]
@@ -65,13 +63,6 @@ enum ReceivedMessage {
 }
 
 impl ReceivedMessage {
-    pub fn is_carbon(&self) -> bool {
-        match self {
-            Self::Message(_) => false,
-            Self::Carbon(_) => true,
-        }
-    }
-
     pub fn sender(&self) -> Option<UserEndpointId> {
         let message = match &self {
             ReceivedMessage::Message(message) => Some(message),
@@ -129,7 +120,6 @@ impl MessagesEventHandler {
         };
 
         let room_id = from.to_room_id();
-        let message_is_carbon = message.is_carbon();
         let now = self.time_provider.now();
 
         let parsed_message: Result<MessageLike> = match message {
@@ -200,17 +190,6 @@ impl MessagesEventHandler {
         } else {
             self.client_event_dispatcher
                 .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
-        }
-
-        // Don't send delivery receipts for carbons or anything other than a regular message.
-        if message_is_carbon || !message.payload.is_message() {
-            return Ok(());
-        }
-
-        if let Some(message_id) = message.id.into_original_id() {
-            self.messaging_service
-                .send_read_receipt(&room.room_id, &message_id)
-                .await?;
         }
 
         Ok(())

@@ -76,12 +76,6 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
         )
         .return_once(|_, _| ());
 
-    deps.messaging_service
-        .expect_send_read_receipt()
-        .once()
-        .in_sequence(&mut seq)
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
-
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
         .handle_event(ServerEvent::Message(MessageEvent {
@@ -147,12 +141,6 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
             }),
         )
         .return_once(|_, _| ());
-
-    deps.messaging_service
-        .expect_send_read_receipt()
-        .once()
-        .in_sequence(&mut seq)
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
@@ -279,10 +267,6 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
         )
         .return_once(|_, _| ());
 
-    deps.messaging_service
-        .expect_send_read_receipt()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
-
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
         .handle_event(ServerEvent::Message(MessageEvent {
@@ -333,10 +317,6 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
             }),
         )
         .return_once(|_, _| ());
-
-    deps.messaging_service
-        .expect_send_read_receipt()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = MessagesEventHandler::from(&deps.into_deps());
     event_handler
