@@ -264,6 +264,7 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
 
     deps.messages_repo
         .expect_contains()
+        .once()
         .return_once(|_| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
@@ -316,10 +317,6 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
     }
 
     // sidebar_domain_service.handle_received_message should not be called
-
-    deps.messages_repo
-        .expect_contains()
-        .return_once(|_| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
@@ -385,10 +382,6 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
     // sidebar_domain_service.handle_received_message should not be called
 
     deps.messages_repo
-        .expect_contains()
-        .return_once(|_| Box::pin(async { Ok(false) }));
-
-    deps.messages_repo
         .expect_append()
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
@@ -444,6 +437,7 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
 
     deps.messages_repo
         .expect_contains()
+        .once()
         .return_once(|_| Box::pin(async { Ok(true) }));
 
     deps.messages_repo
