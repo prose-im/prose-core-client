@@ -16,9 +16,9 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::messaging::models::{MessageLike, MessageLikePayload};
-use prose_core_client::domain::rooms::models::Room;
+use prose_core_client::domain::rooms::models::{Room, RoomInfo};
 use prose_core_client::domain::shared::models::{
-    MucId, OccupantId, RoomId, UserEndpointId, UserId, UserResourceId,
+    MucId, OccupantId, RoomId, RoomType, UserEndpointId, UserId, UserResourceId,
 };
 use prose_core_client::dtos::{Availability, MessageId, ParticipantId, StanzaId};
 use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
@@ -35,12 +35,22 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
 
     let room = Room::group(muc_id!("group@conference.prose.org")).with_name("Group Name");
 
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .in_sequence(&mut seq)
+            .with(predicate::eq(bare!("group@conference.prose.org")))
+            .return_once(|_| Some(room));
+    }
+
     deps.sidebar_domain_service
         .expect_handle_received_message()
         .once()
         .in_sequence(&mut seq)
         .with(predicate::eq(UserEndpointId::Occupant(occupant_id!(
-            "group@conference.prose.org/jane.doe"
+            "group@conference.prose.org/user"
         ))))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
@@ -86,7 +96,7 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
                 Message::default()
                     .set_type(MessageType::Groupchat)
                     .set_id("message-id".into())
-                    .set_from(jid!("group@conference.prose.org/jane.doe"))
+                    .set_from(jid!("group@conference.prose.org/user"))
                     .set_body("Hello World"),
             ),
         }))
@@ -305,6 +315,8 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
             .return_once(|_| Some(room));
     }
 
+    // sidebar_domain_service.handle_received_message should not be called
+
     deps.messages_repo
         .expect_contains()
         .return_once(|_| Box::pin(async { Ok(false) }));
@@ -343,6 +355,69 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
                         }),
                 )),
             })),
+        }))
+        .await?;
+
+    Ok(())
+}
+
+// When we send a message to a MUC room we'll receive the same message back to our
+// connected BareJid. This is what this test is for…
+#[tokio::test]
+async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    let room = Room::mock(RoomInfo {
+        room_id: RoomId::Muc(muc_id!("room@groups.prose.org")),
+        user_nickname: "me".to_string(),
+        r#type: RoomType::PrivateChannel,
+    });
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .times(2)
+            .with(predicate::eq(bare!("room@groups.prose.org")))
+            .returning(move |_| Some(room.clone()));
+    }
+
+    // sidebar_domain_service.handle_received_message should not be called
+
+    deps.messages_repo
+        .expect_contains()
+        .return_once(|_| Box::pin(async { Ok(false) }));
+
+    deps.messages_repo
+        .expect_append()
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .with(
+            predicate::eq(room),
+            predicate::eq(ClientRoomEventType::MessagesAppended {
+                message_ids: vec!["message-id".into()],
+            }),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = MessagesEventHandler::from(&deps.into_deps());
+    event_handler
+        .handle_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Received(
+                Message::new()
+                    .set_id("message-id".into())
+                    .set_type(MessageType::Groupchat)
+                    .set_from(full!("room@groups.prose.org/me"))
+                    .set_to(bare!("me@prose.org"))
+                    .set_body("Hello World")
+                    .set_stanza_id(prose_xmpp::stanza::message::stanza_id::StanzaId {
+                        id: "Qiuahv1eo3C222uKhOqjPiW0".into(),
+                        by: bare!("user@prose.org").into(),
+                    }),
+            ),
         }))
         .await?;
 
@@ -411,8 +486,8 @@ async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()>
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .once()
-            .return_once(|_| Some(room));
+            .times(2)
+            .returning(move |_| Some(room.clone()));
     }
 
     deps.messages_repo

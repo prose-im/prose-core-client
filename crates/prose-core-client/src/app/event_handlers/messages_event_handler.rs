@@ -26,6 +26,7 @@ use crate::domain::messaging::models::{
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{RoomId, UserEndpointId};
+use crate::dtos::OccupantId;
 use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
@@ -86,7 +87,7 @@ impl ReceivedMessage {
         match message.type_ {
             MessageType::Groupchat => {
                 let Jid::Full(from) = from else {
-                    error!("Expected FullJid in ChatState");
+                    error!("Expected FullJid in received groupchat message");
                     return None;
                 };
                 UserEndpointId::Occupant(from.into())
@@ -124,7 +125,28 @@ impl SentMessage {
 impl MessagesEventHandler {
     async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
         match event.r#type {
-            MessageEventType::Received(message) => {
+            MessageEventType::Received(mut message) => {
+                // When we send a message to a MUC room we'll receive the same message back to our
+                // connected BareJid. In this case we want to treat it as a sent message…
+                if message.type_ == MessageType::Groupchat {
+                    let Some(Jid::Full(from)) = &message.from else {
+                        error!("Expected FullJid in received groupchat message");
+                        return Ok(());
+                    };
+
+                    let from = OccupantId::from(from.clone());
+                    let room_id = from.room_id();
+
+                    if let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) {
+                        if Some(from) == room.occupant_id() {
+                            message.from = message.to.take();
+                            message.to = Some(room_id.into_bare().into());
+                            return self
+                                .handle_sent_message(SentMessage::Message(message))
+                                .await;
+                        }
+                    }
+                }
                 self.handle_received_message(ReceivedMessage::Message(message))
                     .await?
             }
@@ -187,7 +209,7 @@ impl MessagesEventHandler {
         }
 
         let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
-            error!("Received message from sender for which we do not have a room.");
+            error!("Received message from sender ('{room_id}') for which we do not have a room.");
             return Ok(());
         };
 
@@ -227,7 +249,7 @@ impl MessagesEventHandler {
         };
 
         let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
-            error!("Sent message to recipient for which we do not have a room.");
+            error!("Sent message to recipient ('{room_id}') for which we do not have a room.");
             return Ok(());
         };
 
