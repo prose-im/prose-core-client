@@ -3,18 +3,21 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::fmt::{Debug, Display};
+
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use jid::BareJid;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use uuid::Uuid;
+use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::{mam, stanza_id, Forwarded, Message};
 
-use crate::domain::messaging::models::Attachment;
+use crate::domain::messaging::models::{Attachment, MessageTargetId};
 use crate::domain::shared::models::ParticipantId;
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
@@ -30,18 +33,18 @@ pub enum MessageLikeError {
 /// A type that describes permanent messages, i.e. messages that need to be replayed to restore
 /// the complete history of a conversation. Note that ephemeral messages like chat states are
 /// handled differently.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct MessageLike {
     pub id: MessageLikeId,
     pub stanza_id: Option<StanzaId>,
-    pub target: Option<MessageId>,
+    pub target: Option<MessageTargetId>,
     pub to: Option<BareJid>,
     pub from: ParticipantId,
     pub timestamp: DateTime<Utc>,
     pub payload: Payload,
 }
 
-/// A ID that can act as a placeholder in the rare cases when a message doesn't have an ID. Since
+/// An ID that can act as a placeholder in the rare cases when a message doesn't have an ID. Since
 /// our DataCache backends require some ID for each message we simply generate one.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MessageLikeId(MessageId);
@@ -83,9 +86,9 @@ impl std::str::FromStr for MessageLikeId {
     }
 }
 
-impl ToString for MessageLikeId {
-    fn to_string(&self) -> String {
-        self.0.to_string()
+impl Display for MessageLikeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        Display::fmt(&self.0, f)
     }
 }
 
@@ -156,15 +159,12 @@ impl TryFrom<TimestampedMessage<Message>> for MessageLike {
             .delay()
             .map(|delay| delay.stamp.0.into())
             .unwrap_or(envelope.timestamp);
-        let TargetedPayload {
-            target: refs,
-            payload,
-        } = TargetedPayload::try_from(&msg)?;
+        let TargetedPayload { target, payload } = TargetedPayload::try_from(&msg)?;
 
         Ok(MessageLike {
             id,
             stanza_id: stanza_id.map(|s| s.id.as_ref().into()),
-            target: refs.map(|id| id.as_ref().into()),
+            target,
             to: to.map(|jid| jid.to_bare()),
             from,
             timestamp: timestamp.into(),
@@ -196,10 +196,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
             .ok_or(StanzaParseError::missing_child_node("message"))?
             .clone();
 
-        let TargetedPayload {
-            target: refs,
-            payload,
-        } = TargetedPayload::try_from(&message)?;
+        let TargetedPayload { target, payload } = TargetedPayload::try_from(&message)?;
 
         let id = MessageLikeId::new(message.id.as_ref().map(|id| id.into()));
         let to = message.to.as_ref();
@@ -213,7 +210,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
         Ok(MessageLike {
             id,
             stanza_id: Some(stanza_id.as_ref().into()),
-            target: refs.map(|id| id.as_ref().into()),
+            target,
             to: to.map(|jid| jid.to_bare()),
             from,
             timestamp: timestamp.0.into(),
@@ -223,7 +220,7 @@ impl TryFrom<(Option<stanza_id::Id>, &Forwarded)> for MessageLike {
 }
 
 struct TargetedPayload {
-    target: Option<message::Id>,
+    target: Option<MessageTargetId>,
     payload: Payload,
 }
 
@@ -243,7 +240,10 @@ impl TryFrom<&Message> for TargetedPayload {
 
         if let Some(reactions) = message.reactions() {
             return Ok(TargetedPayload {
-                target: Some(reactions.id),
+                target: Some(match message.type_ {
+                    MessageType::Groupchat => MessageTargetId::StanzaId(reactions.id.into()),
+                    _ => MessageTargetId::MessageId(reactions.id.into()),
+                }),
                 payload: Payload::Reaction {
                     emojis: reactions.reactions,
                 },
@@ -253,7 +253,7 @@ impl TryFrom<&Message> for TargetedPayload {
         if let Some(fastening) = message.fastening() {
             if fastening.retract() {
                 return Ok(TargetedPayload {
-                    target: Some(fastening.id),
+                    target: Some(MessageTargetId::MessageId(fastening.id.as_ref().into())),
                     payload: Payload::Retraction,
                 });
             }
@@ -261,7 +261,7 @@ impl TryFrom<&Message> for TargetedPayload {
 
         if let (Some(replace_id), Some(body)) = (message.replace(), message.body()) {
             return Ok(TargetedPayload {
-                target: Some(replace_id),
+                target: Some(MessageTargetId::MessageId(replace_id.as_ref().into())),
                 payload: Payload::Correction {
                     body: body.to_string(),
                     attachments: message.attachments(),
@@ -271,14 +271,14 @@ impl TryFrom<&Message> for TargetedPayload {
 
         if let Some(marker) = message.received_marker() {
             return Ok(TargetedPayload {
-                target: Some(marker.id),
+                target: Some(MessageTargetId::MessageId(marker.id.as_ref().into())),
                 payload: Payload::DeliveryReceipt,
             });
         }
 
         if let Some(marker) = message.displayed_marker() {
             return Ok(TargetedPayload {
-                target: Some(marker.id),
+                target: Some(MessageTargetId::MessageId(marker.id.as_ref().into())),
                 payload: Payload::ReadReceipt,
             });
         }

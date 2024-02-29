@@ -8,7 +8,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use anyhow::{anyhow, format_err, Result};
+use anyhow::{anyhow, bail, format_err, Result};
 use chrono::Duration;
 use tracing::{debug, info};
 
@@ -18,7 +18,7 @@ use crate::app::deps::{
     DynRoomParticipationService, DynSidebarDomainService, DynTimeProvider,
     DynUserProfileRepository,
 };
-use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike};
+use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike, MessageTargetId};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{
@@ -188,9 +188,21 @@ impl<Kind> Room<Kind> {
             .cloned()
             .collect::<Vec<_>>();
 
-        self.messaging_service
-            .react_to_message(&self.data.room_id, &id, all_emojis.as_slice())
-            .await
+        match &self.data.room_id {
+            RoomId::User(room_id) => {
+                self.messaging_service
+                    .react_to_chat_message(room_id, &id, &all_emojis)
+                    .await
+            }
+            RoomId::Muc(room_id) => {
+                let Some(stanza_id) = &message.stanza_id else {
+                    bail!("Cannot react to MUC message for which we do not have a StanzaId.")
+                };
+                self.messaging_service
+                    .react_to_muc_message(room_id, stanza_id, &all_emojis)
+                    .await
+            }
+        }
     }
 
     pub async fn retract_message(&self, id: MessageId) -> Result<()> {
@@ -283,7 +295,10 @@ impl<Kind> Room<Kind> {
                 if parsed_message.payload.is_message() {
                     num_text_messages += 1;
                     if let Some(message_id) = parsed_message.id.original_id().cloned() {
-                        text_message_ids.push(message_id)
+                        text_message_ids.push(MessageTargetId::MessageId(message_id))
+                    }
+                    if let Some(stanza_id) = parsed_message.stanza_id.as_ref() {
+                        text_message_ids.push(MessageTargetId::StanzaId(stanza_id.clone()))
                     }
                 }
 

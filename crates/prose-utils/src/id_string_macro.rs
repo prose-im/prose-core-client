@@ -7,6 +7,7 @@
 macro_rules! id_string {
     ($t:ident) => {
         #[derive(Debug, Eq, PartialEq, Hash, Clone, serde::Serialize, serde::Deserialize)]
+        #[serde(transparent)]
         pub struct $t(String);
 
         impl $t {

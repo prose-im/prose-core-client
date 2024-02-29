@@ -13,9 +13,9 @@ use prose_xmpp::mods;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::Message;
 
-use crate::domain::messaging::models::{Emoji, MessageId, StanzaParseError};
+use crate::domain::messaging::models::{Emoji, MessageId, StanzaId, StanzaParseError};
 use crate::domain::messaging::services::MessagingService;
-use crate::dtos::{RoomId, SendMessageRequest};
+use crate::dtos::{MucId, RoomId, SendMessageRequest, UserId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::infra::xmpp::XMPPClient;
 
@@ -79,18 +79,32 @@ impl MessagingService for XMPPClient {
         Ok(())
     }
 
-    async fn react_to_message(
+    async fn react_to_chat_message(
         &self,
-        room_id: &RoomId,
+        room_id: &UserId,
         message_id: &MessageId,
         emoji: &[Emoji],
     ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
-        chat.react_to_message(
+        chat.react_to_chat_message(
             message_id.as_ref().into(),
-            room_id.clone().into_bare(),
+            room_id.clone().into_inner(),
             emoji.iter().map(|e| e.as_ref().into()),
-            &room_id.message_type(),
+        )?;
+        Ok(())
+    }
+
+    async fn react_to_muc_message(
+        &self,
+        room_id: &MucId,
+        message_id: &StanzaId,
+        emoji: &[Emoji],
+    ) -> Result<()> {
+        let chat = self.client.get_mod::<mods::Chat>();
+        chat.react_to_muc_message(
+            message_id.as_ref().into(),
+            room_id.clone().into_inner(),
+            emoji.iter().map(|e| e.as_ref().into()),
         )?;
         Ok(())
     }

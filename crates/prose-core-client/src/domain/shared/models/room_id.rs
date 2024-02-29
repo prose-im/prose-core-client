@@ -34,6 +34,13 @@ impl RoomId {
             RoomId::Muc(_) => None,
         }
     }
+
+    pub fn is_muc_room(&self) -> bool {
+        match self {
+            RoomId::User(_) => false,
+            RoomId::Muc(_) => true,
+        }
+    }
 }
 
 impl From<UserId> for RoomId {

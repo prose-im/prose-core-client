@@ -3,19 +3,20 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use tracing::{error, warn};
 
 use prose_utils::id_string;
 
 use crate::domain::shared::models::ParticipantId;
-use crate::dtos::Attachment;
+use crate::dtos::{Attachment, MessageId, StanzaId};
 
-use super::{MessageLike, MessageLikePayload};
+use super::{MessageLike, MessageLikePayload, MessageTargetId};
 
-id_string!(MessageId);
-id_string!(StanzaId);
 id_string!(Emoji);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -75,6 +76,7 @@ impl Message {
         messages: impl IntoIterator<Item = MessageLike>,
     ) -> Vec<Message> {
         let mut messages_map = IndexMap::new();
+        let mut stanza_to_id_map = HashMap::new();
         let mut modifiers: Vec<MessageLike> = vec![];
 
         for msg in messages.into_iter() {
@@ -94,6 +96,11 @@ impl Message {
                         reactions: vec![],
                         attachments,
                     };
+
+                    if let Some(stanza_id) = &message.stanza_id {
+                        stanza_to_id_map.insert(stanza_id.clone(), msg.id.id().clone());
+                    };
+
                     messages_map.insert(msg.id.id().clone(), Some(message));
                 }
                 _ => modifiers.push(msg),
@@ -101,11 +108,24 @@ impl Message {
         }
 
         for modifier in modifiers.into_iter() {
-            let Some(target) = modifier.target else {
-                panic!("Missing target in modifier {:?}", modifier);
+            let Some(target_id) = modifier.target else {
+                error!("Missing target in modifier {:?}", modifier);
+                continue;
             };
 
-            let Some(Some(message)) = messages_map.get_mut(&target) else {
+            let message_id = match target_id {
+                MessageTargetId::MessageId(ref id) => id,
+                MessageTargetId::StanzaId(stanza_id) => {
+                    let Some(id) = stanza_to_id_map.get(&stanza_id) else {
+                        error!("Could not resolve StanzaId '{stanza_id}' to a MessageId");
+                        continue;
+                    };
+                    id
+                }
+            };
+
+            let Some(Some(message)) = messages_map.get_mut(message_id) else {
+                warn!("Ignoring message modifier targeting unknown message '{message_id}'.");
                 continue;
             };
 
@@ -161,7 +181,7 @@ impl Message {
                     }
                 }
                 MessageLikePayload::Retraction => {
-                    messages_map.insert(target, None);
+                    messages_map.insert(message_id.clone(), None);
                 }
             }
         }
@@ -173,6 +193,7 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use chrono::{TimeZone, Utc};
+    use pretty_assertions::assert_eq;
 
     use prose_xmpp::bare;
 
@@ -296,7 +317,7 @@ mod tests {
         let messages = [
             MessageLike {
                 id: "1".into(),
-                stanza_id: None,
+                stanza_id: Some("stanza-id-1".into()),
                 target: None,
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
@@ -312,7 +333,7 @@ mod tests {
             MessageLike {
                 id: "2".into(),
                 stanza_id: None,
-                target: Some("1".into()),
+                target: Some(MessageTargetId::MessageId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -326,7 +347,7 @@ mod tests {
             MessageLike {
                 id: "3".into(),
                 stanza_id: None,
-                target: Some("1".into()),
+                target: Some(MessageTargetId::MessageId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("c@prose.org").into(),
                 timestamp: Utc
@@ -340,7 +361,7 @@ mod tests {
             MessageLike {
                 id: "4".into(),
                 stanza_id: None,
-                target: Some("1".into()),
+                target: Some(MessageTargetId::MessageId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -354,7 +375,7 @@ mod tests {
             MessageLike {
                 id: "5".into(),
                 stanza_id: None,
-                target: Some("1".into()),
+                target: Some(MessageTargetId::StanzaId("stanza-id-1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -369,10 +390,9 @@ mod tests {
 
         let reduced_message = Message::reducing_messages(messages).pop().unwrap();
         assert_eq!(
-            reduced_message,
             Message {
                 id: Some("1".into()),
-                stanza_id: None,
+                stanza_id: Some("stanza-id-1".into()),
                 from: user_id!("b@prose.org").into(),
                 body: "Hello World".to_string(),
                 timestamp: Utc
@@ -397,7 +417,8 @@ mod tests {
                     }
                 ],
                 attachments: vec![],
-            }
+            },
+            reduced_message,
         )
     }
 }

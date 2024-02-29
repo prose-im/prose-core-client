@@ -10,12 +10,12 @@ use chrono::{TimeZone, Utc};
 use mockall::predicate;
 use pretty_assertions::assert_eq;
 
-use prose_core_client::domain::messaging::models::MessageLikePayload;
+use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId};
 use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{MucId, OccupantId, RoomId, UserId};
-use prose_core_client::dtos::{MessageResultSet, Participant, Reaction, StanzaId};
+use prose_core_client::dtos::{Availability, MessageResultSet, Participant, Reaction, StanzaId};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id};
 use prose_xmpp::jid;
@@ -194,45 +194,110 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_toggle_reaction() -> Result<()> {
+async fn test_toggle_reaction_in_direct_message() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
 
-    deps.message_repo.expect_get().once().return_once(|_, _| {
-        Box::pin(async {
-            Ok(vec![
-                MessageBuilder::new_with_index(1).build_message_like(),
-                MessageBuilder::new_with_index(2)
-                    .set_from(mock_data::account_jid().into_user_id())
-                    .set_target_message_idx(1)
-                    .set_payload(MessageLikePayload::Reaction {
-                        emojis: vec!["🍻".into()],
-                    })
-                    .build_message_like(),
-                MessageBuilder::new_with_index(3)
-                    .set_from(mock_data::account_jid().into_user_id())
-                    .set_target_message_idx(1)
-                    .set_payload(MessageLikePayload::Reaction {
-                        emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
-                    })
-                    .build_message_like(),
-            ])
-        })
-    });
+    deps.message_repo
+        .expect_get()
+        .with(
+            predicate::eq(RoomId::User(user_id!("user@prose.org"))),
+            predicate::eq(MessageBuilder::id_for_index(1)),
+        )
+        .once()
+        .return_once(|_, _| {
+            Box::pin(async {
+                Ok(vec![
+                    MessageBuilder::new_with_index(1).build_message_like(),
+                    MessageBuilder::new_with_index(2)
+                        .set_from(mock_data::account_jid().into_user_id())
+                        .set_target_message_idx(1)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["🍻".into()],
+                        })
+                        .build_message_like(),
+                    MessageBuilder::new_with_index(3)
+                        .set_from(mock_data::account_jid().into_user_id())
+                        .set_target_message_idx(1)
+                        .set_payload(MessageLikePayload::Reaction {
+                            emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
+                        })
+                        .build_message_like(),
+                ])
+            })
+        });
 
     deps.messaging_service
-        .expect_react_to_message()
+        .expect_react_to_chat_message()
         .once()
         .with(
-            predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
+            predicate::eq(user_id!("user@prose.org")),
             predicate::eq(MessageBuilder::id_for_index(1)),
             predicate::eq(vec!["🍻".into(), "✅".into()]),
         )
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
-    let internals = Room::group(muc_id!("room@conference.prose.org"));
+    let room = RoomFactory::from(deps)
+        .build(Room::direct_message(
+            user_id!("user@prose.org"),
+            Availability::Available,
+        ))
+        .to_generic_room();
+    room.toggle_reaction_to_message(MessageBuilder::id_for_index(1), "🍕".into())
+        .await?;
 
-    let room = RoomFactory::from(deps).build(internals).to_generic_room();
+    Ok(())
+}
 
+#[tokio::test]
+async fn test_toggle_reaction_in_muc_room() -> Result<()> {
+    let mut deps = MockRoomFactoryDependencies::default();
+
+    let message1 = MessageBuilder::new_with_index(1).build_message_like();
+
+    let mut message2 = MessageBuilder::new_with_index(2)
+        .set_from(mock_data::account_jid().into_user_id())
+        .set_target_message_idx(1)
+        .set_payload(MessageLikePayload::Reaction {
+            emojis: vec!["🍻".into()],
+        })
+        .build_message_like();
+    message2.target = Some(MessageTargetId::StanzaId(
+        MessageBuilder::stanza_id_for_index(1),
+    ));
+
+    let mut message3 = MessageBuilder::new_with_index(3)
+        .set_from(mock_data::account_jid().into_user_id())
+        .set_target_message_idx(1)
+        .set_payload(MessageLikePayload::Reaction {
+            emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
+        })
+        .build_message_like();
+    message3.target = Some(MessageTargetId::StanzaId(
+        MessageBuilder::stanza_id_for_index(1),
+    ));
+
+    deps.message_repo
+        .expect_get()
+        .with(
+            predicate::eq(RoomId::Muc(muc_id!("room@conference.prose.org"))),
+            predicate::eq(MessageBuilder::id_for_index(1)),
+        )
+        .once()
+        .return_once(|_, _| Box::pin(async { Ok(vec![message1, message2, message3]) }));
+
+    deps.messaging_service
+        .expect_react_to_muc_message()
+        .once()
+        .with(
+            predicate::eq(muc_id!("room@conference.prose.org")),
+            predicate::eq(MessageBuilder::stanza_id_for_index(1)),
+            predicate::eq(vec!["🍻".into(), "✅".into()]),
+        )
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+
+    let room = RoomFactory::from(deps)
+        .build(Room::group(muc_id!("room@conference.prose.org")))
+        .to_generic_room();
     room.toggle_reaction_to_message(MessageBuilder::id_for_index(1), "🍕".into())
         .await?;
 
@@ -661,10 +726,14 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .with(
             predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
             predicate::eq(vec![
-                MessageBuilder::id_for_index(5),
-                MessageBuilder::id_for_index(4),
-                MessageBuilder::id_for_index(2),
-                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(5).into(),
+                MessageBuilder::stanza_id_for_index(5).into(),
+                MessageBuilder::id_for_index(4).into(),
+                MessageBuilder::stanza_id_for_index(4).into(),
+                MessageBuilder::id_for_index(2).into(),
+                MessageBuilder::stanza_id_for_index(2).into(),
+                MessageBuilder::id_for_index(1).into(),
+                MessageBuilder::stanza_id_for_index(1).into(),
             ]),
             predicate::eq(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap()),
         )

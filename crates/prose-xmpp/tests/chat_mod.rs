@@ -292,17 +292,16 @@ async fn test_send_chat_state() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn test_react_to_message() -> Result<()> {
+async fn test_react_to_chat_message() -> Result<()> {
     let ConnectedClient {
         connection, client, ..
     } = Client::connected_client().await?;
 
     let chat = client.get_mod::<mods::Chat>();
-    chat.react_to_message(
+    chat.react_to_chat_message(
         "msg-id".into(),
         jid!("recv@prose.org/resource"),
         vec!["😅".into(), "🍕".into()],
-        &MessageType::Chat,
     )?;
 
     let sent_stanzas = connection.sent_stanza_strings();

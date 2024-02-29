@@ -8,13 +8,11 @@ use xmpp_parsers::message::MessagePayload;
 
 use prose_utils::id_string;
 
-use crate::stanza::message;
-
 id_string!(Emoji);
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Reactions {
-    pub id: message::Id,
+    pub id: String,
     pub reactions: Vec<Emoji>,
 }
 
@@ -24,7 +22,7 @@ impl TryFrom<Element> for Reactions {
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         let reactions = xmpp_parsers::reactions::Reactions::try_from(value)?;
         Ok(Reactions {
-            id: reactions.id.into(),
+            id: reactions.id,
             reactions: reactions
                 .reactions
                 .into_iter()
@@ -37,7 +35,7 @@ impl TryFrom<Element> for Reactions {
 impl From<Reactions> for Element {
     fn from(value: Reactions) -> Self {
         xmpp_parsers::reactions::Reactions {
-            id: value.id.into_inner(),
+            id: value.id,
             reactions: value
                 .reactions
                 .into_iter()

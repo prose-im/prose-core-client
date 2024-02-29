@@ -20,7 +20,6 @@ use crate::app::event_handlers::{
     UserStatusEventType,
 };
 use crate::client_event::ClientRoomEventType;
-use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::Room;
 use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
@@ -319,25 +318,5 @@ impl RoomsEventHandler {
         }
 
         Ok(())
-    }
-}
-
-impl From<&MessageLike> for ClientRoomEventType {
-    fn from(message: &MessageLike) -> Self {
-        if let Some(ref target) = message.target {
-            if message.payload == MessageLikePayload::Retraction {
-                Self::MessagesDeleted {
-                    message_ids: vec![target.as_ref().into()],
-                }
-            } else {
-                Self::MessagesUpdated {
-                    message_ids: vec![target.as_ref().into()],
-                }
-            }
-        } else {
-            Self::MessagesAppended {
-                message_ids: vec![message.id.id().as_ref().into()],
-            }
-        }
     }
 }

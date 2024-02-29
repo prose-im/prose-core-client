@@ -5,7 +5,8 @@
 
 pub use attachment::{Attachment, AttachmentType, Thumbnail};
 pub(crate) use error::StanzaParseError;
-pub use message::{Emoji, Message, MessageId, Reaction, StanzaId};
+pub use message::{Emoji, Message, Reaction};
+pub use message_id::{MessageId, MessageTargetId, StanzaId};
 pub use message_like::{
     MessageLike, MessageLikeError, MessageLikeId, Payload as MessageLikePayload, TimestampedMessage,
 };
@@ -14,5 +15,6 @@ pub use send_message_request::SendMessageRequest;
 mod attachment;
 mod error;
 mod message;
+mod message_id;
 mod message_like;
 mod send_message_request;

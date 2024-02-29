@@ -160,25 +160,24 @@ impl Chat {
         Ok(())
     }
 
-    // https://xmpp.org/extensions/xep-0444.html
-    pub fn react_to_message(
+    // https://xmpp.org/extensions/xep-0444.html#sending-reactions
+    pub fn react_to_chat_message(
         &self,
         id: message::Id,
         to: impl Into<Jid>,
         reactions: impl IntoIterator<Item = Emoji>,
-        message_type: &MessageType,
     ) -> Result<()> {
-        let stanza = Message::new()
-            .set_type(message_type.clone())
-            .set_id(self.ctx.generate_id().into())
-            .set_from(self.ctx.full_jid())
-            .set_to(to)
-            .set_message_reactions(Reactions {
-                id,
-                reactions: reactions.into_iter().collect(),
-            })
-            .set_store(true);
-        self.send_raw_message(stanza, true)
+        self.react_to_message(id.into_inner(), to, reactions, &MessageType::Chat)
+    }
+
+    // https://xmpp.org/extensions/xep-0444.html#sending-reactions
+    pub fn react_to_muc_message(
+        &self,
+        id: message::stanza_id::Id,
+        to: impl Into<Jid>,
+        reactions: impl IntoIterator<Item = Emoji>,
+    ) -> Result<()> {
+        self.react_to_message(id.into_inner(), to, reactions, &MessageType::Groupchat)
     }
 
     // https://xmpp.org/extensions/xep-0424.html
@@ -226,6 +225,29 @@ impl Chat {
             .set_from(self.ctx.full_jid().clone())
             .set_to(to)
             .set_received_marker(Received { id });
+        self.send_raw_message(stanza, true)
+    }
+}
+
+impl Chat {
+    // https://xmpp.org/extensions/xep-0444.html
+    pub fn react_to_message(
+        &self,
+        id: String,
+        to: impl Into<Jid>,
+        reactions: impl IntoIterator<Item = Emoji>,
+        message_type: &MessageType,
+    ) -> Result<()> {
+        let stanza = Message::new()
+            .set_type(message_type.clone())
+            .set_id(self.ctx.generate_id().into())
+            .set_from(self.ctx.full_jid())
+            .set_to(to)
+            .set_message_reactions(Reactions {
+                id,
+                reactions: reactions.into_iter().collect(),
+            })
+            .set_store(true);
         self.send_raw_message(stanza, true)
     }
 }

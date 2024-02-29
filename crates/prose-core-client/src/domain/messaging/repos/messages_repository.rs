@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::messaging::models::{MessageId, MessageLike};
+use crate::domain::messaging::models::{MessageId, MessageLike, MessageTargetId, StanzaId};
 use crate::domain::shared::models::RoomId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -25,10 +25,18 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get_messages_targeting(
         &self,
         room_id: &RoomId,
-        targeted_ids: &[MessageId],
+        targeted_ids: &[MessageTargetId],
         newer_than: &DateTime<Utc>,
     ) -> Result<Vec<MessageLike>>;
     async fn contains(&self, id: &MessageId) -> Result<bool>;
     async fn append(&self, room_id: &RoomId, messages: &[MessageLike]) -> Result<()>;
     async fn clear_cache(&self) -> Result<()>;
+
+    /// Attempts to look up the message identified by `stanza_id` and returns
+    /// its `id` if it was found.
+    async fn resolve_message_id(
+        &self,
+        room_id: &RoomId,
+        stanza_id: &StanzaId,
+    ) -> Result<Option<MessageId>>;
 }

@@ -156,7 +156,9 @@ impl MessageBuilder {
         MessageLike {
             id: MessageLikeId::new(Some(self.id)),
             stanza_id: self.stanza_id,
-            target: self.target_message_idx.map(Self::id_for_index),
+            target: self
+                .target_message_idx
+                .map(|idx| Self::id_for_index(idx).into()),
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,

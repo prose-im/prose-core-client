@@ -9,8 +9,9 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
-use crate::domain::messaging::models::{Emoji, MessageId, SendMessageRequest};
+use crate::domain::messaging::models::{Emoji, MessageId, SendMessageRequest, StanzaId};
 use crate::domain::shared::models::RoomId;
+use crate::dtos::{MucId, UserId};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -27,10 +28,17 @@ pub trait MessagingService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn retract_message(&self, room_id: &RoomId, message_id: &MessageId) -> Result<()>;
 
-    async fn react_to_message(
+    async fn react_to_chat_message(
         &self,
-        room_id: &RoomId,
+        room_id: &UserId,
         message_id: &MessageId,
+        emoji: &[Emoji],
+    ) -> Result<()>;
+
+    async fn react_to_muc_message(
+        &self,
+        room_id: &MucId,
+        message_id: &StanzaId,
         emoji: &[Emoji],
     ) -> Result<()>;
 

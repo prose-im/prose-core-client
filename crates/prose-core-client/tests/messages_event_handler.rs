@@ -19,9 +19,10 @@ use prose_core_client::domain::rooms::models::Room;
 use prose_core_client::domain::shared::models::{
     MucId, OccupantId, RoomId, UserEndpointId, UserId,
 };
-use prose_core_client::dtos::{Availability, MessageId, ParticipantId};
+use prose_core_client::dtos::{Availability, MessageId, ParticipantId, StanzaId};
 use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id, ClientRoomEventType};
+use prose_xmpp::stanza::message::Reactions;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, full, jid};
 
@@ -326,6 +327,68 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
                     .set_id("message-id".into())
                     .set_from(jid!("user@prose.org"))
                     .set_body("Hello World"),
+            ),
+        }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    let room = Room::group(muc_id!("group@prose.org"));
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .return_once(|_| Some(room));
+    }
+
+    deps.messages_repo
+        .expect_contains()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(false) }));
+
+    deps.messages_repo
+        .expect_append()
+        .once()
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.messages_repo
+        .expect_resolve_message_id()
+        .with(
+            predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
+            predicate::eq(StanzaId::from("stanza-id-100")),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .with(
+            predicate::eq(room),
+            predicate::eq(ClientRoomEventType::MessagesUpdated {
+                message_ids: vec!["message-id-100".into()],
+            }),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = MessagesEventHandler::from(&deps.into_deps());
+    event_handler
+        .handle_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Received(
+                Message::default()
+                    .set_id("message-id".into())
+                    .set_type(MessageType::Groupchat)
+                    .set_from(jid!("group@prose.org/user"))
+                    .set_message_reactions(Reactions {
+                        id: "stanza-id-100".to_string(),
+                        reactions: vec!["🙃".into()],
+                    }),
             ),
         }))
         .await?;

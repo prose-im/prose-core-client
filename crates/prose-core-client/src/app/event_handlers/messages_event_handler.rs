@@ -8,7 +8,7 @@ use std::ops::Deref;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::Jid;
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
@@ -20,7 +20,10 @@ use crate::app::deps::{
     DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
-use crate::domain::messaging::models::{MessageLike, MessageLikeError, TimestampedMessage};
+use crate::domain::messaging::models::{
+    MessageLike, MessageLikeError, MessageLikePayload, MessageTargetId, TimestampedMessage,
+};
+use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{MucId, RoomId, UserEndpointId};
 use crate::dtos::UserId;
 use crate::ClientRoomEventType;
@@ -188,8 +191,7 @@ impl MessagesEventHandler {
                 },
             )
         } else {
-            self.client_event_dispatcher
-                .dispatch_room_event(room.clone(), ClientRoomEventType::from(&message));
+            self.dispatch_event_for_message(room, message).await;
         }
 
         Ok(())
@@ -227,9 +229,50 @@ impl MessagesEventHandler {
         self.messages_repo.append(&to, &messages).await?;
         let [message] = messages;
 
-        self.client_event_dispatcher
-            .dispatch_room_event(room, ClientRoomEventType::from(&message));
+        self.dispatch_event_for_message(room, message).await;
 
         Ok(())
+    }
+
+    async fn dispatch_event_for_message(&self, room: Room, message: MessageLike) {
+        let event_type = if let Some(target) = message.target {
+            let message_id = match target {
+                MessageTargetId::MessageId(id) => id,
+                MessageTargetId::StanzaId(stanza_id) => {
+                    match self
+                        .messages_repo
+                        .resolve_message_id(&room.room_id, &stanza_id)
+                        .await
+                    {
+                        Ok(Some(id)) => id,
+                        Ok(None) => {
+                            warn!("Not dispatching event for message with id '{}'. Failed to look up targeted MessageId from StanzaId '{}'.", message.id, stanza_id);
+                            return;
+                        }
+                        Err(err) => {
+                            error!("Not dispatching event for message with id '{}'. Encountered error while looking up StanzaId '{}': {}", message.id, stanza_id, err.to_string());
+                            return;
+                        }
+                    }
+                }
+            };
+
+            if message.payload == MessageLikePayload::Retraction {
+                ClientRoomEventType::MessagesDeleted {
+                    message_ids: vec![message_id],
+                }
+            } else {
+                ClientRoomEventType::MessagesUpdated {
+                    message_ids: vec![message_id],
+                }
+            }
+        } else {
+            ClientRoomEventType::MessagesAppended {
+                message_ids: vec![message.id.id().as_ref().into()],
+            }
+        };
+
+        self.client_event_dispatcher
+            .dispatch_room_event(room, event_type);
     }
 }

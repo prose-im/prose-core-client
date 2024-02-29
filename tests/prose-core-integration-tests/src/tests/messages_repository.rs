@@ -7,7 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use pretty_assertions::assert_eq;
 
-use prose_core_client::domain::messaging::models::MessageLikePayload;
+use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
@@ -42,7 +42,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     let room_id = RoomId::from(user_id!("a@prose.org"));
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
-    let message2 = MessageBuilder::new_with_index(3)
+    let message2 = MessageBuilder::new_with_index(2)
         .set_from(user_id!("b@prose.org"))
         .build_reaction_to(1, &["🍿".into(), "📼".into()]);
 
@@ -50,9 +50,36 @@ async fn test_loads_message_with_reactions() -> Result<()> {
 
     repo.append(&room_id, messages.as_slice()).await?;
 
-    let mut message = MessageBuilder::new_with_index(1).build_message();
-    message.toggle_reaction(&user_id!("b@prose.org").into(), "🍿".into());
-    message.toggle_reaction(&user_id!("b@prose.org").into(), "📼".into());
+    assert_eq!(
+        repo.get_all(&room_id, &[MessageBuilder::id_for_index(1)])
+            .await?,
+        messages
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = RoomId::from(user_id!("a@prose.org"));
+
+    let message1 = MessageBuilder::new_with_index(1).build_message_like();
+    let mut message2 = MessageBuilder::new_with_index(2)
+        .set_from(user_id!("b@prose.org"))
+        .build_message_like();
+
+    // Reactions in MUC rooms target other messages by their StanzaId.
+    message2.target = Some(MessageTargetId::StanzaId(
+        MessageBuilder::stanza_id_for_index(1),
+    ));
+    message2.payload = MessageLikePayload::Reaction {
+        emojis: vec!["🍿".into(), "📼".into()],
+    };
+
+    let messages = vec![message1, message2];
+    repo.append(&room_id, messages.as_slice()).await?;
 
     assert_eq!(
         repo.get_all(&room_id, &[MessageBuilder::id_for_index(1)])
@@ -128,10 +155,20 @@ async fn test_load_only_messages_targeting() -> Result<()> {
         .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
         .build_reaction_to(1, &["🍿".into(), "📼".into()]);
     let message5 = MessageBuilder::new_with_index(5).build_message_like();
-    let message6 = MessageBuilder::new_with_index(6)
+
+    // Throw in a message that targets another message by their StanzaId. This usually happens
+    // only in MUC rooms, but our repo should return it as well…
+    let mut message6 = MessageBuilder::new_with_index(6)
         .set_from(user_id!("c@prose.org"))
         .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
-        .build_reaction_to(2, &["🍕".into()]);
+        .build_message_like();
+    message6.target = Some(MessageTargetId::StanzaId(
+        MessageBuilder::stanza_id_for_index(2),
+    ));
+    message6.payload = MessageLikePayload::Reaction {
+        emojis: vec!["🍕".into()],
+    };
+
     let message7 = MessageBuilder::new_with_index(7)
         .set_target_message_idx(5)
         .set_payload(MessageLikePayload::ReadReceipt)
@@ -156,8 +193,10 @@ async fn test_load_only_messages_targeting() -> Result<()> {
         repo.get_messages_targeting(
             &room_id,
             &[
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2),
+                MessageTargetId::MessageId(MessageBuilder::id_for_index(1)),
+                MessageTargetId::StanzaId(MessageBuilder::stanza_id_for_index(1)),
+                MessageTargetId::MessageId(MessageBuilder::id_for_index(2)),
+                MessageTargetId::StanzaId(MessageBuilder::stanza_id_for_index(2)),
             ],
             &Utc.with_ymd_and_hms(2024, 02, 22, 0, 0, 0).unwrap()
         )
@@ -199,10 +238,36 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
         vec![message3, message1, message2],
         repo.get_messages_targeting(
             &room_id,
-            &[MessageBuilder::id_for_index(100),],
+            &[MessageTargetId::MessageId(MessageBuilder::id_for_index(
+                100
+            ))],
             &DateTime::<Utc>::default()
         )
         .await?
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_resolves_message_id() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = RoomId::from(user_id!("a@prose.org"));
+    let message = MessageBuilder::new_with_index(101).build_message_like();
+
+    repo.append(&room_id, &[message]).await?;
+
+    assert_eq!(
+        repo.resolve_message_id(&room_id, &MessageBuilder::stanza_id_for_index(101))
+            .await?,
+        Some(MessageBuilder::id_for_index(101))
+    );
+
+    assert_eq!(
+        repo.resolve_message_id(&room_id, &MessageBuilder::stanza_id_for_index(1))
+            .await?,
+        None
     );
 
     Ok(())

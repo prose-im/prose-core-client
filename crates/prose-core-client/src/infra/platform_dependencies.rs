@@ -29,7 +29,7 @@ use crate::infra::contacts::{
     CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
 };
 use crate::infra::messaging::{
-    CachingMessageRepository, DraftsRecord, DraftsRepository, MessagesRecord,
+    CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
 };
 use crate::infra::rooms::InMemoryConnectedRoomsRepository;
 use crate::infra::settings::{AccountSettingsRecord, AccountSettingsRepository};
@@ -53,7 +53,7 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
 
     let inner_versions_changed = versions_changed.clone();
-    let store = Store::open(driver, 14, move |event| {
+    let store = Store::open(driver, 15, move |event| {
         let tx = &event.tx;
 
         inner_versions_changed.store(true, Ordering::Relaxed);
@@ -61,7 +61,7 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         if event.old_version < 10 {
             create_collection::<D, AccountSettingsRecord>(&tx)?;
             create_collection::<D, DraftsRecord>(&tx)?;
-            create_collection::<D, MessagesRecord>(&tx)?;
+            create_collection::<D, MessageRecord>(&tx)?;
             create_collection::<D, UserInfoRecord>(&tx)?;
             create_collection::<D, UserProfileRecord>(&tx)?;
             #[cfg(target_arch = "wasm32")]
@@ -69,11 +69,16 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         }
 
         if event.old_version < 13 {
-            tx.delete_collection(MessagesRecord::collection())?;
+            tx.delete_collection(MessageRecord::collection())?;
         }
 
         if event.old_version < 14 {
-            create_collection::<D, MessagesRecord>(&tx)?;
+            create_collection::<D, MessageRecord>(&tx)?;
+        }
+
+        if event.old_version < 15 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
         }
 
         Ok(())
@@ -83,7 +88,7 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     if versions_changed.load(Ordering::Acquire) {
         store
             .truncate_collections(&[
-                MessagesRecord::collection(),
+                MessageRecord::collection(),
                 UserInfoRecord::collection(),
                 UserProfileRecord::collection(),
                 #[cfg(target_arch = "wasm32")]
