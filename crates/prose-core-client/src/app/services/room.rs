@@ -18,7 +18,9 @@ use crate::app::deps::{
     DynRoomParticipationService, DynSidebarDomainService, DynTimeProvider,
     DynUserProfileRepository,
 };
-use crate::domain::messaging::models::{Emoji, Message, MessageId, MessageLike, MessageTargetId};
+use crate::domain::messaging::models::{
+    Emoji, Message, MessageId, MessageLike, MessageParser, MessageTargetId,
+};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{
@@ -288,7 +290,9 @@ impl<Kind> Room<Kind> {
             // and we want to push them into `messages` in the order 6, 5, 4, 3, 2, 1 which is
             // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
-                let Ok(parsed_message) = MessageLike::try_from(&archive_message) else {
+                let Ok(parsed_message) =
+                    MessageParser::new(Default::default()).parse_mam_message(archive_message)
+                else {
                     continue;
                 };
 

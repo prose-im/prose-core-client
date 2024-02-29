@@ -4,7 +4,9 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use jid::{BareJid, FullJid};
 use minidom::Element;
+use std::str::FromStr;
 
 pub use constant_time_provider::ConstantTimeProvider;
 pub use message_builder::MessageBuilder;
@@ -12,6 +14,7 @@ pub use mock_app_dependencies::{
     MockAppDependencies, MockRoomFactoryDependencies, MockRoomsDomainServiceDependencies,
     MockSidebarDomainServiceDependencies,
 };
+use prose_xmpp::test::BareJidTestAdditions;
 use prose_xmpp::Client;
 pub use room_internals::DisconnectedState;
 
@@ -76,17 +79,28 @@ macro_rules! occupant_id {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn parse_xml(xml: &str) -> Result<Vec<ServerEvent>> {
+    parse_xml_with_current_user(
+        xml,
+        FullJid::from_str(&format!("{}/test", BareJid::ours()))?,
+    )
+    .await
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn parse_xml_with_current_user(
+    xml: &str,
+    current_user: FullJid,
+) -> Result<Vec<ServerEvent>> {
     use prose_xmpp::test::ClientTestAdditions;
 
-    let client = Client::connected_client().await?;
+    let element = xml.trim().parse::<Element>()?;
 
-    client
-        .connection
-        .receive_stanza(xml.trim().parse::<Element>()?)
-        .await;
+    let client = Client::connected_client_with_current_user(current_user).await?;
+    client.connection.receive_stanza(element).await;
 
-    let parsed_events = client
-        .sent_events()
+    let sent_events = client.sent_events();
+
+    let parsed_events = sent_events
         .into_iter()
         .map(|e| parse_xmpp_event(e))
         .collect::<Result<Vec<_>, _>>()?;

@@ -50,6 +50,10 @@ impl Message {
     pub fn new() -> Self {
         Self::default()
     }
+
+    pub fn into_inner(self) -> RawMessage {
+        self.0
+    }
 }
 
 impl Deref for Message {

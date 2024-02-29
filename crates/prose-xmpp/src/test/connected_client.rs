@@ -17,6 +17,7 @@ use crate::{Client, Event, IDProvider};
 #[async_trait(?Send)]
 pub trait ClientTestAdditions {
     async fn connected_client() -> Result<ConnectedClient>;
+    async fn connected_client_with_current_user(jid: FullJid) -> Result<ConnectedClient>;
 }
 
 pub struct ConnectedClient {
@@ -29,6 +30,13 @@ pub struct ConnectedClient {
 #[async_trait(?Send)]
 impl ClientTestAdditions for Client {
     async fn connected_client() -> Result<ConnectedClient> {
+        Self::connected_client_with_current_user(
+            FullJid::from_str(&format!("{}/test", BareJid::ours())).unwrap(),
+        )
+        .await
+    }
+
+    async fn connected_client_with_current_user(jid: FullJid) -> Result<ConnectedClient> {
         let connection = Arc::new(Connection::default());
         let id_provider = Arc::new(IncrementingIDProvider::new("id"));
         let sent_events = Arc::new(RwLock::new(vec![]));
@@ -43,12 +51,7 @@ impl ClientTestAdditions for Client {
             }))
             .build();
 
-        client
-            .connect(
-                &FullJid::from_str(&format!("{}/test", BareJid::ours()))?,
-                "",
-            )
-            .await?;
+        client.connect(&jid, "").await?;
 
         id_provider.reset();
         sent_events.write().clear();

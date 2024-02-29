@@ -13,6 +13,7 @@ use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::chat::Carbon;
+use prose_xmpp::stanza::message::Forwarded;
 use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
@@ -21,11 +22,10 @@ use crate::app::deps::{
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
-    MessageLike, MessageLikeError, MessageLikePayload, MessageTargetId, TimestampedMessage,
+    MessageLike, MessageLikeError, MessageLikePayload, MessageParser, MessageTargetId,
 };
 use crate::domain::rooms::models::Room;
-use crate::domain::shared::models::{MucId, RoomId, UserEndpointId};
-use crate::dtos::UserId;
+use crate::domain::shared::models::{RoomId, UserEndpointId};
 use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
@@ -62,19 +62,19 @@ impl ServerEventHandler for MessagesEventHandler {
 
 enum ReceivedMessage {
     Message(Message),
-    Carbon(Carbon),
+    Carbon(Forwarded),
+}
+
+enum SentMessage {
+    Message(Message),
+    Carbon(Forwarded),
 }
 
 impl ReceivedMessage {
-    pub fn sender(&self) -> Option<UserEndpointId> {
+    pub fn from(&self) -> Option<UserEndpointId> {
         let message = match &self {
             ReceivedMessage::Message(message) => Some(message),
-            ReceivedMessage::Carbon(Carbon::Received(message)) => {
-                message.stanza.as_ref().map(|b| b.deref())
-            }
-            ReceivedMessage::Carbon(Carbon::Sent(message)) => {
-                message.stanza.as_ref().map(|b| b.deref())
-            }
+            ReceivedMessage::Carbon(message) => message.stanza.as_ref().map(|m| m.deref()),
         };
 
         let Some(message) = message else { return None };
@@ -100,6 +100,27 @@ impl ReceivedMessage {
     }
 }
 
+impl SentMessage {
+    pub fn room_id(&self) -> Option<RoomId> {
+        let message = match self {
+            SentMessage::Message(message) => Some(message),
+            SentMessage::Carbon(message) => message.stanza.as_ref().map(|m| m.deref()),
+        };
+
+        let Some(message) = message else { return None };
+
+        let Some(to) = message.to.clone() else {
+            return None;
+        };
+
+        match message.type_ {
+            MessageType::Groupchat => RoomId::Muc(to.into_bare().into()),
+            _ => RoomId::User(to.into_bare().into()),
+        }
+        .into()
+    }
+}
+
 impl MessagesEventHandler {
     async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
         match event.r#type {
@@ -107,33 +128,35 @@ impl MessagesEventHandler {
                 self.handle_received_message(ReceivedMessage::Message(message))
                     .await?
             }
-            MessageEventType::Sync(carbon) => {
-                self.handle_received_message(ReceivedMessage::Carbon(carbon))
+            MessageEventType::Sync(Carbon::Received(message)) => {
+                self.handle_received_message(ReceivedMessage::Carbon(message))
                     .await?
             }
-            MessageEventType::Sent(message) => self.handle_sent_message(message).await?,
+            MessageEventType::Sync(Carbon::Sent(message)) => {
+                self.handle_sent_message(SentMessage::Carbon(message))
+                    .await?
+            }
+            MessageEventType::Sent(message) => {
+                self.handle_sent_message(SentMessage::Message(message))
+                    .await?
+            }
         }
         Ok(())
     }
 
     async fn handle_received_message(&self, message: ReceivedMessage) -> Result<()> {
-        let Some(from) = message.sender() else {
+        let Some(from) = message.from() else {
             error!("Received message from unknown sender.");
             return Ok(());
         };
 
         let room_id = from.to_room_id();
-        let now = self.time_provider.now();
+
+        let parser = MessageParser::new(self.time_provider.now());
 
         let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => MessageLike::try_from(TimestampedMessage {
-                message,
-                timestamp: now.into(),
-            }),
-            ReceivedMessage::Carbon(carbon) => MessageLike::try_from(TimestampedMessage {
-                message: carbon,
-                timestamp: now.into(),
-            }),
+            ReceivedMessage::Message(message) => parser.parse_message(message),
+            ReceivedMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon),
         };
 
         let message = match parsed_message {
@@ -197,39 +220,43 @@ impl MessagesEventHandler {
         Ok(())
     }
 
-    async fn handle_sent_message(&self, mut message: Message) -> Result<()> {
-        let Some(to) = &message.to else {
+    async fn handle_sent_message(&self, message: SentMessage) -> Result<()> {
+        let Some(room_id) = &message.room_id() else {
             error!("Sent message to unknown recipient.");
             return Ok(());
         };
 
-        let to = match message.type_ {
-            MessageType::Groupchat => RoomId::Muc(MucId::from(to.to_bare())),
-            _ => RoomId::User(UserId::from(to.to_bare())),
-        };
-
-        let Some(room) = self.connected_rooms_repo.get(to.as_ref()) else {
+        let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
             error!("Sent message to recipient for which we do not have a room.");
             return Ok(());
         };
 
+        let parser = MessageParser::new(self.time_provider.now());
+
         // For the purpose of parsing our sent message into a `MessageLike` let's treat it as
         // a regular 'chat' message. This way the 'from' attribute will be parsed into
         // a ParticipantId::User instead of a ParticipantId::Occupant which is what we want.
-        // Otherwise the ParticipantId::Occupant would contain our (real) FullJid, not our JID in
+        // Otherwise, the ParticipantId::Occupant would contain our (real) FullJid, not our JID in
         // the room.
-        message.type_ = MessageType::Chat;
-        let message = MessageLike::try_from(TimestampedMessage {
-            message,
-            timestamp: self.time_provider.now(),
-        })?;
+        let parsed_message = match message {
+            SentMessage::Message(mut message) => {
+                message.type_ = MessageType::Chat;
+                parser.parse_message(message)
+            }
+            SentMessage::Carbon(mut carbon) => {
+                if let Some(ref mut message) = carbon.stanza {
+                    message.type_ = MessageType::Chat;
+                }
+                parser.parse_forwarded_message(carbon)
+            }
+        }?;
 
         debug!("Caching sent message…");
-        let messages = [message];
-        self.messages_repo.append(&to, &messages).await?;
-        let [message] = messages;
+        let messages = [parsed_message];
+        self.messages_repo.append(&room_id, &messages).await?;
+        let [parsed_message] = messages;
 
-        self.dispatch_event_for_message(room, message).await;
+        self.dispatch_event_for_message(room, parsed_message).await;
 
         Ok(())
     }

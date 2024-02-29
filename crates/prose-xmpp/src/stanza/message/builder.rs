@@ -12,6 +12,7 @@ use xmpp_parsers::message::{Body, MessagePayload, MessageType, Subject};
 use xmpp_parsers::message_correct::Replace;
 
 use crate::ns;
+use crate::stanza::message;
 use crate::stanza::message::chat_marker::{Acknowledged, Displayed, Received};
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::mam::ArchivedMessage;
@@ -32,6 +33,11 @@ impl Message {
 
     pub fn set_id(mut self, id: Id) -> Self {
         self.id = Some(id.into_inner());
+        self
+    }
+
+    pub fn set_stanza_id(mut self, stanza_id: message::stanza_id::StanzaId) -> Self {
+        self.payloads.push(stanza_id.into());
         self
     }
 
