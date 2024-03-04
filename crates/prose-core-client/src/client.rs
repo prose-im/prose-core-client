@@ -8,11 +8,13 @@ use std::sync::Arc;
 
 use anyhow::Result;
 
+use crate::app::deps::DynAppContext;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
 
 use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore};
 use crate::domain::shared::models::UserId;
+use crate::dtos::UserResourceId;
 use crate::services::{
     AccountService, BlockListService, CacheService, ConnectionService, ContactListService,
     RoomsService, SidebarService, UploadService, UserDataService,
@@ -39,6 +41,7 @@ pub struct ClientInner {
     pub block_list: BlockListService,
     pub cache: CacheService,
     pub contact_list: ContactListService,
+    pub(crate) ctx: DynAppContext,
     #[cfg(feature = "debug")]
     pub debug: crate::services::DebugService,
     pub rooms: RoomsService,
@@ -73,6 +76,10 @@ impl Client {
 
     pub async fn disconnect(&self) {
         self.connection.disconnect().await
+    }
+
+    pub fn connected_user_id(&self) -> Option<UserResourceId> {
+        self.ctx.connected_id().ok()
     }
 }
 

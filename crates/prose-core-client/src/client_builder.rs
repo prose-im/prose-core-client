@@ -198,6 +198,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             connection: ConnectionService::from(&dependencies),
             account: AccountService::from(&dependencies),
             contact_list: ContactListService::from(&dependencies),
+            ctx: dependencies.ctx.clone(),
             #[cfg(feature = "debug")]
             debug: crate::services::DebugService::new(xmpp_client.clone()),
             rooms: RoomsService::from(&dependencies),

@@ -1,8 +1,10 @@
-// prose-core-client/prose-xmpp
+// prose-core-client/prose-core-integration-tests
 //
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use parking_lot::Mutex;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::str::FromStr;
 
@@ -19,9 +21,10 @@ use crate::tests::store;
 use super::{connector::Connector, test_message_queue::TestMessageQueue};
 
 pub struct TestClient {
-    client: Client,
+    pub(super) client: Client,
     id_provider: IncrementingIDProvider,
     messages: TestMessageQueue,
+    context: Mutex<Vec<HashMap<String, String>>>,
 }
 
 impl TestClient {
@@ -45,30 +48,57 @@ impl TestClient {
             // We'll just mirror the used ID provider here…
             id_provider: IncrementingIDProvider::new("id"),
             messages,
+            context: Default::default(),
         }
     }
 }
 
 impl TestClient {
     pub fn send(&self, xml: impl Into<String>) {
-        let xml = xml.into();
+        let mut xml = xml.into();
 
         // Only increase the ID counter if the message contains an ID…
-        let xml = if xml.contains("{{ID}}") {
-            xml.replace("{{ID}}", &self.id_provider.new_id())
+        if xml.contains("{{ID}}") {
+            self.push_ctx([("ID".into(), self.id_provider.new_id())].into());
+            self.apply_ctx(&mut xml);
+            self.pop_ctx();
         } else {
-            xml
-        };
+            self.apply_ctx(&mut xml);
+        }
         self.messages.send(xml);
     }
 
     pub fn receive(&self, xml: impl Into<String>) {
-        let xml = xml.into().replace("{{ID}}", &self.id_provider.last_id());
+        let mut xml = xml.into();
+
+        self.push_ctx([("ID".into(), self.id_provider.last_id())].into());
+        self.apply_ctx(&mut xml);
+        self.pop_ctx();
+
         self.messages.receive(xml);
     }
 
     pub fn event(&self, event: ClientEvent) {
         self.messages.event(event);
+    }
+}
+
+impl TestClient {
+    pub fn push_ctx(&self, ctx: HashMap<String, String>) {
+        self.context.lock().push(ctx);
+    }
+
+    pub fn pop_ctx(&self) {
+        self.context.lock().pop();
+    }
+
+    fn apply_ctx(&self, xml_str: &mut String) {
+        let guard = self.context.lock();
+        for ctx in guard.iter().rev() {
+            for (key, value) in ctx {
+                *xml_str = xml_str.replace(&format!("{{{{{}}}}}", key.to_uppercase()), value);
+            }
+        }
     }
 }
 
