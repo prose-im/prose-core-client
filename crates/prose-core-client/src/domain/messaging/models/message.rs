@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 use prose_utils::id_string;
 
@@ -117,7 +117,10 @@ impl Message {
                 MessageTargetId::MessageId(ref id) => id,
                 MessageTargetId::StanzaId(stanza_id) => {
                     let Some(id) = stanza_to_id_map.get(&stanza_id) else {
-                        error!("Could not resolve StanzaId '{stanza_id}' to a MessageId");
+                        info!(
+                            "Could not resolve StanzaId '{stanza_id}' to a MessageId \n{:?}\n{:?}",
+                            stanza_to_id_map, messages_map
+                        );
                         continue;
                     };
                     id

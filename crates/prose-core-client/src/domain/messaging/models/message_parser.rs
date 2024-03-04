@@ -144,14 +144,20 @@ impl TryFrom<&Message> for TargetedPayload {
 
         if let Some(marker) = message.received_marker() {
             return Ok(TargetedPayload {
-                target: Some(MessageTargetId::MessageId(marker.id.as_ref().into())),
+                target: Some(match message.type_ {
+                    MessageType::Groupchat => MessageTargetId::StanzaId(marker.id.as_ref().into()),
+                    _ => MessageTargetId::MessageId(marker.id.as_ref().into()),
+                }),
                 payload: Payload::DeliveryReceipt,
             });
         }
 
         if let Some(marker) = message.displayed_marker() {
             return Ok(TargetedPayload {
-                target: Some(MessageTargetId::MessageId(marker.id.as_ref().into())),
+                target: Some(match message.type_ {
+                    MessageType::Groupchat => MessageTargetId::StanzaId(marker.id.as_ref().into()),
+                    _ => MessageTargetId::MessageId(marker.id.as_ref().into()),
+                }),
                 payload: Payload::ReadReceipt,
             });
         }
