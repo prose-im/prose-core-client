@@ -79,6 +79,8 @@ pub struct RoomDetails {
     pub state: RoomState,
     /// The number of unread messages in this room.
     pub unread_count: u32,
+    /// The number of unread messages mentioning our user in this room.
+    pub mentions_count: u32,
 }
 
 #[derive(Debug)]
@@ -159,13 +161,24 @@ impl Room {
         self.inner.details.read().unread_count
     }
 
+    pub fn mentions_count(&self) -> u32 {
+        self.inner.details.read().mentions_count
+    }
+
     pub fn increment_unread_count(&self) {
         let mut guard = self.inner.details.write();
         guard.unread_count = guard.unread_count.saturating_add(1);
     }
 
+    pub fn increment_mentions_count(&self) {
+        let mut guard = self.inner.details.write();
+        guard.mentions_count = guard.mentions_count.saturating_add(1);
+    }
+
     pub fn mark_as_read(&self) {
-        self.inner.details.write().unread_count = 0
+        let mut guard = self.inner.details.write();
+        guard.unread_count = 0;
+        guard.mentions_count = 0;
     }
 }
 
@@ -185,6 +198,7 @@ impl Room {
                 sidebar_state: bookmark.sidebar_state,
                 state: RoomState::Pending,
                 unread_count: 0,
+                mentions_count: 0,
             },
         )
     }
@@ -204,6 +218,7 @@ impl Room {
                 sidebar_state,
                 state: RoomState::Connecting,
                 unread_count: 0,
+                mentions_count: 0,
             },
         )
     }
@@ -274,6 +289,7 @@ impl Room {
                 sidebar_state,
                 state: RoomState::Connected,
                 unread_count: 0,
+                mentions_count: 0,
             },
         )
     }
@@ -292,6 +308,7 @@ impl Room {
                 sidebar_state: RoomSidebarState::InSidebar,
                 state: Default::default(),
                 unread_count: 0,
+                mentions_count: 0,
             },
         )
     }
@@ -358,6 +375,7 @@ mod tests {
                     sidebar_state: RoomSidebarState::Favorite,
                     state: RoomState::Connected,
                     unread_count: 0,
+                    mentions_count: 0,
                 }
             )
         )

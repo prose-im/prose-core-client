@@ -8,16 +8,17 @@ use mockall::{predicate, Sequence};
 use xmpp_parsers::stanza_error::{DefinedCondition, ErrorType, StanzaError};
 
 use prose_core_client::domain::connection::models::ConnectionProperties;
+use prose_core_client::domain::messaging::models::MessageLikePayload;
 use prose_core_client::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec};
 use prose_core_client::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
-use prose_core_client::domain::shared::models::{
-    MucId, OccupantId, UserEndpointId, UserId, UserResourceId,
-};
+use prose_core_client::domain::shared::models::{MucId, OccupantId, UserId, UserResourceId};
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType};
 use prose_core_client::domain::sidebar::services::impls::SidebarDomainService;
 use prose_core_client::domain::sidebar::services::SidebarDomainService as SidebarDomainServiceTrait;
-use prose_core_client::dtos::{Availability, RoomState};
-use prose_core_client::test::{DisconnectedState, MockSidebarDomainServiceDependencies};
+use prose_core_client::dtos::{Availability, Mention, Participant, RoomState, UnicodeScalarIndex};
+use prose_core_client::test::{
+    DisconnectedState, MessageBuilder, MockSidebarDomainServiceDependencies,
+};
 use prose_core_client::{muc_id, occupant_id, user_id, user_resource_id, ClientEvent};
 use prose_xmpp::{bare, RequestError};
 
@@ -559,12 +560,12 @@ async fn test_insert_item_for_received_group_message_if_needed() -> Result<()> {
         .with(predicate::eq(ClientEvent::SidebarChanged))
         .return_once(|_| ());
 
+    let message = MessageBuilder::new_with_index(1)
+        .set_from(occupant_id!("group@conference.prose.org/user"))
+        .build_message_like();
+
     let service = SidebarDomainService::from(deps.into_deps());
-    service
-        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
-            "group@conference.prose.org/user"
-        )))
-        .await?;
+    service.handle_received_message(&message).await?;
 
     assert_eq!(room.sidebar_state(), RoomSidebarState::InSidebar);
     assert_eq!(room.unread_count(), 1);
@@ -619,30 +620,218 @@ async fn test_increases_unread_count() -> Result<()> {
     assert_eq!(group.unread_count(), 0);
 
     service
-        .handle_received_message(&UserEndpointId::User(user_id!("dm@prose.org")))
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(user_id!("dm@prose.org"))
+                .build_message_like(),
+        )
         .await?;
     assert_eq!(direct_message.unread_count(), 1);
 
     service
-        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
-            "private_channel@conf.prose.org/user"
-        )))
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("private_channel@conf.prose.org/user"))
+                .build_message_like(),
+        )
         .await?;
     assert_eq!(private_channel.unread_count(), 1);
 
     service
-        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
-            "public_channel@conf.prose.org/user"
-        )))
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("public_channel@conf.prose.org/user"))
+                .build_message_like(),
+        )
         .await?;
     assert_eq!(public_channel.unread_count(), 1);
 
     service
-        .handle_received_message(&UserEndpointId::Occupant(occupant_id!(
-            "group@conf.prose.org/user"
-        )))
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("group@conf.prose.org/user"))
+                .build_message_like(),
+        )
         .await?;
     assert_eq!(group.unread_count(), 1);
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_increases_mentions_count() -> Result<()> {
+    let mut deps = MockSidebarDomainServiceDependencies::default();
+
+    deps.ctx.set_connection_properties(ConnectionProperties {
+        connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
+        server_features: Default::default(),
+    });
+
+    let direct_message = Room::for_direct_message(
+        &user_id!("dm@prose.org"),
+        "user",
+        Availability::Available,
+        RoomSidebarState::InSidebar,
+    );
+    let private_channel = Room::private_channel(muc_id!("private_channel@conf.prose.org"))
+        .with_sidebar_state(RoomSidebarState::InSidebar)
+        .with_participants([(
+            occupant_id!("private_channel@conf.prose.org/jd"),
+            Participant::owner().set_real_id(&user_id!("jane.doe@prose.org")),
+        )]);
+    let public_channel = Room::public_channel(muc_id!("public_channel@conf.prose.org"))
+        .with_sidebar_state(RoomSidebarState::InSidebar)
+        .with_participants([(
+            occupant_id!("public_channel@conf.prose.org/jd"),
+            Participant::owner().set_real_id(&user_id!("jane.doe@prose.org")),
+        )]);
+    let group = Room::group(muc_id!("group@conf.prose.org"))
+        .with_sidebar_state(RoomSidebarState::InSidebar)
+        .with_participants([(
+            occupant_id!("group@conf.prose.org/jd"),
+            Participant::owner().set_real_id(&user_id!("jane.doe@prose.org")),
+        )]);
+
+    {
+        let direct_message = direct_message.clone();
+        let private_channel = private_channel.clone();
+        let public_channel = public_channel.clone();
+        let group = group.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .returning(move |room_id| match room_id.to_string().as_str() {
+                "dm@prose.org" => Some(direct_message.clone()),
+                "private_channel@conf.prose.org" => Some(private_channel.clone()),
+                "public_channel@conf.prose.org" => Some(public_channel.clone()),
+                "group@conf.prose.org" => Some(group.clone()),
+                _ => panic!("Unexpected room id"),
+            });
+    }
+
+    deps.client_event_dispatcher
+        .expect_dispatch_event()
+        .times(6)
+        .with(predicate::eq(ClientEvent::SidebarChanged))
+        .returning(|_| ());
+
+    let service = SidebarDomainService::from(deps.into_deps());
+
+    assert_eq!(direct_message.mentions_count(), 0);
+    assert_eq!(private_channel.mentions_count(), 0);
+    assert_eq!(public_channel.mentions_count(), 0);
+    assert_eq!(group.mentions_count(), 0);
+
+    service
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(user_id!("dm@prose.org"))
+                .set_payload(MessageLikePayload::Message {
+                    body: "Hello @ou, @jd & @jd".to_string(),
+                    attachments: vec![],
+                    mentions: vec![
+                        Mention {
+                            user: user_id!("other.user@prose.org"),
+                            range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
+                        },
+                        Mention {
+                            user: user_id!("jane.doe@prose.org"),
+                            range: UnicodeScalarIndex::new(11)..UnicodeScalarIndex::new(14),
+                        },
+                        Mention {
+                            user: user_id!("jane.doe@prose.org"),
+                            range: UnicodeScalarIndex::new(17)..UnicodeScalarIndex::new(20),
+                        },
+                    ],
+                })
+                .build_message_like(),
+        )
+        .await?;
+    assert_eq!(direct_message.mentions_count(), 1);
+
+    service
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(user_id!("dm@prose.org"))
+                .set_payload(MessageLikePayload::Message {
+                    body: "Hello @ou".to_string(),
+                    attachments: vec![],
+                    mentions: vec![Mention {
+                        user: user_id!("other.user@prose.org"),
+                        range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
+                    }],
+                })
+                .build_message_like(),
+        )
+        .await?;
+    assert_eq!(direct_message.mentions_count(), 1);
+
+    service
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("private_channel@conf.prose.org/user"))
+                .set_payload(MessageLikePayload::Message {
+                    body: "Hello @jd".to_string(),
+                    attachments: vec![],
+                    mentions: vec![Mention {
+                        user: user_id!("jane.doe@prose.org"),
+                        range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
+                    }],
+                })
+                .build_message_like(),
+        )
+        .await?;
+    assert_eq!(private_channel.mentions_count(), 1);
+
+    service
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("private_channel@conf.prose.org/user"))
+                .set_payload(MessageLikePayload::Message {
+                    body: "Hello @ou".to_string(),
+                    attachments: vec![],
+                    mentions: vec![Mention {
+                        user: user_id!("other.user@prose.org"),
+                        range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
+                    }],
+                })
+                .build_message_like(),
+        )
+        .await?;
+    assert_eq!(private_channel.mentions_count(), 1);
+
+    service
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("public_channel@conf.prose.org/user"))
+                .set_payload(MessageLikePayload::Message {
+                    body: "Hello @jd".to_string(),
+                    attachments: vec![],
+                    mentions: vec![Mention {
+                        user: user_id!("jane.doe@prose.org"),
+                        range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
+                    }],
+                })
+                .build_message_like(),
+        )
+        .await?;
+    assert_eq!(public_channel.mentions_count(), 1);
+
+    service
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(occupant_id!("group@conf.prose.org/user"))
+                .set_payload(MessageLikePayload::Message {
+                    body: "Hello @jd".to_string(),
+                    attachments: vec![],
+                    mentions: vec![Mention {
+                        user: user_id!("jane.doe@prose.org"),
+                        range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
+                    }],
+                })
+                .build_message_like(),
+        )
+        .await?;
+    assert_eq!(group.mentions_count(), 1);
 
     Ok(())
 }
@@ -695,9 +884,11 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .handle_received_message(&UserEndpointId::UserResource(user_resource_id!(
-            "contact@prose.org/res"
-        )))
+        .handle_received_message(
+            &MessageBuilder::new_with_index(1)
+                .set_from(user_id!("contact@prose.org"))
+                .build_message_like(),
+        )
         .await?;
 
     Ok(())

@@ -9,9 +9,10 @@ use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
+use crate::domain::messaging::models::MessageLike;
 use crate::domain::rooms::models::RoomSpec;
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
-use crate::domain::shared::models::{MucId, RoomId, UserEndpointId};
+use crate::domain::shared::models::{MucId, RoomId};
 use crate::domain::sidebar::models::Bookmark;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -57,7 +58,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// corresponding bookmark. It will also update the unread count of the affected room.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_received_message(&self, sender: &UserEndpointId) -> Result<()>;
+    async fn handle_received_message(&self, message: &MessageLike) -> Result<()>;
 
     /// Destroys the room identified by `room_id` and the associated bookmark.
     /// `ClientEvent::SidebarChanged` will be dispatched after processing.

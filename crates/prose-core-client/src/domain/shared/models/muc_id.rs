@@ -11,6 +11,7 @@ use jid::{BareJid, Jid};
 use minidom::IntoAttributeValue;
 
 use crate::dtos::OccupantId;
+use crate::infra::xmpp::util::{JidExt, JidParseError};
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 /// Represents the BareJid of a MUC room.
@@ -83,42 +84,8 @@ impl From<MucId> for Jid {
     }
 }
 
-#[derive(thiserror::Error, Debug, PartialEq)]
-pub enum MucIdParseError {
-    #[error("Missing xmpp: prefix in IRI")]
-    InvalidIRI,
-    #[error(transparent)]
-    JID(#[from] jid::Error),
-}
-
 impl MucId {
-    pub fn from_iri(iri: &str) -> Result<Self, MucIdParseError> {
-        let Some(mut iri) = iri.strip_prefix("xmpp:") else {
-            return Err(MucIdParseError::InvalidIRI);
-        };
-        if let Some(idx) = iri.rfind("?join") {
-            iri = &iri[..idx];
-        }
-        Ok(Self::from_str(iri)?)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::muc_id;
-
-    use super::*;
-
-    #[test]
-    fn test_from_iri() {
-        assert!(MucId::from_iri("").is_err());
-        assert_eq!(
-            MucId::from_iri("xmpp:room@muc.example.org?join"),
-            Ok(muc_id!("room@muc.example.org"))
-        );
-        assert_eq!(
-            MucId::from_iri("xmpp:room@muc.example.org"),
-            Ok(muc_id!("room@muc.example.org"))
-        );
+    pub fn from_iri(iri: &str) -> Result<Self, JidParseError> {
+        Ok(Self(Jid::from_iri(iri)?.into_bare()))
     }
 }

@@ -25,6 +25,7 @@ use crate::stanza::message::stanza_id::StanzaId;
 use crate::stanza::message::{carbons, Reactions};
 use crate::stanza::message::{chat_marker, mam};
 use crate::stanza::muc;
+use crate::stanza::references::Reference;
 
 id_string!(Id);
 
@@ -180,6 +181,28 @@ impl Message {
                     Err(err) => {
                         println!(
                             "Failed to parse 'media-share' {}. {}",
+                            String::from(elem),
+                            err.to_string()
+                        );
+                        None
+                    }
+                }
+            })
+            .collect()
+    }
+
+    pub fn mentions(&self) -> Vec<Reference> {
+        self.payloads
+            .iter()
+            .filter_map(|elem| {
+                if !elem.is("reference", ns::REFERENCE) || elem.attr("type") != Some("mention") {
+                    return None;
+                }
+                match Reference::try_from(elem.clone()) {
+                    Ok(share) => Some(share),
+                    Err(err) => {
+                        println!(
+                            "Failed to parse 'reference' {}. {}",
                             String::from(elem),
                             err.to_string()
                         );

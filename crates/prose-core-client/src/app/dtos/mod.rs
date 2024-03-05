@@ -20,13 +20,14 @@ pub use crate::domain::{
     contacts::models::PresenceSubscription,
     general::models::SoftwareVersion,
     messaging::models::{
-        Attachment, AttachmentType, Emoji, MessageId, Reaction, SendMessageRequest, StanzaId,
-        Thumbnail,
+        Attachment, AttachmentType, Emoji, Mention, MessageId, Reaction, SendMessageRequest,
+        SendMessageRequestBody, StanzaId, Thumbnail,
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        Availability, MucId, OccupantId, ParticipantId, ParticipantInfo, RoomId, UserBasicInfo,
-        UserId, UserPresenceInfo, UserResourceId,
+        Availability, MucId, OccupantId, ParticipantId, ParticipantInfo, RoomId, ScalarRangeExt,
+        StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId, UserPresenceInfo,
+        UserResourceId, Utf16Index, Utf8Index,
     },
     uploads::models::UploadHeader,
     user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},

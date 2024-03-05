@@ -68,6 +68,7 @@ impl MessageBuilder {
             payload: MessageLikePayload::Message {
                 body: format!("Message {}", idx),
                 attachments: vec![],
+                mentions: vec![],
             },
             timestamp: mock_data::reference_date() + Duration::minutes(idx.into()),
             is_read: false,
@@ -125,6 +126,7 @@ impl MessageBuilder {
             is_delivered: self.is_delivered,
             reactions: self.reactions,
             attachments: vec![],
+            mentions: vec![],
         }
     }
 
@@ -149,6 +151,7 @@ impl MessageBuilder {
             is_delivered: self.is_delivered,
             reactions: self.reactions,
             attachments: vec![],
+            mentions: vec![],
         }
     }
 

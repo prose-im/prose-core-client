@@ -13,6 +13,9 @@ pub use request_id::RequestId;
 pub use room_id::RoomId;
 pub use room_type::RoomType;
 pub use sender_id::SenderId;
+pub use string_index::{
+    ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex, Utf16Index, Utf8Index,
+};
 pub use user_endpoint_id::UserEndpointId;
 pub use user_id::UserId;
 pub use user_info::{ParticipantInfo, UserBasicInfo, UserPresenceInfo};
@@ -29,6 +32,7 @@ mod request_id;
 mod room_id;
 mod room_type;
 mod sender_id;
+mod string_index;
 mod user_endpoint_id;
 mod user_id;
 mod user_info;

@@ -19,8 +19,8 @@ pub struct Reference {
     pub r#type: ReferenceType,
     pub uri: String,
     pub anchor: Option<String>,
-    pub begin: Option<u32>,
-    pub end: Option<u32>,
+    pub begin: Option<usize>,
+    pub end: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -22,7 +22,7 @@ impl TestClient {
         self.send(r#"
         <presence xmlns='jabber:client'>
             <show>chat</show>
-            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="dWkYhmO8yFRrk+2G6R324ES7G9E=" />
+            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="ipEcl0ID83wbGxX3lfUdwi1F8VM=" />
         </presence>"#
         );
 

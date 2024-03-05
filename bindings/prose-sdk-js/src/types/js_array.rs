@@ -20,6 +20,9 @@ extern "C" {
     #[wasm_bindgen(typescript_type = "Reaction[]")]
     pub type ReactionsArray;
 
+    #[wasm_bindgen(typescript_type = "Mention[]")]
+    pub type MentionsArray;
+
     #[wasm_bindgen(typescript_type = "BareJID[]")]
     pub type BareJidArray;
 

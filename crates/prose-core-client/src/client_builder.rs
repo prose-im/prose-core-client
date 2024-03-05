@@ -139,6 +139,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
                 Feature::Name(ns::PUBSUB_EVENT),
                 Feature::Name(ns::REACTIONS),
                 Feature::Name(ns::RECEIPTS),
+                Feature::Name(ns::REFERENCE),
                 Feature::Name(ns::RETRACT),
                 Feature::Name(ns::ROSTER),
                 Feature::Name(ns::RSM),

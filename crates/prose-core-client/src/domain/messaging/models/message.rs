@@ -7,7 +7,6 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use prose_utils::id_string;
@@ -15,17 +14,17 @@ use prose_utils::id_string;
 use crate::domain::shared::models::ParticipantId;
 use crate::dtos::{Attachment, MessageId, StanzaId};
 
-use super::{MessageLike, MessageLikePayload, MessageTargetId};
+use super::{Mention, MessageLike, MessageLikePayload, MessageTargetId};
 
 id_string!(Emoji);
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Reaction {
     pub emoji: Emoji,
     pub from: Vec<ParticipantId>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
@@ -37,6 +36,7 @@ pub struct Message {
     pub is_delivered: bool,
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
+    pub mentions: Vec<Mention>,
 }
 
 impl Message {
@@ -81,7 +81,11 @@ impl Message {
 
         for msg in messages.into_iter() {
             match msg.payload {
-                MessageLikePayload::Message { body, attachments } => {
+                MessageLikePayload::Message {
+                    body,
+                    attachments,
+                    mentions,
+                } => {
                     let message_id = msg.id.clone();
 
                     let message = Message {
@@ -95,6 +99,7 @@ impl Message {
                         is_delivered: false,
                         reactions: vec![],
                         attachments,
+                        mentions,
                     };
 
                     if let Some(stanza_id) = &message.stanza_id {
@@ -331,6 +336,7 @@ mod tests {
                 payload: MessageLikePayload::Message {
                     body: String::from("Hello World"),
                     attachments: vec![],
+                    mentions: vec![],
                 },
             },
             MessageLike {
@@ -420,6 +426,7 @@ mod tests {
                     }
                 ],
                 attachments: vec![],
+                mentions: vec![]
             },
             reduced_message,
         )

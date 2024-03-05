@@ -7,12 +7,13 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 
-use jid::BareJid;
+use jid::{BareJid, Jid};
 use minidom::IntoAttributeValue;
 use serde::{Deserialize, Serialize};
 
 use prose_store::{KeyType, RawKey};
 
+use crate::infra::xmpp::util::{JidExt, JidParseError};
 use crate::util::StringExt;
 
 use super::UserResourceId;
@@ -72,6 +73,12 @@ impl FromStr for UserId {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(UserId(s.parse::<BareJid>()?))
+    }
+}
+
+impl UserId {
+    pub fn from_iri(iri: &str) -> Result<Self, JidParseError> {
+        Ok(Self(Jid::from_iri(iri)?.into_bare()))
     }
 }
 

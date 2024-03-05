@@ -18,7 +18,7 @@ use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::messaging::models::{MessageLike, MessageLikePayload};
 use prose_core_client::domain::rooms::models::{Room, RoomInfo};
 use prose_core_client::domain::shared::models::{
-    MucId, OccupantId, RoomId, RoomType, UserEndpointId, UserId, UserResourceId,
+    MucId, OccupantId, RoomId, RoomType, UserId, UserResourceId,
 };
 use prose_core_client::dtos::{Availability, MessageId, ParticipantId, StanzaId};
 use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
@@ -49,9 +49,9 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
         .expect_handle_received_message()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(UserEndpointId::Occupant(occupant_id!(
-            "group@conference.prose.org/user"
-        ))))
+        .with(predicate::function(|msg: &MessageLike| {
+            msg.from == ParticipantId::Occupant(occupant_id!("group@conference.prose.org/user"))
+        }))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     {
@@ -116,9 +116,9 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
         .expect_handle_received_message()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(UserEndpointId::User(user_id!(
-            "jane.doe@prose.org"
-        ))))
+        .with(predicate::function(|msg: &MessageLike| {
+            msg.from == ParticipantId::User(user_id!("jane.doe@prose.org"))
+        }))
         .return_once(|_| Box::pin(async { Ok(()) }));
 
     {
@@ -197,6 +197,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         payload: MessageLikePayload::Message {
             body: "Hello World".to_string(),
             attachments: vec![],
+            mentions: vec![],
         },
     };
 

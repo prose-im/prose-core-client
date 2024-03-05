@@ -13,7 +13,7 @@ use uuid::Uuid;
 
 use prose_xmpp::stanza::message;
 
-use crate::domain::messaging::models::{Attachment, MessageTargetId};
+use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId};
 use crate::domain::shared::models::ParticipantId;
 
 use super::{MessageId, StanzaId};
@@ -49,6 +49,7 @@ pub enum Payload {
     Message {
         body: String,
         attachments: Vec<Attachment>,
+        mentions: Vec<Mention>,
     },
     Reaction {
         emojis: Vec<message::Emoji>,

@@ -12,16 +12,55 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 
 use prose_core_client::dtos;
+use prose_core_client::dtos::StringIndexRangeExt;
 
 use crate::types::attachment::{AttachmentMetadata, AttachmentType};
-use crate::types::{Attachment, AttachmentsArray, IntoJSArray, Thumbnail};
+use crate::types::{Attachment, AttachmentsArray, IntoJSArray, Mention, MentionsArray, Thumbnail};
 
 #[wasm_bindgen]
 pub struct SendMessageRequest {
     /// The body of the message.
-    body: Option<String>,
+    body: Option<SendMessageRequestBody>,
     /// The URLs of the files to attach to the message.
     attachments: Vec<Attachment>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct SendMessageRequestBody {
+    text: String,
+    mentions: Vec<Mention>,
+}
+
+#[wasm_bindgen]
+impl SendMessageRequestBody {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            text: String::new(),
+            mentions: vec![],
+        }
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn text(&self) -> String {
+        self.text.clone()
+    }
+
+    #[wasm_bindgen(setter)]
+    pub fn set_text(&mut self, text: String) {
+        self.text = text
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn mentions(&self) -> MentionsArray {
+        self.mentions.iter().cloned().collect_into_js_array()
+    }
+
+    #[wasm_bindgen(js_name = "addMention")]
+    pub fn add_mention(&mut self, mention: Mention) {
+        self.mentions.push(mention)
+    }
 }
 
 #[wasm_bindgen]
@@ -35,12 +74,12 @@ impl SendMessageRequest {
     }
 
     #[wasm_bindgen(getter)]
-    pub fn body(&self) -> Option<String> {
+    pub fn body(&self) -> Option<SendMessageRequestBody> {
         self.body.clone()
     }
 
     #[wasm_bindgen(setter)]
-    pub fn set_body(&mut self, body: Option<String>) {
+    pub fn set_body(&mut self, body: Option<SendMessageRequestBody>) {
         self.body = body;
     }
 
@@ -88,12 +127,32 @@ impl SendMessageRequest {
     }
 }
 
+impl TryFrom<SendMessageRequestBody> for dtos::SendMessageRequestBody {
+    type Error = anyhow::Error;
+
+    fn try_from(value: SendMessageRequestBody) -> Result<Self, Self::Error> {
+        let mut body = dtos::SendMessageRequestBody {
+            text: value.text,
+            mentions: vec![],
+        };
+
+        for mention in value.mentions {
+            body.mentions.push(dtos::Mention {
+                user: mention.user.into(),
+                range: mention.range.to_scalar_range(&body.text)?,
+            });
+        }
+
+        Ok(body)
+    }
+}
+
 impl TryFrom<SendMessageRequest> for dtos::SendMessageRequest {
     type Error = anyhow::Error;
 
     fn try_from(value: SendMessageRequest) -> Result<Self, Self::Error> {
         Ok(Self {
-            body: value.body,
+            body: value.body.map(TryInto::try_into).transpose()?,
             attachments: value
                 .attachments
                 .into_iter()

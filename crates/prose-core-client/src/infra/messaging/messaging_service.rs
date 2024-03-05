@@ -29,14 +29,20 @@ impl MessagingService for XMPPClient {
             "Failed to read the user's JID since the client is not connected."
         ))?;
 
+        let (body, mentions) = request
+            .body
+            .map(|body| (body.text, body.mentions))
+            .unwrap_or_default();
+
         let mut message = Message::new()
             .set_type(room_id.message_type())
             .set_id(self.generate_id().into())
             .set_from(from)
             .set_to(room_id.clone().into_bare())
-            .set_body(request.body.unwrap_or_default())
+            .set_body(body)
             .set_chat_state(Some(ChatState::Active))
-            .set_markable();
+            .set_markable()
+            .add_references(mentions.into_iter().map(Into::into));
         message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
@@ -56,12 +62,18 @@ impl MessagingService for XMPPClient {
             "Failed to read the user's JID since the client is not connected."
         ))?;
 
+        let (body, mentions) = request
+            .body
+            .map(|body| (body.text, body.mentions))
+            .unwrap_or_default();
+
         let mut message = Message::new()
             .set_type(room_id.message_type())
             .set_id(self.generate_id().into())
             .set_from(from)
             .set_to(room_id.clone().into_bare())
-            .set_body(request.body.unwrap_or_default())
+            .set_body(body)
+            .add_references(mentions.into_iter().map(Into::into))
             .set_replace(message_id.clone().into_inner().into());
         message.append_attachments(request.attachments);
 

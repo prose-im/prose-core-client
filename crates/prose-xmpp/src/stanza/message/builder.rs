@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use jid::Jid;
-
 use minidom::Element;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::delay::Delay;
@@ -19,6 +18,7 @@ use crate::stanza::message::mam::ArchivedMessage;
 use crate::stanza::message::message::Message;
 use crate::stanza::message::muc_user::MucUser;
 use crate::stanza::message::{carbons, chat_marker, Fallback, Id, Reactions};
+use crate::stanza::references::Reference;
 
 impl Message {
     pub fn set_to(mut self, to: impl Into<Jid>) -> Self {
@@ -142,6 +142,12 @@ impl Message {
 
     pub fn set_muc_user(mut self, user: MucUser) -> Self {
         self.payloads.push(user.into());
+        self
+    }
+
+    pub fn add_references(mut self, reference: impl IntoIterator<Item = Reference>) -> Self {
+        self.payloads
+            .extend(reference.into_iter().map(Element::from));
         self
     }
 }

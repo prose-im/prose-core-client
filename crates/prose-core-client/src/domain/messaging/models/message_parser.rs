@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use tracing::error;
+use tracing::{error, warn};
 use xmpp_parsers::message::MessageType;
 
 use prose_xmpp::mods::chat::Carbon;
@@ -17,6 +17,7 @@ use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
     MessageLike, MessageLikeId, MessageTargetId, StanzaId, StanzaParseError,
 };
+use crate::dtos::Mention;
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
 
@@ -107,6 +108,7 @@ impl TryFrom<&Message> for TargetedPayload {
                 payload: Payload::Message {
                     body: format!("Error: {}", error.to_string()),
                     attachments: vec![],
+                    mentions: vec![],
                 },
             });
         }
@@ -168,6 +170,20 @@ impl TryFrom<&Message> for TargetedPayload {
                 payload: Payload::Message {
                     body: body.to_string(),
                     attachments: message.attachments(),
+                    mentions: message
+                        .mentions()
+                        .into_iter()
+                        .filter_map(|r| match Mention::try_from(r) {
+                            Ok(mention) => Some(mention),
+                            Err(err) => {
+                                warn!(
+                                    "Failed to parse mention from reference. {}",
+                                    err.to_string()
+                                );
+                                None
+                            }
+                        })
+                        .collect(),
                 },
             });
         }

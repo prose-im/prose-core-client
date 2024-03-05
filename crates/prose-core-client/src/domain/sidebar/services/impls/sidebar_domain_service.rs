@@ -16,12 +16,13 @@ use crate::app::deps::{
     DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService,
 };
+use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec, RoomState};
 use crate::domain::rooms::services::impls::build_nickname;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
-use crate::domain::shared::models::{MucId, RoomId, RoomType, UserEndpointId, UserId};
+use crate::domain::shared::models::{MucId, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
-use crate::dtos::Availability;
+use crate::dtos::{Availability, ParticipantId};
 use crate::ClientEvent;
 
 use super::super::SidebarDomainService as SidebarDomainServiceTrait;
@@ -285,18 +286,18 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// corresponding bookmark.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_received_message(&self, sender: &UserEndpointId) -> Result<()> {
-        let room_id = sender.to_room_id();
+    async fn handle_received_message(&self, message: &MessageLike) -> Result<()> {
+        let room_id = message.from.to_room_id();
 
-        let room = match sender {
+        let room = match message.from {
             // We do not need to create or join a room here since we couldn't have received
-            // a message from a room we're not connected to. Also we always stay connected to rooms
+            // a message from a room we're not connected to. Also, we always stay connected to rooms
             // for groups no matter if they are in the sidebar or not.
-            UserEndpointId::Occupant(_) => self.try_get_room(room_id.as_ref())?,
+            ParticipantId::Occupant(_) => self.try_get_room(room_id.as_ref())?,
 
-            // If the message is from a user outside of a room we create a room if we don't
+            // If the message is from a user outside a room we create a room if we don't
             // have one yet.
-            UserEndpointId::User(_) | UserEndpointId::UserResource(_) => 'room: {
+            ParticipantId::User(_) => 'room: {
                 if let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) {
                     break 'room room;
                 };
@@ -310,6 +311,17 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                     .await?
             }
         };
+
+        if let MessageLikePayload::Message { ref mentions, .. } = message.payload {
+            let connected_user_id = self.ctx.connected_id()?.into_user_id();
+
+            for mention in mentions {
+                if mention.user == connected_user_id {
+                    room.increment_mentions_count();
+                    break;
+                }
+            }
+        }
 
         room.increment_unread_count();
 

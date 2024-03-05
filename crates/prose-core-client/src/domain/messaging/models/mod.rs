@@ -5,14 +5,16 @@
 
 pub use attachment::{Attachment, AttachmentType, Thumbnail};
 pub(crate) use error::StanzaParseError;
+pub use mention::Mention;
 pub use message::{Emoji, Message, Reaction};
 pub use message_id::{MessageId, MessageTargetId, StanzaId};
 pub use message_like::{MessageLike, MessageLikeId, Payload as MessageLikePayload};
 pub use message_parser::{MessageLikeError, MessageParser};
-pub use send_message_request::SendMessageRequest;
+pub use send_message_request::{Body as SendMessageRequestBody, SendMessageRequest};
 
 mod attachment;
 mod error;
+mod mention;
 mod message;
 mod message_id;
 mod message_like;

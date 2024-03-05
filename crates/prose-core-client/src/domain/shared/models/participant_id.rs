@@ -3,9 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use super::{OccupantId, UserEndpointId, UserId};
 use jid::Jid;
 use serde::{Deserialize, Serialize};
+
+use crate::dtos::RoomId;
+
+use super::{OccupantId, UserEndpointId, UserId};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
@@ -30,6 +33,13 @@ impl ParticipantId {
             return None;
         };
         Some(id.clone())
+    }
+
+    pub fn to_room_id(&self) -> RoomId {
+        match self {
+            ParticipantId::User(id) => RoomId::User(id.clone()),
+            ParticipantId::Occupant(id) => RoomId::Muc(id.muc_id()),
+        }
     }
 
     pub fn to_opaque_identifier(&self) -> String {

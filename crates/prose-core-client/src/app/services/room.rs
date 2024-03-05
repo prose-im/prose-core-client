@@ -384,6 +384,7 @@ impl<Kind> Room<Kind> {
                 is_delivered: message.is_delivered,
                 reactions: message.reactions,
                 attachments: message.attachments,
+                mentions: message.mentions,
             });
         }
 

@@ -354,6 +354,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .set_payload(MessageLikePayload::Message {
                                 body: "Message 101".to_string(),
                                 attachments: vec![],
+                                mentions: vec![],
                             })
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(102)
@@ -361,6 +362,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .set_payload(MessageLikePayload::Message {
                                 body: "Message 102".to_string(),
                                 attachments: vec![],
+                                mentions: vec![],
                             })
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(103)
@@ -398,6 +400,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .set_payload(MessageLikePayload::Message {
                                 body: "Message 90".to_string(),
                                 attachments: vec![],
+                                mentions: vec![],
                             })
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(91)
@@ -412,6 +415,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .set_payload(MessageLikePayload::Message {
                                 body: "Message 92".to_string(),
                                 attachments: vec![],
+                                mentions: vec![],
                             })
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(93)
@@ -419,6 +423,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .set_payload(MessageLikePayload::Message {
                                 body: "Message 93".to_string(),
                                 attachments: vec![],
+                                mentions: vec![],
                             })
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(94)
@@ -426,6 +431,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .set_payload(MessageLikePayload::Message {
                                 body: "Message 94".to_string(),
                                 attachments: vec![],
+                                mentions: vec![],
                             })
                             .build_archived_message("q2", None),
                     ],
@@ -458,6 +464,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_payload(MessageLikePayload::Message {
                     body: "Message 90".to_string(),
                     attachments: vec![],
+                    mentions: vec![],
                 })
                 .set_reactions([Reaction {
                     emoji: "✅".into(),
@@ -473,6 +480,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_payload(MessageLikePayload::Message {
                     body: "Message 92".to_string(),
                     attachments: vec![],
+                    mentions: vec![],
                 })
                 .build_message_dto(),
             MessageBuilder::new_with_index(93)
@@ -481,6 +489,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_payload(MessageLikePayload::Message {
                     body: "Message 93".to_string(),
                     attachments: vec![],
+                    mentions: vec![],
                 })
                 .build_message_dto(),
             MessageBuilder::new_with_index(94)
@@ -489,6 +498,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_payload(MessageLikePayload::Message {
                     body: "Message 94".to_string(),
                     attachments: vec![],
+                    mentions: vec![],
                 })
                 .build_message_dto(),
             MessageBuilder::new_with_index(101)
@@ -497,6 +507,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_payload(MessageLikePayload::Message {
                     body: "Message 101".to_string(),
                     attachments: vec![],
+                    mentions: vec![],
                 })
                 .set_reactions([Reaction {
                     emoji: "🍕".into(),
@@ -509,6 +520,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_payload(MessageLikePayload::Message {
                     body: "Message 102".to_string(),
                     attachments: vec![],
+                    mentions: vec![],
                 })
                 .set_reactions([Reaction {
                     emoji: "🎉".into(),
@@ -552,6 +564,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                                 .set_payload(MessageLikePayload::Message {
                                     body: "Message 100".to_string(),
                                     attachments: vec![],
+                                    mentions: vec![],
                                 })
                                 .build_archived_message("q1", None),
                         ))
@@ -610,6 +623,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
             .set_payload(MessageLikePayload::Message {
                 body: "Message 100".to_string(),
                 attachments: vec![],
+                mentions: vec![],
             })
             .build_message_dto()],
         result.messages

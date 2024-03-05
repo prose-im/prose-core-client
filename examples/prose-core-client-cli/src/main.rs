@@ -7,6 +7,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::time::Duration;
@@ -16,6 +17,7 @@ use anyhow::{anyhow, format_err, Result};
 use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
+use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -24,9 +26,10 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, AttachmentType, Availability, Bookmark, Contact, Message, ParticipantInfo,
-    PublicRoomInfo, RoomEnvelope, RoomId, SendMessageRequest, SidebarItem, StanzaId, UploadSlot,
-    UserBasicInfo, UserId,
+    Address, Attachment, AttachmentType, Availability, Bookmark, Contact, Mention, Message,
+    ParticipantInfo, PublicRoomInfo, RoomEnvelope, RoomId, SendMessageRequest,
+    SendMessageRequestBody, SidebarItem, StanzaId, StringIndexRangeExt, UploadSlot, UserBasicInfo,
+    UserId, Utf8Index,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::{
@@ -644,7 +647,7 @@ impl Display for MessageEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} | {:<36} | {:<20} | {} attachments | {}",
+            "{} | {:<36} | {:<20} | {} attachments | {} mentions | {}",
             self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
             self.0
                 .id
@@ -653,6 +656,7 @@ impl Display for MessageEnvelope {
                 .unwrap_or("<no-id>".to_string()),
             self.0.from.id.to_opaque_identifier().truncate_to(20),
             self.0.attachments.len(),
+            self.0.mentions.len(),
             self.0.body
         )
     }
@@ -663,14 +667,43 @@ async fn send_message(client: &Client) -> Result<()> {
         return Ok(());
     };
 
-    let body: String = Input::with_theme(&ColorfulTheme::default())
+    let participant_ids = room
+        .to_generic_room()
+        .participants()
+        .into_iter()
+        .filter_map(|p| p.id)
+        .collect::<Vec<_>>();
+
+    let message: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message (leave empty to send a file without a message)")
         .allow_empty(true)
         .interact_text()
         .unwrap();
 
+    let mut body = SendMessageRequestBody {
+        text: message,
+        mentions: vec![],
+    };
+
+    let regex = Regex::new(r"@(\w+)").unwrap();
+
+    for mat in regex.find_iter(&body.text) {
+        let user = mat.as_str().chars().skip(1).collect::<String>();
+
+        if let Some(user_id) = participant_ids.iter().find(|id| id.username() == user) {
+            body.mentions.push(Mention {
+                user: user_id.clone(),
+                range: Range {
+                    start: Utf8Index::new(mat.start()),
+                    end: Utf8Index::new(mat.end()),
+                }
+                .to_scalar_range(&body.text)?,
+            });
+        }
+    }
+
     let mut request = SendMessageRequest {
-        body: (!body.is_empty()).then_some(body),
+        body: (!body.text.is_empty()).then_some(body),
         attachments: vec![],
     };
 
@@ -687,7 +720,8 @@ async fn send_message(client: &Client) -> Result<()> {
     }
 
     println!("Sending message…");
-    room.to_generic_room().send_message(request).await
+    room.to_generic_room().send_message(request).await?;
+    Ok(())
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -1034,7 +1068,10 @@ async fn main() -> Result<()> {
                 loop {
                     room.to_generic_room()
                         .send_message(SendMessageRequest {
-                            body: Some(format!("Message {idx}")),
+                            body: Some(SendMessageRequestBody {
+                                text: format!("Message {idx}"),
+                                mentions: vec![],
+                            }),
                             attachments: vec![],
                         })
                         .await?;
@@ -1061,7 +1098,10 @@ async fn main() -> Result<()> {
                     .unwrap();
                 room.to_generic_room()
                     .send_message(SendMessageRequest {
-                        body: Some(body),
+                        body: Some(SendMessageRequestBody {
+                            text: body,
+                            mentions: vec![],
+                        }),
                         attachments: vec![],
                     })
                     .await?;

@@ -17,23 +17,29 @@ use xmpp_parsers::muc::user::{Affiliation, Role};
 use prose_core_client::domain::messaging::models::{
     MessageLike, MessageLikePayload, MessageParser,
 };
-use prose_core_client::dtos::{OccupantId, ParticipantId, UserId};
+use prose_core_client::dtos::{Mention, OccupantId, ParticipantId, UnicodeScalarIndex, UserId};
 use prose_core_client::{occupant_id, user_id};
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::stanza_id::StanzaId;
 use prose_xmpp::stanza::message::{Forwarded, MucUser};
+use prose_xmpp::stanza::references::Reference;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, full};
 
 #[test]
 fn test_parse_chat_message() -> Result<()> {
+    let mut reference = Reference::mention(bare!("them@prose.org"));
+    reference.begin = Some(6);
+    reference.end = Some(11);
+
     let message = Message::new()
         .set_id("message-id-1".into())
         .set_type(MessageType::Chat)
         .set_to(bare!("me@prose.org"))
         .set_from(full!("them@prose.org/resource"))
-        .set_body("Hello World");
+        .set_body("Hello @them")
+        .add_references([reference]);
 
     let parsed_message = MessageParser::new(Default::default()).parse_message(message)?;
 
@@ -46,8 +52,12 @@ fn test_parse_chat_message() -> Result<()> {
             from: ParticipantId::User(user_id!("them@prose.org")),
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
-                body: "Hello World".to_string(),
-                attachments: vec![]
+                body: "Hello @them".to_string(),
+                attachments: vec![],
+                mentions: vec![Mention {
+                    user: user_id!("them@prose.org"),
+                    range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(11),
+                }],
             },
         },
         parsed_message
@@ -81,7 +91,8 @@ fn test_parse_groupchat_message() -> Result<()> {
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
                 body: "Hello World".to_string(),
-                attachments: vec![]
+                attachments: vec![],
+                mentions: vec![],
             },
         },
         parsed_message
@@ -121,7 +132,8 @@ fn test_parse_sent_carbon_message() -> Result<()> {
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
                 body: "Hello World".to_string(),
-                attachments: vec![]
+                attachments: vec![],
+                mentions: vec![],
             },
         },
         parsed_message
@@ -164,7 +176,8 @@ fn test_parse_mam_groupchat_message() -> Result<()> {
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
                 body: "Hello World".to_string(),
-                attachments: vec![]
+                attachments: vec![],
+                mentions: vec![],
             },
         },
         parsed_message
@@ -212,7 +225,8 @@ fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
                 body: "Hello World".to_string(),
-                attachments: vec![]
+                attachments: vec![],
+                mentions: vec![],
             },
         },
         parsed_message
@@ -255,7 +269,8 @@ fn test_parse_mam_chat_message() -> Result<()> {
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
                 body: "Hello World".to_string(),
-                attachments: vec![]
+                attachments: vec![],
+                mentions: vec![],
             },
         },
         parsed_message
