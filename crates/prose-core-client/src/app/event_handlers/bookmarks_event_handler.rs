@@ -9,7 +9,9 @@ use async_trait::async_trait;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::DynSidebarDomainService;
-use crate::app::event_handlers::{ServerEvent, ServerEventHandler, SidebarBookmarkEvent};
+use crate::app::event_handlers::{
+    PubSubEventType, ServerEvent, ServerEventHandler, SidebarBookmarkEvent,
+};
 
 #[derive(InjectDependencies)]
 pub struct BookmarksEventHandler {
@@ -35,18 +37,18 @@ impl ServerEventHandler for BookmarksEventHandler {
 
 impl BookmarksEventHandler {
     async fn handle_bookmark_event(&self, event: SidebarBookmarkEvent) -> Result<()> {
-        match event {
-            SidebarBookmarkEvent::AddedOrUpdated { bookmarks } => {
+        match event.r#type {
+            PubSubEventType::AddedOrUpdated { items: bookmarks } => {
                 self.sidebar_domain_service
                     .extend_items_from_bookmarks(bookmarks)
                     .await?;
             }
-            SidebarBookmarkEvent::Deleted { ids } => {
+            PubSubEventType::Deleted { ids } => {
                 self.sidebar_domain_service
                     .handle_removed_items(ids.as_slice())
                     .await?;
             }
-            SidebarBookmarkEvent::Purged => {
+            PubSubEventType::Purged => {
                 self.sidebar_domain_service.handle_remote_purge().await?;
             }
         }

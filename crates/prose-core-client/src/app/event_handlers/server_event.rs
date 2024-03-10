@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use jid::BareJid;
+
 use prose_xmpp::ConnectionError;
 
 use crate::domain::contacts::models::PresenceSubscription;
@@ -175,11 +176,19 @@ pub enum MessageEventType {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SidebarBookmarkEvent {
-    AddedOrUpdated { bookmarks: Vec<Bookmark> },
-    Deleted { ids: Vec<BareJid> },
+pub struct PubSubEvent<Id, Item> {
+    pub user_id: UserId,
+    pub r#type: PubSubEventType<Id, Item>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PubSubEventType<Id, Item> {
+    AddedOrUpdated { items: Vec<Item> },
+    Deleted { ids: Vec<Id> },
     Purged,
 }
+
+pub type SidebarBookmarkEvent = PubSubEvent<BareJid, Bookmark>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContactListEventType {
