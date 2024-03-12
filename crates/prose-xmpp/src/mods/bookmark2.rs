@@ -17,7 +17,7 @@ use crate::client::ModuleContext;
 use crate::mods::Module;
 use crate::ns;
 use crate::stanza::ConferenceBookmark;
-use crate::util::{PublishOptionsExt, RequestError};
+use crate::util::{PubSubQuery, PublishOptionsExt};
 use crate::Event as ClientEvent;
 
 /// XEP-0402: PEP Native Bookmarks
@@ -59,31 +59,13 @@ impl Module for Bookmark {
 impl Bookmark {
     /// https://xmpp.org/extensions/xep-0402.html#retrieving-bookmarks
     pub async fn load_bookmarks(&self) -> Result<Vec<ConferenceBookmark>> {
-        let iq = Iq::from_get(
-            self.ctx.generate_id(),
-            pubsub::PubSub::Items(pubsub::pubsub::Items {
-                max_items: None,
-                node: NodeName(ns::BOOKMARKS2.to_string()),
-                subid: None,
-                items: vec![],
-            }),
-        );
-
-        let response = match self.ctx.send_iq(iq).await {
-            Ok(iq) => iq,
-            Err(e) if e.is_item_not_found_err() => return Ok(vec![]),
-            Err(e) => return Err(e.into()),
-        }
-        .ok_or(RequestError::UnexpectedResponse)?;
-
-        let pubsub::PubSub::Items(items) = pubsub::PubSub::try_from(response)? else {
-            return Err(RequestError::UnexpectedResponse.into());
-        };
-
-        let bookmarks = items
-            .items
+        let bookmarks = self
+            .ctx
+            .query_pubsub_node(PubSubQuery::new(self.ctx.generate_id(), ns::BOOKMARKS2))
+            .await?
+            .unwrap_or_default()
             .into_iter()
-            .map(|item| ConferenceBookmark::try_from(item.0))
+            .map(ConferenceBookmark::try_from)
             .collect::<Result<Vec<ConferenceBookmark>>>()?;
 
         Ok(bookmarks)

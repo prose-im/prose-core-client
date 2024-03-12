@@ -9,8 +9,8 @@ use xmpp_parsers::pubsub::PubSubPayload;
 
 use prose_utils::id_string;
 
-use crate::ns;
 use crate::util::ElementExt;
+use crate::{ns, ParseError};
 
 id_string!(ImageId);
 
@@ -30,7 +30,7 @@ pub struct Info {
 }
 
 impl TryFrom<Element> for Metadata {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("metadata", ns::AVATAR_METADATA)?;
@@ -56,7 +56,7 @@ impl From<Metadata> for Element {
 impl PubSubPayload for Metadata {}
 
 impl TryFrom<Element> for Info {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("info", ns::AVATAR_METADATA)?;

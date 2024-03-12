@@ -3,24 +3,25 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashSet;
+use std::sync::OnceLock;
+
 use anyhow::Result;
 use jid::Jid;
 use minidom::Element;
-use std::collections::HashSet;
-use std::sync::OnceLock;
 use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::disco::Item as DiscoItem;
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub::owner::Configure;
-use xmpp_parsers::pubsub::pubsub::{Item, Items, Notify, PublishOptions, Retract};
+use xmpp_parsers::pubsub::pubsub::{Item, Notify, PublishOptions, Retract};
 use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName, PubSubEvent};
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
 use crate::stanza::PubSubMessage;
-use crate::util::RequestError;
+use crate::util::{PubSubQuery, RequestError};
 use crate::{ns, ElementExt};
 
 #[derive(Default, Clone)]
@@ -43,6 +44,7 @@ impl Module for PubSub {
             return Ok(());
         };
 
+        // TODO: Remove this once elements are consumed by modules.
         static IGNORED_PUBSUB_NODES: OnceLock<HashSet<&str>> = OnceLock::new();
         let ignored_pubsub_nodes = IGNORED_PUBSUB_NODES.get_or_init(|| {
             let mut m = HashSet::new();
@@ -110,65 +112,33 @@ impl PubSub {
         Ok(DiscoItemsResult::try_from(response)?.items)
     }
 
-    pub async fn load_items_with_ids<ID: AsRef<str>>(
+    pub async fn load_items_with_ids<ID: Into<String>>(
         &self,
         node: impl AsRef<str>,
         item_ids: impl IntoIterator<Item = ID>,
     ) -> Result<Vec<PubSubItem>, RequestError> {
-        let iq = Iq::from_get(
-            self.ctx.generate_id(),
-            pubsub::PubSub::Items(Items {
-                max_items: None,
-                node: NodeName(node.as_ref().to_string()),
-                subid: None,
-                items: item_ids
-                    .into_iter()
-                    .map(|id| {
-                        Item(PubSubItem {
-                            id: Some(ItemId(id.as_ref().to_string())),
-                            publisher: None,
-                            payload: None,
-                        })
-                    })
-                    .collect(),
-            }),
-        );
+        let items = self
+            .ctx
+            .query_pubsub_node(
+                PubSubQuery::new(self.ctx.generate_id(), node.as_ref()).set_item_ids(item_ids),
+            )
+            .await?
+            .unwrap_or_default();
 
-        let response = match self.ctx.send_iq(iq).await {
-            Ok(iq) => iq,
-            Err(e) if e.is_item_not_found_err() => return Ok(vec![]),
-            Err(e) => return Err(e.into()),
-        }
-        .ok_or(RequestError::UnexpectedResponse)?;
-
-        let pubsub::PubSub::Items(items) = pubsub::PubSub::try_from(response)? else {
-            return Err(RequestError::UnexpectedResponse.into());
-        };
-
-        Ok(items.items.into_iter().map(|item| item.0).collect())
+        Ok(items)
     }
 
     pub async fn load_all_items(
         &self,
         node: impl AsRef<str>,
     ) -> Result<Vec<PubSubItem>, RequestError> {
-        let iq = Iq::from_get(
-            self.ctx.generate_id(),
-            pubsub::PubSub::Items(Items::new(node.as_ref())),
-        );
+        let items = self
+            .ctx
+            .query_pubsub_node(PubSubQuery::new(self.ctx.generate_id(), node.as_ref()))
+            .await?
+            .unwrap_or_default();
 
-        let response = match self.ctx.send_iq(iq).await {
-            Ok(iq) => iq,
-            Err(e) if e.is_item_not_found_err() => return Ok(vec![]),
-            Err(e) => return Err(e.into()),
-        }
-        .ok_or(RequestError::UnexpectedResponse)?;
-
-        let pubsub::PubSub::Items(items) = pubsub::PubSub::try_from(response)? else {
-            return Err(RequestError::UnexpectedResponse.into());
-        };
-
-        Ok(items.items.into_iter().map(|item| item.0).collect())
+        Ok(items)
     }
 
     pub async fn delete_items_with_ids<ID: AsRef<str>>(

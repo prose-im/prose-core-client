@@ -27,6 +27,8 @@ pub enum ParseError {
     Generic { msg: String },
     #[error(transparent)]
     XMPPParseError(#[from] xmpp_parsers::Error),
+    #[error(transparent)]
+    ParseIntError(#[from] std::num::ParseIntError),
 }
 
 impl From<xmpp_parsers::Error> for RequestError {

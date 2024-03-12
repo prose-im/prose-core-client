@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use jid::Jid;
+use xmpp_parsers::bookmarks::Storage;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub::{NodeName, PubSubEvent};
 use xmpp_parsers::{bookmarks, pubsub};
@@ -13,7 +14,7 @@ use crate::client::ModuleContext;
 use crate::mods::Module;
 use crate::ns;
 use crate::stanza::ConferenceBookmark;
-use crate::util::{PublishOptionsExt, RequestError};
+use crate::util::{PubSubItemsExt, PubSubQuery, PublishOptionsExt};
 use crate::Event as ClientEvent;
 
 /// XEP-0048: Bookmarks
@@ -48,40 +49,15 @@ impl Module for Bookmark {
 
 impl Bookmark {
     pub async fn load_bookmarks(&self) -> Result<Vec<ConferenceBookmark>> {
-        let iq = Iq::from_get(
-            self.ctx.generate_id(),
-            pubsub::PubSub::Items(pubsub::pubsub::Items {
-                max_items: None,
-                node: NodeName(ns::BOOKMARKS.to_string()),
-                subid: None,
-                items: vec![],
-            }),
-        );
+        let storage = self
+            .ctx
+            .query_pubsub_node(PubSubQuery::new(self.ctx.generate_id(), ns::BOOKMARKS))
+            .await?
+            .unwrap_or_default()
+            .find_first_payload::<Storage>("storage", ns::BOOKMARKS)?
+            .unwrap_or_default();
 
-        let response = match self.ctx.send_iq(iq).await {
-            Ok(iq) => iq,
-            Err(e) if e.is_item_not_found_err() => return Ok(vec![]),
-            Err(e) => return Err(e.into()),
-        }
-        .ok_or(RequestError::UnexpectedResponse)?;
-
-        let pubsub::PubSub::Items(items) = pubsub::PubSub::try_from(response)? else {
-            return Err(RequestError::UnexpectedResponse.into());
-        };
-
-        let Some(storage) = items.items.into_iter().find_map(|item| {
-            let Some(payload) = &item.payload else {
-                return None;
-            };
-            if !payload.is("storage", ns::BOOKMARKS) {
-                return None;
-            }
-            return Some(bookmarks::Storage::try_from(payload.clone()));
-        }) else {
-            return Ok(vec![]);
-        };
-
-        let bookmarks = storage?
+        let bookmarks = storage
             .conferences
             .into_iter()
             .map(ConferenceBookmark::from)

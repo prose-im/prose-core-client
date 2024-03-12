@@ -26,7 +26,7 @@ use crate::stanza::avatar;
 use crate::stanza::avatar::ImageId;
 use crate::stanza::last_activity::LastActivityResponse;
 use crate::stanza::{LastActivityRequest, VCard4};
-use crate::util::RequestError;
+use crate::util::{PubSubItemsExt, PubSubQuery, RequestError};
 use crate::{ns, ParseError};
 
 #[derive(Default, Clone)]
@@ -246,50 +246,21 @@ impl Profile {
 
     pub async fn load_latest_avatar_metadata(
         &self,
-        from: impl Into<Jid>,
+        from: &BareJid,
     ) -> Result<Option<avatar::Info>, RequestError> {
-        let iq = Iq {
-            from: None,
-            to: Some(from.into()),
-            id: self.ctx.generate_id(),
-            payload: IqType::Get(
-                PubSub::Items(Items {
-                    max_items: Some(1),
-                    node: NodeName(ns::AVATAR_METADATA.to_string()),
-                    subid: None,
-                    items: vec![],
-                })
-                .into(),
-            ),
-        };
+        let metadata = self
+            .ctx
+            .query_pubsub_node(
+                PubSubQuery::new(self.ctx.generate_id(), ns::AVATAR_METADATA)
+                    .set_to(from.clone())
+                    .set_max_items(1),
+            )
+            .await?
+            .unwrap_or_default()
+            .find_first_payload::<avatar::Metadata>("metadata", ns::AVATAR_METADATA)?;
 
-        let response = match self.ctx.send_iq(iq).await {
-            Ok(iq) => iq,
-            Err(e) if e.is_item_not_found_err() => return Ok(None),
-            Err(e) => return Err(e.into()),
-        }
-        .ok_or(RequestError::UnexpectedResponse)?;
-
-        let PubSub::Items(mut items) = PubSub::try_from(response)? else {
-            return Err(RequestError::UnexpectedResponse.into());
-        };
-
-        if items.items.is_empty() {
+        let Some(mut metadata) = metadata else {
             return Ok(None);
-        }
-
-        let Some(payload) = items.items.swap_remove(0).payload.take() else {
-            return Ok(None);
-        };
-
-        let mut metadata = match avatar::Metadata::try_from(payload) {
-            Ok(metadata) => metadata,
-            Err(err) => {
-                return Err(ParseError::Generic {
-                    msg: err.to_string(),
-                }
-                .into())
-            }
         };
 
         if metadata.infos.is_empty() {

@@ -26,10 +26,7 @@ impl UserInfoService for XMPPClient {
     async fn load_latest_avatar_metadata(&self, from: &UserId) -> Result<Option<AvatarMetadata>> {
         let profile = self.client.get_mod::<mods::Profile>();
 
-        match profile
-            .load_latest_avatar_metadata(Jid::Bare(from.clone().into_inner()))
-            .await
-        {
+        match profile.load_latest_avatar_metadata(from.as_ref()).await {
             Ok(metadata) => Ok(metadata.map(Into::into)),
             Err(err) if err.is_forbidden_err() => {
                 warn!(

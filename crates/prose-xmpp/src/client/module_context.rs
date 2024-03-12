@@ -12,15 +12,17 @@ use anyhow::Result;
 use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
-use prose_wasm_utils::PinnedFuture;
 use tracing::instrument;
 use xmpp_parsers::iq::{Iq, IqType};
+use xmpp_parsers::pubsub;
+
+use prose_wasm_utils::PinnedFuture;
 
 use crate::client::builder::UndefinedConnector;
 use crate::client::{ConnectorProvider, EventHandler, ModuleLookup};
 use crate::connector::Connection;
 use crate::deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
-use crate::util::{ModuleFutureState, RequestError, RequestFuture};
+use crate::util::{ModuleFutureState, PubSubQuery, RequestError, RequestFuture};
 use crate::Event;
 
 #[derive(Clone)]
@@ -40,6 +42,26 @@ impl ModuleContext {
 
         let future = RequestFuture::new_iq_request(&iq.id);
         self.send_stanza_with_future(iq, future)
+    }
+
+    pub(crate) async fn query_pubsub_node(
+        &self,
+        query: PubSubQuery,
+    ) -> Result<Option<Vec<pubsub::Item>>, RequestError> {
+        let response = match self.send_iq(query.build()).await {
+            Ok(iq) => iq,
+            Err(err) if err.is_item_not_found_err() => return Ok(None),
+            Err(err) => return Err(err.into()),
+        }
+        .ok_or(RequestError::UnexpectedResponse)?;
+
+        let pubsub::PubSub::Items(items) =
+            xmpp_parsers::pubsub::pubsub::PubSub::try_from(response)?
+        else {
+            return Err(RequestError::UnexpectedResponse.into());
+        };
+
+        Ok(Some(items.items.into_iter().map(|item| item.0).collect()))
     }
 
     pub(crate) fn send_stanza_with_future<T: Send + 'static, U: 'static>(
