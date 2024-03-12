@@ -3,16 +3,19 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+extern crate core;
+
+pub use app::deps::DynEncryptionKeysRepository;
 pub use app::{dtos, services};
 pub use client::{Client, ClientDelegate};
 pub use client_event::{ClientEvent, ClientRoomEventType, ConnectionEvent};
+#[cfg(not(target_arch = "wasm32"))]
+pub use domain::encryption::services::impls::signal_native::SignalServiceHandle;
+pub use domain::encryption::services::EncryptionService;
 pub use infra::platform_dependencies::open_store;
 #[cfg(feature = "test")]
 pub use infra::xmpp::event_parser::parse_xmpp_event;
-#[cfg(target_arch = "wasm32")]
-pub use prose_store::prelude::IndexedDBDriver;
-#[cfg(not(target_arch = "wasm32"))]
-pub use prose_store::prelude::SqliteDriver;
+pub use prose_store::prelude::{PlatformDriver, Store};
 #[cfg(not(target_arch = "wasm32"))]
 pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient};
 

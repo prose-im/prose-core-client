@@ -58,10 +58,6 @@ impl Client {
         self.inner.context.jid.read().clone()
     }
 
-    pub fn generate_id(&self) -> String {
-        self.inner.context.id_provider.new_id()
-    }
-
     pub fn get_mod<M: AnyModule + Clone>(&self) -> M {
         self.inner.get_mod()
     }

@@ -742,6 +742,7 @@ async fn test_increases_mentions_count() -> Result<()> {
                             range: UnicodeScalarIndex::new(17)..UnicodeScalarIndex::new(20),
                         },
                     ],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_like(),
@@ -760,6 +761,7 @@ async fn test_increases_mentions_count() -> Result<()> {
                         user: user_id!("other.user@prose.org"),
                         range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
                     }],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_like(),
@@ -778,6 +780,7 @@ async fn test_increases_mentions_count() -> Result<()> {
                         user: user_id!("jane.doe@prose.org"),
                         range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
                     }],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_like(),
@@ -796,6 +799,7 @@ async fn test_increases_mentions_count() -> Result<()> {
                         user: user_id!("other.user@prose.org"),
                         range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
                     }],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_like(),
@@ -814,6 +818,7 @@ async fn test_increases_mentions_count() -> Result<()> {
                         user: user_id!("jane.doe@prose.org"),
                         range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
                     }],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_like(),
@@ -832,6 +837,7 @@ async fn test_increases_mentions_count() -> Result<()> {
                         user: user_id!("jane.doe@prose.org"),
                         range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
                     }],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_like(),

@@ -9,7 +9,7 @@ use wasm_bindgen::{JsError, JsValue};
 use prose_core_client::dtos::{RoomEnvelope, SidebarItem as SidebarItemDTO};
 use prose_core_client::Client;
 
-use crate::client::WasmError;
+use crate::error::WasmError;
 use crate::types::RoomEnvelopeExt;
 
 #[wasm_bindgen]

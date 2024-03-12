@@ -12,7 +12,9 @@ use tracing::{error, warn};
 use xmpp_parsers::pubsub;
 
 use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
+use prose_xmpp::ns;
 
+use crate::domain::encryption::models::DeviceList;
 use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::UserId;
 use crate::infra::xmpp::event_parser::pubsub::generic_pub_sub_parser::GenericPubSubParser;
@@ -44,11 +46,17 @@ static PUB_SUB_PARSERS: OnceLock<HashMap<String, Box<dyn PubSubParser>>> = OnceL
 fn get_parser(ns: &str) -> Option<&Box<dyn PubSubParser>> {
     PUB_SUB_PARSERS
         .get_or_init(|| {
-            [(
-                bookmark::ns::PROSE_BOOKMARK.to_string(),
-                Box::new(GenericPubSubParser::<BareJid, Bookmark>::new(Into::into))
-                    as Box<dyn PubSubParser>,
-            )]
+            [
+                (
+                    bookmark::ns::PROSE_BOOKMARK.to_string(),
+                    Box::new(GenericPubSubParser::<BareJid, Bookmark>::new(Into::into))
+                        as Box<dyn PubSubParser>,
+                ),
+                (
+                    ns::LEGACY_OMEMO_DEVICELIST.to_string(),
+                    Box::new(GenericPubSubParser::<String, DeviceList>::new(Into::into)),
+                ),
+            ]
             .into_iter()
             .collect()
         })

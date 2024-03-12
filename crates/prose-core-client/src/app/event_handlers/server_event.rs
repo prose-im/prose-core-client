@@ -8,6 +8,7 @@ use jid::BareJid;
 use prose_xmpp::ConnectionError;
 
 use crate::domain::contacts::models::PresenceSubscription;
+use crate::domain::encryption::models::DeviceList;
 use crate::domain::shared::models::MucId;
 use crate::domain::sidebar::models::Bookmark;
 use crate::domain::{
@@ -44,6 +45,8 @@ pub enum ServerEvent {
     Message(MessageEvent),
     /// Events about changes to the sidebar.
     SidebarBookmark(SidebarBookmarkEvent),
+    /// Events about OMEMO devices.
+    UserDevice(UserDeviceEvent),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -189,6 +192,7 @@ pub enum PubSubEventType<Id, Item> {
 }
 
 pub type SidebarBookmarkEvent = PubSubEvent<BareJid, Bookmark>;
+pub type UserDeviceEvent = PubSubEvent<String, DeviceList>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContactListEventType {

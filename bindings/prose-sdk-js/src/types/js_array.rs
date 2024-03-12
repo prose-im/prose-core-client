@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::UserId;
 
-use crate::client::WasmError;
+use crate::error::WasmError;
 use crate::types::Message;
 
 #[wasm_bindgen]
@@ -53,6 +53,7 @@ pub trait IntoJSArray {
 }
 
 pub trait IntoJSStringArray {
+    #[allow(dead_code)]
     fn collect_into_js_string_array(self) -> StringArray;
 }
 

@@ -55,6 +55,7 @@ impl ClientBuilder {
         .add_mod(mods::Roster::default())
         .add_mod(mods::BlockList::default())
         .add_mod(mods::HttpUpload::default())
+        .add_mod(mods::OMEMO::default())
     }
 
     pub fn set_connector_provider(self, connector_provider: ConnectorProvider) -> Self {

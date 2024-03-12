@@ -3,16 +3,22 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::ops::Deref;
-use std::str::FromStr;
+use std::sync::Arc;
+use std::time::SystemTime;
 
+use anyhow::Result;
+use async_trait::async_trait;
+use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 
-use prose_core_client::dtos::{RoomEnvelope, RoomId};
+use prose_core_client::dtos::{
+    DeviceId, EncryptedMessage, IdentityKey, IdentityKeyPair, LocalEncryptionBundle, PreKeyBundle,
+    PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SignedPreKeyId, SignedPreKeyRecord, UserId,
+};
 use prose_core_client::test::ConstantTimeProvider;
-use prose_core_client::{Client, ClientDelegate, ClientEvent, FsAvatarCache};
+use prose_core_client::{Client, ClientDelegate, ClientEvent, EncryptionService, FsAvatarCache};
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::IDProvider;
 
@@ -36,6 +42,7 @@ impl TestClient {
             .set_connector_provider(Connector::provider(messages.clone()))
             .set_id_provider(IncrementingIDProvider::new("id"))
             .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
+            .set_encryption_service(Arc::new(NoOpEncryptionService {}))
             .set_store(store().await.expect("Failed to set up store."))
             .set_time_provider(ConstantTimeProvider::ymd(2024, 02, 19))
             .set_delegate(Some(Box::new(Delegate {
@@ -139,5 +146,59 @@ impl ClientDelegate for Delegate {
             panic!("Received unexpected event: {:?}", received_event)
         };
         assert_eq!(expected_event, received_event);
+    }
+}
+
+struct NoOpEncryptionService {}
+
+#[async_trait]
+impl EncryptionService for NoOpEncryptionService {
+    async fn generate_local_encryption_bundle(
+        &self,
+        _device_id: DeviceId,
+    ) -> Result<LocalEncryptionBundle> {
+        Ok(LocalEncryptionBundle {
+            device_id: DeviceId::from(0),
+            identity_key_pair: IdentityKeyPair {
+                identity_key: IdentityKey::from(vec![0u8].as_slice()),
+                private_key: PrivateKey::from(vec![0u8].as_slice()),
+            },
+            signed_pre_key: SignedPreKeyRecord {
+                id: SignedPreKeyId::from(0),
+                public_key: PublicKey::from(vec![0u8].as_slice()),
+                private_key: PrivateKey::from(vec![0u8].as_slice()),
+                signature: Box::new([0u8]),
+                timestamp: 0,
+            },
+            pre_keys: vec![],
+        })
+    }
+
+    async fn generate_pre_keys_with_ids(&self, _ids: Vec<PreKeyId>) -> Result<Vec<PreKeyRecord>> {
+        todo!("generate_pre_keys_with_ids")
+    }
+
+    async fn process_pre_key_bundle(&self, _user_id: &UserId, _bundle: PreKeyBundle) -> Result<()> {
+        todo!("process_pre_key_bundle")
+    }
+
+    async fn encrypt_key(
+        &self,
+        _recipient_id: &UserId,
+        _device_id: &DeviceId,
+        _message: &[u8],
+        _now: &SystemTime,
+    ) -> Result<EncryptedMessage> {
+        todo!("encrypt_key")
+    }
+
+    async fn decrypt_key(
+        &self,
+        _sender_id: &UserId,
+        _device_id: &DeviceId,
+        _message: &[u8],
+        _is_pre_key: bool,
+    ) -> Result<Box<[u8]>> {
+        todo!("decrypt_key")
     }
 }

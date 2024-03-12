@@ -20,9 +20,8 @@ use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
 use crate::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec, RoomState};
 use crate::domain::rooms::services::impls::build_nickname;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
-use crate::domain::shared::models::{MucId, RoomId, RoomType, UserId};
+use crate::domain::shared::models::{MucId, ParticipantId, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
-use crate::dtos::{Availability, ParticipantId};
 use crate::ClientEvent;
 
 use super::super::SidebarDomainService as SidebarDomainServiceTrait;
@@ -97,15 +96,8 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 {
                     ()
                 }
-                BookmarkType::DirectMessage => {
-                    _ = self.connected_rooms_repo.set(Room::for_direct_message(
-                        &UserId::from(bookmark.jid.clone().into_bare()),
-                        &bookmark.name,
-                        Availability::Unavailable,
-                        bookmark.sidebar_state,
-                    ));
-                }
-                BookmarkType::Group
+                BookmarkType::DirectMessage
+                | BookmarkType::Group
                 | BookmarkType::PrivateChannel
                 | BookmarkType::PublicChannel
                 | BookmarkType::Generic => {

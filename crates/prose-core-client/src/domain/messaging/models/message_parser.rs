@@ -14,45 +14,56 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::Forwarded;
 use prose_xmpp::stanza::Message;
 
+use crate::app::deps::DynEncryptionDomainService;
 use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
-    MessageLike, MessageLikeId, MessageTargetId, StanzaId, StanzaParseError,
+    MessageLike, MessageLikeEncryptionInfo, MessageLikeId, MessageTargetId, StanzaId,
+    StanzaParseError,
 };
-use crate::dtos::{Mention, OccupantId, ParticipantId, UserId};
+use crate::dtos::{DeviceId, Mention, MessageId, OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
 
 pub struct MessageParser {
     timestamp: DateTime<Utc>,
+    encryption_domain_service: DynEncryptionDomainService,
 }
 
 impl MessageParser {
-    pub fn new(now: DateTime<Utc>) -> Self {
-        Self { timestamp: now }
+    pub fn new(now: DateTime<Utc>, encryption_domain_service: DynEncryptionDomainService) -> Self {
+        Self {
+            timestamp: now,
+            encryption_domain_service,
+        }
     }
 }
 
 impl MessageParser {
-    pub fn parse_mam_message(self, mam_message: ArchivedMessage) -> Result<MessageLike> {
-        let mut parsed_message = self.parse_forwarded_message(mam_message.forwarded)?;
+    pub async fn parse_mam_message(self, mam_message: ArchivedMessage) -> Result<MessageLike> {
+        let mut parsed_message = self.parse_forwarded_message(mam_message.forwarded).await?;
         parsed_message.stanza_id = Some(StanzaId::from(mam_message.id.into_inner()));
         Ok(parsed_message)
     }
 
-    pub fn parse_carbon(self, carbon: Carbon) -> Result<MessageLike> {
+    pub async fn parse_carbon(self, carbon: Carbon) -> Result<MessageLike> {
         let forwarded = match carbon {
             Carbon::Received(carbon) => carbon,
             Carbon::Sent(carbon) => carbon,
         };
-        self.parse_forwarded_message(forwarded)
+        self.parse_forwarded_message(forwarded).await
     }
 
-    pub fn parse_forwarded_message(self, forwarded_message: Forwarded) -> Result<MessageLike> {
-        let mut parsed_message = self.parse_message(
-            *forwarded_message
-                .stanza
-                .ok_or(StanzaParseError::missing_child_node("message"))?,
-        )?;
+    pub async fn parse_forwarded_message(
+        self,
+        forwarded_message: Forwarded,
+    ) -> Result<MessageLike> {
+        let mut parsed_message = self
+            .parse_message(
+                *forwarded_message
+                    .stanza
+                    .ok_or(StanzaParseError::missing_child_node("message"))?,
+            )
+            .await?;
 
         if let Some(delay) = forwarded_message.delay {
             parsed_message.timestamp = delay.stamp.0.into()
@@ -61,12 +72,13 @@ impl MessageParser {
         Ok(parsed_message)
     }
 
-    pub fn parse_message(self, message: Message) -> Result<MessageLike> {
+    pub async fn parse_message(self, message: Message) -> Result<MessageLike> {
         let stanza_id = message
             .stanza_id()
             .map(|sid| StanzaId::from(sid.id.into_inner()));
-        let TargetedPayload { target, payload } = TargetedPayload::try_from(&message)?;
         let from = self.parse_from(&message)?;
+        let TargetedPayload { target, payload } =
+            self.parse_message_payload(&from, &message).await?;
         let timestamp = message
             .delay()
             .map(|delay| delay.stamp.0.into())
@@ -124,10 +136,12 @@ pub enum MessageLikeError {
     NoPayload,
 }
 
-impl TryFrom<&Message> for TargetedPayload {
-    type Error = anyhow::Error;
-
-    fn try_from(message: &Message) -> Result<Self> {
+impl MessageParser {
+    async fn parse_message_payload(
+        &self,
+        from: &ParticipantId,
+        message: &Message,
+    ) -> Result<TargetedPayload> {
         if let Some(error) = &message.error() {
             return Ok(TargetedPayload {
                 target: None,
@@ -135,6 +149,7 @@ impl TryFrom<&Message> for TargetedPayload {
                     body: format!("Error: {}", error.to_string()),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 },
             });
@@ -164,16 +179,6 @@ impl TryFrom<&Message> for TargetedPayload {
             }
         }
 
-        if let (Some(replace_id), Some(body)) = (message.replace(), message.body()) {
-            return Ok(TargetedPayload {
-                target: Some(MessageTargetId::MessageId(replace_id.as_ref().into())),
-                payload: Payload::Correction {
-                    body: body.to_string(),
-                    attachments: message.attachments(),
-                },
-            });
-        }
-
         if let Some(marker) = message.received_marker() {
             return Ok(TargetedPayload {
                 target: Some(if is_groupchat_message {
@@ -196,7 +201,18 @@ impl TryFrom<&Message> for TargetedPayload {
             });
         }
 
-        if let Some(body) = message.body() {
+        if let Some((body, encryption_info)) = self.parse_message_body(from, message).await? {
+            if let Some(replace_id) = message.replace() {
+                return Ok(TargetedPayload {
+                    target: Some(MessageTargetId::MessageId(replace_id.as_ref().into())),
+                    payload: Payload::Correction {
+                        body: body.to_string(),
+                        attachments: message.attachments(),
+                        encryption_info,
+                    },
+                });
+            }
+
             return Ok(TargetedPayload {
                 target: None,
                 payload: Payload::Message {
@@ -216,6 +232,7 @@ impl TryFrom<&Message> for TargetedPayload {
                             }
                         })
                         .collect(),
+                    encryption_info,
                     // A message that we consider a groupchat message but is of type 'chat' is
                     // usually a private message. We'll treat them as transient messages.
                     is_transient: is_groupchat_message && message.type_ == MessageType::Chat,
@@ -224,6 +241,44 @@ impl TryFrom<&Message> for TargetedPayload {
         }
 
         error!("Failed to parse message {:?}", message);
+
         Err(MessageLikeError::NoPayload.into())
+    }
+
+    async fn parse_message_body(
+        &self,
+        from: &ParticipantId,
+        message: &Message,
+    ) -> Result<Option<(String, Option<MessageLikeEncryptionInfo>)>> {
+        // If the message contains an encrypted payload, try to decrypt it. Otherwise, fall back
+        // to the default body.
+        if let (ParticipantId::User(sender_id), Some(message_id), Some(omemo_element)) =
+            (from, &message.id, message.omemo_element())
+        {
+            let sender = DeviceId::from(omemo_element.header.sid);
+
+            if let Ok(body) = self
+                .encryption_domain_service
+                .decrypt_message(
+                    sender_id,
+                    &MessageId::from(message_id),
+                    omemo_element.into(),
+                )
+                .await
+            {
+                return Ok(Some((body, Some(MessageLikeEncryptionInfo { sender }))));
+            }
+        }
+
+        Ok(message.body().map(|body| {
+            (
+                body.to_string(),
+                message
+                    .omemo_element()
+                    .map(|omemo| MessageLikeEncryptionInfo {
+                        sender: omemo.header.sid.into(),
+                    }),
+            )
+        }))
     }
 }

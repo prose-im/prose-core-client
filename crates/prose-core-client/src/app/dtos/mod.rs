@@ -11,6 +11,7 @@ pub use message::{Message, MessageSender};
 pub use message_result_set::MessageResultSet;
 pub use presence_sub_request::{PresenceSubRequest, PresenceSubRequestId};
 pub use room_envelope::RoomEnvelope;
+pub use send_message_request::{Body as SendMessageRequestBody, SendMessageRequest};
 pub use sidebar_item::SidebarItem;
 pub use upload_slot::UploadSlot;
 
@@ -18,10 +19,15 @@ pub use upload_slot::UploadSlot;
 pub use crate::domain::sidebar::models::Bookmark;
 pub use crate::domain::{
     contacts::models::PresenceSubscription,
+    encryption::models::{
+        DeviceBundle, DeviceId, EncryptionDirection, IdentityKey, IdentityKeyPair,
+        LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey, PublicKey,
+        SessionRecord, SignedPreKeyId, SignedPreKeyRecord,
+    },
     general::models::SoftwareVersion,
     messaging::models::{
-        Attachment, AttachmentType, Emoji, Mention, MessageId, Reaction, SendMessageRequest,
-        SendMessageRequestBody, StanzaId, Thumbnail,
+        send_message_request::{EncryptedMessage, EncryptedPayload},
+        Attachment, AttachmentType, Emoji, Mention, MessageId, Reaction, StanzaId, Thumbnail,
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
@@ -40,5 +46,6 @@ mod message;
 mod message_result_set;
 mod presence_sub_request;
 mod room_envelope;
+mod send_message_request;
 mod sidebar_item;
 mod upload_slot;

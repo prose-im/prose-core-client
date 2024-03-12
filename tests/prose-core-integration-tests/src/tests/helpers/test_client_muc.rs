@@ -35,7 +35,7 @@ impl TestClient {
             <x xmlns='http://jabber.org/protocol/muc'>
               <history maxstanzas="0" />
             </x>
-            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="ipEcl0ID83wbGxX3lfUdwi1F8VM="/>
+            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc="/>
         </presence>
         "#
         );
@@ -43,7 +43,7 @@ impl TestClient {
         self.receive(r#"
         <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
           <show>chat</show>
-          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="ipEcl0ID83wbGxX3lfUdwi1F8VM=" />
+          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
           <occupant-id xmlns="urn:xmpp:occupant-id:0" id="LlY4x7k0T+udxUmRfaIuYJB1pzlFu4yEziE7hzxaeYI=" />
           <x xmlns="http://jabber.org/protocol/muc#user">
             <status code="100" />

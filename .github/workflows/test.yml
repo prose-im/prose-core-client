@@ -33,6 +33,9 @@ jobs:
           components: rustfmt
           override: true
 
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version && sqlite3 --version
 
@@ -43,7 +46,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
           key: test-${{ runner.os }}-cargo
 
       - name: Check code style
@@ -95,7 +97,6 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
           key: test-${{ runner.os }}-cargo
 
       - name: Build prose-sdk-js

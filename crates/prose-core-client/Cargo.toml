@@ -12,6 +12,7 @@ categories = ["network-programming"]
 authors = ["Valerian Saliou <valerian@valeriansaliou.name>"]
 
 [dependencies]
+aes-gcm = "0.10"
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
@@ -28,10 +29,11 @@ nanoid = "0.4"
 parking_lot = { workspace = true }
 paste = "1.0"
 prose-proc-macros = { path = "../prose-proc-macros" }
-prose-store = { path = "../prose-store", features = ["chrono", "jid"] }
+prose-store = { path = "../prose-store", features = ["chrono", "jid", "uuid"] }
 prose-utils = { path = "../prose-utils" }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
 prose-xmpp = { path = "../prose-xmpp" }
+rand = "0.8"
 serde = { workspace = true, features = ["derive"] }
 sha1 = { workspace = true }
 strum = { workspace = true }
@@ -46,7 +48,8 @@ xmpp-parsers = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { workspace = true, features = ["serde"] }
 either = { version = "1.8" }
-image = {version = "0.24.5" }
+image = { version = "0.24.5" }
+libsignal-protocol = { git = "https://github.com/signalapp/libsignal.git", tag = "v0.41.2" }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 

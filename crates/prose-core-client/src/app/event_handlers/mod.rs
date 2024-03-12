@@ -18,6 +18,7 @@ pub use prose_xmpp::Event as XMPPEvent;
 pub use requests_event_handler::RequestsEventHandler;
 pub use rooms_event_handler::RoomsEventHandler;
 pub use server_event::*;
+pub use user_devices_event_handler::UserDevicesEventHandler;
 pub use user_state_event_handler::UserStateEventHandler;
 
 use crate::domain::rooms::models::Room;
@@ -33,6 +34,7 @@ mod messages_event_handler;
 mod requests_event_handler;
 mod rooms_event_handler;
 mod server_event;
+mod user_devices_event_handler;
 mod user_state_event_handler;
 
 /// `ServerEventHandler` is a trait representing a handler for XMPP events.

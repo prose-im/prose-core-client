@@ -6,12 +6,14 @@
 use parking_lot::{Mutex, RwLock};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::info;
 
 use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
+use prose_core_client::infra::encryption::EncryptionKeysRepository;
 use prose_core_client::{
     open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarCache,
-    SqliteDriver,
+    PlatformDriver, SignalServiceHandle,
 };
 use prose_xmpp::{connector, ConnectionError};
 
@@ -264,14 +266,17 @@ impl Client {
         info!("Caching data at {:?}", self.cache_dir);
         fs::create_dir_all(&self.cache_dir).map_err(anyhow::Error::new)?;
 
-        let store = open_store(SqliteDriver::new(self.cache_dir.join("cache.sqlite")))
+        let store = open_store(PlatformDriver::new(self.cache_dir.join("cache.sqlite")))
             .await
             .map_err(|e| ClientError::Generic { msg: e.to_string() })?;
 
         let client = ProseClient::builder()
             .set_connector_provider(connector::xmpp_rs::Connector::provider())
-            .set_store(store)
+            .set_store(store.clone())
             .set_avatar_cache(FsAvatarCache::new(&self.cache_dir.join("Avatars"))?)
+            .set_encryption_service(Arc::new(SignalServiceHandle::new(Arc::new(
+                EncryptionKeysRepository::new(store),
+            ))))
             .set_delegate(self.delegate.lock().take())
             .build();
         self.client.write().replace(client.clone());

@@ -204,6 +204,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
             body: "Hello World".to_string(),
             attachments: vec![],
             mentions: vec![],
+            encryption_info: None,
             is_transient: false,
         },
     };
@@ -283,6 +284,7 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
             body: "Private Message".to_string(),
             attachments: vec![],
             mentions: vec![],
+            encryption_info: None,
             is_transient: true,
         },
     };

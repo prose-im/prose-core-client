@@ -10,6 +10,7 @@ use minidom::Element;
 use tracing::error;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::delay::Delay;
+use xmpp_parsers::legacy_omemo;
 use xmpp_parsers::message::{Message as RawMessage, MessagePayload};
 use xmpp_parsers::message_correct::Replace;
 use xmpp_parsers::stanza_error::StanzaError;
@@ -211,6 +212,10 @@ impl Message {
                 }
             })
             .collect()
+    }
+
+    pub fn omemo_element(&self) -> Option<legacy_omemo::Encrypted> {
+        self.typed_payload("encrypted", ns::LEGACY_OMEMO)
     }
 }
 

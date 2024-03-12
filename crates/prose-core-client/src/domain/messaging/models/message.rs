@@ -35,6 +35,7 @@ pub struct Message {
     pub is_edited: bool,
     pub is_delivered: bool,
     pub is_transient: bool,
+    pub is_encrypted: bool,
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,
@@ -86,6 +87,7 @@ impl Message {
                     body,
                     attachments,
                     mentions,
+                    encryption_info,
                     is_transient: is_private,
                 } => {
                     let message_id = msg.id.clone();
@@ -100,6 +102,7 @@ impl Message {
                         is_edited: false,
                         is_delivered: false,
                         is_transient: is_private,
+                        is_encrypted: encryption_info.is_some(),
                         reactions: vec![],
                         attachments,
                         mentions,
@@ -141,10 +144,15 @@ impl Message {
             };
 
             match modifier.payload {
-                MessageLikePayload::Correction { body, attachments } => {
+                MessageLikePayload::Correction {
+                    body,
+                    attachments,
+                    encryption_info,
+                } => {
                     message.body = body;
                     message.is_edited = true;
                     message.attachments = attachments;
+                    message.is_encrypted = encryption_info.is_some()
                 }
                 MessageLikePayload::DeliveryReceipt => message.is_delivered = true,
                 MessageLikePayload::ReadReceipt => message.is_read = true,
@@ -339,6 +347,7 @@ mod tests {
                     body: String::from("Hello World"),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 },
             },
@@ -415,6 +424,7 @@ mod tests {
                 is_edited: false,
                 is_delivered: false,
                 is_transient: false,
+                is_encrypted: false,
                 reactions: vec![
                     Reaction {
                         emoji: "👍".into(),

@@ -14,6 +14,8 @@ use wasm_bindgen::prelude::*;
 mod client;
 mod connector;
 mod delegate;
+mod encryption;
+mod error;
 mod types;
 mod util;
 

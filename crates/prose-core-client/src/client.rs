@@ -12,7 +12,9 @@ use crate::app::deps::DynAppContext;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
 
-use crate::client_builder::{ClientBuilder, UndefinedAvatarCache, UndefinedStore};
+use crate::client_builder::{
+    ClientBuilder, UndefinedAvatarCache, UndefinedEncryptionService, UndefinedStore,
+};
 use crate::domain::shared::models::UserId;
 use crate::dtos::UserResourceId;
 use crate::services::{
@@ -31,7 +33,8 @@ pub trait ClientDelegate: SendUnlessWasm + SyncUnlessWasm {
 }
 
 impl Client {
-    pub fn builder() -> ClientBuilder<UndefinedStore, UndefinedAvatarCache> {
+    pub fn builder(
+    ) -> ClientBuilder<UndefinedStore, UndefinedAvatarCache, UndefinedEncryptionService> {
         ClientBuilder::new()
     }
 }

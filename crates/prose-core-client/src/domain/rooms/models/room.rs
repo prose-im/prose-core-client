@@ -81,6 +81,8 @@ pub struct RoomDetails {
     pub unread_count: u32,
     /// The number of unread messages mentioning our user in this room.
     pub mentions_count: u32,
+    /// Should messages be OMEMO encrypted?
+    pub encryption_enabled: bool,
 }
 
 #[derive(Debug)]
@@ -165,6 +167,14 @@ impl Room {
         self.inner.details.read().mentions_count
     }
 
+    pub fn encryption_enabled(&self) -> bool {
+        self.inner.details.read().encryption_enabled
+    }
+
+    pub fn set_encryption_enabled(&self, enabled: bool) {
+        self.inner.details.write().encryption_enabled = enabled
+    }
+
     pub fn increment_unread_count(&self) {
         let mut guard = self.inner.details.write();
         guard.unread_count = guard.unread_count.saturating_add(1);
@@ -208,6 +218,7 @@ impl Room {
                 state: RoomState::Pending,
                 unread_count: 0,
                 mentions_count: 0,
+                encryption_enabled: false,
             },
         )
     }
@@ -228,6 +239,7 @@ impl Room {
                 state: RoomState::Connecting,
                 unread_count: 0,
                 mentions_count: 0,
+                encryption_enabled: false,
             },
         )
     }
@@ -299,6 +311,7 @@ impl Room {
                 state: RoomState::Connected,
                 unread_count: 0,
                 mentions_count: 0,
+                encryption_enabled: false,
             },
         )
     }
@@ -318,6 +331,7 @@ impl Room {
                 state: Default::default(),
                 unread_count: 0,
                 mentions_count: 0,
+                encryption_enabled: false,
             },
         )
     }
@@ -385,6 +399,7 @@ mod tests {
                     state: RoomState::Connected,
                     unread_count: 0,
                     mentions_count: 0,
+                    encryption_enabled: false,
                 }
             )
         )

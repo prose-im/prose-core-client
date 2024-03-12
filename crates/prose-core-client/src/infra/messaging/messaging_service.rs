@@ -13,9 +13,11 @@ use prose_xmpp::mods;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::Message;
 
-use crate::domain::messaging::models::{Emoji, MessageId, StanzaId, StanzaParseError};
+use crate::domain::messaging::models::{
+    Emoji, MessageId, SendMessageRequest, StanzaId, StanzaParseError,
+};
 use crate::domain::messaging::services::MessagingService;
-use crate::dtos::{MucId, RoomId, SendMessageRequest, UserId};
+use crate::dtos::{MucId, RoomId, UserId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::infra::xmpp::XMPPClient;
 
@@ -29,20 +31,14 @@ impl MessagingService for XMPPClient {
             "Failed to read the user's JID since the client is not connected."
         ))?;
 
-        let (body, mentions) = request
-            .body
-            .map(|body| (body.text, body.mentions))
-            .unwrap_or_default();
-
         let mut message = Message::new()
             .set_type(room_id.message_type())
-            .set_id(self.generate_id().into())
+            .set_id(request.id.into_inner().into())
             .set_from(from)
             .set_to(room_id.clone().into_bare())
-            .set_body(body)
+            .set_message_body(request.body)
             .set_chat_state(Some(ChatState::Active))
-            .set_markable()
-            .add_references(mentions.into_iter().map(Into::into));
+            .set_markable();
         message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
@@ -62,18 +58,12 @@ impl MessagingService for XMPPClient {
             "Failed to read the user's JID since the client is not connected."
         ))?;
 
-        let (body, mentions) = request
-            .body
-            .map(|body| (body.text, body.mentions))
-            .unwrap_or_default();
-
         let mut message = Message::new()
             .set_type(room_id.message_type())
-            .set_id(self.generate_id().into())
+            .set_id(request.id.into_inner().into())
             .set_from(from)
             .set_to(room_id.clone().into_bare())
-            .set_body(body)
-            .add_references(mentions.into_iter().map(Into::into))
+            .set_message_body(request.body)
             .set_replace(message_id.clone().into_inner().into());
         message.append_attachments(request.attachments);
 

@@ -1,4 +1,4 @@
-use crate::tests::{async_test, platform_driver, PlatformDriver};
+use crate::tests::{async_test, platform_driver};
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::BareJid;

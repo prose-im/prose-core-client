@@ -15,6 +15,7 @@ use prose_xmpp::stanza::message;
 
 use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId};
 use crate::domain::shared::models::ParticipantId;
+use crate::dtos::DeviceId;
 
 use super::{MessageId, StanzaId};
 
@@ -38,11 +39,18 @@ pub struct MessageLike {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct EncryptionInfo {
+    pub sender: DeviceId,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum Payload {
     Correction {
         body: String,
         attachments: Vec<Attachment>,
+        // Set if the message was encrypted
+        encryption_info: Option<EncryptionInfo>,
     },
     DeliveryReceipt,
     ReadReceipt,
@@ -50,6 +58,8 @@ pub enum Payload {
         body: String,
         attachments: Vec<Attachment>,
         mentions: Vec<Mention>,
+        // Set if the message was encrypted
+        encryption_info: Option<EncryptionInfo>,
         is_transient: bool,
     },
     Reaction {
