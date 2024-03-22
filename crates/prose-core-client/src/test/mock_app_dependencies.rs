@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::convert::Into;
 use std::sync::Arc;
 
 use chrono::{DateTime, TimeZone, Utc};

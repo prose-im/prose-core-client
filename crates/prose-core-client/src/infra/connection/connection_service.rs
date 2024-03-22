@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
 
-use prose_xmpp::{mods, ns, ConnectionError, RequestError};
+use prose_xmpp::{mods, ns, ConnectionError};
 
 use crate::domain::connection::models::{HttpUploadService, ServerFeatures};
 use crate::domain::connection::services::ConnectionService;

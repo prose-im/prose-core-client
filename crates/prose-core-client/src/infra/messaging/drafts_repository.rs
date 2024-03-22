@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use jid::BareJid;
 
 use prose_store::prelude::*;
-use prose_store::Database;
 
 use crate::domain::messaging::repos::DraftsRepository as DomainDraftsRepository;
 use crate::dtos::RoomId;

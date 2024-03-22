@@ -65,7 +65,6 @@ mod tests {
     use xmpp_parsers::muc::user::{Affiliation, Item, Role};
     use xmpp_parsers::occupant_id::OccupantId as XMPPOccupantId;
 
-    use prose_xmpp::mods::muc::RoomOccupancy;
     use prose_xmpp::{bare, full};
 
     use crate::domain::shared::models::AnonOccupantId;

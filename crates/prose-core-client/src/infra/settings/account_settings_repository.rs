@@ -7,7 +7,6 @@ use anyhow::Result;
 use async_trait::async_trait;
 
 use prose_store::prelude::*;
-use prose_store::Database;
 
 use crate::domain::settings::models::AccountSettings;
 use crate::domain::settings::repos::AccountSettingsRepository as DomainAccountSettingsRepository;

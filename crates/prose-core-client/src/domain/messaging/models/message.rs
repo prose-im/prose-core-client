@@ -200,12 +200,11 @@ impl Message {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{TimeZone, Utc};
+    use chrono::TimeZone;
     use pretty_assertions::assert_eq;
 
     use prose_xmpp::bare;
 
-    use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
     use crate::domain::shared::models::UserId;
     use crate::test::MessageBuilder;
     use crate::user_id;

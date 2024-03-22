@@ -135,7 +135,6 @@ mod tests {
     use super::*;
     use crate::bare;
     use anyhow::Result;
-    use std::str::FromStr;
     use xmpp_parsers::muc::user::{Affiliation, Role};
 
     #[test]

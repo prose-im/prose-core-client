@@ -9,7 +9,6 @@ use prose_core_client::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent, UserStatusEvent,
     UserStatusEventType,
 };
-use prose_core_client::domain::rooms::models::RoomAffiliation;
 use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;

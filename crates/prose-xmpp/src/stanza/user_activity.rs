@@ -204,7 +204,6 @@ pub mod activity {
 mod tests {
     use super::*;
     use crate::stanza::user_activity::activity::{General, Specific};
-    use std::str::FromStr;
 
     #[test]
     fn test_deserialize_activity() -> Result<()> {

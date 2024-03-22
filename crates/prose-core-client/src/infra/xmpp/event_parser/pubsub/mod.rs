@@ -12,7 +12,6 @@ use tracing::{error, warn};
 use xmpp_parsers::pubsub;
 
 use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
-use prose_xmpp::ns;
 
 use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::UserId;

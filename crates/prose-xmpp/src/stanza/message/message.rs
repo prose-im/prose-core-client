@@ -281,7 +281,6 @@ impl From<RawMessage> for Message {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
     use xmpp_parsers::mam::QueryId;
     use xmpp_parsers::message::{Message as RawMessage, Subject};
 

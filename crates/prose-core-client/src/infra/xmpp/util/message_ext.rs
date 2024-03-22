@@ -113,9 +113,7 @@ impl MessageExt for Message {
 mod tests {
     use std::str::FromStr;
 
-    use anyhow::Result;
     use mime::Mime;
-    use minidom::Element;
     use url::Url;
 
     use crate::domain::messaging::models::{AttachmentType, Thumbnail};
