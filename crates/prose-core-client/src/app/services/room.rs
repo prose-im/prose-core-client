@@ -382,6 +382,7 @@ impl<Kind> Room<Kind> {
                 is_read: message.is_read,
                 is_edited: message.is_edited,
                 is_delivered: message.is_delivered,
+                is_transient: message.is_transient,
                 reactions: message.reactions,
                 attachments: message.attachments,
                 mentions: message.mentions,

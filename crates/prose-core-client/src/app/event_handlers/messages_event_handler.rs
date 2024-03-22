@@ -27,6 +27,7 @@ use crate::domain::messaging::models::{
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{RoomId, UserEndpointId};
 use crate::dtos::{OccupantId, ParticipantId};
+use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
@@ -86,18 +87,17 @@ impl ReceivedMessage {
             return None;
         };
 
-        match message.type_ {
-            MessageType::Groupchat => {
-                let Jid::Full(from) = from else {
-                    error!("Expected FullJid in received groupchat message");
-                    return None;
-                };
-                UserEndpointId::Occupant(from.into())
-            }
-            _ => match from {
+        if message.is_groupchat_message() {
+            let Jid::Full(from) = from else {
+                error!("Expected FullJid in received groupchat message");
+                return None;
+            };
+            UserEndpointId::Occupant(from.into())
+        } else {
+            match from {
                 Jid::Bare(from) => UserEndpointId::User(from.into()),
                 Jid::Full(from) => UserEndpointId::UserResource(from.into()),
-            },
+            }
         }
         .into()
     }

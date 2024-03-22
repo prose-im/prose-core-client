@@ -58,6 +58,7 @@ fn test_parse_chat_message() -> Result<()> {
                     user: user_id!("them@prose.org"),
                     range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(11),
                 }],
+                is_transient: false,
             },
         },
         parsed_message
@@ -93,6 +94,7 @@ fn test_parse_groupchat_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                is_transient: false,
             },
         },
         parsed_message
@@ -134,6 +136,7 @@ fn test_parse_sent_carbon_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                is_transient: false,
             },
         },
         parsed_message
@@ -178,6 +181,7 @@ fn test_parse_mam_groupchat_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                is_transient: false,
             },
         },
         parsed_message
@@ -227,6 +231,7 @@ fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                is_transient: false,
             },
         },
         parsed_message
@@ -271,6 +276,7 @@ fn test_parse_mam_chat_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                is_transient: false,
             },
         },
         parsed_message

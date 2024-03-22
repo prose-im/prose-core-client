@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
-use jid::Jid;
 use minidom::Element;
 use tracing::error;
 use xmpp_parsers::message::MessageType;
@@ -13,46 +11,22 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::media_sharing::{MediaShare, OOB};
 use prose_xmpp::stanza::Message;
 
-use crate::domain::messaging::models::{Attachment, StanzaParseError};
-use crate::domain::shared::models::ParticipantId;
-use crate::dtos::{OccupantId, UserId};
+use crate::domain::messaging::models::Attachment;
 
 pub trait MessageExt {
-    /// Returns either the real jid from a muc user or the original `from` value.
-    fn resolved_from(&self) -> Result<ParticipantId, StanzaParseError>;
-
     /// Returns unique attachments. Either SIMS or OOB.
     fn attachments(&self) -> Vec<Attachment>;
 
     /// Appends the given attachments by adding a media-sharing and an OOB element for each.
     fn append_attachments(&mut self, attachments: Vec<Attachment>);
+
+    /// Returns 'true' if the message is a groupchat message which can be either the case if
+    /// its type is 'groupchat' or if it contains an element "<x xmlns='http://jabber.org/protocol/muc#user' />".
+    /// The latter can happen even for 'chat' messages, e.g. for private messages in a MUC room.
+    fn is_groupchat_message(&self) -> bool;
 }
 
 impl MessageExt for Message {
-    fn resolved_from(&self) -> Result<ParticipantId, StanzaParseError> {
-        let Some(from) = &self.from else {
-            return Err(StanzaParseError::missing_attribute("from"));
-        };
-
-        match self.type_ {
-            MessageType::Groupchat => {
-                if let Some(muc_user) = &self.muc_user() {
-                    if let Some(jid) = &muc_user.jid {
-                        return Ok(ParticipantId::User(jid.to_bare().into()));
-                    }
-                }
-                let Jid::Full(from) = from else {
-                    return Err(StanzaParseError::ParseError {
-                        error: "Expected `from` attribute to contain FullJid for groupchat message"
-                            .to_string(),
-                    });
-                };
-                Ok(ParticipantId::Occupant(OccupantId::from(from.clone())))
-            }
-            _ => Ok(ParticipantId::User(UserId::from(from.to_bare()))),
-        }
-    }
-
     fn attachments(&self) -> Vec<Attachment> {
         let mut attachments = Vec::<Attachment>::new();
 
@@ -107,12 +81,23 @@ impl MessageExt for Message {
             self.payloads.push(OOB::from(attachment).into())
         }
     }
+
+    fn is_groupchat_message(&self) -> bool {
+        if self.type_ == MessageType::Groupchat {
+            return true;
+        }
+        self.payloads
+            .iter()
+            .find(|p| p.is("x", ns::MUC_USER))
+            .is_some()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
 
+    use anyhow::Result;
     use mime::Mime;
     use url::Url;
 

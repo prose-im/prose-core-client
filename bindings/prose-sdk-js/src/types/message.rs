@@ -55,6 +55,8 @@ pub struct Reaction {
 pub struct MessageMetadata {
     #[wasm_bindgen(js_name = "isEdited")]
     pub is_edited: bool,
+    #[wasm_bindgen(js_name = "isTransient")]
+    pub is_transient: bool,
 }
 
 impl From<dtos::Message> for Message {
@@ -82,6 +84,7 @@ impl From<dtos::Message> for Message {
             timestamp: js_sys::Date::new(&JsValue::from(value.timestamp.timestamp_millis() as f64)),
             meta: MessageMetadata {
                 is_edited: value.is_edited,
+                is_transient: value.is_transient,
             },
             reactions: value
                 .reactions

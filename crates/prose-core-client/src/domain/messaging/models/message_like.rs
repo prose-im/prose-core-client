@@ -50,6 +50,7 @@ pub enum Payload {
         body: String,
         attachments: Vec<Attachment>,
         mentions: Vec<Mention>,
+        is_transient: bool,
     },
     Reaction {
         emojis: Vec<message::Emoji>,

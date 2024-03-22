@@ -25,6 +25,7 @@ use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id, user_resource_id, ClientRoomEventType};
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message::{Forwarded, Reactions};
+use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, full, jid};
 
@@ -203,6 +204,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
             body: "Hello World".to_string(),
             attachments: vec![],
             mentions: vec![],
+            is_transient: false,
         },
     };
 
@@ -244,6 +246,96 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
     event_handler
         .handle_event(ServerEvent::Message(MessageEvent {
             r#type: MessageEventType::Sent(sent_message),
+        }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_parses_private_message_in_muc_room() -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+    let mut seq = Sequence::new();
+
+    *deps.ctx.connection_properties.write() = Some(ConnectionProperties {
+        connected_jid: user_resource_id!("user@prose.org/res"),
+        server_features: Default::default(),
+    });
+
+    let room = Room::group(muc_id!("room@conference.prose.org"));
+
+    let received_message = prose_xmpp::stanza::Message::new()
+        .set_type(MessageType::Chat)
+        .set_id("message-id".into())
+        .set_from(full!("room@conference.prose.org/other-user"))
+        .set_to(full!("user@prose.org/res"))
+        .set_body("Private Message")
+        .add_payload(MucUser::new());
+
+    let expected_saved_message = MessageLike {
+        id: "message-id".into(),
+        stanza_id: None,
+        target: None,
+        to: Some(bare!("user@prose.org")),
+        from: ParticipantId::Occupant(occupant_id!("room@conference.prose.org/other-user")),
+        timestamp: Utc.with_ymd_and_hms(2023, 09, 11, 0, 0, 0).unwrap(),
+        payload: MessageLikePayload::Message {
+            body: "Private Message".to_string(),
+            attachments: vec![],
+            mentions: vec![],
+            is_transient: true,
+        },
+    };
+
+    deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 09, 11));
+
+    deps.sidebar_domain_service
+        .expect_handle_received_message()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async { Ok(()) }));
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .in_sequence(&mut seq)
+            .with(predicate::eq(bare!("room@conference.prose.org")))
+            .return_once(|_| Some(room));
+    }
+
+    deps.messages_repo
+        .expect_contains()
+        .once()
+        .return_once(|_| Box::pin(async { Ok(false) }));
+
+    deps.messages_repo
+        .expect_append()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(RoomId::Muc(muc_id!("room@conference.prose.org"))),
+            predicate::eq([expected_saved_message]),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(room),
+            predicate::eq(ClientRoomEventType::MessagesAppended {
+                message_ids: vec!["message-id".into()],
+            }),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = MessagesEventHandler::from(&deps.into_deps());
+    event_handler
+        .handle_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Received(received_message),
         }))
         .await?;
 

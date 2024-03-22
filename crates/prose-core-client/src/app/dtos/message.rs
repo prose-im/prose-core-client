@@ -18,6 +18,7 @@ pub struct Message {
     pub is_read: bool,
     pub is_edited: bool,
     pub is_delivered: bool,
+    pub is_transient: bool,
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,

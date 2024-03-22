@@ -34,6 +34,7 @@ pub struct Message {
     pub is_read: bool,
     pub is_edited: bool,
     pub is_delivered: bool,
+    pub is_transient: bool,
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,
@@ -85,6 +86,7 @@ impl Message {
                     body,
                     attachments,
                     mentions,
+                    is_transient: is_private,
                 } => {
                     let message_id = msg.id.clone();
 
@@ -97,6 +99,7 @@ impl Message {
                         is_read: false,
                         is_edited: false,
                         is_delivered: false,
+                        is_transient: is_private,
                         reactions: vec![],
                         attachments,
                         mentions,
@@ -336,6 +339,7 @@ mod tests {
                     body: String::from("Hello World"),
                     attachments: vec![],
                     mentions: vec![],
+                    is_transient: false,
                 },
             },
             MessageLike {
@@ -410,6 +414,7 @@ mod tests {
                 is_read: false,
                 is_edited: false,
                 is_delivered: false,
+                is_transient: false,
                 reactions: vec![
                     Reaction {
                         emoji: "👍".into(),
