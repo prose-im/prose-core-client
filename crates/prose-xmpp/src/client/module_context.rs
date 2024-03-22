@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::future::Future;
-use std::string::ToString;
 use std::sync::{Arc, Weak};
 use std::time::SystemTime;
 
@@ -69,26 +68,27 @@ impl ModuleContext {
         stanza: impl Into<Element>,
         future: RequestFuture<T, U>,
     ) -> impl Future<Output = Result<U, RequestError>> {
+        let future_id = self.generate_id();
+
         self.inner.mod_futures.lock().push(ModFutureStateEntry {
+            id: future_id.clone(),
             state: future.state.clone(),
             timestamp: self.inner.time_provider.now().into(),
         });
 
         if let Err(err) = self.send_stanza(stanza) {
-            return RequestFuture::failed(RequestError::Generic {
-                msg: err.to_string(),
-            });
+            self.inner
+                .mod_futures
+                .lock()
+                .retain(|state| state.id != future_id);
+            return RequestFuture::failed(err);
         }
 
         future
     }
 
     pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<(), RequestError> {
-        self.inner
-            .send_stanza(stanza)
-            .map_err(|err| RequestError::Generic {
-                msg: err.to_string(),
-            })
+        self.inner.send_stanza(stanza)
     }
 
     pub(crate) fn full_jid(&self) -> FullJid {
@@ -136,11 +136,14 @@ pub(super) struct ModuleContextInner {
 }
 
 impl ModuleContextInner {
-    pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<()> {
+    pub(crate) fn send_stanza(&self, stanza: impl Into<Element>) -> Result<(), RequestError> {
         let Some(conn) = &*self.connection.read() else {
-            return Ok(());
+            return Err(RequestError::Disconnected);
         };
         conn.send_stanza(stanza.into())
+            .map_err(|err| RequestError::Generic {
+                msg: err.to_string(),
+            })
     }
 
     #[cfg(any(not(feature = "test"), target_arch = "wasm32"))]
@@ -165,6 +168,7 @@ impl ModuleContextInner {
 }
 
 pub(super) struct ModFutureStateEntry {
+    pub id: String,
     pub state: Arc<Mutex<dyn ModuleFutureState>>,
     pub timestamp: SystemTime,
 }

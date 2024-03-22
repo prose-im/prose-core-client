@@ -9,6 +9,8 @@ use xmpp_parsers::stanza_error::{DefinedCondition, StanzaError};
 pub enum RequestError {
     #[error("Request Timeout")]
     TimedOut,
+    #[error("Client is disconnected")]
+    Disconnected,
     #[error("Request Error: Unexpected server response")]
     UnexpectedResponse,
     #[error("XMPP Error: {err:?}")]

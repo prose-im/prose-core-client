@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
 
-use prose_xmpp::{mods, ns, ConnectionError};
+use prose_xmpp::{mods, ns, ConnectionError, RequestError};
 
 use crate::domain::connection::models::{HttpUploadService, ServerFeatures};
 use crate::domain::connection::services::ConnectionService;
@@ -79,6 +79,6 @@ impl ConnectionService for XMPPClient {
     }
 
     async fn send_raw_stanza(&self, stanza: Element) -> Result<()> {
-        self.client.send_raw_stanza(stanza)
+        Ok(self.client.send_raw_stanza(stanza)?)
     }
 }

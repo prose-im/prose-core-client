@@ -149,6 +149,11 @@ impl<T: Send, U> ModuleFutureState for ReducerFutureState<T, U> {
         self.result = Some(Err(RequestError::TimedOut));
         self.waker.take()
     }
+
+    fn fail_with_disconnect(&mut self) -> Option<Waker> {
+        self.result = Some(Err(RequestError::Disconnected));
+        self.waker.take()
+    }
 }
 
 impl<T: Send, U> Future for RequestFuture<T, U> {

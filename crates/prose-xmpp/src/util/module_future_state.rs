@@ -14,4 +14,5 @@ pub(crate) enum ModuleFuturePoll {
 pub(crate) trait ModuleFutureState: Send {
     fn handle_element(&mut self, element: XMPPElement) -> ModuleFuturePoll;
     fn fail_with_timeout(&mut self) -> Option<Waker>;
+    fn fail_with_disconnect(&mut self) -> Option<Waker>;
 }

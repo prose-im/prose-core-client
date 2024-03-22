@@ -5,6 +5,7 @@
 
 use std::any::TypeId;
 use std::fmt::{Debug, Formatter};
+use std::mem;
 use std::sync::Arc;
 use std::task::Waker;
 use std::time::{Duration, SystemTime};
@@ -12,17 +13,18 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use jid::FullJid;
 use minidom::Element;
-use prose_wasm_utils::PinnedFuture;
 use tracing::{error, warn};
+
+use prose_wasm_utils::PinnedFuture;
 
 use crate::client::builder::ClientBuilder;
 use crate::client::module_context::ModuleContextInner;
 use crate::client::{Event, ModuleLookup};
 use crate::connector::{ConnectionError, ConnectionEvent};
-use crate::mods;
 use crate::mods::AnyModule;
 use crate::util::{ModuleFuturePoll, XMPPElement};
 use crate::Event as ClientEvent;
+use crate::{mods, RequestError};
 
 #[derive(Clone)]
 pub struct Client {
@@ -64,7 +66,7 @@ impl Client {
         self.inner.get_mod()
     }
 
-    pub fn send_raw_stanza(&self, stanza: impl Into<Element>) -> Result<()> {
+    pub fn send_raw_stanza(&self, stanza: impl Into<Element>) -> Result<(), RequestError> {
         self.inner.context.send_stanza(stanza)
     }
 }
@@ -116,6 +118,7 @@ impl ClientInner {
     }
 
     fn disconnect(&self) {
+        Self::cancel_pending_futures(&self.context);
         self.context.disconnect()
     }
 
@@ -219,6 +222,19 @@ impl ClientInner {
 
         for waker in wakers {
             waker.wake()
+        }
+    }
+
+    fn cancel_pending_futures(ctx: &ModuleContextInner) {
+        let pending_futures = {
+            let mut guard = ctx.mod_futures.lock();
+            mem::take(&mut *guard)
+        };
+
+        for fut in pending_futures {
+            if let Some(waker) = fut.state.lock().fail_with_disconnect() {
+                waker.wake()
+            }
         }
     }
 }
