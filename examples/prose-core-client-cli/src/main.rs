@@ -478,7 +478,7 @@ async fn upload_file(client: &Client, path: impl AsRef<Path>) -> Result<UploadSl
     println!("Requesting upload slot…");
     let slot = client
         .uploads
-        .request_upload_slot(path_str, metadata.len())
+        .request_upload_slot(path_str, metadata.len(), None)
         .await?;
 
     let mut headers = HeaderMap::new();

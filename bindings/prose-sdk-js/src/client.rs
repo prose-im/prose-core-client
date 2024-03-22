@@ -5,6 +5,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
 use js_sys::Array;
 use tracing::{info, Level};
@@ -599,11 +600,21 @@ impl Client {
 
     /// Request a slot for uploading a file to attach it to a message.
     #[wasm_bindgen(js_name = "requestUploadSlot")]
-    pub async fn request_upload_slot(&self, file_name: &str, file_size: u64) -> Result<UploadSlot> {
+    pub async fn request_upload_slot(
+        &self,
+        file_name: &str,
+        file_size: u64,
+        media_type: Option<String>,
+    ) -> Result<UploadSlot> {
+        let media_type = media_type
+            .map(|mt| mt.parse())
+            .transpose()
+            .map_err(|err| WasmError::from(anyhow!("{err}")))?;
+
         let slot = self
             .client
             .uploads
-            .request_upload_slot(file_name, file_size)
+            .request_upload_slot(file_name, file_size, media_type)
             .await
             .map_err(WasmError::from)?;
         Ok(slot.into())

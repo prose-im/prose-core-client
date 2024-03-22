@@ -6,6 +6,7 @@
 use std::path::Path;
 
 use anyhow::{format_err, Result};
+use mime::Mime;
 
 use prose_proc_macros::InjectDependencies;
 
@@ -22,7 +23,12 @@ pub struct UploadService {
 }
 
 impl UploadService {
-    pub async fn request_upload_slot(&self, file_name: &str, file_size: u64) -> Result<UploadSlot> {
+    pub async fn request_upload_slot(
+        &self,
+        file_name: &str,
+        file_size: u64,
+        media_type: Option<Mime>,
+    ) -> Result<UploadSlot> {
         let service = self.ctx.http_upload_service()?;
 
         if file_size > service.max_file_size {
@@ -31,7 +37,7 @@ impl UploadService {
             ));
         }
 
-        let media_type = Path::new(file_name).media_type();
+        let media_type = media_type.unwrap_or_else(|| Path::new(file_name).media_type());
 
         let slot = self
             .upload_service
