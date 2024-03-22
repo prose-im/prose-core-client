@@ -126,7 +126,7 @@ async fn test_pubsub_node_purged() -> Result<()> {
     Ok(())
 }
 
-// #[mt_test]
+#[mt_test]
 async fn test_pubsub_node_deleted() -> Result<()> {
     // Delete a node (https://xmpp.org/extensions/xep-0060.html#owner-delete)
     let events = parse_xml(
