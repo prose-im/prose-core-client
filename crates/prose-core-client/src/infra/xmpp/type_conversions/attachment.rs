@@ -15,6 +15,7 @@ use prose_xmpp::stanza::references::Reference;
 
 use crate::domain::messaging::models::{Attachment, AttachmentType};
 use crate::infra::xmpp::util::{FileExt, MediaShareExt};
+use crate::util::PathExt;
 
 impl From<Attachment> for OOB {
     fn from(value: Attachment) -> Self {
@@ -73,8 +74,7 @@ impl TryFrom<MediaShare> for Attachment {
 
 impl From<Url> for Attachment {
     fn from(value: Url) -> Self {
-        let media_type =
-            mime_guess::from_path(Path::new(value.path())).first_or(mime::APPLICATION_OCTET_STREAM);
+        let media_type = Path::new(value.path()).media_type();
 
         let kind = match media_type.type_() {
             mime::IMAGE => AttachmentType::Image { thumbnail: None },

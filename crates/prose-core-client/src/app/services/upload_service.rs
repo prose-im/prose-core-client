@@ -3,13 +3,15 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::path::Path;
+
 use anyhow::{format_err, Result};
-use mime_guess::mime;
 
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{DynAppContext, DynUploadService};
 use crate::dtos::UploadSlot;
+use crate::util::PathExt;
 
 #[derive(InjectDependencies)]
 pub struct UploadService {
@@ -29,9 +31,7 @@ impl UploadService {
             ));
         }
 
-        let media_type = mime_guess::from_path(file_name)
-            .first()
-            .unwrap_or(mime::APPLICATION_OCTET_STREAM);
+        let media_type = Path::new(file_name).media_type();
 
         let slot = self
             .upload_service

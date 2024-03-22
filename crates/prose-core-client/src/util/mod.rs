@@ -5,6 +5,7 @@
 
 pub use coalesce_client_events::coalesce_client_events;
 pub use form_config::FormConfig;
+pub use path_ext::PathExt;
 pub use string_ext::StringExt;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -13,4 +14,5 @@ pub mod account_bookmarks_client;
 mod coalesce_client_events;
 pub mod form_config;
 pub mod mime_serde_shim;
+mod path_ext;
 pub mod string_ext;
