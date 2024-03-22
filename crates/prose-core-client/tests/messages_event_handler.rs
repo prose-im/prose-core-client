@@ -176,6 +176,11 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
 
+    *deps.ctx.connection_properties.write() = Some(ConnectionProperties {
+        connected_jid: user_resource_id!("from@prose.org/res"),
+        server_features: Default::default(),
+    });
+
     let room = Room::group(muc_id!("room@conference.prose.org"));
 
     let sent_message = prose_xmpp::stanza::Message::new()
@@ -360,7 +365,7 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
 }
 
 // When we send a message to a MUC room we'll receive the same message back to our
-// connected BareJid. This is what this test is for…
+// connected JID. This is what this test is for…
 #[tokio::test]
 async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
     let mut deps = MockAppDependencies::default();
@@ -405,7 +410,7 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
                     .set_id("message-id".into())
                     .set_type(MessageType::Groupchat)
                     .set_from(full!("room@groups.prose.org/me"))
-                    .set_to(bare!("me@prose.org"))
+                    .set_to(full!("me@prose.org/res"))
                     .set_body("Hello World")
                     .set_stanza_id(prose_xmpp::stanza::message::stanza_id::StanzaId {
                         id: "Qiuahv1eo3C222uKhOqjPiW0".into(),
@@ -522,6 +527,65 @@ async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()>
                     .set_id("message-id".into())
                     .set_type(MessageType::Groupchat)
                     .set_from(jid!("group@prose.org/user"))
+                    .set_message_reactions(Reactions {
+                        id: "stanza-id-100".to_string(),
+                        reactions: vec!["🙃".into()],
+                    }),
+            ),
+        }))
+        .await?;
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_message_event(
+) -> Result<()> {
+    let mut deps = MockAppDependencies::default();
+
+    let room = Room::group(muc_id!("group@prose.org"));
+
+    {
+        let room = room.clone();
+        deps.connected_rooms_repo
+            .expect_get()
+            .once()
+            .returning(move |_| Some(room.clone()));
+    }
+
+    deps.messages_repo
+        .expect_append()
+        .once()
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
+
+    deps.messages_repo
+        .expect_resolve_message_id()
+        .with(
+            predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
+            predicate::eq(StanzaId::from("stanza-id-100")),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
+
+    deps.client_event_dispatcher
+        .expect_dispatch_room_event()
+        .once()
+        .with(
+            predicate::eq(room),
+            predicate::eq(ClientRoomEventType::MessagesUpdated {
+                message_ids: vec!["message-id-100".into()],
+            }),
+        )
+        .return_once(|_, _| ());
+
+    let event_handler = MessagesEventHandler::from(&deps.into_deps());
+    event_handler
+        .handle_event(ServerEvent::Message(MessageEvent {
+            r#type: MessageEventType::Sent(
+                Message::default()
+                    .set_id("message-id".into())
+                    .set_type(MessageType::Groupchat)
+                    .set_from(full!("from@prose.org/res"))
+                    .set_to(jid!("group@prose.org"))
                     .set_message_reactions(Reactions {
                         id: "stanza-id-100".to_string(),
                         reactions: vec!["🙃".into()],

@@ -17,8 +17,8 @@ use prose_xmpp::stanza::message::Forwarded;
 use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
-    DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository, DynMessagesRepository,
-    DynSidebarDomainService, DynTimeProvider,
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
+    DynMessagesRepository, DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
@@ -26,11 +26,13 @@ use crate::domain::messaging::models::{
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{RoomId, UserEndpointId};
-use crate::dtos::OccupantId;
+use crate::dtos::{OccupantId, ParticipantId};
 use crate::ClientRoomEventType;
 
 #[derive(InjectDependencies)]
 pub struct MessagesEventHandler {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
@@ -126,8 +128,10 @@ impl MessagesEventHandler {
     async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
         match event.r#type {
             MessageEventType::Received(mut message) => {
-                // When we send a message to a MUC room we'll receive the same message back to our
-                // connected BareJid. In this case we want to treat it as a sent message…
+                // When we send a message to a MUC room we'll receive the same message from
+                // our JID in the room back to our connected JID.
+                // I.e. `from` is 'room@groups.prose.org/me' and `to` is 'me@prose.org/res'
+                // In this case we want to treat it as a sent message…
                 if message.type_ == MessageType::Groupchat {
                     let Some(Jid::Full(from)) = &message.from else {
                         error!("Expected FullJid in received groupchat message");
@@ -138,7 +142,13 @@ impl MessagesEventHandler {
                     let room_id = from.room_id();
 
                     if let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) {
+                        // Was the message sent by us?
                         if Some(from) == room.occupant_id() {
+                            // Now we'll modify the message so that it looks like other "sent"
+                            // messages. Expanding on the example above, we want our
+                            // `from` to be 'me@prose.org/res' and our
+                            // `to` to be 'room@groups.prose.org/me'.
+
                             message.from = message.to.take();
                             message.to = Some(room_id.into_bare().into());
                             return self
@@ -255,23 +265,22 @@ impl MessagesEventHandler {
 
         let parser = MessageParser::new(self.time_provider.now());
 
-        // For the purpose of parsing our sent message into a `MessageLike` let's treat it as
-        // a regular 'chat' message. This way the 'from' attribute will be parsed into
-        // a ParticipantId::User instead of a ParticipantId::Occupant which is what we want.
-        // Otherwise, the ParticipantId::Occupant would contain our (real) FullJid, not our JID in
-        // the room.
-        let parsed_message = match message {
-            SentMessage::Message(mut message) => {
-                message.type_ = MessageType::Chat;
-                parser.parse_message(message)
-            }
-            SentMessage::Carbon(mut carbon) => {
-                if let Some(ref mut message) = carbon.stanza {
-                    message.type_ = MessageType::Chat;
-                }
-                parser.parse_forwarded_message(carbon)
-            }
+        let mut parsed_message = match message {
+            SentMessage::Message(message) => parser.parse_message(message),
+            SentMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon),
         }?;
+
+        // Usually for sent messages the `from` would be our connected JID and the `to` would be
+        // the JID of the recipient. For sent groupchat messages the `from` would also be our
+        // connected JID and the `to` would be the JID of the room.
+        //
+        // For received groupchat messages the `from` however would be the JID of the occupant,
+        // i.e. 'room@rooms.prose.org/user' and that is what our message parser tries to parse.
+        //
+        // What we'll receive as the `from` in a parsed message would then be a
+        // ParticipantId::Occupant('me@prose.org/res') which is clearly wrong. Which is why we just
+        // take our connected jid and plug it into the `from`.
+        parsed_message.from = ParticipantId::User(self.ctx.connected_id()?.into_user_id());
 
         debug!("Caching sent message…");
         let messages = [parsed_message];
