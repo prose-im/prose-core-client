@@ -12,6 +12,7 @@ use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
 use tracing::instrument;
+use uuid::Uuid;
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub;
 
@@ -68,7 +69,7 @@ impl ModuleContext {
         stanza: impl Into<Element>,
         future: RequestFuture<T, U>,
     ) -> impl Future<Output = Result<U, RequestError>> {
-        let future_id = self.generate_id();
+        let future_id = Uuid::new_v4();
 
         self.inner.mod_futures.lock().push(ModFutureStateEntry {
             id: future_id.clone(),
@@ -168,7 +169,7 @@ impl ModuleContextInner {
 }
 
 pub(super) struct ModFutureStateEntry {
-    pub id: String,
+    pub id: Uuid,
     pub state: Arc<Mutex<dyn ModuleFutureState>>,
     pub timestamp: SystemTime,
 }
