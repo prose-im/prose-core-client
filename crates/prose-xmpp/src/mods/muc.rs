@@ -418,6 +418,11 @@ impl MUC {
                 .append_all(
                     password.map(|password| Element::builder("password", ns::MUC).append(password)),
                 )
+                .append(
+                    Element::builder("history", ns::MUC)
+                        .attr("maxstanzas", "0")
+                        .build(),
+                )
                 .build()]);
         presence.show = show;
 

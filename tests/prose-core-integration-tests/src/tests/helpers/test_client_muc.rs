@@ -32,7 +32,9 @@ impl TestClient {
         self.send(r#"
         <presence xmlns='jabber:client' to="{{OCCUPANT_ID}}">
             <show>chat</show>
-            <x xmlns='http://jabber.org/protocol/muc'/>
+            <x xmlns='http://jabber.org/protocol/muc'>
+              <history maxstanzas="0" />
+            </x>
             <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="ipEcl0ID83wbGxX3lfUdwi1F8VM="/>
         </presence>
         "#
