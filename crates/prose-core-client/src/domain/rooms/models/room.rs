@@ -184,6 +184,15 @@ impl Room {
 
 impl Room {
     pub fn pending(bookmark: &Bookmark, nickname: &str) -> Self {
+        let participants = match &bookmark.jid {
+            RoomId::User(user_id) => ParticipantList::for_direct_message(
+                user_id,
+                user_id.username(),
+                Availability::Unavailable,
+            ),
+            RoomId::Muc(_) => Default::default(),
+        };
+
         Self::new(
             RoomInfo {
                 room_id: bookmark.jid.clone(),
@@ -194,7 +203,7 @@ impl Room {
                 name: Some(bookmark.name.clone()),
                 description: None,
                 topic: None,
-                participants: Default::default(),
+                participants,
                 sidebar_state: bookmark.sidebar_state,
                 state: RoomState::Pending,
                 unread_count: 0,
