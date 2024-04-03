@@ -314,7 +314,13 @@ where
         while result.len() <= limit {
             let key = cursor
                 .primary_key()
-                .and_then(|key| key.as_string())
+                .and_then(|key| match key {
+                    _ if key.is_string() => key.as_string(),
+                    _ if key.as_f64().is_some() => {
+                        key.as_f64().map(|value| (value as i64).to_string())
+                    }
+                    _ => key.as_string(),
+                })
                 .ok_or(Error::InvalidDBKey)?;
             let value = JsValueSerdeExt::into_serde(&cursor.value())?;
 
