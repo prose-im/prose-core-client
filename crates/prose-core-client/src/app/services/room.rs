@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use anyhow::{anyhow, bail, format_err, Result};
 use chrono::Duration;
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
@@ -290,10 +290,14 @@ impl<Kind> Room<Kind> {
             // and we want to push them into `messages` in the order 6, 5, 4, 3, 2, 1 which is
             // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
-                let Ok(parsed_message) =
-                    MessageParser::new(Default::default()).parse_mam_message(archive_message)
-                else {
-                    continue;
+                let parsed_message = match MessageParser::new(Default::default())
+                    .parse_mam_message(archive_message)
+                {
+                    Ok(message) => message,
+                    Err(error) => {
+                        error!("Failed to parse MAM message. {}", error.to_string());
+                        continue;
+                    }
                 };
 
                 if parsed_message.payload.is_message() {
