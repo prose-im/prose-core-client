@@ -1,6 +1,6 @@
 [package]
 name = "prose-sdk-js"
-version = "0.1.66"
+version = "0.1.68"
 description = "Prose JavaScript SDK"
 readme = "README.md"
 license = "MPL-2.0"
@@ -36,4 +36,4 @@ url = { workspace = true }
 wasm-bindgen = { workspace = true }
 wasm-bindgen-derive = "0.2.0"
 wasm-bindgen-futures = { workspace = true }
-web-sys = {version = "0.3", features = ["DomException"] }
+web-sys = { version = "0.3", features = ["DomException"] }
