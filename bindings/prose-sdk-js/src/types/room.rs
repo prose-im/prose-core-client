@@ -13,7 +13,7 @@ use prose_core_client::services::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
 };
 
-use crate::client::WasmError;
+use crate::error::WasmError;
 use crate::types::message::ArchiveID;
 use crate::types::{
     try_user_id_vec_from_string_array, MessageResultSet, MessagesArray, ParticipantInfo,
@@ -88,6 +88,7 @@ export interface RoomChannel {
 
 export interface RoomDirectMessage extends RoomBase {
   type: RoomType.DirectMessage;
+  isEncryptionEnabled: boolean;
 }
 
 export interface RoomGroup extends RoomBase, RoomMUC {
@@ -427,6 +428,23 @@ macro_rules! channel_room_impl {
     };
 }
 
+macro_rules! direct_message_impl {
+    ($t:ident) => {
+        #[wasm_bindgen]
+        impl $t {
+            #[wasm_bindgen(getter, js_name = "isEncryptionEnabled")]
+            pub fn is_encryption_enabled(&self) -> bool {
+                self.room.encryption_enabled()
+            }
+
+            #[wasm_bindgen(setter, js_name = "isEncryptionEnabled")]
+            pub fn set_is_encryption_enabled(&self, enabled: bool) {
+                self.room.set_encryption_enabled(enabled);
+            }
+        }
+    };
+}
+
 #[wasm_bindgen]
 impl RoomGroup {
     #[wasm_bindgen(js_name = "resendInvitesToMembers")]
@@ -456,6 +474,8 @@ mut_name_impl!(RoomGeneric);
 
 channel_room_impl!(RoomPrivateChannel);
 channel_room_impl!(RoomPublicChannel);
+
+direct_message_impl!(RoomDirectMessage);
 
 pub trait RoomEnvelopeExt {
     fn into_js_value(self) -> JsValue;

@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use element_ext::{parse_bool, ElementBuilderExt, ElementExt};
+pub use item_id_ext::ItemIdExt;
 pub(crate) use module_future_state::{ModuleFuturePoll, ModuleFutureState};
 pub use pub_sub_items_ext::PubSubItemsExt;
 pub use pub_sub_query::PubSubQuery;
@@ -13,6 +14,7 @@ pub(crate) use request_future::{ElementReducerPoll, RequestFuture};
 pub use xmpp_element::XMPPElement;
 
 pub mod element_ext;
+mod item_id_ext;
 mod module_future_state;
 mod pub_sub_items_ext;
 mod pub_sub_query;

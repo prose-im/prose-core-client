@@ -22,6 +22,11 @@ use prose_xmpp::{bare, ConnectionError};
 async fn test_starts_available_and_generates_resource() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
+    deps.encryption_domain_service
+        .expect_initialize()
+        .once()
+        .return_once(|| Box::pin(async { Ok(()) }));
+
     deps.short_id_provider = Arc::new(ConstantIDProvider::new("resource-id"));
 
     deps.account_settings_repo
@@ -121,6 +126,11 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
 #[tokio::test]
 async fn test_restores_availability_and_resource() -> Result<()> {
     let mut deps = MockAppDependencies::default();
+
+    deps.encryption_domain_service
+        .expect_initialize()
+        .once()
+        .return_once(|| Box::pin(async { Ok(()) }));
 
     deps.account_settings_repo
         .expect_get()

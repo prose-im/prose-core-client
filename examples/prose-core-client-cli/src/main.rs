@@ -10,6 +10,7 @@ use std::iter::once;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
 
@@ -32,8 +33,10 @@ use prose_core_client::dtos::{
     UserId, Utf8Index,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
+use prose_core_client::infra::encryption::EncryptionKeysRepository;
 use prose_core_client::{
-    open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, SqliteDriver,
+    open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, PlatformDriver,
+    SignalServiceHandle,
 };
 use prose_xmpp::connector;
 use prose_xmpp::mods::muc;
@@ -47,10 +50,13 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     println!("Cached data can be found at {:?}", cache_path);
 
-    let store = open_store(SqliteDriver::new(&cache_path.join("db.sqlite3"))).await?;
+    let store = open_store(PlatformDriver::new(&cache_path.join("db.sqlite3"))).await?;
 
     let client = Client::builder()
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
+        .set_encryption_service(Arc::new(SignalServiceHandle::new(Arc::new(
+            EncryptionKeysRepository::new(store.clone()),
+        ))))
         .set_store(store)
         .set_avatar_cache(FsAvatarCache::new(&cache_path.join("Avatar"))?)
         .set_delegate(Some(Box::new(Delegate {})))

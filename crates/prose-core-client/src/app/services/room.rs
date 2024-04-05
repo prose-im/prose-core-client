@@ -12,20 +12,23 @@ use anyhow::{anyhow, bail, format_err, Result};
 use chrono::Duration;
 use tracing::{debug, error, info};
 
+use prose_xmpp::{IDProvider, TimeProvider};
+
 use crate::app::deps::{
-    DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynMessageArchiveService,
-    DynMessagesRepository, DynMessagingService, DynRoomAttributesService,
-    DynRoomParticipationService, DynSidebarDomainService, DynTimeProvider,
-    DynUserProfileRepository,
+    DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynEncryptionDomainService,
+    DynIDProvider, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
+    DynRoomAttributesService, DynRoomParticipationService, DynSidebarDomainService,
+    DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{
-    Emoji, Message, MessageId, MessageLike, MessageParser, MessageTargetId,
+    send_message_request, Emoji, Message, MessageId, MessageLike, MessageParser, MessageTargetId,
 };
+use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{
-    Message as MessageDTO, MessageResultSet, MessageSender, RoomState, SendMessageRequest,
-    StanzaId, UserBasicInfo, UserId,
+    Message as MessageDTO, MessageResultSet, MessageSender, RoomState,
+    SendMessageRequest as SendMessageRequestDTO, StanzaId, UserBasicInfo, UserId,
 };
 use crate::{ClientEvent, ClientRoomEventType};
 
@@ -38,6 +41,7 @@ pub struct DirectMessage;
 pub struct Group;
 pub struct Generic;
 
+#[allow(dead_code)]
 pub trait Channel {}
 
 pub struct PrivateChannel;
@@ -68,10 +72,12 @@ impl MucRoom for Generic {}
 pub struct RoomInner {
     pub(crate) data: DomainRoom,
 
-    pub(crate) ctx: DynAppContext,
     pub(crate) attributes_service: DynRoomAttributesService,
     pub(crate) client_event_dispatcher: DynClientEventDispatcher,
+    pub(crate) ctx: DynAppContext,
     pub(crate) drafts_repo: DynDraftsRepository,
+    pub(crate) encryption_domain_service: DynEncryptionDomainService,
+    pub(crate) id_provider: DynIDProvider,
     pub(crate) message_archive_service: DynMessageArchiveService,
     pub(crate) message_repo: DynMessagesRepository,
     pub(crate) messaging_service: DynMessagingService,
@@ -164,13 +170,102 @@ impl<Kind> Room<Kind> {
 }
 
 impl<Kind> Room<Kind> {
-    pub async fn send_message(&self, request: SendMessageRequest) -> Result<()> {
+    pub async fn send_message(&self, request: SendMessageRequestDTO) -> Result<()> {
+        let Some(body) = request.body else {
+            return self
+                .messaging_service
+                .send_message(
+                    &self.data.room_id,
+                    SendMessageRequest {
+                        id: self.id_provider.new_id().into(),
+                        body: None,
+                        attachments: request.attachments,
+                    },
+                )
+                .await;
+        };
+
+        match body.text.as_str() {
+            "/omemo enable" => {
+                self.data.set_encryption_enabled(true);
+                self.show_system_message("OMEMO is now enabled.").await?;
+                return Ok(());
+            }
+            "/omemo disable" => {
+                self.data.set_encryption_enabled(false);
+                self.show_system_message("OMEMO is now disabled.").await?;
+                return Ok(());
+            }
+            _ => (),
+        }
+
+        let message_id = MessageId::from(self.id_provider.new_id());
+
+        // Save the unencrypted message so that we can look it up later…
+        // TODO: Can we move this into EncryptionDomainService as well?
+        self.message_repo
+            .append(
+                &self.data.room_id,
+                &[MessageLike {
+                    id: MessageLikeId::new(Some(message_id.clone())),
+                    stanza_id: None,
+                    target: None,
+                    to: None,
+                    from: self.ctx.connected_id()?.into_user_id().into(),
+                    timestamp: self.time_provider.now(),
+                    payload: MessageLikePayload::Message {
+                        body: body.text.clone(),
+                        attachments: request.attachments.clone(),
+                        mentions: body.mentions.clone(),
+                        encryption_info: None,
+                        is_transient: false,
+                    },
+                }],
+            )
+            .await?;
+
+        let payload = match &self.data.room_id {
+            RoomId::User(user_id) if self.data.encryption_enabled() => {
+                send_message_request::Payload::Encrypted(
+                    self.encryption_domain_service
+                        .encrypt_message(user_id, body.text)
+                        .await?,
+                )
+            }
+            _ => send_message_request::Payload::Plaintext(body.text),
+        };
+
         self.messaging_service
-            .send_message(&self.data.room_id, request)
+            .send_message(
+                &self.data.room_id,
+                SendMessageRequest {
+                    id: message_id,
+                    body: Some(send_message_request::Body {
+                        payload,
+                        mentions: body.mentions,
+                    }),
+                    attachments: request.attachments,
+                },
+            )
             .await
     }
 
-    pub async fn update_message(&self, id: MessageId, request: SendMessageRequest) -> Result<()> {
+    pub async fn update_message(
+        &self,
+        id: MessageId,
+        request: SendMessageRequestDTO,
+    ) -> Result<()> {
+        // TODO: Encrypt updates as well…
+
+        let request = SendMessageRequest {
+            id: self.id_provider.new_id().into(),
+            body: request.body.map(|body| send_message_request::Body {
+                payload: send_message_request::Payload::Plaintext(body.text),
+                mentions: body.mentions,
+            }),
+            attachments: request.attachments,
+        };
+
         self.messaging_service
             .update_message(&self.data.room_id, &id, request)
             .await
@@ -244,7 +339,15 @@ impl<Kind> Room<Kind> {
 
     pub async fn load_latest_messages(&self) -> Result<MessageResultSet> {
         debug!("Loading latest messages from server…");
-        self.load_messages(None).await
+        let messages = self.load_messages(None).await?;
+
+        // TODO: Remove this when we have server-synchronized settings.
+        if messages.messages.last().map(|m| m.is_encrypted) == Some(true) {
+            info!("Found encrypted message. Enabling encryption…");
+            self.set_encryption_enabled(true);
+        }
+
+        Ok(messages)
     }
 
     pub async fn load_messages_before(&self, stanza_id: &StanzaId) -> Result<MessageResultSet> {
@@ -257,6 +360,14 @@ impl<Kind> Room<Kind> {
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::SidebarChanged);
         Ok(())
+    }
+
+    pub fn encryption_enabled(&self) -> bool {
+        self.data.encryption_enabled()
+    }
+
+    pub fn set_encryption_enabled(&self, enabled: bool) {
+        self.data.set_encryption_enabled(enabled)
     }
 }
 
@@ -290,8 +401,12 @@ impl<Kind> Room<Kind> {
             // and we want to push them into `messages` in the order 6, 5, 4, 3, 2, 1 which is
             // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
-                let parsed_message = match MessageParser::new(Default::default())
-                    .parse_mam_message(archive_message)
+                let parsed_message = match MessageParser::new(
+                    Default::default(),
+                    self.encryption_domain_service.clone(),
+                )
+                .parse_mam_message(archive_message)
+                .await
                 {
                     Ok(message) => message,
                     Err(error) => {
@@ -387,6 +502,7 @@ impl<Kind> Room<Kind> {
                 is_edited: message.is_edited,
                 is_delivered: message.is_delivered,
                 is_transient: message.is_transient,
+                is_encrypted: message.is_encrypted,
                 reactions: message.reactions,
                 attachments: message.attachments,
                 mentions: message.mentions,
@@ -440,6 +556,40 @@ impl<Kind> Room<Kind> {
             id: sender_id,
             name,
         }
+    }
+
+    async fn show_system_message(&self, message: impl Into<String>) -> Result<()> {
+        let id = MessageLikeId::new(Some(self.id_provider.new_id().into()));
+
+        self.message_repo
+            .append(
+                &self.data.room_id,
+                &[MessageLike {
+                    id: id.clone(),
+                    stanza_id: None,
+                    target: None,
+                    to: None,
+                    from: ParticipantId::User("prose-bot@prose.org".parse()?),
+                    timestamp: self.time_provider.now(),
+                    payload: MessageLikePayload::Message {
+                        body: message.into(),
+                        attachments: vec![],
+                        mentions: vec![],
+                        encryption_info: None,
+                        is_transient: true,
+                    },
+                }],
+            )
+            .await?;
+
+        self.client_event_dispatcher.dispatch_room_event(
+            self.data.clone(),
+            ClientRoomEventType::MessagesAppended {
+                message_ids: vec![id.id().clone()],
+            },
+        );
+
+        Ok(())
     }
 }
 

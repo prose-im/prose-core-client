@@ -18,7 +18,7 @@ use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynMessagesRepository, DynSidebarDomainService, DynTimeProvider,
+    DynEncryptionDomainService, DynMessagesRepository, DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
@@ -36,6 +36,8 @@ pub struct MessagesEventHandler {
     ctx: DynAppContext,
     #[inject]
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
+    #[inject]
+    encryption_domain_service: DynEncryptionDomainService,
     #[inject]
     messages_repo: DynMessagesRepository,
     #[inject]
@@ -184,11 +186,14 @@ impl MessagesEventHandler {
 
         let room_id = from.to_room_id();
 
-        let parser = MessageParser::new(self.time_provider.now());
+        let parser = MessageParser::new(
+            self.time_provider.now(),
+            self.encryption_domain_service.clone(),
+        );
 
         let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => parser.parse_message(message),
-            ReceivedMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon),
+            ReceivedMessage::Message(message) => parser.parse_message(message).await,
+            ReceivedMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon).await,
         };
 
         let message = match parsed_message {
@@ -197,7 +202,7 @@ impl MessagesEventHandler {
                 return match err.downcast_ref::<MessageLikeError>() {
                     Some(MessageLikeError::NoPayload) => Ok(()),
                     None => {
-                        error!("Failed to parse received message: {}", err);
+                        error!("Failed to parse received message: {:?}", err);
                         Ok(())
                     }
                 }
@@ -263,11 +268,14 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        let parser = MessageParser::new(self.time_provider.now());
+        let parser = MessageParser::new(
+            self.time_provider.now(),
+            self.encryption_domain_service.clone(),
+        );
 
         let mut parsed_message = match message {
-            SentMessage::Message(message) => parser.parse_message(message),
-            SentMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon),
+            SentMessage::Message(message) => parser.parse_message(message).await,
+            SentMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon).await,
         }?;
 
         // Usually for sent messages the `from` would be our connected JID and the `to` would be

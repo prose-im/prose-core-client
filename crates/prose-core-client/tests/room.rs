@@ -355,6 +355,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                                 body: "Message 101".to_string(),
                                 attachments: vec![],
                                 mentions: vec![],
+                                encryption_info: None,
                                 is_transient: false,
                             })
                             .build_archived_message("q1", None),
@@ -364,6 +365,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                                 body: "Message 102".to_string(),
                                 attachments: vec![],
                                 mentions: vec![],
+                                encryption_info: None,
                                 is_transient: false,
                             })
                             .build_archived_message("q1", None),
@@ -403,6 +405,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                                 body: "Message 90".to_string(),
                                 attachments: vec![],
                                 mentions: vec![],
+                                encryption_info: None,
                                 is_transient: false,
                             })
                             .build_archived_message("q2", None),
@@ -419,6 +422,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                                 body: "Message 92".to_string(),
                                 attachments: vec![],
                                 mentions: vec![],
+                                encryption_info: None,
                                 is_transient: false,
                             })
                             .build_archived_message("q2", None),
@@ -428,6 +432,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                                 body: "Message 93".to_string(),
                                 attachments: vec![],
                                 mentions: vec![],
+                                encryption_info: None,
                                 is_transient: false,
                             })
                             .build_archived_message("q2", None),
@@ -437,6 +442,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                                 body: "Message 94".to_string(),
                                 attachments: vec![],
                                 mentions: vec![],
+                                encryption_info: None,
                                 is_transient: false,
                             })
                             .build_archived_message("q2", None),
@@ -471,6 +477,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     body: "Message 90".to_string(),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .set_reactions([Reaction {
@@ -488,6 +495,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     body: "Message 92".to_string(),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_dto(),
@@ -498,6 +506,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     body: "Message 93".to_string(),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_dto(),
@@ -508,6 +517,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     body: "Message 94".to_string(),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .build_message_dto(),
@@ -518,6 +528,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     body: "Message 101".to_string(),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .set_reactions([Reaction {
@@ -532,6 +543,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     body: "Message 102".to_string(),
                     attachments: vec![],
                     mentions: vec![],
+                    encryption_info: None,
                     is_transient: false,
                 })
                 .set_reactions([Reaction {
@@ -577,6 +589,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                                     body: "Message 100".to_string(),
                                     attachments: vec![],
                                     mentions: vec![],
+                                    encryption_info: None,
                                     is_transient: false,
                                 })
                                 .build_archived_message("q1", None),
@@ -637,6 +650,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                 body: "Message 100".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                encryption_info: None,
                 is_transient: false,
             })
             .build_message_dto()],

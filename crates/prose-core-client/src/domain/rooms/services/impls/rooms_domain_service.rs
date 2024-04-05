@@ -17,9 +17,9 @@ use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
-    DynConnectedRoomsRepository, DynIDProvider, DynMessageMigrationDomainService,
-    DynRoomAttributesService, DynRoomManagementService, DynRoomParticipationService,
-    DynUserInfoRepository, DynUserProfileRepository,
+    DynConnectedRoomsRepository, DynEncryptionDomainService, DynIDProvider,
+    DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
+    DynRoomParticipationService, DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
@@ -46,6 +46,7 @@ pub struct RoomsDomainService {
     client_event_dispatcher: DynClientEventDispatcher,
     connected_rooms_repo: DynConnectedRoomsRepository,
     ctx: DynAppContext,
+    encryption_domain_service: DynEncryptionDomainService,
     id_provider: DynIDProvider,
     message_migration_domain_service: DynMessageMigrationDomainService,
     room_attributes_service: DynRoomAttributesService,
@@ -425,6 +426,22 @@ impl RoomsDomainService {
             .unwrap_or_else(|| participant.formatted_username());
         let user_info = user_info.unwrap_or_default().unwrap_or_default();
 
+        match self
+            .encryption_domain_service
+            .start_session(participant)
+            .await
+        {
+            Ok(_) => {
+                // TODO: Mark room as OMEMO enabled or not
+            }
+            Err(err) => {
+                error!(
+                    "Failed to start OMEMO session with {participant}. {}",
+                    err.to_string()
+                );
+            }
+        }
+
         let room = Room::for_direct_message(
             &participant,
             &contact_name,
@@ -433,6 +450,7 @@ impl RoomsDomainService {
         );
 
         self.connected_rooms_repo.set_or_replace(room.clone());
+
         Ok(room)
     }
 

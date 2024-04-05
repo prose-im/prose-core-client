@@ -34,6 +34,7 @@ impl PubSubQuery {
         self
     }
 
+    #[allow(dead_code)]
     pub fn set_sub_id(mut self, sub_id: impl Into<String>) -> Self {
         self.items.subid = Some(SubscriptionId(sub_id.into()));
         self

@@ -6,6 +6,7 @@
 pub mod account;
 pub mod connection;
 pub mod contacts;
+pub mod encryption;
 pub mod general;
 pub mod messaging;
 pub mod rooms;

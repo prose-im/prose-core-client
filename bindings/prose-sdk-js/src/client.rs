@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
@@ -14,22 +15,19 @@ use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::{MucId, SoftwareVersion, UserStatus};
-use prose_core_client::{open_store, Client as ProseClient, IndexedDBDriver, StoreAvatarCache};
+use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarCache};
 
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
+use crate::encryption::{EncryptionService, JsEncryptionService};
+use crate::error::{Result, WasmError};
 use crate::types::{
     try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
     ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
     PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UploadSlot,
     UserBasicInfo, UserBasicInfoArray, UserMetadata, UserProfile,
 };
-
-type Result<T, E = JsError> = std::result::Result<T, E>;
-
-#[derive(thiserror::Error, Debug)]
-#[error(transparent)]
-pub struct WasmError(#[from] anyhow::Error);
 
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "ProseClientConfig")]
@@ -138,9 +136,10 @@ impl Client {
     pub async fn init(
         connection_provider: ProseConnectionProvider,
         delegate: JSDelegate,
+        encryption_service: JsEncryptionService,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
-        let store = open_store(IndexedDBDriver::new("ProseCache2")).await?;
+        let store = open_store(PlatformDriver::new("ProseCache2")).await?;
         let config = config.unwrap_or_default();
 
         static LOGGING_INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -180,7 +179,11 @@ impl Client {
             client: ProseClient::builder()
                 .set_connector_provider(Connector::provider(connection_provider, config))
                 .set_store(store.clone())
-                .set_avatar_cache(StoreAvatarCache::new(store))
+                .set_avatar_cache(StoreAvatarCache::new(store.clone()))
+                .set_encryption_service(Arc::new(EncryptionService::new(
+                    encryption_service,
+                    Arc::new(EncryptionKeysRepository::new(store.clone())),
+                )))
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .set_software_version(software_version)
                 .build(),

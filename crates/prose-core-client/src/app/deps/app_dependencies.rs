@@ -17,6 +17,10 @@ use crate::domain::contacts::repos::{
 use crate::domain::contacts::services::{
     BlockListDomainService, BlockListService, ContactListDomainService, ContactListService,
 };
+use crate::domain::encryption::repos::{EncryptionKeysRepository, UserDeviceRepository};
+use crate::domain::encryption::services::{
+    EncryptionDomainService, EncryptionService, UserDeviceIdProvider, UserDeviceService,
+};
 use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
 use crate::domain::messaging::services::{
@@ -50,6 +54,9 @@ pub type DynContactListDomainService = Arc<dyn ContactListDomainService>;
 pub type DynContactListRepository = Arc<dyn ContactListRepository>;
 pub type DynContactListService = Arc<dyn ContactListService>;
 pub type DynDraftsRepository = Arc<dyn DraftsRepository>;
+pub type DynEncryptionDomainService = Arc<dyn EncryptionDomainService>;
+pub type DynEncryptionKeysRepository = Arc<dyn EncryptionKeysRepository>;
+pub type DynEncryptionService = Arc<dyn EncryptionService>;
 pub type DynIDProvider = Arc<dyn IDProvider>;
 pub type DynMessageArchiveService = Arc<dyn MessageArchiveService>;
 pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
@@ -66,6 +73,9 @@ pub type DynSidebarDomainService = Arc<dyn SidebarDomainService>;
 pub type DynTimeProvider = Arc<dyn TimeProvider>;
 pub type DynUploadService = Arc<dyn UploadService>;
 pub type DynUserAccountService = Arc<dyn UserAccountService>;
+pub type DynUserDeviceIdProvider = Arc<dyn UserDeviceIdProvider>;
+pub type DynUserDeviceRepository = Arc<dyn UserDeviceRepository>;
+pub type DynUserDeviceService = Arc<dyn UserDeviceService>;
 pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
@@ -81,6 +91,7 @@ pub struct AppDependencies {
     pub contact_list_domain_service: DynContactListDomainService,
     pub ctx: DynAppContext,
     pub drafts_repo: DynDraftsRepository,
+    pub encryption_domain_service: DynEncryptionDomainService,
     pub id_provider: DynIDProvider,
     pub message_archive_service: DynMessageArchiveService,
     pub messages_repo: DynMessagesRepository,
@@ -96,6 +107,7 @@ pub struct AppDependencies {
     pub time_provider: DynTimeProvider,
     pub upload_service: DynUploadService,
     pub user_account_service: DynUserAccountService,
+    pub user_device_repo: DynUserDeviceRepository,
     pub user_info_repo: DynUserInfoRepository,
     pub user_info_service: DynUserInfoService,
     pub user_profile_repo: DynUserProfileRepository,

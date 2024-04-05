@@ -1,12 +1,15 @@
-use crate::repository::Entity;
-use async_trait::async_trait;
-use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
-use serde::de::DeserializeOwned;
-use serde::{Serialize, Serializer};
 use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::{Bound, RangeBounds};
+
+use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::{Serialize, Serializer};
+
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+
+use crate::repository::Entity;
 
 mod driver;
 pub mod prelude;
@@ -336,6 +339,12 @@ impl KeyType for String {
     }
 }
 
+impl KeyType for u32 {
+    fn to_raw_key(&self) -> RawKey {
+        RawKey::Integer(*self as i64)
+    }
+}
+
 to_raw_key!(i32);
 to_raw_key!(i64);
 to_raw_key!(f32);
@@ -345,8 +354,9 @@ to_raw_key!(&str);
 
 #[cfg(feature = "chrono")]
 mod chrono {
-    use super::{KeyType, RawKey};
     use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
+
+    use super::{KeyType, RawKey};
 
     /// N.B: DateTime<Local> and DateTime<FixedOffset> are not supported as keys, since these get
     /// encoded with their timezone, i.e. "2022-09-15T16:10:00+07:00".
@@ -365,10 +375,24 @@ mod chrono {
     }
 }
 
+#[cfg(feature = "uuid")]
+mod uuid {
+    use uuid::Uuid;
+
+    use super::{KeyType, RawKey};
+
+    impl KeyType for Uuid {
+        fn to_raw_key(&self) -> RawKey {
+            RawKey::Text(self.to_string())
+        }
+    }
+}
+
 #[cfg(feature = "jid")]
 mod jid {
-    use super::{KeyType, RawKey};
     use jid::{BareJid, FullJid, Jid};
+
+    use super::{KeyType, RawKey};
 
     to_raw_key_str!(BareJid);
     to_raw_key_str!(&BareJid);

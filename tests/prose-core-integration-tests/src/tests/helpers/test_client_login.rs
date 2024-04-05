@@ -16,13 +16,15 @@ impl TestClient {
         user: UserId,
         password: impl AsRef<str>,
     ) -> Result<(), ConnectionError> {
+        self.push_ctx([("USER_ID".into(), user.to_string())].into());
+
         self.perform_load_roster();
 
         // Initial presence
         self.send(r#"
         <presence xmlns='jabber:client'>
             <show>chat</show>
-            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="ipEcl0ID83wbGxX3lfUdwi1F8VM=" />
+            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
         </presence>"#
         );
 
@@ -37,6 +39,10 @@ impl TestClient {
 
         self.perform_request_server_capabilities();
         self.perform_load_block_list();
+        self.perform_load_device_list();
+        self.perform_publish_device();
+        self.perform_publish_device_bundle();
+        self.perform_start_session(&user);
 
         self.connect(&user, password).await
     }
@@ -171,5 +177,158 @@ impl TestClient {
         </iq>
         "#,
         );
+    }
+
+    fn perform_load_device_list(&self) {
+        self.send(
+            r#"
+        <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="get">
+            <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+                <items node="eu.siacs.conversations.axolotl.devicelist"/>
+            </pubsub>
+        </iq>
+        "#,
+        );
+        self.receive(
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="eu.siacs.conversations.axolotl.devicelist">
+              <item id="current">
+                <list xmlns="eu.siacs.conversations.axolotl" />
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+            "#,
+        )
+    }
+
+    fn perform_publish_device(&self) {
+        self.send(
+            r#"
+            <iq xmlns='jabber:client' id="{{ID}}" type="set">
+              <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+                <publish node="eu.siacs.conversations.axolotl.devicelist">
+                  <item id="current">
+                    <list xmlns='eu.siacs.conversations.axolotl'>
+                      <device id="0" label="prose-core-client" />
+                    </list>
+                  </item>
+                </publish><publish-options>
+                  <x xmlns='jabber:x:data' type="submit">
+                    <field type="hidden" var="FORM_TYPE">
+                      <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                    </field>
+                    <field var="pubsub#access_model">
+                      <value>open</value>
+                    </field>
+                  </x>
+                </publish-options>
+              </pubsub>
+            </iq>
+            "#,
+        );
+        self.receive(
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="eu.siacs.conversations.axolotl.devicelist">
+              <item id="current" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#,
+        );
+    }
+
+    fn perform_publish_device_bundle(&self) {
+        self.send(
+            r#"
+            <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="get">
+              <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+                <items node="eu.siacs.conversations.axolotl.bundles:0" />
+              </pubsub>
+            </iq>
+            "#,
+        );
+        self.receive(
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="error">
+              <error type="cancel">
+                <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+              </error>
+            </iq>
+            "#,
+        );
+
+        self.send(
+            r#"
+            <iq xmlns='jabber:client' id="{{ID}}" type="set">
+              <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+                <publish node="eu.siacs.conversations.axolotl.bundles:0">
+                  <item id="current">
+                    <bundle xmlns='eu.siacs.conversations.axolotl'>
+                      <signedPreKeyPublic signedPreKeyId="0">AA==</signedPreKeyPublic>
+                      <signedPreKeySignature>AA==</signedPreKeySignature>
+                      <identityKey>AA==</identityKey>
+                      <prekeys />
+                    </bundle>
+                  </item>
+                </publish>
+                <publish-options>
+                  <x xmlns='jabber:x:data' type="submit">
+                    <field type="hidden" var="FORM_TYPE">
+                      <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                    </field>
+                    <field var="pubsub#access_model">
+                      <value>open</value>
+                    </field>
+                  </x>
+                </publish-options>
+              </pubsub>
+            </iq>
+            "#,
+        );
+        self.receive(
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="eu.siacs.conversations.axolotl.bundles:0">
+              <item id="current" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#,
+        );
+    }
+
+    fn perform_start_session(&self, user_id: &UserId) {
+        self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+
+        self.send(
+            r#"
+        <iq xmlns='jabber:client' id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
+            <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+                <items node="eu.siacs.conversations.axolotl.devicelist"/>
+            </pubsub>
+        </iq>
+        "#,
+        );
+        self.receive(
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items node="eu.siacs.conversations.axolotl.devicelist">
+              <item id="current">
+                <list xmlns="eu.siacs.conversations.axolotl" />
+              </item>
+            </items>
+          </pubsub>
+        </iq>
+            "#,
+        );
+
+        self.pop_ctx();
     }
 }

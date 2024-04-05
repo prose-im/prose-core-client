@@ -7,6 +7,7 @@ use anyhow::Result;
 use chrono::{TimeZone, Utc};
 use jid::Jid;
 use pretty_assertions::assert_eq;
+use std::sync::Arc;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::date;
 use xmpp_parsers::delay::Delay;
@@ -14,11 +15,13 @@ use xmpp_parsers::mam::QueryId;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::{Affiliation, Role};
 
+use prose_core_client::domain::encryption::services::mocks::MockEncryptionDomainService;
 use prose_core_client::domain::messaging::models::{
     MessageLike, MessageLikePayload, MessageParser,
 };
 use prose_core_client::dtos::{Mention, OccupantId, ParticipantId, UnicodeScalarIndex, UserId};
 use prose_core_client::{occupant_id, user_id};
+use prose_proc_macros::mt_test;
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::stanza_id::StanzaId;
@@ -27,8 +30,8 @@ use prose_xmpp::stanza::references::Reference;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::{bare, full};
 
-#[test]
-fn test_parse_chat_message() -> Result<()> {
+#[mt_test]
+async fn test_parse_chat_message() -> Result<()> {
     let mut reference = Reference::mention(bare!("them@prose.org"));
     reference.begin = Some(6);
     reference.end = Some(11);
@@ -41,7 +44,12 @@ fn test_parse_chat_message() -> Result<()> {
         .set_body("Hello @them")
         .add_references([reference]);
 
-    let parsed_message = MessageParser::new(Default::default()).parse_message(message)?;
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_message(message)
+    .await?;
 
     assert_eq!(
         MessageLike {
@@ -58,6 +66,7 @@ fn test_parse_chat_message() -> Result<()> {
                     user: user_id!("them@prose.org"),
                     range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(11),
                 }],
+                encryption_info: None,
                 is_transient: false,
             },
         },
@@ -67,8 +76,8 @@ fn test_parse_chat_message() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_parse_groupchat_message() -> Result<()> {
+#[mt_test]
+async fn test_parse_groupchat_message() -> Result<()> {
     let message = Message::new()
         .set_id("message-id-1".into())
         .set_type(MessageType::Groupchat)
@@ -80,7 +89,12 @@ fn test_parse_groupchat_message() -> Result<()> {
             by: bare!("user@prose.org").into(),
         });
 
-    let parsed_message = MessageParser::new(Default::default()).parse_message(message)?;
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_message(message)
+    .await?;
 
     assert_eq!(
         MessageLike {
@@ -94,6 +108,7 @@ fn test_parse_groupchat_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                encryption_info: None,
                 is_transient: false,
             },
         },
@@ -103,8 +118,8 @@ fn test_parse_groupchat_message() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_parse_sent_carbon_message() -> Result<()> {
+#[mt_test]
+async fn test_parse_sent_carbon_message() -> Result<()> {
     let message = Carbon::Sent(Forwarded {
         delay: None,
         stanza: Some(Box::new(
@@ -122,7 +137,12 @@ fn test_parse_sent_carbon_message() -> Result<()> {
         )),
     });
 
-    let parsed_message = MessageParser::new(Default::default()).parse_carbon(message)?;
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_carbon(message)
+    .await?;
 
     assert_eq!(
         MessageLike {
@@ -136,6 +156,7 @@ fn test_parse_sent_carbon_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                encryption_info: None,
                 is_transient: false,
             },
         },
@@ -145,8 +166,8 @@ fn test_parse_sent_carbon_message() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_parse_mam_groupchat_message() -> Result<()> {
+#[mt_test]
+async fn test_parse_mam_groupchat_message() -> Result<()> {
     let message = ArchivedMessage {
         id: "FbGQI-iEUNysr8pdD2PP9mmU".into(),
         query_id: Some(QueryId("de4aba65-7b04-40c0-9bd1-e8454f001e37".to_string())),
@@ -167,7 +188,12 @@ fn test_parse_mam_groupchat_message() -> Result<()> {
         },
     };
 
-    let parsed_message = MessageParser::new(Default::default()).parse_mam_message(message)?;
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_mam_message(message)
+    .await?;
 
     assert_eq!(
         MessageLike {
@@ -181,6 +207,7 @@ fn test_parse_mam_groupchat_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                encryption_info: None,
                 is_transient: false,
             },
         },
@@ -190,8 +217,8 @@ fn test_parse_mam_groupchat_message() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
+#[mt_test]
+async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
     let message = ArchivedMessage {
         id: "FbGQI-iEUNysr8pdD2PP9mmU".into(),
         query_id: Some(QueryId("de4aba65-7b04-40c0-9bd1-e8454f001e37".to_string())),
@@ -217,7 +244,12 @@ fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
         },
     };
 
-    let parsed_message = MessageParser::new(Default::default()).parse_mam_message(message)?;
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_mam_message(message)
+    .await?;
 
     assert_eq!(
         MessageLike {
@@ -231,6 +263,7 @@ fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                encryption_info: None,
                 is_transient: false,
             },
         },
@@ -240,8 +273,8 @@ fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn test_parse_mam_chat_message() -> Result<()> {
+#[mt_test]
+async fn test_parse_mam_chat_message() -> Result<()> {
     let message = ArchivedMessage {
         id: "bne6LtG1ev_jIb1oYNA7nxip".into(),
         query_id: Some(QueryId("037927bd-fe98-4dd5-a9e8-aeab2650c343".to_string())),
@@ -262,7 +295,12 @@ fn test_parse_mam_chat_message() -> Result<()> {
         },
     };
 
-    let parsed_message = MessageParser::new(Default::default()).parse_mam_message(message)?;
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_mam_message(message)
+    .await?;
 
     assert_eq!(
         MessageLike {
@@ -276,6 +314,7 @@ fn test_parse_mam_chat_message() -> Result<()> {
                 body: "Hello World".to_string(),
                 attachments: vec![],
                 mentions: vec![],
+                encryption_info: None,
                 is_transient: false,
             },
         },

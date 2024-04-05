@@ -9,12 +9,16 @@ use std::sync::Arc;
 use prose_store::prelude::*;
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynClientEventDispatcher, DynIDProvider, DynTimeProvider,
+    AppContext, AppDependencies, DynClientEventDispatcher, DynEncryptionService, DynIDProvider,
+    DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::services::RoomInner;
 use crate::domain::contacts::services::impls::{
     BlockListDomainService, BlockListDomainServiceDependencies, ContactListDomainService,
     ContactListDomainServiceDependencies,
+};
+use crate::domain::encryption::services::impls::{
+    EncryptionDomainService, EncryptionDomainServiceDependencies,
 };
 use crate::domain::messaging::services::impls::{
     MessageMigrationDomainService, MessageMigrationDomainServiceDependencies,
@@ -27,6 +31,9 @@ use crate::domain::sidebar::services::impls::{
 use crate::infra::avatars::AvatarCache;
 use crate::infra::contacts::{
     CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
+};
+use crate::infra::encryption::{
+    encryption_keys_collections, EncryptionKeysRepository, UserDeviceRecord, UserDeviceRepository,
 };
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
@@ -42,18 +49,22 @@ pub(crate) struct PlatformDependencies {
     pub avatar_cache: Box<dyn AvatarCache>,
     pub client_event_dispatcher: DynClientEventDispatcher,
     pub ctx: AppContext,
+    pub encryption_service: DynEncryptionService,
     pub id_provider: DynIDProvider,
     pub short_id_provider: DynIDProvider,
     pub store: Store<PlatformDriver>,
     pub time_provider: DynTimeProvider,
+    pub user_device_id_provider: DynUserDeviceIdProvider,
     pub xmpp: Arc<XMPPClient>,
 }
+
+const DB_VERSION: u32 = 16;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
 
     let inner_versions_changed = versions_changed.clone();
-    let store = Store::open(driver, 15, move |event| {
+    let store = Store::open(driver, DB_VERSION, move |event| {
         let tx = &event.tx;
 
         inner_versions_changed.store(true, Ordering::Relaxed);
@@ -79,6 +90,16 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         if event.old_version < 15 {
             tx.delete_collection(MessageRecord::collection())?;
             create_collection::<D, MessageRecord>(&tx)?;
+        }
+
+        if event.old_version < 16 {
+            create_collection::<D, UserDeviceRecord>(&tx)?;
+            tx.create_collection(encryption_keys_collections::IDENTITY)?;
+            tx.create_collection(encryption_keys_collections::LOCAL_DEVICE)?;
+            tx.create_collection(encryption_keys_collections::PRE_KEY)?;
+            tx.create_collection(encryption_keys_collections::SENDER_KEY)?;
+            tx.create_collection(encryption_keys_collections::SESSION_RECORD)?;
+            tx.create_collection(encryption_keys_collections::SIGNED_PRE_KEY)?;
         }
 
         Ok(())
@@ -137,11 +158,29 @@ impl From<PlatformDependencies> for AppDependencies {
             message_migration_domain_service_dependencies,
         ));
 
+        let encryption_keys_repo = Arc::new(EncryptionKeysRepository::new(d.store.clone()));
+        let user_device_repo = Arc::new(UserDeviceRepository::new(d.store.clone()));
+
+        let encryption_domain_service_dependencies = EncryptionDomainServiceDependencies {
+            ctx: ctx.clone(),
+            encryption_keys_repo: encryption_keys_repo.clone(),
+            encryption_service: d.encryption_service,
+            message_repo: messages_repo.clone(),
+            time_provider: time_provider.clone(),
+            user_device_id_provider: d.user_device_id_provider,
+            user_device_repo,
+            user_device_service: d.xmpp.clone(),
+        };
+        let encryption_domain_service = Arc::new(EncryptionDomainService::from(
+            encryption_domain_service_dependencies,
+        ));
+
         let rooms_domain_service_dependencies = RoomsDomainServiceDependencies {
             account_settings_repo: account_settings_repo.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
             ctx: ctx.clone(),
+            encryption_domain_service: encryption_domain_service.clone(),
             id_provider: d.short_id_provider.clone(),
             message_migration_domain_service: message_migration_domain_service.clone(),
             room_attributes_service: d.xmpp.clone(),
@@ -191,27 +230,31 @@ impl From<PlatformDependencies> for AppDependencies {
         let room_factory = {
             let client_event_dispatcher = client_event_dispatcher.clone();
             let ctx = ctx.clone();
-            let xmpp = d.xmpp.clone();
-            let time_provider = time_provider.clone();
-            let message_repo = messages_repo.clone();
             let drafts_repo = drafts_repo.clone();
-            let user_profile_repo = user_profile_repo.clone();
+            let encryption_domain_service = encryption_domain_service.clone();
+            let id_provider = id_provider.clone();
+            let message_repo = messages_repo.clone();
             let sidebar_domain_service = sidebar_domain_service.clone();
+            let time_provider = time_provider.clone();
+            let user_profile_repo = user_profile_repo.clone();
+            let xmpp = d.xmpp.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
-                    data: data.clone(),
-                    ctx: ctx.clone(),
-                    time_provider: time_provider.clone(),
-                    messaging_service: xmpp.clone(),
-                    message_archive_service: xmpp.clone(),
-                    participation_service: xmpp.clone(),
                     attributes_service: xmpp.clone(),
-                    message_repo: message_repo.clone(),
-                    drafts_repo: drafts_repo.clone(),
-                    user_profile_repo: user_profile_repo.clone(),
                     client_event_dispatcher: client_event_dispatcher.clone(),
+                    ctx: ctx.clone(),
+                    data: data.clone(),
+                    drafts_repo: drafts_repo.clone(),
+                    encryption_domain_service: encryption_domain_service.clone(),
+                    id_provider: id_provider.clone(),
+                    message_archive_service: xmpp.clone(),
+                    message_repo: message_repo.clone(),
+                    messaging_service: xmpp.clone(),
+                    participation_service: xmpp.clone(),
                     sidebar_domain_service: sidebar_domain_service.clone(),
+                    time_provider: time_provider.clone(),
+                    user_profile_repo: user_profile_repo.clone(),
                 }
                 .into()
             }))
@@ -241,11 +284,13 @@ impl From<PlatformDependencies> for AppDependencies {
             time_provider,
             upload_service: d.xmpp.clone(),
             user_account_service: d.xmpp.clone(),
+            user_device_repo: Arc::new(UserDeviceRepository::new(d.store)),
             user_info_repo,
             user_info_service: d.xmpp.clone(),
             user_profile_repo,
             user_profile_service: d.xmpp.clone(),
             id_provider,
+            encryption_domain_service,
         }
     }
 }

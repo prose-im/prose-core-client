@@ -57,6 +57,8 @@ pub struct MessageMetadata {
     pub is_edited: bool,
     #[wasm_bindgen(js_name = "isTransient")]
     pub is_transient: bool,
+    #[wasm_bindgen(js_name = "isEncrypted")]
+    pub is_encrypted: bool,
 }
 
 impl From<dtos::Message> for Message {
@@ -85,6 +87,7 @@ impl From<dtos::Message> for Message {
             meta: MessageMetadata {
                 is_edited: value.is_edited,
                 is_transient: value.is_transient,
+                is_encrypted: value.is_encrypted,
             },
             reactions: value
                 .reactions

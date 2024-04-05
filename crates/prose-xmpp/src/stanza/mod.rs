@@ -19,6 +19,7 @@ pub mod media_sharing;
 pub mod message;
 pub mod muc;
 pub mod ns;
+pub mod omemo;
 pub mod pubsub;
 pub mod references;
 pub mod user_activity;

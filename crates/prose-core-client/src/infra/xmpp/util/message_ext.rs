@@ -6,11 +6,13 @@
 use minidom::Element;
 use tracing::error;
 use xmpp_parsers::message::MessageType;
+use xmpp_parsers::{eme, legacy_omemo};
 
 use prose_xmpp::ns;
 use prose_xmpp::stanza::media_sharing::{MediaShare, OOB};
 use prose_xmpp::stanza::Message;
 
+use crate::domain::messaging::models::send_message_request::{Body, Payload};
 use crate::domain::messaging::models::Attachment;
 
 pub trait MessageExt {
@@ -24,6 +26,7 @@ pub trait MessageExt {
     /// its type is 'groupchat' or if it contains an element "<x xmlns='http://jabber.org/protocol/muc#user' />".
     /// The latter can happen even for 'chat' messages, e.g. for private messages in a MUC room.
     fn is_groupchat_message(&self) -> bool;
+    fn set_message_body(self, body: Option<Body>) -> Self;
 }
 
 impl MessageExt for Message {
@@ -90,6 +93,30 @@ impl MessageExt for Message {
             .iter()
             .find(|p| p.is("x", ns::MUC_USER))
             .is_some()
+    }
+
+    fn set_message_body(mut self, body: Option<Body>) -> Self {
+        let Some(body) = body else {
+            return self;
+        };
+
+        self = self.add_references(body.mentions.into_iter().map(Into::into));
+
+        match body.payload {
+            Payload::Plaintext(message) => self.set_body(message),
+            Payload::Encrypted(encrypted_payload) => {
+                self.payloads
+                    .push(legacy_omemo::Encrypted::from(encrypted_payload).into());
+                self.payloads.push(
+                    eme::ExplicitMessageEncryption {
+                        namespace: ns::LEGACY_OMEMO.to_string(),
+                        name: Some("OMEMO".to_string()),
+                    }
+                    .into(),
+                );
+                self.set_body("[This message is OMEMO encrypted]")
+            }
+        }
     }
 }
 

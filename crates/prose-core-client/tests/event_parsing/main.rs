@@ -9,4 +9,5 @@ mod message_event_parser;
 mod request_event_parser;
 mod room_event_parser;
 mod sidebar_bookmark_event_parser;
+mod user_device_event_parser;
 mod user_event_parser;

@@ -17,3 +17,8 @@ pub use crate::driver::sqlite::{Error, SqliteDriver};
 pub use IndexedDBDriver as PlatformDriver;
 #[cfg(not(target_arch = "wasm32"))]
 pub use SqliteDriver as PlatformDriver;
+
+#[cfg(target_arch = "wasm32")]
+pub use crate::driver::indexed_db::Error as DriverError;
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::driver::sqlite::Error as DriverError;

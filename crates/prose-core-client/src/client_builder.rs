@@ -9,16 +9,19 @@ use prose_store::prelude::{PlatformDriver, Store};
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
-use crate::app::deps::{AppContext, AppDependencies};
+use crate::app::deps::{
+    AppContext, AppDependencies, DynEncryptionService, DynTimeProvider, DynUserDeviceIdProvider,
+};
 use crate::app::event_handlers::{
     BlockListEventHandler, BookmarksEventHandler, ClientEventDispatcher, ConnectionEventHandler,
     ContactListEventHandler, MessagesEventHandler, RequestsEventHandler, RoomsEventHandler,
-    ServerEventHandlerQueue, UserStateEventHandler,
+    ServerEventHandlerQueue, UserDevicesEventHandler, UserStateEventHandler,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactListService, RoomsService, UserDataService,
 };
 use crate::client::ClientInner;
+use crate::domain::encryption::services::{RandUserDeviceIdProvider, UserDeviceIdProvider};
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
 use crate::infra::avatars::AvatarCache;
 use crate::infra::general::NanoIDProvider;
@@ -27,65 +30,93 @@ use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
 use crate::services::{BlockListService, CacheService, SidebarService, UploadService};
 use crate::{Client, ClientDelegate};
 
-pub struct UndefinedStore {}
-pub struct UndefinedAvatarCache {}
+pub struct UndefinedStore;
+pub struct UndefinedAvatarCache;
+pub struct UndefinedEncryptionService;
 
-pub struct ClientBuilder<S, A> {
-    builder: XMPPClientBuilder,
-    store: S,
+pub struct ClientBuilder<S, A, E> {
     avatar_cache: A,
-    time_provider: Arc<dyn TimeProvider>,
+    builder: XMPPClientBuilder,
+    delegate: Option<Box<dyn ClientDelegate>>,
+    encryption_service: E,
     id_provider: Arc<dyn IDProvider>,
     software_version: SoftwareVersion,
-    delegate: Option<Box<dyn ClientDelegate>>,
+    store: S,
+    time_provider: DynTimeProvider,
+    user_device_id_provider: DynUserDeviceIdProvider,
 }
 
-impl ClientBuilder<UndefinedStore, UndefinedAvatarCache> {
+impl ClientBuilder<UndefinedStore, UndefinedAvatarCache, UndefinedEncryptionService> {
     pub(crate) fn new() -> Self {
         ClientBuilder {
-            builder: XMPPClient::builder(),
-            store: UndefinedStore {},
             avatar_cache: UndefinedAvatarCache {},
-            time_provider: Arc::new(SystemTimeProvider::default()),
+            builder: XMPPClient::builder(),
+            delegate: None,
+            encryption_service: UndefinedEncryptionService,
             id_provider: Arc::new(UUIDProvider::default()),
             software_version: SoftwareVersion::default(),
-            delegate: None,
+            store: UndefinedStore,
+            time_provider: Arc::new(SystemTimeProvider::default()),
+            user_device_id_provider: Arc::new(RandUserDeviceIdProvider::default()),
         }
     }
 }
 
-impl<A> ClientBuilder<UndefinedStore, A> {
+impl<A, E> ClientBuilder<UndefinedStore, A, E> {
     pub fn set_store(
         self,
         store: Store<PlatformDriver>,
-    ) -> ClientBuilder<Store<PlatformDriver>, A> {
+    ) -> ClientBuilder<Store<PlatformDriver>, A, E> {
         ClientBuilder {
-            builder: self.builder,
-            store,
             avatar_cache: self.avatar_cache,
-            time_provider: self.time_provider,
-            id_provider: self.id_provider,
-            software_version: self.software_version,
-            delegate: None,
-        }
-    }
-}
-
-impl<D> ClientBuilder<D, UndefinedAvatarCache> {
-    pub fn set_avatar_cache<A2: AvatarCache>(self, avatar_cache: A2) -> ClientBuilder<D, A2> {
-        ClientBuilder {
             builder: self.builder,
-            store: self.store,
-            avatar_cache,
-            time_provider: self.time_provider,
+            delegate: None,
+            encryption_service: self.encryption_service,
             id_provider: self.id_provider,
             software_version: self.software_version,
-            delegate: None,
+            store,
+            time_provider: self.time_provider,
+            user_device_id_provider: self.user_device_id_provider,
         }
     }
 }
 
-impl<D, A> ClientBuilder<D, A> {
+impl<D, E> ClientBuilder<D, UndefinedAvatarCache, E> {
+    pub fn set_avatar_cache<A2: AvatarCache>(self, avatar_cache: A2) -> ClientBuilder<D, A2, E> {
+        ClientBuilder {
+            avatar_cache,
+            builder: self.builder,
+            delegate: None,
+            encryption_service: self.encryption_service,
+            id_provider: self.id_provider,
+            software_version: self.software_version,
+            store: self.store,
+            time_provider: self.time_provider,
+            user_device_id_provider: self.user_device_id_provider,
+        }
+    }
+}
+
+impl<S, A> ClientBuilder<S, A, UndefinedEncryptionService> {
+    pub fn set_encryption_service(
+        self,
+        encryption_service: DynEncryptionService,
+    ) -> ClientBuilder<S, A, DynEncryptionService> {
+        ClientBuilder {
+            avatar_cache: self.avatar_cache,
+            builder: self.builder,
+            delegate: None,
+            encryption_service,
+            id_provider: self.id_provider,
+            software_version: self.software_version,
+            store: self.store,
+            time_provider: self.time_provider,
+            user_device_id_provider: self.user_device_id_provider,
+        }
+    }
+}
+
+impl<D, A, E> ClientBuilder<D, A, E> {
     pub fn set_connector_provider(mut self, connector_provider: ConnectorProvider) -> Self {
         self.builder = self.builder.set_connector_provider(connector_provider);
         self
@@ -93,6 +124,14 @@ impl<D, A> ClientBuilder<D, A> {
 
     pub fn set_id_provider<P: IDProvider + 'static>(mut self, id_provider: P) -> Self {
         self.builder = self.builder.set_id_provider(id_provider);
+        self
+    }
+
+    pub fn set_user_device_id_provider<P: UserDeviceIdProvider + 'static>(
+        mut self,
+        id_provider: P,
+    ) -> Self {
+        self.user_device_id_provider = Arc::new(id_provider);
         self
     }
 
@@ -112,7 +151,7 @@ impl<D, A> ClientBuilder<D, A> {
     }
 }
 
-impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
+impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryptionService> {
     pub fn build(self) -> Client {
         let capabilities = Capabilities::new(
             self.software_version.name.clone(),
@@ -151,6 +190,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
                 Feature::Notify(ns::AVATAR_METADATA),
                 Feature::Notify(ns::BOOKMARKS),
                 Feature::Notify(ns::BOOKMARKS2),
+                Feature::Notify(ns::LEGACY_OMEMO_DEVICELIST),
                 Feature::Notify(ns::PUBSUB),
                 Feature::Notify(ns::USER_ACTIVITY),
                 Feature::Notify(ns::VCARD4),
@@ -174,10 +214,12 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
 
         let dependencies: AppDependencies = PlatformDependencies {
             ctx: AppContext::new(capabilities, self.software_version),
+            encryption_service: self.encryption_service,
             id_provider: self.id_provider,
             short_id_provider: Arc::new(NanoIDProvider::default()),
             store: self.store,
             time_provider: self.time_provider,
+            user_device_id_provider: self.user_device_id_provider,
             xmpp: xmpp_client.clone(),
             avatar_cache: Box::new(self.avatar_cache),
             client_event_dispatcher: event_dispatcher.clone(),
@@ -193,6 +235,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A> {
             Box::new(BookmarksEventHandler::from(&dependencies)),
             Box::new(ContactListEventHandler::from(&dependencies)),
             Box::new(BlockListEventHandler::from(&dependencies)),
+            Box::new(UserDevicesEventHandler::from(&dependencies)),
         ]);
 
         let client_inner = Arc::new(ClientInner {
