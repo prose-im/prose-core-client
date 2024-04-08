@@ -8,12 +8,13 @@ use anyhow::Result;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAvatarRepository, DynTimeProvider, DynUserInfoRepository, DynUserProfileRepository,
-    DynUserProfileService,
+    DynAvatarRepository, DynTimeProvider, DynUserDeviceService, DynUserInfoRepository,
+    DynUserProfileRepository, DynUserProfileService,
 };
 use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{PlatformImage, UserMetadata};
 use crate::domain::user_profiles::models::UserProfile;
+use crate::dtos::{Device, DeviceBundle, DeviceId};
 
 #[derive(InjectDependencies)]
 pub struct UserDataService {
@@ -24,33 +25,35 @@ pub struct UserDataService {
     #[inject]
     avatar_repo: DynAvatarRepository,
     #[inject]
+    user_device_service: DynUserDeviceService,
+    #[inject]
     user_info_repo: DynUserInfoRepository,
     #[inject]
     user_profile_repo: DynUserProfileRepository,
 }
 
 impl UserDataService {
-    pub async fn load_avatar(&self, from: &UserId) -> Result<Option<PlatformImage>> {
+    pub async fn load_avatar(&self, user_id: &UserId) -> Result<Option<PlatformImage>> {
         let Some(avatar_metadata) = self
             .user_info_repo
-            .get_user_info(from)
+            .get_user_info(user_id)
             .await?
             .and_then(|info| info.avatar)
         else {
             return Ok(None);
         };
-        let image = self.avatar_repo.get(from, &avatar_metadata).await?;
+        let image = self.avatar_repo.get(user_id, &avatar_metadata).await?;
         Ok(image)
     }
 
-    pub async fn load_user_profile(&self, from: &UserId) -> Result<Option<UserProfile>> {
-        self.user_profile_repo.get(from).await
+    pub async fn load_user_profile(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
+        self.user_profile_repo.get(user_id).await
     }
 
-    pub async fn load_user_metadata(&self, from: &UserId) -> Result<Option<UserMetadata>> {
+    pub async fn load_user_metadata(&self, user_id: &UserId) -> Result<Option<UserMetadata>> {
         let Some(resource_id) = self
             .user_info_repo
-            .resolve_user_id_to_user_resource_id(from)
+            .resolve_user_id_to_user_resource_id(user_id)
         else {
             return Ok(None);
         };
@@ -59,5 +62,23 @@ impl UserDataService {
             .load_user_metadata(&resource_id, self.time_provider.now())
             .await?;
         Ok(metadata)
+    }
+
+    pub async fn load_user_devices(&self, user_id: &UserId) -> Result<Vec<Device>> {
+        Ok(self
+            .user_device_service
+            .load_device_list(user_id)
+            .await?
+            .devices)
+    }
+
+    pub async fn load_device_bundle(
+        &self,
+        user_id: &UserId,
+        device_id: &DeviceId,
+    ) -> Result<Option<DeviceBundle>> {
+        self.user_device_service
+            .load_device_bundle(user_id, device_id)
+            .await
     }
 }

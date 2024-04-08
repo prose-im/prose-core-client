@@ -20,7 +20,7 @@ pub use crate::domain::sidebar::models::Bookmark;
 pub use crate::domain::{
     contacts::models::PresenceSubscription,
     encryption::models::{
-        DeviceBundle, DeviceId, EncryptionDirection, IdentityKey, IdentityKeyPair,
+        Device, DeviceBundle, DeviceId, EncryptionDirection, IdentityKey, IdentityKeyPair,
         LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey, PublicKey,
         SessionRecord, SignedPreKeyId, SignedPreKeyRecord,
     },

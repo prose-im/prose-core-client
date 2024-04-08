@@ -8,14 +8,14 @@ use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{env, fs};
 
 use anyhow::{anyhow, format_err, Result};
-use dialoguer::{theme::ColorfulTheme, Input, MultiSelect, Select};
+use dialoguer::{theme::ColorfulTheme, Input, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
 use regex::Regex;
@@ -27,10 +27,9 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, AttachmentType, Availability, Bookmark, Contact, Mention, Message,
-    ParticipantInfo, PublicRoomInfo, RoomEnvelope, RoomId, SendMessageRequest,
-    SendMessageRequestBody, SidebarItem, StanzaId, StringIndexRangeExt, UploadSlot, UserBasicInfo,
-    UserId, Utf8Index,
+    Address, Attachment, AttachmentType, Availability, Mention, Message, RoomEnvelope, RoomId,
+    SendMessageRequest, SendMessageRequestBody, StanzaId, StringIndexRangeExt, UploadSlot,
+    UserBasicInfo, UserId, Utf8Index,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::infra::encryption::EncryptionKeysRepository;
@@ -39,7 +38,18 @@ use prose_core_client::{
     SignalServiceHandle,
 };
 use prose_xmpp::connector;
-use prose_xmpp::mods::muc;
+
+use crate::type_display::{
+    ConnectedRoomEnvelope, DeviceEnvelope, JidWithName, ParticipantEnvelope,
+};
+use crate::type_selection::{
+    select_contact, select_contact_or_self, select_device, select_file, select_item_from_list,
+    select_muc_room, select_multiple_contacts, select_multiple_jids_from_list,
+    select_public_channel, select_room, select_sidebar_item,
+};
+
+mod type_display;
+mod type_selection;
 
 async fn configure_client() -> Result<(BareJid, Client)> {
     let cache_path = env::current_dir()?
@@ -209,228 +219,6 @@ fn prompt_string(prompt: impl Into<String>) -> String {
         .unwrap()
 }
 
-#[derive(Debug)]
-struct JidWithName {
-    jid: BareJid,
-    name: String,
-}
-
-impl Display for JidWithName {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:<30} | {}", self.name.truncate_to(30), self.jid)
-    }
-}
-
-impl From<RoomEnvelope> for JidWithName {
-    fn from(value: RoomEnvelope) -> Self {
-        Self {
-            jid: value.to_generic_room().jid().clone().into_bare(),
-            name: format!(
-                "{} {}",
-                value.kind(),
-                value
-                    .to_generic_room()
-                    .name()
-                    .unwrap_or("<untitled>".to_string())
-            ),
-        }
-    }
-}
-
-impl From<muc::Room> for JidWithName {
-    fn from(value: muc::Room) -> Self {
-        Self {
-            jid: value.jid.into_bare(),
-            name: value.name.as_deref().unwrap_or("<untitled>").to_string(),
-        }
-    }
-}
-
-impl From<PublicRoomInfo> for JidWithName {
-    fn from(value: PublicRoomInfo) -> Self {
-        Self {
-            jid: value.id.into_inner(),
-            name: value.name.as_deref().unwrap_or("<untitled>").to_string(),
-        }
-    }
-}
-
-impl From<Contact> for JidWithName {
-    fn from(value: Contact) -> Self {
-        Self {
-            jid: value.id.into_inner(),
-            name: value.name,
-        }
-    }
-}
-
-impl From<SidebarItem> for JidWithName {
-    fn from(value: SidebarItem) -> Self {
-        Self {
-            jid: value.room.to_generic_room().jid().clone().into_bare(),
-            name: value.name,
-        }
-    }
-}
-
-impl From<Bookmark> for JidWithName {
-    fn from(value: Bookmark) -> Self {
-        Self {
-            jid: value.jid.into_bare(),
-            name: value.name,
-        }
-    }
-}
-
-struct ConnectedRoomEnvelope(RoomEnvelope);
-
-impl Display for ConnectedRoomEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} {:<40} | {:<70} | {}",
-            self.0.kind(),
-            self.0
-                .to_generic_room()
-                .name()
-                .unwrap_or("<untitled>".to_string())
-                .truncate_to(40),
-            self.0.to_generic_room().jid().to_string().truncate_to(70),
-            self.0
-                .to_generic_room()
-                .subject()
-                .as_deref()
-                .unwrap_or("<no subject>")
-        )
-    }
-}
-
-struct ParticipantEnvelope(ParticipantInfo);
-
-impl Display for ParticipantEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{:<20} {:<20} {:<10} {}",
-            self.0
-                .id
-                .as_ref()
-                .map(|jid| jid.to_string())
-                .unwrap_or("<unknown real jid>".to_string())
-                .truncate_to(20),
-            self.0.name,
-            self.0.affiliation,
-            self.0.availability
-        )
-    }
-}
-
-#[allow(dead_code)]
-async fn select_contact(client: &Client) -> Result<UserId> {
-    let contacts = client.contact_list.load_contacts().await?.into_iter();
-    Ok(
-        select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
-            .id
-            .clone(),
-    )
-}
-
-async fn select_multiple_contacts(client: &Client) -> Result<Vec<UserId>> {
-    let contacts = client
-        .contact_list
-        .load_contacts()
-        .await?
-        .into_iter()
-        .map(JidWithName::from);
-    Ok(select_multiple_jids_from_list(contacts)
-        .into_iter()
-        .map(UserId::from)
-        .collect())
-}
-
-async fn select_room(
-    client: &Client,
-    filter: impl Fn(&SidebarItem) -> bool,
-) -> Result<Option<RoomEnvelope>> {
-    let mut rooms = client
-        .sidebar
-        .sidebar_items()
-        .await
-        .into_iter()
-        .filter_map(|room| {
-            if !filter(&room) {
-                return None;
-            }
-            Some(room.room)
-        })
-        .collect::<Vec<_>>();
-    rooms.sort_by(compare_room_envelopes);
-
-    if rooms.is_empty() {
-        println!("Could not find any matching rooms.");
-        return Ok(None);
-    }
-
-    Ok(Some(
-        select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone(),
-    ))
-}
-
-async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
-    select_room(client, |room| {
-        if let RoomEnvelope::DirectMessage(_) = room.room {
-            return false;
-        }
-        true
-    })
-    .await
-}
-
-async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
-    let rooms = client.rooms.load_public_rooms().await?;
-    Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
-}
-
-async fn select_sidebar_item(client: &Client) -> Result<Option<SidebarItem>> {
-    let items = client.sidebar.sidebar_items().await;
-    if items.is_empty() {
-        return Ok(None);
-    }
-    Ok(Some(
-        select_item_from_list(items, |item| JidWithName::from(item.clone())).clone(),
-    ))
-}
-
-fn select_item_from_list<T, O: ToString>(
-    iter: impl IntoIterator<Item = T>,
-    format: impl Fn(&T) -> O,
-) -> T {
-    let mut list = iter.into_iter().collect::<Vec<_>>();
-    let display_list = list.iter().map(format).collect::<Vec<_>>();
-    let selection = Select::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select a contact")
-        .default(0)
-        .items(display_list.as_slice())
-        .interact()
-        .unwrap();
-    println!();
-    list.swap_remove(selection)
-}
-
-fn select_multiple_jids_from_list(jids: impl IntoIterator<Item = JidWithName>) -> Vec<BareJid> {
-    let items = jids.into_iter().collect::<Vec<JidWithName>>();
-    let selection = MultiSelect::with_theme(&ColorfulTheme::default())
-        .with_prompt("Select contacts")
-        .items(items.as_slice())
-        .interact()
-        .unwrap();
-    println!();
-    selection
-        .into_iter()
-        .map(|idx| items[idx].jid.clone())
-        .collect()
-}
-
 async fn load_avatar(client: &Client, jid: &UserId) -> Result<()> {
     println!("Loading avatar for {}…", jid);
     match client.user_data.load_avatar(jid).await? {
@@ -438,32 +226,6 @@ async fn load_avatar(client: &Client, jid: &UserId) -> Result<()> {
         None => println!("{} has not set an avatar.", jid),
     }
     Ok(())
-}
-
-fn select_file(prompt: &str) -> Option<PathBuf> {
-    let path = Input::with_theme(&ColorfulTheme::default())
-        .with_prompt(prompt)
-        .validate_with({
-            |input: &String| {
-                if input.is_empty() {
-                    return Ok(());
-                }
-                if Path::new(input.trim()).exists() {
-                    Ok(())
-                } else {
-                    Err("No file exists at the given path")
-                }
-            }
-        })
-        .allow_empty(true)
-        .interact_text()
-        .unwrap();
-
-    if path.is_empty() {
-        return None;
-    }
-
-    Some(Path::new(path.trim()).to_path_buf())
 }
 
 async fn save_avatar(client: &Client) -> Result<()> {
@@ -928,6 +690,16 @@ enum Selection {
     InviteUserToPrivateChannel,
     #[strum(serialize = "Convert group to private channel")]
     ConvertGroupToPrivateChannel,
+
+    #[strum(serialize = "[OMEMO] List user devices")]
+    ListUserDevices,
+    #[strum(serialize = "[OMEMO] Load device bundle")]
+    LoadDeviceBundle,
+    #[strum(serialize = "[OMEMO] Delete device")]
+    DeleteDevice,
+    #[strum(serialize = "[OMEMO] Disable OMEMO (Delete all devices)")]
+    DisableOMEMO,
+
     #[strum(serialize = "[Debug] Load bookmarks")]
     LoadBookmarks,
     #[strum(serialize = "[Debug] Delete individual bookmarks")]
@@ -1352,6 +1124,48 @@ async fn main() -> Result<()> {
 
                 let channel_name = prompt_string("Enter a name for the private channel");
                 room.convert_to_private_channel(&channel_name).await?;
+            }
+            Selection::ListUserDevices => {
+                let jid = select_contact_or_self(&client).await?;
+                let devices = client.user_data.load_user_devices(&jid).await?;
+
+                if devices.is_empty() {
+                    println!("No devices found.");
+                } else {
+                    println!(
+                        "{}",
+                        devices
+                            .into_iter()
+                            .map(|d| DeviceEnvelope(d).to_string())
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    )
+                }
+            }
+            Selection::LoadDeviceBundle => {
+                let user_id = select_contact(&client).await?;
+                let device_id = select_device(&client, &user_id).await?;
+
+                if let Some(bundle) = client
+                    .user_data
+                    .load_device_bundle(&user_id, &device_id)
+                    .await?
+                {
+                    println!("{:?}", bundle);
+                } else {
+                    println!("No bundle found for device {} of {}.", device_id, user_id);
+                }
+            }
+            Selection::DeleteDevice => {
+                let device_id =
+                    select_device(&client, &client.connected_user_id().unwrap().into_user_id())
+                        .await?;
+                client.account.delete_device(&device_id).await?;
+                println!("Device deleted.")
+            }
+            Selection::DisableOMEMO => {
+                client.account.disable_omemo().await?;
+                println!("OMEMO disabled.")
             }
             Selection::LoadBookmarks => {
                 let bookmarks = client

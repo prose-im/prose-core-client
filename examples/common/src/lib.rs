@@ -8,7 +8,6 @@ use std::str::FromStr;
 use std::time::Instant;
 use std::{env, fs};
 
-use dotenvy;
 use jid::{BareJid, FullJid, ResourcePart};
 use tracing::metadata::LevelFilter;
 pub use tracing::Level;

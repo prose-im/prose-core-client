@@ -23,7 +23,7 @@ use crate::client::{ConnectorProvider, EventHandler, ModuleLookup};
 use crate::connector::Connection;
 use crate::deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 use crate::util::{ModuleFutureState, PubSubQuery, RequestError, RequestFuture};
-use crate::Event;
+use crate::{ns, Event};
 
 #[derive(Clone)]
 pub struct ModuleContext {
@@ -62,6 +62,26 @@ impl ModuleContext {
         };
 
         Ok(Some(items.items.into_iter().map(|item| item.0).collect()))
+    }
+
+    pub(crate) async fn delete_pubsub_node(
+        &self,
+        node: impl AsRef<str>,
+    ) -> Result<(), RequestError> {
+        let iq = Iq {
+            from: None,
+            to: None,
+            id: self.generate_id(),
+            payload: IqType::Set(
+                Element::builder("pubsub", ns::PUBSUB_OWNER)
+                    .append(
+                        Element::builder("delete", ns::PUBSUB_OWNER).attr("node", node.as_ref()),
+                    )
+                    .build(),
+            ),
+        };
+        self.send_iq(iq).await?;
+        Ok(())
     }
 
     pub(crate) fn send_stanza_with_future<T: Send + 'static, U: 'static>(

@@ -17,6 +17,7 @@ use crate::domain::shared::models::UserId;
 pub trait UserDeviceService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_device_list(&self, user_id: &UserId) -> Result<DeviceList>;
     async fn publish_device_list(&self, device_list: DeviceList) -> Result<()>;
+    async fn delete_device_list(&self) -> Result<()>;
 
     async fn load_device_bundle(
         &self,
@@ -24,4 +25,5 @@ pub trait UserDeviceService: SendUnlessWasm + SyncUnlessWasm {
         device_id: &DeviceId,
     ) -> Result<Option<DeviceBundle>>;
     async fn publish_device_bundle(&self, bundle: DeviceBundle) -> Result<()>;
+    async fn delete_device_bundle(&self, device_id: &DeviceId) -> Result<()>;
 }

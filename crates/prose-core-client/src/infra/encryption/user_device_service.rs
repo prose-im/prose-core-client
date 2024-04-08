@@ -30,6 +30,12 @@ impl UserDeviceService for XMPPClient {
         Ok(())
     }
 
+    async fn delete_device_list(&self) -> Result<()> {
+        let omemo = self.client.get_mod::<mods::OMEMO>();
+        omemo.delete_device_list().await?;
+        Ok(())
+    }
+
     async fn load_device_bundle(
         &self,
         user_id: &UserId,
@@ -50,6 +56,12 @@ impl UserDeviceService for XMPPClient {
         omemo
             .publish_device_bundle(*bundle.device_id.as_ref(), bundle.into())
             .await?;
+        Ok(())
+    }
+
+    async fn delete_device_bundle(&self, device_id: &DeviceId) -> Result<()> {
+        let omemo = self.client.get_mod::<mods::OMEMO>();
+        omemo.delete_device_bundle(*device_id.as_ref()).await?;
         Ok(())
     }
 }

@@ -15,7 +15,7 @@ use crate::client::ModuleContext;
 use crate::mods::Module;
 use crate::stanza::omemo::DeviceList;
 use crate::util::{ItemIdExt, PubSubItemsExt, PubSubQuery};
-use crate::{ns, PublishOptionsExt};
+use crate::{ns, PublishOptionsExt, RequestError};
 
 /// XEP-0384: OMEMO Encryption
 /// https://xmpp.org/extensions/xep-0384.html#usecases-building
@@ -65,6 +65,18 @@ impl OMEMO {
         Ok(())
     }
 
+    pub async fn delete_device_list(&self) -> Result<(), RequestError> {
+        match self
+            .ctx
+            .delete_pubsub_node(ns::LEGACY_OMEMO_DEVICELIST)
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) if err.is_item_not_found_err() => Ok(()),
+            Err(err) => Err(err),
+        }
+    }
+
     pub async fn load_device_bundle(
         &self,
         from: &BareJid,
@@ -104,5 +116,17 @@ impl OMEMO {
         );
         self.ctx.send_iq(iq).await?;
         Ok(())
+    }
+
+    pub async fn delete_device_bundle(&self, device_id: u32) -> Result<(), RequestError> {
+        match self
+            .ctx
+            .delete_pubsub_node(format!("{}:{device_id}", ns::LEGACY_OMEMO_BUNDLES))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) if err.is_item_not_found_err() => Ok(()),
+            Err(err) => Err(err),
+        }
     }
 }

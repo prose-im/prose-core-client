@@ -186,20 +186,7 @@ impl PubSub {
     }
 
     pub async fn delete_node(&self, node: impl AsRef<str>) -> Result<(), RequestError> {
-        let iq = Iq {
-            from: None,
-            to: None,
-            id: self.ctx.generate_id(),
-            payload: IqType::Set(
-                Element::builder("pubsub", ns::PUBSUB_OWNER)
-                    .append(
-                        Element::builder("delete", ns::PUBSUB_OWNER).attr("node", node.as_ref()),
-                    )
-                    .build(),
-            ),
-        };
-        self.ctx.send_iq(iq).await?;
-        Ok(())
+        self.ctx.delete_pubsub_node(node).await
     }
 
     pub async fn request_node_configuration_form(

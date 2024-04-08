@@ -13,7 +13,7 @@ use crate::app::deps::*;
 use crate::domain::shared::models::Availability;
 use crate::domain::user_info::models::{AvatarMetadata, UserStatus};
 use crate::domain::user_profiles::models::UserProfile;
-use crate::dtos::AccountInfo;
+use crate::dtos::{AccountInfo, Device, DeviceBundle, DeviceId};
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
@@ -30,6 +30,8 @@ pub struct AccountService {
     client_event_dispatcher: DynClientEventDispatcher,
     #[inject]
     user_account_service: DynUserAccountService,
+    #[inject]
+    user_device_service: DynUserDeviceService,
     #[inject]
     user_info_repo: DynUserInfoRepository,
     #[inject]
@@ -183,5 +185,58 @@ impl AccountService {
             IMAGE_OUTPUT_MIME_TYPE,
         )
         .await
+    }
+
+    pub async fn load_devices(&self) -> Result<Vec<Device>> {
+        Ok(self
+            .user_device_service
+            .load_device_list(&self.ctx.connected_id()?.into_user_id())
+            .await?
+            .devices)
+    }
+
+    pub async fn load_device_bundle(&self, device_id: &DeviceId) -> Result<Option<DeviceBundle>> {
+        self.user_device_service
+            .load_device_bundle(&self.ctx.connected_id()?.into_user_id(), device_id)
+            .await
+    }
+
+    pub async fn delete_device(&self, device_id: &DeviceId) -> Result<()> {
+        let mut device_list = self
+            .user_device_service
+            .load_device_list(&self.ctx.connected_id()?.into_user_id())
+            .await?;
+        let num_devices = device_list.devices.len();
+        device_list.devices.retain(|device| &device.id != device_id);
+
+        if device_list.devices.len() != num_devices {
+            self.user_device_service
+                .publish_device_list(device_list)
+                .await?;
+        }
+
+        self.user_device_service
+            .delete_device_bundle(device_id)
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn disable_omemo(&self) -> Result<()> {
+        let device_list = self
+            .user_device_service
+            .load_device_list(&self.ctx.connected_id()?.into_user_id())
+            .await?;
+
+        self.user_device_service.delete_device_list().await?;
+
+        for device in device_list.devices {
+            _ = self
+                .user_device_service
+                .delete_device_bundle(&device.id)
+                .await
+        }
+
+        Ok(())
     }
 }

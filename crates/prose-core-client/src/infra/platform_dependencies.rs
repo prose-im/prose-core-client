@@ -285,6 +285,7 @@ impl From<PlatformDependencies> for AppDependencies {
             upload_service: d.xmpp.clone(),
             user_account_service: d.xmpp.clone(),
             user_device_repo: Arc::new(UserDeviceRepository::new(d.store)),
+            user_device_service: d.xmpp.clone(),
             user_info_repo,
             user_info_service: d.xmpp.clone(),
             user_profile_repo,
