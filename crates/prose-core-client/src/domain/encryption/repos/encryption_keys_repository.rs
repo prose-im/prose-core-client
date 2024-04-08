@@ -103,4 +103,6 @@ pub trait EncryptionKeysRepository: SendUnlessWasm + SyncUnlessWasm {
         user_id: &UserId,
         device_id: &DeviceId,
     ) -> Result<Option<IdentityKey>>;
+
+    async fn clear_cache(&self) -> Result<()>;
 }

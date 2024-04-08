@@ -37,4 +37,6 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         user_id: &UserId,
         device_list: DeviceList,
     ) -> Result<()>;
+
+    async fn clear_cache(&self) -> Result<()>;
 }

@@ -424,4 +424,30 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
         let identity = collection.get(&key).await?;
         Ok(identity)
     }
+
+    async fn clear_cache(&self) -> Result<()> {
+        let tx = self
+            .store
+            .transaction_for_reading_and_writing(&[
+                encryption_keys_collections::IDENTITY,
+                encryption_keys_collections::KYBER_PRE_KEY,
+                encryption_keys_collections::LOCAL_DEVICE,
+                encryption_keys_collections::PRE_KEY,
+                encryption_keys_collections::SENDER_KEY,
+                encryption_keys_collections::SESSION_RECORD,
+                encryption_keys_collections::SIGNED_PRE_KEY,
+            ])
+            .await?;
+        tx.truncate_collections(&[
+            encryption_keys_collections::IDENTITY,
+            encryption_keys_collections::KYBER_PRE_KEY,
+            encryption_keys_collections::LOCAL_DEVICE,
+            encryption_keys_collections::PRE_KEY,
+            encryption_keys_collections::SENDER_KEY,
+            encryption_keys_collections::SESSION_RECORD,
+            encryption_keys_collections::SIGNED_PRE_KEY,
+        ])?;
+        tx.commit().await?;
+        Ok(())
+    }
 }

@@ -58,7 +58,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 16;
+const DB_VERSION: u32 = 17;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -100,6 +100,10 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             tx.create_collection(encryption_keys_collections::SENDER_KEY)?;
             tx.create_collection(encryption_keys_collections::SESSION_RECORD)?;
             tx.create_collection(encryption_keys_collections::SIGNED_PRE_KEY)?;
+        }
+
+        if event.old_version < 17 {
+            tx.create_collection(encryption_keys_collections::KYBER_PRE_KEY)?;
         }
 
         Ok(())

@@ -196,6 +196,12 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await?;
         Ok(())
     }
+
+    async fn clear_cache(&self) -> Result<()> {
+        self.user_device_repo.clear_cache().await?;
+        self.encryption_keys_repo.clear_cache().await?;
+        Ok(())
+    }
 }
 
 impl EncryptionDomainService {
