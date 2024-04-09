@@ -108,7 +108,6 @@ pub struct AppDependencies {
     pub upload_service: DynUploadService,
     pub user_account_service: DynUserAccountService,
     pub user_device_repo: DynUserDeviceRepository,
-    pub user_device_service: DynUserDeviceService,
     pub user_info_repo: DynUserInfoRepository,
     pub user_info_service: DynUserInfoService,
     pub user_profile_repo: DynUserProfileRepository,

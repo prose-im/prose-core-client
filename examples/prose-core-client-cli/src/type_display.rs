@@ -8,7 +8,7 @@ use std::fmt::{Display, Formatter};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    Bookmark, Contact, Device, ParticipantInfo, PublicRoomInfo, RoomEnvelope, SidebarItem,
+    Bookmark, Contact, DeviceInfo, ParticipantInfo, PublicRoomInfo, RoomEnvelope, SidebarItem,
 };
 use prose_xmpp::mods::muc;
 
@@ -130,15 +130,23 @@ impl Display for ParticipantEnvelope {
     }
 }
 
-pub struct DeviceEnvelope(pub Device);
+pub struct DeviceInfoEnvelope(pub DeviceInfo);
 
-impl Display for DeviceEnvelope {
+impl Display for DeviceInfoEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{:<5} ({})",
+            "{} {:>10} | {} | trusted: {} | {:<50}",
+            if self.0.is_this_device { ">" } else { " " },
             self.0.id.as_ref(),
-            self.0.label.as_deref().unwrap_or("<no label>")
+            self.0.fingerprint(),
+            self.0.is_trusted,
+            self.0
+                .label
+                .as_deref()
+                .unwrap_or("<no label>")
+                .to_string()
+                .truncate_to(50),
         )
     }
 }

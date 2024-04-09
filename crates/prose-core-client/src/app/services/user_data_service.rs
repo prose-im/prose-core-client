@@ -8,13 +8,13 @@ use anyhow::Result;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAvatarRepository, DynTimeProvider, DynUserDeviceService, DynUserInfoRepository,
+    DynAvatarRepository, DynEncryptionDomainService, DynTimeProvider, DynUserInfoRepository,
     DynUserProfileRepository, DynUserProfileService,
 };
 use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{PlatformImage, UserMetadata};
 use crate::domain::user_profiles::models::UserProfile;
-use crate::dtos::{Device, DeviceBundle, DeviceId};
+use crate::dtos::DeviceInfo;
 
 #[derive(InjectDependencies)]
 pub struct UserDataService {
@@ -25,7 +25,7 @@ pub struct UserDataService {
     #[inject]
     avatar_repo: DynAvatarRepository,
     #[inject]
-    user_device_service: DynUserDeviceService,
+    encryption_domain_service: DynEncryptionDomainService,
     #[inject]
     user_info_repo: DynUserInfoRepository,
     #[inject]
@@ -64,21 +64,9 @@ impl UserDataService {
         Ok(metadata)
     }
 
-    pub async fn load_user_devices(&self, user_id: &UserId) -> Result<Vec<Device>> {
-        Ok(self
-            .user_device_service
-            .load_device_list(user_id)
-            .await?
-            .devices)
-    }
-
-    pub async fn load_device_bundle(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-    ) -> Result<Option<DeviceBundle>> {
-        self.user_device_service
-            .load_device_bundle(user_id, device_id)
+    pub async fn load_user_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
+        self.encryption_domain_service
+            .load_device_infos(user_id)
             .await
     }
 }

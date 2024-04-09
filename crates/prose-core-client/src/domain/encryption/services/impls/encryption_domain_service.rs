@@ -22,11 +22,11 @@ use crate::app::deps::{
     DynAppContext, DynEncryptionKeysRepository, DynEncryptionService, DynMessagesRepository,
     DynTimeProvider, DynUserDeviceIdProvider, DynUserDeviceRepository, DynUserDeviceService,
 };
-use crate::domain::encryption::models::{Device, DeviceId, DeviceList, PreKeyBundle};
+use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
 use crate::domain::messaging::models::send_message_request::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::shared::models::UserId;
-use crate::dtos::{DeviceBundle, MessageId, PreKeyId, RoomId};
+use crate::dtos::{DeviceBundle, EncryptionDirection, MessageId, PreKeyId, RoomId};
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
 
@@ -53,9 +53,9 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         self.publish_device_info_if_needed(bundle).await?;
 
         let user_id = self.ctx.connected_id()?.into_user_id();
-        let device_list = self.user_device_service.load_device_list(&user_id).await?;
+        let devices = self.user_device_repo.get_all(&user_id).await?;
 
-        join_all(device_list.devices.into_iter().map(|device| {
+        join_all(devices.into_iter().map(|device| {
             let user_id = user_id.clone();
             async move {
                 match self
@@ -76,11 +76,10 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     }
 
     async fn start_session(&self, user_id: &UserId) -> Result<()> {
-        let device_list = self.user_device_service.load_device_list(user_id).await?;
+        let devices = self.user_device_repo.get_all(user_id).await?;
 
         join_all(
-            device_list
-                .devices
+            devices
                 .into_iter()
                 .map(|device| self.start_session_with_device(user_id.clone(), device.id)),
         )
@@ -186,13 +185,107 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         Ok(body.to_string())
     }
 
+    async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
+        let this_device_id = if &self.ctx.connected_id()?.into_user_id() == user_id {
+            self.encryption_keys_repo
+                .get_local_device()
+                .await?
+                .map(|device| device.device_id)
+        } else {
+            None
+        };
+
+        let device_list = self.user_device_repo.get_all(user_id).await?;
+
+        let mut device_infos = vec![];
+        for device in device_list {
+            let Some(identity) = self
+                .encryption_keys_repo
+                .get_identity(user_id, &device.id)
+                .await?
+            else {
+                warn!(
+                    "Ignoring device {} for which we do not have an identity.",
+                    device.id
+                );
+                continue;
+            };
+
+            let is_device_trusted = self
+                .encryption_keys_repo
+                .is_trusted_identity(
+                    user_id,
+                    Some(&device.id),
+                    &identity,
+                    EncryptionDirection::Receiving,
+                )
+                .await?;
+
+            let is_this_device = Some(&device.id) == this_device_id.as_ref();
+
+            device_infos.push(DeviceInfo {
+                id: device.id,
+                label: device.label,
+                identity,
+                is_trusted: is_device_trusted,
+                is_this_device,
+            });
+        }
+
+        Ok(device_infos)
+    }
+
+    async fn delete_device(&self, device_id: &DeviceId) -> Result<()> {
+        let user_id = self.ctx.connected_id()?.into_user_id();
+
+        let mut devices = self.user_device_repo.get_all(&user_id).await?;
+        let num_devices = devices.len();
+        devices.retain(|device| &device.id != device_id);
+
+        if devices.len() == num_devices {
+            return Ok(());
+        }
+
+        self.user_device_repo
+            .set_all(&user_id, devices.clone())
+            .await?;
+
+        self.user_device_service
+            .publish_device_list(DeviceList { devices })
+            .await?;
+
+        self.user_device_service
+            .delete_device_bundle(device_id)
+            .await?;
+
+        Ok(())
+    }
+
+    async fn disable_omemo(&self) -> Result<()> {
+        let devices = self
+            .user_device_repo
+            .get_all(&self.ctx.connected_id()?.into_user_id())
+            .await?;
+
+        self.user_device_service.delete_device_list().await?;
+
+        for device in devices {
+            _ = self
+                .user_device_service
+                .delete_device_bundle(&device.id)
+                .await
+        }
+
+        Ok(())
+    }
+
     async fn handle_received_device_list(
         &self,
         user_id: &UserId,
         device_list: DeviceList,
     ) -> Result<()> {
         self.user_device_repo
-            .put_all(user_id, device_list.devices)
+            .set_all(user_id, device_list.devices)
             .await?;
         Ok(())
     }
@@ -305,10 +398,9 @@ impl EncryptionDomainService {
     async fn publish_device_info_if_needed(&self, bundle: DeviceBundle) -> Result<()> {
         let user_id = self.ctx.connected_id()?.into_user_id();
 
-        let mut device_list = self.user_device_service.load_device_list(&user_id).await?;
+        let mut devices = self.user_device_repo.get_all(&user_id).await?;
         // Add our device to our device list if needed…
-        if !device_list
-            .devices
+        if !devices
             .iter()
             .find(|device| device.id == bundle.device_id)
             .is_some()
@@ -317,7 +409,7 @@ impl EncryptionDomainService {
                 "Adding our device {} the list of devices…",
                 bundle.device_id
             );
-            device_list.devices.push(Device {
+            devices.push(Device {
                 id: bundle.device_id.clone(),
                 label: Some(
                     self.ctx
@@ -329,7 +421,7 @@ impl EncryptionDomainService {
                 ),
             });
             self.user_device_service
-                .publish_device_list(device_list)
+                .publish_device_list(DeviceList { devices })
                 .await?;
         }
 

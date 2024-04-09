@@ -8,9 +8,10 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::encryption::models::DeviceList;
+use crate::domain::encryption::models::{DeviceInfo, DeviceList};
 use crate::domain::messaging::models::{send_message_request::EncryptedPayload, MessageId};
 use crate::domain::shared::models::UserId;
+use crate::dtos::DeviceId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -31,6 +32,10 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         message_id: &MessageId,
         payload: EncryptedPayload,
     ) -> Result<String>;
+
+    async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>>;
+    async fn delete_device(&self, device_id: &DeviceId) -> Result<()>;
+    async fn disable_omemo(&self) -> Result<()>;
 
     async fn handle_received_device_list(
         &self,

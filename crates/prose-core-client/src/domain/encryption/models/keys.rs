@@ -6,6 +6,7 @@
 use std::fmt::{Debug, Formatter};
 
 use base64::{engine::general_purpose, Engine as _};
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -84,7 +85,24 @@ pub struct SenderKeyRecord(Box<[u8]>);
 #[serde(transparent)]
 pub struct SessionRecord(Box<[u8]>);
 
+impl IdentityKeyPair {
+    pub fn fingerprint(&self) -> String {
+        self.identity_key.fingerprint()
+    }
+}
+
 impl PublicKey {
+    pub fn fingerprint(&self) -> String {
+        self.0
+            .iter()
+            .skip(1)
+            .map(|b| format!("{:02x}", b))
+            .chunks(4)
+            .into_iter()
+            .map(|word| word.collect::<String>())
+            .join(" ")
+    }
+
     pub fn into_inner(self) -> Box<[u8]> {
         self.0
     }
@@ -99,6 +117,10 @@ impl PrivateKey {
 impl IdentityKey {
     pub fn into_inner(self) -> Box<[u8]> {
         self.0.into_inner()
+    }
+
+    pub fn fingerprint(&self) -> String {
+        self.0.fingerprint()
     }
 }
 

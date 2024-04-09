@@ -15,7 +15,7 @@ use prose_core_client::dtos::{DeviceId, PublicRoomInfo, RoomEnvelope, SidebarIte
 use prose_core_client::Client;
 
 use crate::compare_room_envelopes;
-use crate::type_display::{DeviceEnvelope, JidWithName};
+use crate::type_display::{DeviceInfoEnvelope, JidWithName};
 
 #[allow(dead_code)]
 pub async fn select_contact(client: &Client) -> Result<UserId> {
@@ -54,10 +54,10 @@ pub async fn select_contact_or_self(client: &Client) -> Result<UserId> {
 pub async fn select_device(client: &Client, user_id: &UserId) -> Result<DeviceId> {
     let devices = client
         .user_data
-        .load_user_devices(&user_id)
+        .load_user_device_infos(&user_id)
         .await?
         .into_iter()
-        .map(|d| DeviceEnvelope(d));
+        .map(|d| DeviceInfoEnvelope(d));
     let device_id = select_item_from_list(devices, ToString::to_string).0.id;
     Ok(device_id)
 }

@@ -42,7 +42,6 @@ impl TestClient {
         self.perform_load_device_list();
         self.perform_publish_device();
         self.perform_publish_device_bundle();
-        self.perform_start_session(&user);
 
         self.connect(&user, password).await
     }
@@ -303,6 +302,7 @@ impl TestClient {
         );
     }
 
+    #[allow(dead_code)]
     fn perform_start_session(&self, user_id: &UserId) {
         self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
 

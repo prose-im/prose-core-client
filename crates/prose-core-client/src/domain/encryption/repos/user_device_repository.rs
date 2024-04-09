@@ -15,7 +15,10 @@ use crate::dtos::UserId;
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserDeviceRepository: SendUnlessWasm + SyncUnlessWasm {
+    /// Returns all devices associated with `user_id`.
     async fn get_all(&self, user_id: &UserId) -> Result<Vec<Device>>;
-    async fn put_all(&self, user_id: &UserId, devices: Vec<Device>) -> Result<()>;
+    /// Sets `devices` for `user_id`. Devices not contained in `devices` will be deleted.
+    async fn set_all(&self, user_id: &UserId, devices: Vec<Device>) -> Result<()>;
+    /// Deletes all cached devices for all users.
     async fn clear_cache(&self) -> Result<()>;
 }

@@ -33,7 +33,8 @@ use crate::infra::contacts::{
     CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
 };
 use crate::infra::encryption::{
-    encryption_keys_collections, EncryptionKeysRepository, UserDeviceRecord, UserDeviceRepository,
+    encryption_keys_collections, CachingUserDeviceRepository, EncryptionKeysRepository,
+    UserDeviceRecord,
 };
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
@@ -143,6 +144,10 @@ impl From<PlatformDependencies> for AppDependencies {
         let id_provider = d.id_provider;
         let messages_repo = Arc::new(CachingMessageRepository::new(d.store.clone()));
         let time_provider = d.time_provider;
+        let user_device_repo = Arc::new(CachingUserDeviceRepository::new(
+            d.store.clone(),
+            d.xmpp.clone(),
+        ));
         let user_info_repo = Arc::new(CachingUserInfoRepository::new(
             d.store.clone(),
             d.xmpp.clone(),
@@ -162,17 +167,14 @@ impl From<PlatformDependencies> for AppDependencies {
             message_migration_domain_service_dependencies,
         ));
 
-        let encryption_keys_repo = Arc::new(EncryptionKeysRepository::new(d.store.clone()));
-        let user_device_repo = Arc::new(UserDeviceRepository::new(d.store.clone()));
-
         let encryption_domain_service_dependencies = EncryptionDomainServiceDependencies {
             ctx: ctx.clone(),
-            encryption_keys_repo: encryption_keys_repo.clone(),
+            encryption_keys_repo: Arc::new(EncryptionKeysRepository::new(d.store.clone())),
             encryption_service: d.encryption_service,
             message_repo: messages_repo.clone(),
             time_provider: time_provider.clone(),
             user_device_id_provider: d.user_device_id_provider,
-            user_device_repo,
+            user_device_repo: user_device_repo.clone(),
             user_device_service: d.xmpp.clone(),
         };
         let encryption_domain_service = Arc::new(EncryptionDomainService::from(
@@ -274,28 +276,27 @@ impl From<PlatformDependencies> for AppDependencies {
             contact_list_domain_service,
             ctx,
             drafts_repo,
-            request_handling_service: d.xmpp.clone(),
-            room_factory,
-            room_management_service: d.xmpp.clone(),
+            encryption_domain_service,
+            id_provider,
             message_archive_service: d.xmpp.clone(),
             messages_repo,
             messaging_service: d.xmpp.clone(),
-            room_participation_service: d.xmpp.clone(),
+            request_handling_service: d.xmpp.clone(),
             room_attributes_service: d.xmpp.clone(),
+            room_factory,
+            room_management_service: d.xmpp.clone(),
+            room_participation_service: d.xmpp.clone(),
             rooms_domain_service,
             short_id_provider: d.short_id_provider,
             sidebar_domain_service,
             time_provider,
             upload_service: d.xmpp.clone(),
             user_account_service: d.xmpp.clone(),
-            user_device_repo: Arc::new(UserDeviceRepository::new(d.store)),
-            user_device_service: d.xmpp.clone(),
+            user_device_repo,
             user_info_repo,
             user_info_service: d.xmpp.clone(),
             user_profile_repo,
             user_profile_service: d.xmpp.clone(),
-            id_provider,
-            encryption_domain_service,
         }
     }
 }

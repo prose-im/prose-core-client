@@ -40,7 +40,7 @@ use prose_core_client::{
 use prose_xmpp::connector;
 
 use crate::type_display::{
-    ConnectedRoomEnvelope, DeviceEnvelope, JidWithName, ParticipantEnvelope,
+    ConnectedRoomEnvelope, DeviceInfoEnvelope, JidWithName, ParticipantEnvelope,
 };
 use crate::type_selection::{
     select_contact, select_contact_or_self, select_device, select_file, select_item_from_list,
@@ -693,8 +693,6 @@ enum Selection {
 
     #[strum(serialize = "[OMEMO] List user devices")]
     ListUserDevices,
-    #[strum(serialize = "[OMEMO] Load device bundle")]
-    LoadDeviceBundle,
     #[strum(serialize = "[OMEMO] Delete device")]
     DeleteDevice,
     #[strum(serialize = "[OMEMO] Disable OMEMO (Delete all devices)")]
@@ -1127,7 +1125,7 @@ async fn main() -> Result<()> {
             }
             Selection::ListUserDevices => {
                 let jid = select_contact_or_self(&client).await?;
-                let devices = client.user_data.load_user_devices(&jid).await?;
+                let devices = client.user_data.load_user_device_infos(&jid).await?;
 
                 if devices.is_empty() {
                     println!("No devices found.");
@@ -1136,24 +1134,10 @@ async fn main() -> Result<()> {
                         "{}",
                         devices
                             .into_iter()
-                            .map(|d| DeviceEnvelope(d).to_string())
+                            .map(|d| DeviceInfoEnvelope(d).to_string())
                             .collect::<Vec<_>>()
                             .join("\n")
                     )
-                }
-            }
-            Selection::LoadDeviceBundle => {
-                let user_id = select_contact(&client).await?;
-                let device_id = select_device(&client, &user_id).await?;
-
-                if let Some(bundle) = client
-                    .user_data
-                    .load_device_bundle(&user_id, &device_id)
-                    .await?
-                {
-                    println!("{:?}", bundle);
-                } else {
-                    println!("No bundle found for device {} of {}.", device_id, user_id);
                 }
             }
             Selection::DeleteDevice => {
