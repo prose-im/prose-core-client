@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::Local;
 
 use prose_proc_macros::InjectDependencies;
 
@@ -53,7 +54,7 @@ impl RequestsEventHandler {
                     .respond_to_entity_time_request(
                         &event.sender_id,
                         &event.request_id,
-                        &self.time_provider.now().into(),
+                        &self.time_provider.now().with_timezone(&Local).into(),
                     )
                     .await?;
             }

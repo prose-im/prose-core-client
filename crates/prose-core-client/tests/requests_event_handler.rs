@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use chrono::{TimeZone, Utc};
+use chrono::{FixedOffset, TimeZone, Utc};
 use mockall::predicate;
 
 use prose_core_client::app::event_handlers::{
@@ -55,7 +55,11 @@ async fn test_handles_entity_time_query() -> Result<()> {
         .with(
             predicate::eq(sender_id!("sender@prose.org")),
             predicate::eq(RequestId::from("my-request")),
-            predicate::eq(Utc.with_ymd_and_hms(2023, 09, 10, 0, 0, 0).unwrap()),
+            predicate::eq(
+                Utc.with_ymd_and_hms(2023, 09, 10, 0, 0, 0)
+                    .unwrap()
+                    .with_timezone(&FixedOffset::east_opt(0).unwrap()),
+            ),
         )
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 

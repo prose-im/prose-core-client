@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use chrono::{DateTime, Local};
+use chrono::{DateTime, FixedOffset};
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
@@ -29,7 +29,7 @@ pub trait RequestHandlingService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         to: &SenderId,
         id: &RequestId,
-        now: &DateTime<Local>,
+        now: &DateTime<FixedOffset>,
     ) -> Result<()>;
 
     async fn respond_to_software_version_request(
