@@ -22,7 +22,9 @@ use crate::app::deps::{
     DynAppContext, DynEncryptionKeysRepository, DynEncryptionService, DynMessagesRepository,
     DynTimeProvider, DynUserDeviceIdProvider, DynUserDeviceRepository, DynUserDeviceService,
 };
-use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
+use crate::domain::encryption::models::{
+    Device, DeviceId, DeviceInfo, DeviceList, DeviceTrust, PreKeyBundle,
+};
 use crate::domain::messaging::models::send_message_request::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::shared::models::UserId;
@@ -227,7 +229,11 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
                 id: device.id,
                 label: device.label,
                 identity,
-                is_trusted: is_device_trusted,
+                trust: if is_device_trusted {
+                    DeviceTrust::Trusted
+                } else {
+                    DeviceTrust::Untrusted
+                },
                 is_this_device,
             });
         }

@@ -8,7 +8,8 @@ use std::fmt::{Display, Formatter};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    Bookmark, Contact, DeviceInfo, ParticipantInfo, PublicRoomInfo, RoomEnvelope, SidebarItem,
+    Bookmark, Contact, DeviceInfo, DeviceTrust, ParticipantInfo, PublicRoomInfo, RoomEnvelope,
+    SidebarItem,
 };
 use prose_xmpp::mods::muc;
 
@@ -134,13 +135,19 @@ pub struct DeviceInfoEnvelope(pub DeviceInfo);
 
 impl Display for DeviceInfoEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let trust = match self.0.trust {
+            DeviceTrust::Undecided => "undecided",
+            DeviceTrust::Trusted => "trusted",
+            DeviceTrust::Untrusted => "untrusted",
+        };
+
         write!(
             f,
-            "{} {:>10} | {} | trusted: {} | {:<50}",
+            "{} {:>10} | {} | trust: {} | {:<50}",
             if self.0.is_this_device { ">" } else { " " },
             self.0.id.as_ref(),
             self.0.fingerprint(),
-            self.0.is_trusted,
+            trust,
             self.0
                 .label
                 .as_deref()
