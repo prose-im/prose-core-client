@@ -9,7 +9,7 @@ use jid::Jid;
 use pretty_assertions::assert_eq;
 use std::sync::Arc;
 use xmpp_parsers::chatstates::ChatState;
-use xmpp_parsers::date;
+use xmpp_parsers::date::DateTime as XMPPDateTime;
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::mam::QueryId;
 use xmpp_parsers::message::MessageType;
@@ -174,7 +174,7 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
         forwarded: Forwarded {
             delay: Some(Delay {
                 from: None,
-                stamp: date::DateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
+                stamp: XMPPDateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
                 data: None,
             }),
             stanza: Some(Box::new(
@@ -225,7 +225,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
         forwarded: Forwarded {
             delay: Some(Delay {
                 from: None,
-                stamp: date::DateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
+                stamp: XMPPDateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
                 data: None,
             }),
             stanza: Some(Box::new(
@@ -281,7 +281,7 @@ async fn test_parse_mam_chat_message() -> Result<()> {
         forwarded: Forwarded {
             delay: Some(Delay {
                 from: None,
-                stamp: date::DateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
+                stamp: XMPPDateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
                 data: None,
             }),
             stanza: Some(Box::new(
@@ -312,6 +312,53 @@ async fn test_parse_mam_chat_message() -> Result<()> {
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
                 body: "Hello World".to_string(),
+                attachments: vec![],
+                mentions: vec![],
+                encryption_info: None,
+                is_transient: false,
+            },
+        },
+        parsed_message
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_parse_delayed_message() -> Result<()> {
+    let message = Message::new()
+        .set_id("message-id-1".into())
+        .set_type(MessageType::Chat)
+        .set_to(bare!("me@prose.org"))
+        .set_from(full!("them@prose.org/resource"))
+        .set_delay(Delay {
+            from: None,
+            stamp: XMPPDateTime(
+                Utc.with_ymd_and_hms(2024, 01, 01, 20, 30, 10)
+                    .unwrap()
+                    .into(),
+            ),
+            data: None,
+        })
+        .set_body("Hello");
+
+    let parsed_message = MessageParser::new(
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_message(message)
+    .await?;
+
+    assert_eq!(
+        MessageLike {
+            id: "message-id-1".into(),
+            stanza_id: None,
+            target: None,
+            to: Some(bare!("me@prose.org")),
+            from: ParticipantId::User(user_id!("them@prose.org")),
+            timestamp: Utc.with_ymd_and_hms(2024, 01, 01, 20, 30, 10).unwrap(),
+            payload: MessageLikePayload::Message {
+                body: "Hello".to_string(),
                 attachments: vec![],
                 mentions: vec![],
                 encryption_info: None,
