@@ -102,6 +102,7 @@ impl FromStr for BookmarkType {
             "group" => Ok(Self::Group),
             "private-channel" => Ok(Self::PrivateChannel),
             "public-channel" => Ok(Self::PublicChannel),
+            "generic" => Ok(Self::Generic),
             _ => Err(RequestError::ParseError(ParseError::Generic {
                 msg: format!("Unknown RoomType {}", s),
             })),
