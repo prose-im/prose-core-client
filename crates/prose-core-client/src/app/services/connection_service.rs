@@ -80,7 +80,9 @@ impl ConnectionService {
         }
 
         // https://xmpp.org/rfcs/rfc6121.html#roster-login
-        _ = self.contact_list_domain_service.load_contacts().await;
+        if let Err(error) = self.contact_list_domain_service.load_contacts().await {
+            error!("Failed to load contact list. {}", error.to_string());
+        }
 
         self.user_account_service
             .set_availability(None, &self.ctx.capabilities, availability)
@@ -125,7 +127,9 @@ impl ConnectionService {
                 msg: err.to_string(),
             })?;
 
-        _ = self.block_list_domain_service.load_block_list().await;
+        if let Err(error) = self.block_list_domain_service.load_block_list().await {
+            error!("Failed to load block list. {}", error.to_string());
+        }
 
         self.encryption_domain_service
             .initialize()

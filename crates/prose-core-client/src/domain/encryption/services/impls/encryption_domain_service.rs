@@ -8,7 +8,7 @@ use std::time::SystemTime;
 
 use aes_gcm::aead::{Aead, OsRng};
 use aes_gcm::{AeadCore, Aes128Gcm, KeyInit};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::prelude::SliceRandom;
@@ -78,11 +78,11 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     async fn start_session(&self, user_id: &UserId) -> Result<()> {
         let devices = self.user_device_repo.get_all(user_id).await?;
 
-        join_all(
-            devices
-                .into_iter()
-                .map(|device| self.start_session_with_device(user_id.clone(), device.id)),
-        )
+        join_all(devices.into_iter().map(|device| async move {
+            self.start_session_with_device(user_id.clone(), device.id.clone())
+                .await
+                .with_context(|| format!("Failed to start session with {user_id} ({})", device.id))
+        }))
         .await
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
@@ -299,8 +299,11 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 
 impl EncryptionDomainService {
     async fn get_or_initialize_local_encryption_keys(&self) -> Result<DeviceBundle> {
-        if let Some(local_encryption_bundle) =
-            self.encryption_keys_repo.get_local_device_bundle().await?
+        if let Some(local_encryption_bundle) = self
+            .encryption_keys_repo
+            .get_local_device_bundle()
+            .await
+            .context("Failed to load local device bundle.")?
         {
             return Ok(local_encryption_bundle);
         }
@@ -308,11 +311,13 @@ impl EncryptionDomainService {
         let local_encryption_bundle = self
             .encryption_service
             .generate_local_encryption_bundle(self.user_device_id_provider.new_id())
-            .await?;
+            .await
+            .context("Failed to generate local encryption bundle.")?;
 
         self.encryption_keys_repo
             .put_local_encryption_bundle(&local_encryption_bundle)
-            .await?;
+            .await
+            .context("Failed to save local encryption bundle")?;
 
         Ok(local_encryption_bundle.into_device_bundle())
     }
@@ -323,7 +328,8 @@ impl EncryptionDomainService {
         let Some(bundle) = self
             .user_device_service
             .load_device_bundle(&user_id, &device_id)
-            .await?
+            .await
+            .with_context(|| format!("Failed to load device bundle for {user_id} ({device_id})"))?
         else {
             info!("No device bundle found for {user_id} ({device_id}).");
             return Ok(());
@@ -331,10 +337,11 @@ impl EncryptionDomainService {
 
         self.encryption_keys_repo
             .save_identity(&user_id, &device_id, &bundle.identity_key)
-            .await?;
+            .await
+            .with_context(|| format!("Failed to save identity for {user_id} ({device_id})"))?;
 
         let pre_key_bundle = PreKeyBundle {
-            device_id,
+            device_id: device_id.clone(),
             signed_pre_key: bundle.signed_pre_key,
             identity_key: bundle.identity_key,
             pre_key: bundle
@@ -346,18 +353,27 @@ impl EncryptionDomainService {
 
         self.encryption_service
             .process_pre_key_bundle(&user_id, pre_key_bundle)
-            .await?;
+            .await
+            .with_context(|| {
+                format!("Failed to process PreKey bundle for {user_id} ({device_id})")
+            })?;
 
         Ok(())
     }
 
     async fn generate_missing_pre_keys(&self) -> Result<()> {
-        let pre_keys = self.encryption_keys_repo.get_all_pre_keys().await?;
+        let pre_keys = self
+            .encryption_keys_repo
+            .get_all_pre_keys()
+            .await
+            .context("Failed to load local PreKeys")?;
 
+        // Collect existing PreKey ids…
         let pre_key_ids = pre_keys
             .iter()
             .map(|pre_key| pre_key.id.as_ref())
             .collect::<HashSet<_>>();
+        // Check if any IDs between 1 and 100 are missing…
         let missing_pre_key_ids = (1..=100)
             .filter_map(|idx| {
                 if pre_key_ids.contains(&idx) {
@@ -367,6 +383,7 @@ impl EncryptionDomainService {
             })
             .collect::<Vec<_>>();
 
+        // No missing IDs, nothing to do…
         if missing_pre_key_ids.is_empty() {
             return Ok(());
         }
@@ -375,12 +392,14 @@ impl EncryptionDomainService {
         let missing_pre_keys = self
             .encryption_service
             .generate_pre_keys_with_ids(missing_pre_key_ids)
-            .await?;
+            .await
+            .context("Failed to re-generate deleted PreKeys")?;
 
         info!("Saving new PreKeys…");
         self.encryption_keys_repo
             .put_pre_keys(missing_pre_keys.as_slice())
-            .await?;
+            .await
+            .context("Failed to save re-generated PreKeys…")?;
 
         info!("Publishing bundle with new PreKeys…");
         let bundle = self
@@ -390,7 +409,8 @@ impl EncryptionDomainService {
             .ok_or(anyhow!("Missing own device bundle"))?;
         self.user_device_service
             .publish_device_bundle(bundle)
-            .await?;
+            .await
+            .context("Failed to publish device bundle with re-generated PreKeys")?;
 
         Ok(())
     }
@@ -422,20 +442,23 @@ impl EncryptionDomainService {
             });
             self.user_device_service
                 .publish_device_list(DeviceList { devices })
-                .await?;
+                .await
+                .context("Failed to publish our device list")?;
         }
 
         let published_bundle = self
             .user_device_service
             .load_device_bundle(&user_id, &bundle.device_id)
-            .await?;
+            .await
+            .context("Failed to load our device bundle")?;
 
         // … and publish our device bundle…
         if published_bundle.is_none() {
             info!("Publishing our device bundle…");
             self.user_device_service
                 .publish_device_bundle(bundle)
-                .await?;
+                .await
+                .context("Failed to publish our device bundle")?;
         }
 
         Ok(())
