@@ -6,7 +6,7 @@
 use std::fmt::{Display, Formatter};
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use xmpp_parsers::version::VersionResult;
 
 use prose_xmpp::mods;
@@ -45,7 +45,7 @@ impl RequestHandlingService for XMPPClient {
         &self,
         to: &SenderId,
         id: &RequestId,
-        now: &DateTime<Utc>,
+        now: &DateTime<Local>,
     ) -> anyhow::Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile

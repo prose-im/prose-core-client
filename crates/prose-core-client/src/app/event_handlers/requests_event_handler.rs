@@ -53,7 +53,7 @@ impl RequestsEventHandler {
                     .respond_to_entity_time_request(
                         &event.sender_id,
                         &event.request_id,
-                        &self.time_provider.now(),
+                        &self.time_provider.now().into(),
                     )
                     .await?;
             }
