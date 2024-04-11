@@ -19,7 +19,7 @@ use prose_xmpp::test::BareJidTestAdditions;
 use crate::domain::messaging::models::{
     Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
 };
-use crate::dtos::{Message as MessageDTO, MessageSender, ParticipantId};
+use crate::dtos::{Message as MessageDTO, MessageSender, ParticipantId, Reaction as ReactionDTO};
 use crate::test::mock_data;
 
 impl<T> From<T> for MessageLikeId
@@ -155,7 +155,24 @@ impl MessageBuilder {
             is_delivered: self.is_delivered,
             is_transient: false,
             is_encrypted: false,
-            reactions: self.reactions,
+            reactions: self
+                .reactions
+                .into_iter()
+                .map(|reaction| ReactionDTO {
+                    emoji: reaction.emoji,
+                    from: reaction
+                        .from
+                        .into_iter()
+                        .map(|sender| MessageSender {
+                            id: sender.clone(),
+                            name: sender
+                                .to_user_id()
+                                .map(|user_id| user_id.formatted_username())
+                                .unwrap_or(sender.to_opaque_identifier()),
+                        })
+                        .collect(),
+                })
+                .collect(),
             attachments: vec![],
             mentions: vec![],
         }

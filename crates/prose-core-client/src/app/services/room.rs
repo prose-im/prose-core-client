@@ -3,6 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -27,7 +29,7 @@ use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMe
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId};
 use crate::dtos::{
-    Message as MessageDTO, MessageResultSet, MessageSender, RoomState,
+    Message as MessageDTO, MessageResultSet, MessageSender, Reaction as ReactionDTO, RoomState,
     SendMessageRequest as SendMessageRequestDTO, StanzaId, UserBasicInfo, UserId,
 };
 use crate::{ClientEvent, ClientRoomEventType};
@@ -488,9 +490,42 @@ impl<Kind> Room<Kind> {
     ) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
         let mut message_dtos = Vec::with_capacity(messages.len());
+        let mut message_senders = HashMap::new();
+
+        async fn resolve_message_sender<'a, Kind>(
+            room: &Room<Kind>,
+            id: Cow<'a, ParticipantId>,
+            map: &mut HashMap<ParticipantId, MessageSender>,
+        ) -> MessageSender {
+            if let Some(sender) = map.get(id.as_ref()) {
+                return sender.clone();
+            };
+            let sender = room.resolve_message_sender(id.as_ref()).await;
+            map.insert(id.into_owned(), sender.clone());
+            sender
+        }
 
         for message in messages {
-            let from = self.resolve_message_sender(&message.from).await;
+            let from =
+                resolve_message_sender(self, Cow::Borrowed(&message.from), &mut message_senders)
+                    .await;
+
+            let mut reactions = vec![];
+            for reaction in message.reactions {
+                let mut from = vec![];
+
+                for sender in reaction.from {
+                    from.push(
+                        resolve_message_sender(self, Cow::Owned(sender), &mut message_senders)
+                            .await,
+                    );
+                }
+
+                reactions.push(ReactionDTO {
+                    emoji: reaction.emoji,
+                    from,
+                })
+            }
 
             message_dtos.push(MessageDTO {
                 id: message.id,
@@ -503,7 +538,7 @@ impl<Kind> Room<Kind> {
                 is_delivered: message.is_delivered,
                 is_transient: message.is_transient,
                 is_encrypted: message.is_encrypted,
-                reactions: message.reactions,
+                reactions,
                 attachments: message.attachments,
                 mentions: message.mentions,
             });

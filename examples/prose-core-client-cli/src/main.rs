@@ -27,9 +27,9 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, AttachmentType, Availability, Mention, Message, RoomEnvelope, RoomId,
-    SendMessageRequest, SendMessageRequestBody, StanzaId, StringIndexRangeExt, UploadSlot,
-    UserBasicInfo, UserId, Utf8Index,
+    Address, Attachment, AttachmentType, Availability, Mention, RoomEnvelope, RoomId,
+    SendMessageRequest, SendMessageRequestBody, StanzaId, StringIndexRangeExt, UploadSlot, UserId,
+    Utf8Index,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::infra::encryption::EncryptionKeysRepository;
@@ -40,7 +40,8 @@ use prose_core_client::{
 use prose_xmpp::connector;
 
 use crate::type_display::{
-    ConnectedRoomEnvelope, DeviceInfoEnvelope, JidWithName, ParticipantEnvelope,
+    ConnectedRoomEnvelope, DeviceInfoEnvelope, JidWithName, MessageEnvelope, ParticipantEnvelope,
+    UserBasicInfoEnvelope,
 };
 use crate::type_selection::{
     select_contact, select_contact_or_self, select_device, select_file, select_item_from_list,
@@ -399,35 +400,6 @@ async fn load_messages(client: &Client) -> Result<()> {
     }
 
     Ok(())
-}
-
-struct UserBasicInfoEnvelope(UserBasicInfo);
-
-impl Display for UserBasicInfoEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({})", self.0.name, self.0.id)
-    }
-}
-
-struct MessageEnvelope(Message);
-
-impl Display for MessageEnvelope {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{} | {:<36} | {:<20} | {} attachments | {} mentions | {}",
-            self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
-            self.0
-                .id
-                .as_ref()
-                .map(|id| id.clone().into_inner())
-                .unwrap_or("<no-id>".to_string()),
-            self.0.from.id.to_opaque_identifier().truncate_to(20),
-            self.0.attachments.len(),
-            self.0.mentions.len(),
-            self.0.body
-        )
-    }
 }
 
 async fn send_message(client: &Client) -> Result<()> {

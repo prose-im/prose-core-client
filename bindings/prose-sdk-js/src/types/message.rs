@@ -9,9 +9,11 @@ use wasm_bindgen::prelude::*;
 use prose_core_client::dtos;
 use prose_core_client::dtos::{ScalarRangeExt, StanzaId};
 
-use crate::types::{Attachment, AttachmentsArray, BareJid, IntoJSArray, Mention, MentionsArray};
+use crate::types::{
+    Attachment, AttachmentsArray, BareJid, IntoJSArray, Mention, MentionsArray, MessageSendersArray,
+};
 
-use super::{BareJidArray, ReactionsArray};
+use super::ReactionsArray;
 
 #[wasm_bindgen]
 #[derive(Clone)]
@@ -47,7 +49,7 @@ pub struct Reaction {
     #[wasm_bindgen(skip)]
     pub emoji: String,
     #[wasm_bindgen(skip)]
-    pub from: Vec<String>,
+    pub from: Vec<MessageSender>,
 }
 
 #[wasm_bindgen]
@@ -180,11 +182,11 @@ impl Reaction {
     }
 
     #[wasm_bindgen(getter, js_name = "authors")]
-    pub fn from_(&self) -> BareJidArray {
+    pub fn from_(&self) -> MessageSendersArray {
         self.from
             .iter()
             .cloned()
-            .collect_into_js_array::<BareJidArray>()
+            .collect_into_js_array::<MessageSendersArray>()
     }
 }
 
@@ -233,11 +235,7 @@ impl From<dtos::Reaction> for Reaction {
     fn from(value: dtos::Reaction) -> Self {
         Reaction {
             emoji: value.emoji.into_inner(),
-            from: value
-                .from
-                .into_iter()
-                .map(|id| id.to_opaque_identifier())
-                .collect(),
+            from: value.from.into_iter().map(MessageSender::from).collect(),
         }
     }
 }

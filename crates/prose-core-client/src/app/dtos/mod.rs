@@ -7,7 +7,7 @@ pub use url::Url;
 
 pub use account_info::AccountInfo;
 pub use contact::{Contact, Group};
-pub use message::{Message, MessageSender};
+pub use message::{Message, MessageSender, Reaction};
 pub use message_result_set::MessageResultSet;
 pub use presence_sub_request::{PresenceSubRequest, PresenceSubRequestId};
 pub use room_envelope::RoomEnvelope;
@@ -27,7 +27,7 @@ pub use crate::domain::{
     general::models::SoftwareVersion,
     messaging::models::{
         send_message_request::{EncryptedMessage, EncryptedPayload},
-        Attachment, AttachmentType, Emoji, Mention, MessageId, Reaction, StanzaId, Thumbnail,
+        Attachment, AttachmentType, Emoji, Mention, MessageId, StanzaId, Thumbnail,
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{

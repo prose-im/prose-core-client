@@ -5,9 +5,7 @@
 
 use chrono::{DateTime as ChronoDateTime, Utc};
 
-use prose_core_client::dtos::{
-    Emoji, Message as ProseMessage, MessageId, Reaction as ProseReaction, StanzaId,
-};
+use prose_core_client::dtos::{Emoji, Message as ProseMessage, MessageId, StanzaId};
 
 use crate::types::JID;
 
@@ -29,7 +27,7 @@ pub struct Message {
     pub is_read: bool,
     pub is_edited: bool,
     pub is_delivered: bool,
-    pub reactions: Vec<Reaction>,
+    // pub reactions: Vec<Reaction>,
 }
 
 impl From<ProseMessage> for Message {
@@ -43,20 +41,20 @@ impl From<ProseMessage> for Message {
             is_read: value.is_read,
             is_edited: value.is_edited,
             is_delivered: value.is_delivered,
-            reactions: value.reactions.into_iter().map(Into::into).collect(),
+            // reactions: value.reactions.into_iter().map(Into::into).collect(),
         }
     }
 }
 
-impl From<ProseReaction> for Reaction {
-    fn from(value: ProseReaction) -> Self {
-        Reaction {
-            emoji: value.emoji,
-            from: value
-                .from
-                .into_iter()
-                .map(|id| id.to_opaque_identifier())
-                .collect(),
-        }
-    }
-}
+// impl From<ProseReaction> for Reaction {
+//     fn from(value: ProseReaction) -> Self {
+//         Reaction {
+//             emoji: value.emoji,
+//             from: value
+//                 .from
+//                 .into_iter()
+//                 .map(|id| id.to_opaque_identifier())
+//                 .collect(),
+//         }
+//     }
+// }

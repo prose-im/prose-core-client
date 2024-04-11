@@ -6,6 +6,7 @@
 pub use attachment::{Attachment, AttachmentType, Thumbnail};
 pub(crate) use error::StanzaParseError;
 pub use mention::Mention;
+#[allow(unused_imports)] // Reaction is required in unit tests
 pub use message::{Emoji, Message, Reaction};
 pub use message_id::{MessageId, MessageTargetId, StanzaId};
 pub use message_like::{

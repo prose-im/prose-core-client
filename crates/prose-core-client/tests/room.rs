@@ -10,12 +10,12 @@ use chrono::{TimeZone, Utc};
 use mockall::predicate;
 use pretty_assertions::assert_eq;
 
-use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId};
+use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId, Reaction};
 use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{MucId, OccupantId, RoomId, UserId};
-use prose_core_client::dtos::{Availability, MessageResultSet, Participant, Reaction, StanzaId};
+use prose_core_client::dtos::{Availability, MessageResultSet, Participant, StanzaId};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id};
 use prose_xmpp::jid;

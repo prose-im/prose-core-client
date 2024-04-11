@@ -37,6 +37,9 @@ extern "C" {
 
     #[wasm_bindgen(typescript_type = "UploadHeader[]")]
     pub type UploadHeadersArray;
+
+    #[wasm_bindgen(typescript_type = "MessageSender[]")]
+    pub type MessageSendersArray;
 }
 
 impl From<Vec<prose_core_client::dtos::Message>> for MessagesArray {

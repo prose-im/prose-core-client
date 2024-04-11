@@ -8,8 +8,8 @@ use std::fmt::{Display, Formatter};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    Bookmark, Contact, DeviceInfo, DeviceTrust, ParticipantInfo, PublicRoomInfo, RoomEnvelope,
-    SidebarItem,
+    Bookmark, Contact, DeviceInfo, DeviceTrust, Message, ParticipantInfo, PublicRoomInfo,
+    RoomEnvelope, SidebarItem, UserBasicInfo,
 };
 use prose_xmpp::mods::muc;
 
@@ -154,6 +154,57 @@ impl Display for DeviceInfoEnvelope {
                 .unwrap_or("<no label>")
                 .to_string()
                 .truncate_to(50),
+        )
+    }
+}
+
+pub struct UserBasicInfoEnvelope(pub UserBasicInfo);
+
+impl Display for UserBasicInfoEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.0.name, self.0.id)
+    }
+}
+
+pub struct MessageEnvelope(pub Message);
+
+impl Display for MessageEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let reactions = self
+            .0
+            .reactions
+            .iter()
+            .map(|reaction| {
+                let senders = reaction
+                    .from
+                    .iter()
+                    .map(|sender| format!("{} ({})", sender.name, sender.id.to_opaque_identifier()))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                format!("{}: {}", reaction.emoji, senders)
+            })
+            .collect::<Vec<_>>()
+            .join(" | ");
+
+        write!(
+            f,
+            "{} | {:<36} | {:<20} | {} attachments | {} mentions | {}{}",
+            self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
+            self.0
+                .id
+                .as_ref()
+                .map(|id| id.clone().into_inner())
+                .unwrap_or("<no-id>".to_string()),
+            self.0.from.id.to_opaque_identifier().truncate_to(20),
+            self.0.attachments.len(),
+            self.0.mentions.len(),
+            self.0.body,
+            if self.0.reactions.is_empty() {
+                "".to_string()
+            } else {
+                format!("\n{}", reactions)
+            }
         )
     }
 }
