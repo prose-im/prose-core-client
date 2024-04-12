@@ -10,7 +10,6 @@ use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
 use js_sys::Array;
 use tracing::{info, Level};
-use tracing_subscriber::fmt::format::{FmtSpan, Pretty};
 use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 
@@ -22,6 +21,7 @@ use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::encryption::{EncryptionService, JsEncryptionService};
 use crate::error::{Result, WasmError};
+use crate::log::{JSLogger, MakeJSLogWriter};
 use crate::types::{
     try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
     ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
@@ -137,6 +137,7 @@ impl Client {
         connection_provider: ProseConnectionProvider,
         delegate: JSDelegate,
         encryption_service: JsEncryptionService,
+        logger: JSLogger,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
         let store = open_store(PlatformDriver::new("ProseCache2")).await?;
@@ -145,25 +146,16 @@ impl Client {
         static LOGGING_INITIALIZED: AtomicBool = AtomicBool::new(false);
         if !LOGGING_INITIALIZED.swap(true, Ordering::SeqCst) {
             if config.logging_enabled {
-                let fmt_layer = tracing_subscriber::fmt::layer()
-                    .with_ansi(false)
-                    .without_time()
-                    .with_writer(
-                        tracing_web::MakeWebConsoleWriter::new()
-                            .with_pretty_level()
-                            .with_max_level(
-                                config.logging_min_level.parse().unwrap_or(Level::TRACE),
-                            ),
-                    )
-                    .with_level(false)
-                    .with_span_events(FmtSpan::ACTIVE);
-                let perf_layer =
-                    tracing_web::performance_layer().with_details_from_fields(Pretty::default());
+                let fmt_layer =
+                    tracing_subscriber::fmt::layer()
+                        .with_ansi(false)
+                        .without_time()
+                        .with_writer(MakeJSLogWriter::new(logger).with_max_level(
+                            config.logging_min_level.parse().unwrap_or(Level::TRACE),
+                        ))
+                        .with_level(false);
 
-                tracing_subscriber::registry()
-                    .with(fmt_layer)
-                    .with(perf_layer)
-                    .init();
+                tracing_subscriber::registry().with(fmt_layer).init();
 
                 info!("prose-sdk-js Version {VERSION}");
             }

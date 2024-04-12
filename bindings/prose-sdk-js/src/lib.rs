@@ -16,6 +16,7 @@ mod connector;
 mod delegate;
 mod encryption;
 mod error;
+mod log;
 mod types;
 mod util;
 
