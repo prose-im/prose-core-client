@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
 use pretty_assertions::assert_eq;
+use prose_core_client::Secret;
 
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
@@ -41,7 +42,7 @@ impl ConnectorTrait for Connector {
     async fn connect(
         &self,
         _jid: &FullJid,
-        _password: &str,
+        _password: Secret<String>,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
         Ok(Box::new(Connection {

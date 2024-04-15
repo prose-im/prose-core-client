@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
+use secrecy::Secret;
 
 use prose_xmpp::{mods, ns, ConnectionError};
 
@@ -17,7 +18,11 @@ use crate::infra::xmpp::XMPPClient;
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ConnectionService for XMPPClient {
-    async fn connect(&self, jid: &UserResourceId, password: &str) -> Result<(), ConnectionError> {
+    async fn connect(
+        &self,
+        jid: &UserResourceId,
+        password: Secret<String>,
+    ) -> Result<(), ConnectionError> {
         self.client.connect(jid.as_ref(), password).await
     }
 

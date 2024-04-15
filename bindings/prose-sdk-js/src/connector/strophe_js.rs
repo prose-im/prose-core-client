@@ -11,6 +11,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
+use secrecy::{ExposeSecret, Secret};
 use thiserror::Error;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
@@ -97,7 +98,7 @@ impl ConnectorTrait for Connector {
     async fn connect(
         &self,
         jid: &FullJid,
-        password: &str,
+        password: Secret<String>,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
         let client = Rc::new(self.provider.provide_connection(self.config.clone()));
@@ -128,7 +129,9 @@ impl ConnectorTrait for Connector {
             handler: event_handler,
         };
         client.set_event_handler(event_handler);
-        let result = client.connect(jid.to_string(), password.to_string()).await;
+        let result = client
+            .connect(jid.to_string(), password.expose_secret().to_string())
+            .await;
 
         if let Err(err) = result {
             let Some(code) = err.as_f64().map(|code| code as i32) else {

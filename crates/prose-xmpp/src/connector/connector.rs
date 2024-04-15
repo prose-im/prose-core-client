@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
 use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
+use secrecy::Secret;
 
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]
 pub enum ConnectionError {
@@ -31,7 +32,7 @@ pub trait Connector: SendUnlessWasm + SyncUnlessWasm {
     async fn connect(
         &self,
         jid: &FullJid,
-        password: &str,
+        password: Secret<String>,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn Connection>, ConnectionError>;
 }

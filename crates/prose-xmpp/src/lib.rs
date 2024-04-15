@@ -3,6 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+pub use secrecy::Secret;
+
 pub use client::{Client, ClientBuilder};
 pub use connector::{Connection, ConnectionError, Connector};
 pub use deps::{IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};

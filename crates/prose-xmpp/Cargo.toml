@@ -25,6 +25,7 @@ parking_lot = { workspace = true }
 prose-proc-macros = { path = "../prose-proc-macros" }
 prose-utils = { path = "../prose-utils" }
 prose-wasm-utils = { path = "../prose-wasm-utils" }
+secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 sha1 = { workspace = true }
 strum = { workspace = true }

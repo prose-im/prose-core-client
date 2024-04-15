@@ -25,6 +25,7 @@ mime = { workspace = true }
 minidom = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
+secrecy = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = "0.5"
 serde_json = { workspace = true }

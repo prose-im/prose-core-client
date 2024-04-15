@@ -3,17 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use parking_lot::{Mutex, RwLock};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+use parking_lot::{Mutex, RwLock};
 use tracing::info;
 
 use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
 use prose_core_client::infra::encryption::EncryptionKeysRepository;
 use prose_core_client::{
     open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarCache,
-    PlatformDriver, SignalServiceHandle,
+    PlatformDriver, Secret, SignalServiceHandle,
 };
 use prose_xmpp::{connector, ConnectionError};
 
@@ -83,7 +84,7 @@ impl Client {
         self.client()
             .await
             .map_err(|e| ConnectionError::Generic { msg: e.to_string() })?
-            .connect(&self.jid.to_bare().unwrap().into(), password)
+            .connect(&self.jid.to_bare().unwrap().into(), Secret::new(password))
             .await?;
         Ok(())
     }

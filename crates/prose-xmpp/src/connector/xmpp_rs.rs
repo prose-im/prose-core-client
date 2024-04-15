@@ -12,6 +12,7 @@ use futures::stream::StreamExt;
 use futures::SinkExt;
 use jid::FullJid;
 use minidom::Element;
+use secrecy::{ExposeSecret, Secret};
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
@@ -39,14 +40,14 @@ impl ConnectorTrait for Connector {
     async fn connect(
         &self,
         jid: &FullJid,
-        password: &str,
+        password: Secret<String>,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
         async fn connect(
             jid: &FullJid,
-            password: impl Into<String>,
+            password: Secret<String>,
         ) -> Result<AsyncClient<ServerConfig>, ConnectionError> {
-            let mut client = AsyncClient::new(jid.clone(), password);
+            let mut client = AsyncClient::new(jid.clone(), password.expose_secret());
             client.set_reconnect(false);
 
             while let Some(event) = client.next().await {

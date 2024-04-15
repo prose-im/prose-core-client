@@ -6,6 +6,7 @@
 use anyhow::Result;
 
 use prose_core_client::dtos::UserId;
+use prose_core_client::Secret;
 use prose_xmpp::ConnectionError;
 
 use super::TestClient;
@@ -43,7 +44,8 @@ impl TestClient {
         self.perform_publish_device();
         self.perform_publish_device_bundle();
 
-        self.connect(&user, password).await
+        self.connect(&user, Secret::new(password.as_ref().to_string()))
+            .await
     }
 }
 

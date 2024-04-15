@@ -6,6 +6,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
+use secrecy::Secret;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
@@ -17,7 +18,11 @@ use crate::domain::shared::models::UserResourceId;
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait ConnectionService: SendUnlessWasm + SyncUnlessWasm {
-    async fn connect(&self, jid: &UserResourceId, password: &str) -> Result<(), ConnectionError>;
+    async fn connect(
+        &self,
+        jid: &UserResourceId,
+        password: Secret<String>,
+    ) -> Result<(), ConnectionError>;
     async fn disconnect(&self);
 
     async fn set_message_carbons_enabled(&self, is_enabled: bool) -> Result<()>;

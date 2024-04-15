@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use secrecy::Secret;
 use tracing::error;
 
 use prose_proc_macros::InjectDependencies;
@@ -44,7 +45,7 @@ impl ConnectionService {
     pub async fn connect(
         &self,
         jid: &UserId,
-        password: impl AsRef<str>,
+        password: Secret<String>,
     ) -> Result<(), ConnectionError> {
         let settings =
             self.account_settings_repo
@@ -67,10 +68,7 @@ impl ConnectionService {
             server_features: Default::default(),
         });
 
-        let connection_result = self
-            .connection_service
-            .connect(&full_jid, password.as_ref())
-            .await;
+        let connection_result = self.connection_service.connect(&full_jid, password).await;
         match connection_result {
             Ok(_) => (),
             Err(err) => {

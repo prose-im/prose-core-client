@@ -10,6 +10,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::{BareJid, FullJid};
 use parking_lot::RwLock;
+use secrecy::Secret;
 
 use crate::test::{BareJidTestAdditions, Connection, Connector, IncrementingIDProvider};
 use crate::{Client, Event, IDProvider};
@@ -51,7 +52,7 @@ impl ClientTestAdditions for Client {
             }))
             .build();
 
-        client.connect(&jid, "").await?;
+        client.connect(&jid, Secret::new("".to_string())).await?;
 
         id_provider.reset();
         sent_events.write().clear();
