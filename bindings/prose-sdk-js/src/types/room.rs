@@ -257,9 +257,16 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(js_name = "updateMessage")]
-            pub async fn update_message(&self, message_id: &str, request: SendMessageRequest) -> Result<()> {
+            pub async fn update_message(
+                &self,
+                message_id: &str,
+                request: SendMessageRequest,
+            ) -> Result<()> {
                 self.room
-                    .update_message(message_id.into(), request.try_into().map_err(WasmError::from)?)
+                    .update_message(
+                        message_id.into(),
+                        request.try_into().map_err(WasmError::from)?,
+                    )
                     .await
                     .map_err(WasmError::from)?;
                 Ok(())
@@ -291,20 +298,23 @@ macro_rules! base_room_impl {
                     .await
                     .map_err(WasmError::from)?;
 
-                debug!(room_id = self.id(), messages = ?messages, "loadLatestMessages");
+                // debug!(room_id = self.id(), messages = ?messages, "loadLatestMessages");
 
                 Ok(messages.into())
             }
 
             #[wasm_bindgen(js_name = "loadMessagesBefore")]
-            pub async fn load_messages_before(&self, archive_id: &ArchiveID) -> Result<MessageResultSet> {
+            pub async fn load_messages_before(
+                &self,
+                archive_id: &ArchiveID,
+            ) -> Result<MessageResultSet> {
                 let messages = self
                     .room
                     .load_messages_before(archive_id.as_ref())
                     .await
                     .map_err(WasmError::from)?;
 
-                debug!(room_id = self.id(), messages = ?messages, "loadMessagesBefore");
+                // debug!(room_id = self.id(), messages = ?messages, "loadMessagesBefore");
 
                 Ok(messages.into())
             }
@@ -325,11 +335,11 @@ macro_rules! base_room_impl {
                     .await
                     .map_err(WasmError::from)?;
 
-                debug!(
-                    room_id = self.id(),
-                    messages = ?messages,
-                    "loadMessagesWithIDs"
-                );
+                // debug!(
+                //     room_id = self.id(),
+                //     messages = ?messages,
+                //     "loadMessagesWithIDs"
+                // );
 
                 Ok(messages.into())
             }
