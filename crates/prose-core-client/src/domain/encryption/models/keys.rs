@@ -287,11 +287,7 @@ impl Debug for PublicKey {
 
 impl Debug for PrivateKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "PrivateKey({})",
-            general_purpose::STANDARD.encode(self.0.as_ref())
-        )
+        write!(f, "PrivateKey([REDACTED])")
     }
 }
 
