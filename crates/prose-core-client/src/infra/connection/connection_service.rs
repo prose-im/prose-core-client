@@ -7,6 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
 use secrecy::Secret;
+use tracing::warn;
 
 use prose_xmpp::{mods, ns, ConnectionError};
 
@@ -42,7 +43,17 @@ impl ConnectionService for XMPPClient {
         let mut server_features = ServerFeatures::default();
 
         for item in disco_items.items {
-            let info = caps.query_disco_info(item.jid.clone(), None).await?;
+            let info = match caps.query_disco_info(item.jid.clone(), None).await {
+                Ok(info) => info,
+                Err(error) => {
+                    warn!(
+                        "Failed to load server feature info for {}. {}",
+                        item.jid,
+                        error.to_string()
+                    );
+                    continue;
+                }
+            };
 
             let Some(identity) = info.identities.first() else {
                 continue;
