@@ -14,7 +14,7 @@ use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 
 use prose_core_client::dtos::{
-    DeviceId, EncryptedMessage, IdentityKey, IdentityKeyPair, LocalEncryptionBundle, PreKeyBundle,
+    DeviceId, EncryptionKey, IdentityKey, IdentityKeyPair, LocalEncryptionBundle, PreKeyBundle,
     PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SignedPreKeyId, SignedPreKeyRecord, UserId,
 };
 use prose_core_client::test::ConstantTimeProvider;
@@ -188,7 +188,7 @@ impl EncryptionService for NoOpEncryptionService {
         _device_id: &DeviceId,
         _message: &[u8],
         _now: &SystemTime,
-    ) -> Result<EncryptedMessage> {
+    ) -> Result<EncryptionKey> {
         todo!("encrypt_key")
     }
 

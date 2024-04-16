@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use attachment::{Attachment, AttachmentType, Thumbnail};
+pub use encrypted_message::{EncryptedPayload, EncryptionKey};
 pub(crate) use error::StanzaParseError;
 pub use mention::Mention;
 #[allow(unused_imports)] // Reaction is required in unit tests
@@ -17,6 +18,7 @@ pub use message_parser::{MessageLikeError, MessageParser};
 pub use send_message_request::SendMessageRequest;
 
 mod attachment;
+mod encrypted_message;
 mod error;
 mod mention;
 mod message;

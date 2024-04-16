@@ -14,7 +14,7 @@ use wasm_bindgen::JsValue;
 
 use crate::encryption::signal_repo::PreKeyPairType;
 use prose_core_client::dtos::{
-    DeviceId, EncryptedMessage, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord,
+    DeviceId, EncryptionKey, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord,
     SignedPreKeyRecord, UserId,
 };
 use prose_core_client::{DynEncryptionKeysRepository, EncryptionService as EncryptionServiceTrait};
@@ -165,7 +165,7 @@ impl EncryptionServiceTrait for EncryptionService {
         device_id: &DeviceId,
         message: &[u8],
         _now: &SystemTime,
-    ) -> Result<EncryptedMessage> {
+    ) -> Result<EncryptionKey> {
         let value = JsEncryptedMessage::try_from(
             &await_promise(self.inner.encrypt_key(
                 SignalRepo::new(self.repo.clone()),
@@ -177,9 +177,9 @@ impl EncryptionServiceTrait for EncryptionService {
         )
         .map_err(|err| anyhow!("{err}"))?;
 
-        Ok(EncryptedMessage {
+        Ok(EncryptionKey {
             device_id: device_id.clone(),
-            prekey: value.prekey,
+            is_pre_key: value.prekey,
             data: value.data,
         })
     }

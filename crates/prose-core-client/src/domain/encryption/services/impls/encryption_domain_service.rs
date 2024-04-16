@@ -25,7 +25,7 @@ use crate::app::deps::{
 use crate::domain::encryption::models::{
     Device, DeviceId, DeviceInfo, DeviceList, DeviceTrust, PreKeyBundle,
 };
-use crate::domain::messaging::models::send_message_request::EncryptedPayload;
+use crate::domain::messaging::models::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::shared::models::UserId;
 use crate::dtos::{DeviceBundle, EncryptionDirection, MessageId, PreKeyId, RoomId};
@@ -150,7 +150,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         let payload = EncryptedPayload {
             device_id: local_device.device_id,
             iv: nonce.as_slice().into(),
-            messages,
+            keys: messages,
             payload: payload[..message.len()].into(),
         };
 
@@ -482,7 +482,7 @@ impl EncryptionDomainService {
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
         let encrypted_message = payload
-            .messages
+            .keys
             .into_iter()
             .find(|message| message.device_id == local_device.device_id)
             .ok_or(anyhow!("Message was not encrypted for current device."))?;
@@ -493,7 +493,7 @@ impl EncryptionDomainService {
                 sender_id,
                 &payload.device_id,
                 &encrypted_message.data.as_ref(),
-                encrypted_message.prekey,
+                encrypted_message.is_pre_key,
             )
             .await?;
 
@@ -516,7 +516,7 @@ impl EncryptionDomainService {
                 .map_err(|err| anyhow!("{err}"))?,
         )?;
 
-        if encrypted_message.prekey {
+        if encrypted_message.is_pre_key {
             if let Err(err) = self.generate_missing_pre_keys().await {
                 error!("Failed to generate missing prekeys. {}", err.to_string())
             }

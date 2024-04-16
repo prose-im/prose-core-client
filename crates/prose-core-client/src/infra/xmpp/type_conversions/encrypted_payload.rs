@@ -5,7 +5,7 @@
 
 use xmpp_parsers::legacy_omemo;
 
-use crate::domain::messaging::models::send_message_request::{EncryptedMessage, EncryptedPayload};
+use crate::domain::messaging::models::{EncryptedPayload, EncryptionKey};
 
 impl From<EncryptedPayload> for legacy_omemo::Encrypted {
     fn from(value: EncryptedPayload) -> Self {
@@ -13,7 +13,7 @@ impl From<EncryptedPayload> for legacy_omemo::Encrypted {
             header: legacy_omemo::Header {
                 sid: value.device_id.into(),
                 keys: value
-                    .messages
+                    .keys
                     .into_iter()
                     .map(legacy_omemo::Key::from)
                     .collect(),
@@ -33,11 +33,11 @@ impl From<legacy_omemo::Encrypted> for EncryptedPayload {
         Self {
             device_id: value.header.sid.into(),
             iv: value.header.iv.data.into(),
-            messages: value
+            keys: value
                 .header
                 .keys
                 .into_iter()
-                .map(EncryptedMessage::from)
+                .map(EncryptionKey::from)
                 .collect(),
             // TODO: Handle non-existent payload?
             payload: value
@@ -48,12 +48,12 @@ impl From<legacy_omemo::Encrypted> for EncryptedPayload {
     }
 }
 
-impl From<EncryptedMessage> for legacy_omemo::Key {
-    fn from(value: EncryptedMessage) -> Self {
+impl From<EncryptionKey> for legacy_omemo::Key {
+    fn from(value: EncryptionKey) -> Self {
         Self {
             rid: value.device_id.into(),
             prekey: value
-                .prekey
+                .is_pre_key
                 .then_some(legacy_omemo::IsPreKey::True)
                 .unwrap_or(legacy_omemo::IsPreKey::False),
             data: value.data.into_vec(),
@@ -61,11 +61,11 @@ impl From<EncryptedMessage> for legacy_omemo::Key {
     }
 }
 
-impl From<legacy_omemo::Key> for EncryptedMessage {
+impl From<legacy_omemo::Key> for EncryptionKey {
     fn from(value: legacy_omemo::Key) -> Self {
         Self {
             device_id: value.rid.into(),
-            prekey: value.prekey == legacy_omemo::IsPreKey::True,
+            is_pre_key: value.prekey == legacy_omemo::IsPreKey::True,
             data: value.data.into(),
         }
     }

@@ -19,7 +19,7 @@ use crate::domain::encryption::models::{
     SignedPreKeyId, SignedPreKeyRecord,
 };
 use crate::domain::encryption::services::EncryptionService;
-use crate::domain::messaging::models::send_message_request::EncryptedMessage;
+use crate::domain::messaging::models::EncryptionKey;
 use crate::dtos::UserId;
 
 use super::SignalRepoWrapper;
@@ -42,7 +42,7 @@ enum SignalServiceMessage {
         device_id: DeviceId,
         message: Box<[u8]>,
         now: SystemTime,
-        callback: oneshot::Sender<Result<EncryptedMessage>>,
+        callback: oneshot::Sender<Result<EncryptionKey>>,
     },
 
     DecryptKey {
@@ -158,7 +158,7 @@ impl SignalService {
         device_id: DeviceId,
         message: &[u8],
         now: &SystemTime,
-    ) -> Result<EncryptedMessage> {
+    ) -> Result<EncryptionKey> {
         let signal_store = SignalRepoWrapper::new(self.encryption_keys_repo.clone());
 
         let address = ProtocolAddress::new(user_id.to_string(), device_id.clone().into());
@@ -173,14 +173,14 @@ impl SignalService {
         .await?;
 
         let encrypted_message = match encrypted_message {
-            CiphertextMessage::SignalMessage(message) => EncryptedMessage {
+            CiphertextMessage::SignalMessage(message) => EncryptionKey {
                 device_id,
-                prekey: false,
+                is_pre_key: false,
                 data: message.serialized().into(),
             },
-            CiphertextMessage::PreKeySignalMessage(message) => EncryptedMessage {
+            CiphertextMessage::PreKeySignalMessage(message) => EncryptionKey {
                 device_id,
-                prekey: true,
+                is_pre_key: true,
                 data: message.serialized().into(),
             },
             CiphertextMessage::SenderKeyMessage(_) | CiphertextMessage::PlaintextContent(_) => {
@@ -340,7 +340,7 @@ impl EncryptionService for SignalServiceHandle {
         device_id: &DeviceId,
         message: &[u8],
         now: &SystemTime,
-    ) -> Result<EncryptedMessage> {
+    ) -> Result<EncryptionKey> {
         let (send, recv) = oneshot::channel();
         let message = SignalServiceMessage::EncryptKey {
             recipient_id: recipient_id.clone(),

@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::encryption::models::{DeviceInfo, DeviceList};
-use crate::domain::messaging::models::{send_message_request::EncryptedPayload, MessageId};
+use crate::domain::messaging::models::{EncryptedPayload, MessageId};
 use crate::domain::shared::models::UserId;
 use crate::dtos::DeviceId;
 

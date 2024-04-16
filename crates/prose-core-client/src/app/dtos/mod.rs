@@ -26,8 +26,8 @@ pub use crate::domain::{
     },
     general::models::SoftwareVersion,
     messaging::models::{
-        send_message_request::{EncryptedMessage, EncryptedPayload},
-        Attachment, AttachmentType, Emoji, Mention, MessageId, StanzaId, Thumbnail,
+        Attachment, AttachmentType, Emoji, EncryptedPayload, EncryptionKey, Mention, MessageId,
+        StanzaId, Thumbnail,
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
