@@ -17,8 +17,8 @@ pub struct EncryptedPayload {
     /// encrypted for each recipient device.
     pub keys: Vec<EncryptionKey>,
 
-    /// The encrypted message body.
-    pub payload: Box<[u8]>,
+    /// The encrypted message body, unless empty when the message is used for a key exchange.
+    pub payload: Option<Box<[u8]>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

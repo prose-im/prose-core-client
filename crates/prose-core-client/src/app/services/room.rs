@@ -23,7 +23,8 @@ use crate::app::deps::{
     DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{
-    send_message_request, Emoji, Message, MessageId, MessageLike, MessageParser, MessageTargetId,
+    send_message_request, Emoji, Message, MessageId, MessageLike, MessageLikeError, MessageParser,
+    MessageTargetId,
 };
 use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
@@ -412,10 +413,22 @@ impl<Kind> Room<Kind> {
                 {
                     Ok(message) => message,
                     Err(error) => {
-                        error!("Failed to parse MAM message. {}", error.to_string());
+                        match error.downcast_ref::<MessageLikeError>() {
+                            Some(MessageLikeError::NoPayload) => (),
+                            None => {
+                                error!("Failed to parse MAM message. {}", error.to_string());
+                            }
+                        }
                         continue;
                     }
                 };
+
+                // Skip archived error messages. These usually don't have a message id, so the web
+                // frontend chokes on that. And what's the point of archiving an error
+                // message really?
+                if parsed_message.payload.is_error() {
+                    continue;
+                }
 
                 if parsed_message.payload.is_message() {
                     num_text_messages += 1;

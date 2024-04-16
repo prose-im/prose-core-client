@@ -145,12 +145,8 @@ impl MessageParser {
         if let Some(error) = &message.error() {
             return Ok(TargetedPayload {
                 target: None,
-                payload: Payload::Message {
-                    body: format!("Error: {}", error.to_string()),
-                    attachments: vec![],
-                    mentions: vec![],
-                    encryption_info: None,
-                    is_transient: false,
+                payload: Payload::Error {
+                    message: error.to_string(),
                 },
             });
         }
@@ -201,7 +197,13 @@ impl MessageParser {
             });
         }
 
-        if let Some((body, encryption_info)) = self.parse_message_body(from, message).await? {
+        if let Some(parsed_body) = self.parse_message_body(from, message).await? {
+            let (body, encryption_info) = match parsed_body {
+                ParsedMessageBody::Plaintext(body) => (body, None),
+                ParsedMessageBody::EncryptedMessage(body, info) => (body, Some(info)),
+                ParsedMessageBody::EmptyMessage => return Err(MessageLikeError::NoPayload.into()),
+            };
+
             if let Some(replace_id) = message.replace() {
                 return Ok(TargetedPayload {
                     target: Some(MessageTargetId::MessageId(replace_id.as_ref().into())),
@@ -249,36 +251,56 @@ impl MessageParser {
         &self,
         from: &ParticipantId,
         message: &Message,
-    ) -> Result<Option<(String, Option<MessageLikeEncryptionInfo>)>> {
+    ) -> Result<Option<ParsedMessageBody>> {
         // If the message contains an encrypted payload, try to decrypt it. Otherwise, fall back
         // to the default body.
-        if let (ParticipantId::User(sender_id), Some(message_id), Some(omemo_element)) =
-            (from, &message.id, message.omemo_element())
+        if let (ParticipantId::User(sender_id), Some(omemo_element)) =
+            (from, message.omemo_element())
         {
             let sender = DeviceId::from(omemo_element.header.sid);
 
-            if let Ok(body) = self
+            let decryption_result = self
                 .encryption_domain_service
                 .decrypt_message(
                     sender_id,
-                    &MessageId::from(message_id),
+                    message
+                        .id
+                        .as_ref()
+                        .map(|id| MessageId::from(id.clone()))
+                        .as_ref(),
                     omemo_element.into(),
                 )
-                .await
-            {
-                return Ok(Some((body, Some(MessageLikeEncryptionInfo { sender }))));
-            }
+                .await;
+
+            let parsed_message = match decryption_result {
+                Ok(Some(body)) => {
+                    ParsedMessageBody::EncryptedMessage(body, MessageLikeEncryptionInfo { sender })
+                }
+                Ok(None) => ParsedMessageBody::EmptyMessage,
+                Err(_) => ParsedMessageBody::EncryptedMessage(
+                    message
+                        .body()
+                        .unwrap_or("Message failed to decrypt and did not contain a fallback text.")
+                        .to_string(),
+                    MessageLikeEncryptionInfo { sender },
+                ),
+            };
+            return Ok(Some(parsed_message));
         }
 
-        Ok(message.body().map(|body| {
-            (
-                body.to_string(),
-                message
-                    .omemo_element()
-                    .map(|omemo| MessageLikeEncryptionInfo {
-                        sender: omemo.header.sid.into(),
-                    }),
-            )
-        }))
+        Ok(message
+            .body()
+            .map(|body| ParsedMessageBody::Plaintext(body.to_string())))
     }
+}
+
+/// Represents the body of the message.
+enum ParsedMessageBody {
+    /// The message was sent unencrypted.
+    Plaintext(String),
+    /// The message was sent encrypted.
+    EncryptedMessage(String, MessageLikeEncryptionInfo),
+    /// The message did not contain a human-readable body. This can happen for messages that are
+    /// used to exchange OMEMO key material.
+    EmptyMessage,
 }

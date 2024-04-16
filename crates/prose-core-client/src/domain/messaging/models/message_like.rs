@@ -46,6 +46,9 @@ pub struct EncryptionInfo {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum Payload {
+    Error {
+        message: String,
+    },
     Correction {
         body: String,
         attachments: Vec<Attachment>,
@@ -72,6 +75,13 @@ impl Payload {
     pub fn is_message(&self) -> bool {
         match self {
             Self::Message { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_error(&self) -> bool {
+        match self {
+            Self::Error { .. } => true,
             _ => false,
         }
     }

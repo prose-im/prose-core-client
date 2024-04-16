@@ -21,8 +21,8 @@ impl From<EncryptedPayload> for legacy_omemo::Encrypted {
                     data: value.iv.into_vec(),
                 },
             },
-            payload: Some(legacy_omemo::Payload {
-                data: value.payload.into_vec(),
+            payload: value.payload.map(|payload| legacy_omemo::Payload {
+                data: payload.into_vec(),
             }),
         }
     }
@@ -39,11 +39,7 @@ impl From<legacy_omemo::Encrypted> for EncryptedPayload {
                 .into_iter()
                 .map(EncryptionKey::from)
                 .collect(),
-            // TODO: Handle non-existent payload?
-            payload: value
-                .payload
-                .map(|payload| payload.data.into())
-                .unwrap_or_default(),
+            payload: value.payload.map(|payload| payload.data.into()),
         }
     }
 }

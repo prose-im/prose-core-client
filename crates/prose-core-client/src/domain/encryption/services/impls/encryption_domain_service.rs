@@ -151,7 +151,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             device_id: local_device.device_id,
             iv: nonce.as_slice().into(),
             keys: messages,
-            payload: payload[..message.len()].into(),
+            payload: Some(payload[..message.len()].into()),
         };
 
         Ok(payload)
@@ -160,12 +160,28 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     async fn decrypt_message(
         &self,
         sender_id: &UserId,
-        message_id: &MessageId,
+        message_id: Option<&MessageId>,
         payload: EncryptedPayload,
-    ) -> Result<String> {
+    ) -> Result<Option<String>> {
+        let message_is_empty = payload.payload.is_none();
+
+        // First try to decrypt the message. If that succeeds, great!
         let error = match self._decrypt_message(sender_id, payload).await {
             Ok(message) => return Ok(message),
             Err(error) => error,
+        };
+
+        // If it did not succeed, but the message was empty anyway (i.e. used for transferring
+        // key material), we'll treat it like we had successfully decrypted an empty message.
+        // Our user wouldn't be able to act on this anyway.
+        if message_is_empty {
+            return Ok(None);
+        }
+
+        // If it failed and is not empty however, we'll have a look at our message cache to see if
+        // we may have decrypted the message in the past.
+        let Some(message_id) = message_id else {
+            return Err(error);
         };
 
         let Ok(messages) = self
@@ -184,7 +200,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             return Err(error);
         };
 
-        Ok(body.to_string())
+        Ok(Some(body.to_string()))
     }
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
@@ -474,14 +490,14 @@ impl EncryptionDomainService {
         &self,
         sender_id: &UserId,
         payload: EncryptedPayload,
-    ) -> Result<String> {
+    ) -> Result<Option<String>> {
         let local_device = self
             .encryption_keys_repo
             .get_local_device()
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
-        let encrypted_message = payload
+        let key = payload
             .keys
             .into_iter()
             .find(|message| message.device_id == local_device.device_id)
@@ -492,8 +508,8 @@ impl EncryptionDomainService {
             .decrypt_key(
                 sender_id,
                 &payload.device_id,
-                &encrypted_message.data.as_ref(),
-                encrypted_message.is_pre_key,
+                &key.data.as_ref(),
+                key.is_pre_key,
             )
             .await?;
 
@@ -501,22 +517,28 @@ impl EncryptionDomainService {
             bail!("Invalid DEK and MAC size");
         }
 
-        let dek = aes_gcm::Key::<Aes128Gcm>::from_slice(&dek_and_mac[..KEY_SIZE]);
-        let mac = &dek_and_mac[KEY_SIZE..KEY_SIZE + MAC_SIZE];
-        let mut payload_and_mac = Vec::with_capacity(payload.payload.len() + mac.len());
-        payload_and_mac.extend_from_slice(payload.payload.as_ref());
-        payload_and_mac.extend(mac);
+        let message = if let Some(encrypted_message) = payload.payload {
+            let dek = aes_gcm::Key::<Aes128Gcm>::from_slice(&dek_and_mac[..KEY_SIZE]);
+            let mac = &dek_and_mac[KEY_SIZE..KEY_SIZE + MAC_SIZE];
+            let mut payload_and_mac = Vec::with_capacity(encrypted_message.len() + mac.len());
+            payload_and_mac.extend_from_slice(encrypted_message.as_ref());
+            payload_and_mac.extend(mac);
 
-        let cipher = Aes128Gcm::new(&dek);
-        let nonce =
-            aes_gcm::Nonce::<<Aes128Gcm as AeadCore>::NonceSize>::from_slice(payload.iv.as_ref());
-        let message = String::from_utf8(
-            cipher
-                .decrypt(nonce, payload_and_mac.as_slice())
-                .map_err(|err| anyhow!("{err}"))?,
-        )?;
+            let cipher = Aes128Gcm::new(&dek);
+            let nonce = aes_gcm::Nonce::<<Aes128Gcm as AeadCore>::NonceSize>::from_slice(
+                payload.iv.as_ref(),
+            );
+            let message = String::from_utf8(
+                cipher
+                    .decrypt(nonce, payload_and_mac.as_slice())
+                    .map_err(|err| anyhow!("{err}"))?,
+            )?;
+            Some(message)
+        } else {
+            None
+        };
 
-        if encrypted_message.is_pre_key {
+        if key.is_pre_key {
             if let Err(err) = self.generate_missing_pre_keys().await {
                 error!("Failed to generate missing prekeys. {}", err.to_string())
             }

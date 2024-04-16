@@ -114,6 +114,31 @@ impl Message {
 
                     messages_map.insert(msg.id.id().clone(), Some(message));
                 }
+                MessageLikePayload::Error { message: error } => {
+                    let message_id = msg.id.clone();
+
+                    let message = Message {
+                        id: message_id.into_original_id(),
+                        stanza_id: msg.stanza_id,
+                        from: msg.from.into(),
+                        body: error,
+                        timestamp: msg.timestamp.into(),
+                        is_read: false,
+                        is_edited: false,
+                        is_delivered: false,
+                        is_transient: false,
+                        is_encrypted: false,
+                        reactions: vec![],
+                        attachments: vec![],
+                        mentions: vec![],
+                    };
+
+                    if let Some(stanza_id) = &message.stanza_id {
+                        stanza_to_id_map.insert(stanza_id.clone(), msg.id.id().clone());
+                    };
+
+                    messages_map.insert(msg.id.id().clone(), Some(message));
+                }
                 _ => modifiers.push(msg),
             }
         }
@@ -156,7 +181,9 @@ impl Message {
                 }
                 MessageLikePayload::DeliveryReceipt => message.is_delivered = true,
                 MessageLikePayload::ReadReceipt => message.is_read = true,
-                MessageLikePayload::Message { .. } => unreachable!(),
+                MessageLikePayload::Message { .. } | MessageLikePayload::Error { .. } => {
+                    unreachable!()
+                }
                 MessageLikePayload::Reaction { mut emojis } => {
                     let modifier_from = ParticipantId::from(modifier.from);
 

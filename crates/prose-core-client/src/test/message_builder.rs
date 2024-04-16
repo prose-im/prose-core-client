@@ -225,6 +225,9 @@ impl MessageBuilder {
             .set_from(self.from);
 
         match self.payload {
+            MessageLikePayload::Error { message: error } => {
+                message = message.set_body(format!("Error: {error}"))
+            }
             MessageLikePayload::Message { body, .. } => message = message.set_body(body),
             MessageLikePayload::Reaction { emojis } => {
                 message = message.set_message_reactions(Reactions {

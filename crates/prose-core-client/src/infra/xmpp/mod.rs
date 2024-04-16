@@ -5,7 +5,7 @@
 
 pub use xmpp_client::{XMPPClient, XMPPClientBuilder};
 
-pub(crate) mod event_parser;
-pub(crate) mod type_conversions;
-pub(crate) mod util;
-mod xmpp_client;
+pub mod event_parser;
+pub mod type_conversions;
+pub mod util;
+pub mod xmpp_client;

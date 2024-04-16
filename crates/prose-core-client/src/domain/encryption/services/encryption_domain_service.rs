@@ -26,12 +26,18 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         recipient_id: &UserId,
         message: String,
     ) -> Result<EncryptedPayload>;
+
+    /// Decrypts the payload and returns the decrypted message.
+    /// - If the payload does not contain an encrypted message, processes the key material and
+    ///   returns None.
+    /// - If decrypting the message fails, tries to look up the decrypted message in the
+    ///   MessagesRepository and returns it from there.
     async fn decrypt_message(
         &self,
         sender_id: &UserId,
-        message_id: &MessageId,
+        message_id: Option<&MessageId>,
         payload: EncryptedPayload,
-    ) -> Result<String>;
+    ) -> Result<Option<String>>;
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>>;
     async fn delete_device(&self, device_id: &DeviceId) -> Result<()>;
