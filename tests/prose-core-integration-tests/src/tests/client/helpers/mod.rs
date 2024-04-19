@@ -3,7 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+pub(self) use element_ext::ElementExt;
 pub use test_client::TestClient;
+pub(self) use test_message_queue::TestMessageQueue;
 
 mod connector;
 mod element_ext;

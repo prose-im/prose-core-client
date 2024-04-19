@@ -19,9 +19,7 @@ use prose_xmpp::connector::{
     Connector as ConnectorTrait,
 };
 
-use crate::tests::helpers::test_message_queue::TestMessageQueue;
-
-use super::element_ext::ElementExt;
+use super::{ElementExt, TestMessageQueue};
 
 #[derive(Clone)]
 pub struct Connector {

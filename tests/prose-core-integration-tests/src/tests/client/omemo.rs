@@ -9,8 +9,9 @@ use prose_core_client::dtos::UserId;
 use prose_core_client::user_id;
 use prose_proc_macros::mt_test;
 
-use crate::tests::helpers::TestClient;
 use crate::{recv, send};
+
+use super::helpers::TestClient;
 
 #[mt_test]
 async fn test_receives_device_list_with_current_device_missing() -> Result<()> {

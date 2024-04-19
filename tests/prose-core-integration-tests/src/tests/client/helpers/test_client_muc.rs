@@ -9,7 +9,7 @@ use crate::{recv, send};
 use prose_core_client::domain::rooms::services::impls::build_nickname;
 use prose_core_client::dtos::MucId;
 
-use crate::tests::helpers::TestClient;
+use super::TestClient;
 
 impl TestClient {
     pub async fn perform_join_room(&self, room_id: MucId) -> Result<()> {

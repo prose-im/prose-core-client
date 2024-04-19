@@ -15,11 +15,8 @@ pub use wasm_bindgen_test::wasm_bindgen_test as async_test;
 mod account_settings_repository;
 #[cfg(not(target_arch = "wasm32"))]
 mod client;
-mod client_omemo;
 mod contacts_repository;
 mod drafts_repository;
-#[cfg(not(target_arch = "wasm32"))]
-mod helpers;
 mod messages_repository;
 mod user_info_repository;
 

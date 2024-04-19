@@ -9,7 +9,7 @@ use prose_core_client::dtos::{MucId, UserId};
 use prose_core_client::{muc_id, user_id};
 use prose_proc_macros::mt_test;
 
-use crate::tests::helpers::TestClient;
+use super::helpers::TestClient;
 
 #[mt_test]
 async fn test_joins_room() -> Result<()> {
