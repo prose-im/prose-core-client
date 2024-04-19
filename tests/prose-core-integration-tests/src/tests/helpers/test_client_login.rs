@@ -233,7 +233,7 @@ impl TestClient {
                 <publish node="eu.siacs.conversations.axolotl.devicelist">
                   <item id="current">
                     <list xmlns='eu.siacs.conversations.axolotl'>
-                      <device id="0" label="prose-core-client" />
+                      <device id="{{USER_DEVICE_ID}}" label="prose-core-client" />
                     </list>
                   </item>
                 </publish><publish-options>
@@ -270,7 +270,7 @@ impl TestClient {
             r#"
             <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="get">
               <pubsub xmlns='http://jabber.org/protocol/pubsub'>
-                <items node="eu.siacs.conversations.axolotl.bundles:0" />
+                <items node="eu.siacs.conversations.axolotl.bundles:{{USER_DEVICE_ID}}" />
               </pubsub>
             </iq>
             "#
@@ -291,7 +291,7 @@ impl TestClient {
             r#"
             <iq xmlns='jabber:client' id="{{ID}}" type="set">
               <pubsub xmlns='http://jabber.org/protocol/pubsub'>
-                <publish node="eu.siacs.conversations.axolotl.bundles:0">
+                <publish node="eu.siacs.conversations.axolotl.bundles:{{USER_DEVICE_ID}}">
                   <item id="current">
                     <bundle xmlns='eu.siacs.conversations.axolotl'>
                       <signedPreKeyPublic signedPreKeyId="0">AA==</signedPreKeyPublic>

@@ -55,12 +55,15 @@ impl TestClient {
         let messages = TestMessageQueue::default();
         let connector = Connector::new(messages.clone());
         let path = tempfile::tempdir().unwrap().path().join("avatars");
+        let device_id = DeviceId::from(12345);
 
         let client = Client::builder()
             .set_connector_provider(connector.provider())
             .set_id_provider(IncrementingIDProvider::new("id"))
             .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
-            .set_encryption_service(Arc::new(NoOpEncryptionService {}))
+            .set_encryption_service(Arc::new(NoOpEncryptionService {
+                device_id: device_id.clone(),
+            }))
             .set_store(store().await.expect("Failed to set up store."))
             .set_time_provider(ConstantTimeProvider::ymd(2024, 02, 19))
             .set_delegate(Some(Box::new(Delegate {
@@ -68,14 +71,18 @@ impl TestClient {
             })))
             .build();
 
-        Self {
+        let client = Self {
             client,
             // We'll just mirror the used ID provider here…
             connector,
             id_provider: IncrementingIDProvider::new("id"),
             messages,
             context: Default::default(),
-        }
+        };
+
+        client.push_ctx([("USER_DEVICE_ID".into(), format!("{}", device_id.as_ref()))].into());
+
+        client
     }
 }
 
@@ -209,7 +216,9 @@ impl ClientDelegate for Delegate {
     }
 }
 
-struct NoOpEncryptionService {}
+struct NoOpEncryptionService {
+    device_id: DeviceId,
+}
 
 #[async_trait]
 impl EncryptionService for NoOpEncryptionService {
@@ -217,8 +226,11 @@ impl EncryptionService for NoOpEncryptionService {
         &self,
         _device_id: DeviceId,
     ) -> Result<LocalEncryptionBundle> {
+        // We're just silently discarding the generated device id and use our own
+        // to make testing easier…
+
         Ok(LocalEncryptionBundle {
-            device_id: DeviceId::from(0),
+            device_id: self.device_id.clone(),
             identity_key_pair: IdentityKeyPair {
                 identity_key: IdentityKey::from(vec![0u8].as_slice()),
                 private_key: PrivateKey::from(vec![0u8].as_slice()),
