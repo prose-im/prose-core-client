@@ -26,20 +26,38 @@ use crate::tests::store;
 
 use super::{connector::Connector, test_message_queue::TestMessageQueue};
 
+#[allow(dead_code)]
 pub struct TestClient {
     pub(super) client: Client,
+    connector: Connector,
     id_provider: IncrementingIDProvider,
     messages: TestMessageQueue,
     context: Mutex<Vec<HashMap<String, String>>>,
 }
 
+impl Drop for TestClient {
+    fn drop(&mut self) {
+        // Don't perform any further check if we're already panicking…
+        if std::thread::panicking() {
+            return;
+        }
+
+        let num_remaining_messages = self.messages.len();
+        assert_eq!(
+            num_remaining_messages, 0,
+            "TestClient dropped while still containing {num_remaining_messages} messages."
+        );
+    }
+}
+
 impl TestClient {
     pub async fn new() -> Self {
         let messages = TestMessageQueue::default();
+        let connector = Connector::new(messages.clone());
         let path = tempfile::tempdir().unwrap().path().join("avatars");
 
         let client = Client::builder()
-            .set_connector_provider(Connector::provider(messages.clone()))
+            .set_connector_provider(connector.provider())
             .set_id_provider(IncrementingIDProvider::new("id"))
             .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
             .set_encryption_service(Arc::new(NoOpEncryptionService {}))
@@ -53,6 +71,7 @@ impl TestClient {
         Self {
             client,
             // We'll just mirror the used ID provider here…
+            connector,
             id_provider: IncrementingIDProvider::new("id"),
             messages,
             context: Default::default(),
@@ -60,8 +79,30 @@ impl TestClient {
     }
 }
 
+#[macro_export]
+macro_rules! send(
+    ($client:ident, $element:expr) => (
+        $client.send($element, file!(), line!())
+    )
+);
+
+#[macro_export]
+macro_rules! recv(
+    ($client:ident, $element:expr) => (
+        $client.receive($element, file!(), line!())
+    )
+);
+
+#[macro_export]
+macro_rules! event(
+    ($client:ident, $event:expr) => (
+        $client.event($event, file!(), line!())
+    )
+);
+
+#[allow(dead_code)]
 impl TestClient {
-    pub fn send(&self, xml: impl Into<String>) {
+    pub fn send(&self, xml: impl Into<String>, file: &str, line: u32) {
         let mut xml = xml.into();
 
         // Only increase the ID counter if the message contains an ID…
@@ -72,21 +113,25 @@ impl TestClient {
         } else {
             self.apply_ctx(&mut xml);
         }
-        self.messages.send(xml);
+        self.messages.send(xml, file, line);
     }
 
-    pub fn receive(&self, xml: impl Into<String>) {
+    pub fn receive(&self, xml: impl Into<String>, file: &str, line: u32) {
         let mut xml = xml.into();
 
         self.push_ctx([("ID".into(), self.id_provider.last_id())].into());
         self.apply_ctx(&mut xml);
         self.pop_ctx();
 
-        self.messages.receive(xml);
+        self.messages.receive(xml, file, line);
     }
 
-    pub fn event(&self, event: ClientEvent) {
-        self.messages.event(event);
+    pub fn event(&self, event: ClientEvent, file: &str, line: u32) {
+        self.messages.event(event, file, line);
+    }
+
+    pub async fn receive_next(&self) {
+        self.connector.receive_next().await
     }
 }
 
@@ -142,9 +187,24 @@ struct Delegate {
 
 impl ClientDelegate for Delegate {
     fn handle_event(&self, _client: Client, received_event: ClientEvent) {
-        let Some(expected_event) = self.messages.pop_event() else {
-            panic!("Received unexpected event: {:?}", received_event)
+        let Some((expected_event, file, line)) = self.messages.pop_event() else {
+            std::panic::set_hook(Box::new(move |info| {
+                println!(
+                    "\nClient sent unexpected event:\n\n{}",
+                    info.message().unwrap().to_string()
+                );
+            }));
+            panic!("{:?}", received_event);
         };
+
+        std::panic::set_hook(Box::new(move |info| {
+            println!(
+                "{}Assertion failed at:\n{}:{}",
+                info.message().unwrap().to_string(),
+                file,
+                line
+            );
+        }));
         assert_eq!(expected_event, received_event);
     }
 }

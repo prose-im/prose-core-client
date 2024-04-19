@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 
+use crate::{recv, send};
 use prose_core_client::domain::rooms::services::impls::build_nickname;
 use prose_core_client::dtos::MucId;
 
@@ -29,7 +30,9 @@ impl TestClient {
             .into(),
         );
 
-        self.send(r#"
+        send!(
+            self,
+            r#"
         <presence xmlns='jabber:client' to="{{OCCUPANT_ID}}">
             <show>chat</show>
             <x xmlns='http://jabber.org/protocol/muc'>
@@ -40,7 +43,9 @@ impl TestClient {
         "#
         );
 
-        self.receive(r#"
+        recv!(
+            self,
+            r#"
         <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
           <show>chat</show>
           <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
@@ -51,22 +56,27 @@ impl TestClient {
             <status code="110" />
           </x>
         </presence>
-        "#);
-        self.receive(
+        "#
+        );
+        recv!(
+            self,
             r#"
         <message xmlns="jabber:client" from="{{OCCUPANT_ID}}" type="groupchat">
           <subject />
         </message>
-        "#,
+        "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
             <query xmlns='http://jabber.org/protocol/disco#info'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(r#"
+        recv!(
+            self,
+            r#"
         <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
           <query xmlns="http://jabber.org/protocol/disco#info">
             <feature var="muc_persistent" />
@@ -116,66 +126,74 @@ impl TestClient {
         "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
             <query xmlns='http://jabber.org/protocol/muc#admin'>
                 <item xmlns='http://jabber.org/protocol/muc#user' affiliation="owner"/>
             </query>
         </iq>
-        "#,
+        "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
           <query xmlns="http://jabber.org/protocol/muc#admin">
             <item affiliation="owner" jid="user@prose.org" />
           </query>
         </iq>
-        "#,
+        "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
             <query xmlns='http://jabber.org/protocol/muc#admin'>
                 <item xmlns='http://jabber.org/protocol/muc#user' affiliation="member"/>
             </query>
         </iq>
-        "#,
+        "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
             <query xmlns="http://jabber.org/protocol/muc#admin" />
         </iq>
-        "#,
+        "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
             <query xmlns='http://jabber.org/protocol/muc#admin'>
                 <item xmlns='http://jabber.org/protocol/muc#user' affiliation="admin"/>
             </query>
         </iq>
-        "#,
+        "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
             <query xmlns="http://jabber.org/protocol/muc#admin" />
         </iq>
-        "#,
+        "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="user@prose.org" type="get">
             <vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" type="result">
             <vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'>
@@ -186,10 +204,11 @@ impl TestClient {
                 <email><text>user@prose.org</text></email>
                 <nickname><text>Joe</text></nickname>
             </vcard>
-        </iq>"#,
+        </iq>"#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" type="set">
             <pubsub xmlns='http://jabber.org/protocol/pubsub'>
@@ -224,9 +243,12 @@ impl TestClient {
                     </x>
                 </publish-options>
             </pubsub>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#);
+        recv!(
+            self,
+            r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#
+        );
 
         self.pop_ctx();
 

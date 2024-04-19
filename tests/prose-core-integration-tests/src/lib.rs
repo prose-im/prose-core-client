@@ -3,6 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+#![feature(panic_info_message)]
+
 #[cfg(test)]
 mod tests;
 

@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 
+use crate::{recv, send};
 use prose_core_client::dtos::UserId;
 use prose_core_client::Secret;
 use prose_xmpp::ConnectionError;
@@ -22,7 +23,9 @@ impl TestClient {
         self.perform_load_roster();
 
         // Initial presence
-        self.send(r#"
+        send!(
+            self,
+            r#"
         <presence xmlns='jabber:client'>
             <show>chat</show>
             <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
@@ -30,13 +33,17 @@ impl TestClient {
         );
 
         // Enable carbons
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" type="set">
             <enable xmlns='urn:xmpp:carbons:2'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#);
+        recv!(
+            self,
+            r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#
+        );
 
         self.perform_request_server_capabilities();
         self.perform_load_block_list();
@@ -51,30 +58,34 @@ impl TestClient {
 
 impl TestClient {
     fn perform_load_roster(&self) {
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" type="get">
             <query xmlns='jabber:iq:roster'/>
         </iq>
-        "#,
+        "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" type="result">
             <query xmlns="jabber:iq:roster" ver="1" />
         </iq>
-        "#,
+        "#
         );
     }
 
     fn perform_request_server_capabilities(&self) {
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="prose.org" type="get">
             <query xmlns='http://jabber.org/protocol/disco#items'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" from="nsm.chat" id="{{ID}}" type="result">
             <query xmlns="http://jabber.org/protocol/disco#items">
@@ -82,16 +93,18 @@ impl TestClient {
                 <item jid="upload.prose.org" name="HTTP File Upload" />
             </query>
         </iq>
-        "#,
+        "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="conference.prose.org" type="get">
             <query xmlns='http://jabber.org/protocol/disco#info'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" from="conference.nsm.chat" id="{{ID}}" type="result">
           <query xmlns="http://jabber.org/protocol/disco#info">
@@ -119,16 +132,18 @@ impl TestClient {
             </x>
           </query>
         </iq>
-        "#,
+        "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="upload.prose.org" type="get">
             <query xmlns='http://jabber.org/protocol/disco#info'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" from="upload.nsm.chat" id="{{ID}}" type="result">
           <query xmlns="http://jabber.org/protocol/disco#info">
@@ -160,37 +175,41 @@ impl TestClient {
             </x>
           </query>
         </iq>
-        "#,
+        "#
         );
     }
 
     fn perform_load_block_list(&self) {
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" type="get">
             <blocklist xmlns='urn:xmpp:blocking'/>
-        </iq>"#,
+        </iq>"#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" type="result">
           <blocklist xmlns="urn:xmpp:blocking" />
         </iq>
-        "#,
+        "#
         );
     }
 
     fn perform_load_device_list(&self) {
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="get">
             <pubsub xmlns='http://jabber.org/protocol/pubsub'>
                 <items node="eu.siacs.conversations.axolotl.devicelist"/>
             </pubsub>
         </iq>
-        "#,
+        "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
@@ -201,12 +220,13 @@ impl TestClient {
             </items>
           </pubsub>
         </iq>
-            "#,
+            "#
         )
     }
 
     fn perform_publish_device(&self) {
-        self.send(
+        send!(
+            self,
             r#"
             <iq xmlns='jabber:client' id="{{ID}}" type="set">
               <pubsub xmlns='http://jabber.org/protocol/pubsub'>
@@ -228,9 +248,10 @@ impl TestClient {
                 </publish-options>
               </pubsub>
             </iq>
-            "#,
+            "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
@@ -239,31 +260,34 @@ impl TestClient {
             </publish>
           </pubsub>
         </iq>
-        "#,
+        "#
         );
     }
 
     fn perform_publish_device_bundle(&self) {
-        self.send(
+        send!(
+            self,
             r#"
             <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="get">
               <pubsub xmlns='http://jabber.org/protocol/pubsub'>
                 <items node="eu.siacs.conversations.axolotl.bundles:0" />
               </pubsub>
             </iq>
-            "#,
+            "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
             <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="error">
               <error type="cancel">
                 <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
               </error>
             </iq>
-            "#,
+            "#
         );
 
-        self.send(
+        send!(
+            self,
             r#"
             <iq xmlns='jabber:client' id="{{ID}}" type="set">
               <pubsub xmlns='http://jabber.org/protocol/pubsub'>
@@ -289,9 +313,10 @@ impl TestClient {
                 </publish-options>
               </pubsub>
             </iq>
-            "#,
+            "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
@@ -300,7 +325,7 @@ impl TestClient {
             </publish>
           </pubsub>
         </iq>
-        "#,
+        "#
         );
     }
 
@@ -308,16 +333,18 @@ impl TestClient {
     fn perform_start_session(&self, user_id: &UserId) {
         self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
 
-        self.send(
+        send!(
+            self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
             <pubsub xmlns='http://jabber.org/protocol/pubsub'>
                 <items node="eu.siacs.conversations.axolotl.devicelist"/>
             </pubsub>
         </iq>
-        "#,
+        "#
         );
-        self.receive(
+        recv!(
+            self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="result">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
@@ -328,7 +355,7 @@ impl TestClient {
             </items>
           </pubsub>
         </iq>
-            "#,
+            "#
         );
 
         self.pop_ctx();

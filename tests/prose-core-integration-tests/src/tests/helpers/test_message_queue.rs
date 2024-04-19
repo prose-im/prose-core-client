@@ -14,7 +14,14 @@ use prose_core_client::ClientEvent;
 use super::element_ext::ElementExt;
 
 #[derive(Debug)]
-enum Message {
+struct Message {
+    file: String,
+    line: u32,
+    r#type: MessageType,
+}
+
+#[derive(Debug)]
+enum MessageType {
     In(Element),
     Out(Element),
     Event(ClientEvent),
@@ -26,45 +33,77 @@ pub struct TestMessageQueue {
 }
 
 impl TestMessageQueue {
-    pub fn send(&self, xml: impl Into<String>) {
+    pub fn send(&self, xml: impl Into<String>, file: &str, line: u32) {
         self.expect_send_element(
             // minidom is super particular when it comes to whitespaces,
             // so we'll format the string first…
             Element::from_pretty_printed_xml(&xml.into()).expect("Failed to parse xml"),
+            file,
+            line,
         )
     }
 
-    pub fn expect_send_element(&self, element: impl Into<Element>) {
-        self.messages.lock().push_back(Message::Out(element.into()))
+    pub fn expect_send_element(&self, element: impl Into<Element>, file: &str, line: u32) {
+        self.messages.lock().push_back(Message {
+            file: file.to_string(),
+            line,
+            r#type: MessageType::Out(element.into()),
+        })
     }
 
-    pub fn receive(&self, xml: impl Into<String>) {
+    pub fn receive(&self, xml: impl Into<String>, file: &str, line: u32) {
         self.receive_element(
             Element::from_pretty_printed_xml(&xml.into()).expect("Failed to parse xml"),
+            file,
+            line,
         )
     }
 
-    pub fn receive_element(&self, element: impl Into<Element>) {
-        self.messages.lock().push_back(Message::In(element.into()))
+    pub fn receive_element(&self, element: impl Into<Element>, file: &str, line: u32) {
+        self.messages.lock().push_back(Message {
+            file: file.to_string(),
+            line,
+            r#type: MessageType::In(element.into()),
+        })
     }
 
-    pub fn event(&self, event: ClientEvent) {
-        self.messages.lock().push_back(Message::Event(event))
+    pub fn event(&self, event: ClientEvent, file: &str, line: u32) {
+        self.messages.lock().push_back(Message {
+            file: file.to_string(),
+            line,
+            r#type: MessageType::Event(event),
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        self.messages.lock().len()
     }
 }
 
 impl TestMessageQueue {
-    pub fn pop_send(&self) -> Option<Element> {
+    pub fn pop_send(&self) -> Option<(Element, String, u32)> {
         let mut guard = self.messages.lock();
-        match guard.pop_front() {
-            None => None,
-            Some(Message::In(element)) => {
-                guard.push_front(Message::In(element));
+
+        let Some(message) = guard.pop_front() else {
+            return None;
+        };
+
+        match message.r#type {
+            MessageType::In(element) => {
+                guard.push_front(Message {
+                    file: message.file,
+                    line: message.line,
+                    r#type: MessageType::In(element),
+                });
                 None
             }
-            Some(Message::Out(element)) => Some(element),
-            Some(Message::Event(event)) => {
-                guard.push_front(Message::Event(event));
+            MessageType::Out(element) => Some((element, message.file, message.line)),
+            MessageType::Event(event) => {
+                guard.push_front(Message {
+                    file: message.file,
+                    line: message.line,
+                    r#type: MessageType::Event(event),
+                });
                 None
             }
         }
@@ -72,33 +111,57 @@ impl TestMessageQueue {
 
     pub fn pop_receive(&self) -> Option<Element> {
         let mut guard = self.messages.lock();
-        match guard.pop_front() {
-            None => None,
-            Some(Message::In(element)) => Some(element),
-            Some(Message::Out(element)) => {
-                guard.push_front(Message::Out(element));
+
+        let Some(message) = guard.pop_front() else {
+            return None;
+        };
+
+        match message.r#type {
+            MessageType::In(element) => Some(element),
+            MessageType::Out(element) => {
+                guard.push_front(Message {
+                    file: message.file,
+                    line: message.line,
+                    r#type: MessageType::Out(element),
+                });
                 None
             }
-            Some(Message::Event(event)) => {
-                guard.push_front(Message::Event(event));
+            MessageType::Event(event) => {
+                guard.push_front(Message {
+                    file: message.file,
+                    line: message.line,
+                    r#type: MessageType::Event(event),
+                });
                 None
             }
         }
     }
 
-    pub fn pop_event(&self) -> Option<ClientEvent> {
+    pub fn pop_event(&self) -> Option<(ClientEvent, String, u32)> {
         let mut guard = self.messages.lock();
-        match guard.pop_front() {
-            None => None,
-            Some(Message::In(element)) => {
-                guard.push_front(Message::In(element));
+
+        let Some(message) = guard.pop_front() else {
+            return None;
+        };
+
+        match message.r#type {
+            MessageType::In(element) => {
+                guard.push_front(Message {
+                    file: message.file,
+                    line: message.line,
+                    r#type: MessageType::In(element),
+                });
                 None
             }
-            Some(Message::Out(element)) => {
-                guard.push_front(Message::Out(element));
+            MessageType::Out(element) => {
+                guard.push_front(Message {
+                    file: message.file,
+                    line: message.line,
+                    r#type: MessageType::Out(element),
+                });
                 None
             }
-            Some(Message::Event(event)) => Some(event),
+            MessageType::Event(event) => Some((event, message.file, message.line)),
         }
     }
 }

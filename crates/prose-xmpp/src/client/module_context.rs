@@ -177,7 +177,16 @@ impl ModuleContextInner {
     pub(crate) fn schedule_event(self: Arc<Self>, event: Event) {
         tokio::task::block_in_place(move || {
             let fut = (self.event_handler)(self.clone().try_into().unwrap(), event);
-            tokio::runtime::Handle::current().block_on(async move { fut.await });
+            tokio::runtime::Handle::current().block_on(async move {
+                match tokio::time::timeout(std::time::Duration::from_secs(1), fut).await {
+                    Ok(_) => (),
+                    Err(_) => panic!(
+                        "Encountered timeout! This might have happened because you've \
+                    simulated sending a stanza which requires a server response (e.g. an IQ) but \
+                    did not simulate the actual response."
+                    ),
+                }
+            });
         });
     }
 
