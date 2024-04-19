@@ -306,9 +306,50 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         user_id: &UserId,
         device_list: DeviceList,
     ) -> Result<()> {
+        // Did we just receive our own PubSub node?
+        if user_id != &self.ctx.connected_id()?.into_user_id() {
+            self.user_device_repo
+                .set_all(user_id, device_list.devices)
+                .await?;
+            return Ok(());
+        }
+
         self.user_device_repo
-            .set_all(user_id, device_list.devices)
+            .set_all(user_id, device_list.devices.clone())
             .await?;
+
+        let Some(current_device) = self.encryption_keys_repo.get_local_device().await? else {
+            return Ok(());
+        };
+
+        // … This step presents the risk of introducing a race condition: Two devices might
+        // simultaneously try to announce themselves, unaware of the other's existence. The second
+        // device would overwrite the first one. To mitigate this, devices MUST check that their
+        // own device id is contained in the list whenever they receive a PEP update from their own
+        // account. If they have been removed, they MUST reannounce themselves.
+        //
+        // https://xmpp.org/extensions/xep-0384.html#devices
+
+        if device_list
+            .devices
+            .iter()
+            .find(|device| device.id == current_device.device_id)
+            .is_some()
+        {
+            return Ok(());
+        }
+
+        let mut updated_device_list = device_list;
+        updated_device_list.devices.push(Device {
+            id: current_device.device_id,
+            label: Some(self.build_local_device_label()),
+        });
+
+        self.user_device_service
+            .publish_device_list(updated_device_list)
+            .await
+            .context("Failed to publish our updated device list")?;
+
         Ok(())
     }
 
@@ -453,14 +494,7 @@ impl EncryptionDomainService {
             );
             devices.push(Device {
                 id: bundle.device_id.clone(),
-                label: Some(
-                    self.ctx
-                        .software_version
-                        .os
-                        .as_ref()
-                        .map(|os| format!("{} ({})", self.ctx.software_version.name, os))
-                        .unwrap_or(self.ctx.software_version.name.clone()),
-                ),
+                label: Some(self.build_local_device_label()),
             });
             self.user_device_service
                 .publish_device_list(DeviceList { devices })
@@ -545,5 +579,14 @@ impl EncryptionDomainService {
         }
 
         Ok(message)
+    }
+
+    fn build_local_device_label(&self) -> String {
+        self.ctx
+            .software_version
+            .os
+            .as_ref()
+            .map(|os| format!("{} ({})", self.ctx.software_version.name, os))
+            .unwrap_or(self.ctx.software_version.name.clone())
     }
 }
