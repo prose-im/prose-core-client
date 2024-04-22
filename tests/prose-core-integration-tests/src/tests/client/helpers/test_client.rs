@@ -31,6 +31,7 @@ pub struct TestClient {
     pub(super) client: Client,
     connector: Connector,
     id_provider: IncrementingIDProvider,
+    pub(super) short_id_provider: IncrementingIDProvider,
     messages: TestMessageQueue,
     context: Mutex<Vec<HashMap<String, String>>>,
 }
@@ -60,6 +61,7 @@ impl TestClient {
         let client = Client::builder()
             .set_connector_provider(connector.provider())
             .set_id_provider(IncrementingIDProvider::new("id"))
+            .set_short_id_provider(IncrementingIDProvider::new("short-id"))
             .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
             .set_encryption_service(Arc::new(NoOpEncryptionService {
                 device_id: device_id.clone(),
@@ -76,6 +78,7 @@ impl TestClient {
             // We'll just mirror the used ID provider here…
             connector,
             id_provider: IncrementingIDProvider::new("id"),
+            short_id_provider: IncrementingIDProvider::new("short-id"),
             messages,
             context: Default::default(),
         };

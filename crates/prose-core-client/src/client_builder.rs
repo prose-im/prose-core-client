@@ -10,7 +10,8 @@ use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynEncryptionService, DynTimeProvider, DynUserDeviceIdProvider,
+    AppContext, AppDependencies, DynEncryptionService, DynIDProvider, DynTimeProvider,
+    DynUserDeviceIdProvider,
 };
 use crate::app::event_handlers::{
     BlockListEventHandler, BookmarksEventHandler, ClientEventDispatcher, ConnectionEventHandler,
@@ -39,7 +40,8 @@ pub struct ClientBuilder<S, A, E> {
     builder: XMPPClientBuilder,
     delegate: Option<Box<dyn ClientDelegate>>,
     encryption_service: E,
-    id_provider: Arc<dyn IDProvider>,
+    id_provider: DynIDProvider,
+    short_id_provider: DynIDProvider,
     software_version: SoftwareVersion,
     store: S,
     time_provider: DynTimeProvider,
@@ -54,6 +56,7 @@ impl ClientBuilder<UndefinedStore, UndefinedAvatarCache, UndefinedEncryptionServ
             delegate: None,
             encryption_service: UndefinedEncryptionService,
             id_provider: Arc::new(UUIDProvider::default()),
+            short_id_provider: Arc::new(NanoIDProvider::default()),
             software_version: SoftwareVersion::default(),
             store: UndefinedStore,
             time_provider: Arc::new(SystemTimeProvider::default()),
@@ -73,6 +76,7 @@ impl<A, E> ClientBuilder<UndefinedStore, A, E> {
             delegate: None,
             encryption_service: self.encryption_service,
             id_provider: self.id_provider,
+            short_id_provider: self.short_id_provider,
             software_version: self.software_version,
             store,
             time_provider: self.time_provider,
@@ -89,6 +93,7 @@ impl<D, E> ClientBuilder<D, UndefinedAvatarCache, E> {
             delegate: None,
             encryption_service: self.encryption_service,
             id_provider: self.id_provider,
+            short_id_provider: self.short_id_provider,
             software_version: self.software_version,
             store: self.store,
             time_provider: self.time_provider,
@@ -108,6 +113,7 @@ impl<S, A> ClientBuilder<S, A, UndefinedEncryptionService> {
             delegate: None,
             encryption_service,
             id_provider: self.id_provider,
+            short_id_provider: self.short_id_provider,
             software_version: self.software_version,
             store: self.store,
             time_provider: self.time_provider,
@@ -123,7 +129,14 @@ impl<D, A, E> ClientBuilder<D, A, E> {
     }
 
     pub fn set_id_provider<P: IDProvider + 'static>(mut self, id_provider: P) -> Self {
-        self.builder = self.builder.set_id_provider(id_provider);
+        let id_provider: DynIDProvider = Arc::new(id_provider);
+        self.builder = self.builder.set_id_provider(id_provider.clone());
+        self.id_provider = id_provider;
+        self
+    }
+
+    pub fn set_short_id_provider<P: IDProvider + 'static>(mut self, id_provider: P) -> Self {
+        self.short_id_provider = Arc::new(id_provider);
         self
     }
 
@@ -216,7 +229,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             ctx: AppContext::new(capabilities, self.software_version),
             encryption_service: self.encryption_service,
             id_provider: self.id_provider,
-            short_id_provider: Arc::new(NanoIDProvider::default()),
+            short_id_provider: self.short_id_provider,
             store: self.store,
             time_provider: self.time_provider,
             user_device_id_provider: self.user_device_id_provider,

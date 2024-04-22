@@ -8,7 +8,7 @@ use anyhow::Result;
 use crate::{recv, send};
 use prose_core_client::dtos::UserId;
 use prose_core_client::Secret;
-use prose_xmpp::ConnectionError;
+use prose_xmpp::{ConnectionError, IDProvider};
 
 use super::TestClient;
 
@@ -18,7 +18,16 @@ impl TestClient {
         user: UserId,
         password: impl AsRef<str>,
     ) -> Result<(), ConnectionError> {
-        self.push_ctx([("USER_ID".into(), user.to_string())].into());
+        self.push_ctx(
+            [
+                ("USER_ID".into(), user.to_string()),
+                (
+                    "USER_RESOURCE_ID".into(),
+                    format!("{}/{}", user.to_string(), self.short_id_provider.new_id()),
+                ),
+            ]
+            .into(),
+        );
 
         self.perform_load_roster();
 
