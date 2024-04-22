@@ -10,7 +10,7 @@ use prose_store::prelude::*;
 
 use crate::app::deps::{
     AppContext, AppDependencies, DynClientEventDispatcher, DynEncryptionService, DynIDProvider,
-    DynTimeProvider, DynUserDeviceIdProvider,
+    DynRngProvider, DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::services::RoomInner;
 use crate::domain::contacts::services::impls::{
@@ -52,6 +52,7 @@ pub(crate) struct PlatformDependencies {
     pub ctx: AppContext,
     pub encryption_service: DynEncryptionService,
     pub id_provider: DynIDProvider,
+    pub rng_provider: DynRngProvider,
     pub short_id_provider: DynIDProvider,
     pub store: Store<PlatformDriver>,
     pub time_provider: DynTimeProvider,
@@ -172,6 +173,7 @@ impl From<PlatformDependencies> for AppDependencies {
             encryption_keys_repo: Arc::new(EncryptionKeysRepository::new(d.store.clone())),
             encryption_service: d.encryption_service,
             message_repo: messages_repo.clone(),
+            rng_provider: d.rng_provider.clone(),
             time_provider: time_provider.clone(),
             user_device_id_provider: d.user_device_id_provider,
             user_device_repo: user_device_repo.clone(),
@@ -282,6 +284,7 @@ impl From<PlatformDependencies> for AppDependencies {
             messages_repo,
             messaging_service: d.xmpp.clone(),
             request_handling_service: d.xmpp.clone(),
+            rng_provider: d.rng_provider.clone(),
             room_attributes_service: d.xmpp.clone(),
             room_factory,
             room_management_service: d.xmpp.clone(),

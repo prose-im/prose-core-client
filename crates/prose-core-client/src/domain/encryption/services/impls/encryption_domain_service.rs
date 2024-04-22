@@ -6,13 +6,12 @@
 use std::collections::HashSet;
 use std::time::SystemTime;
 
-use aes_gcm::aead::{Aead, OsRng};
+use aes_gcm::aead::Aead;
 use aes_gcm::{AeadCore, Aes128Gcm, KeyInit};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::prelude::SliceRandom;
-use rand::thread_rng;
 use tracing::{error, info, warn};
 
 use prose_proc_macros::DependenciesStruct;
@@ -20,7 +19,8 @@ use prose_xmpp::TimeProvider;
 
 use crate::app::deps::{
     DynAppContext, DynEncryptionKeysRepository, DynEncryptionService, DynMessagesRepository,
-    DynTimeProvider, DynUserDeviceIdProvider, DynUserDeviceRepository, DynUserDeviceService,
+    DynRngProvider, DynTimeProvider, DynUserDeviceIdProvider, DynUserDeviceRepository,
+    DynUserDeviceService,
 };
 use crate::domain::encryption::models::{
     Device, DeviceId, DeviceInfo, DeviceList, DeviceTrust, PreKeyBundle,
@@ -38,6 +38,7 @@ pub struct EncryptionDomainService {
     encryption_keys_repo: DynEncryptionKeysRepository,
     encryption_service: DynEncryptionService,
     message_repo: DynMessagesRepository,
+    rng_provider: DynRngProvider,
     time_provider: DynTimeProvider,
     user_device_id_provider: DynUserDeviceIdProvider,
     user_device_repo: DynUserDeviceRepository,
@@ -105,8 +106,8 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
-        let nonce = Aes128Gcm::generate_nonce(&mut OsRng);
-        let dek = Aes128Gcm::generate_key(OsRng);
+        let nonce = Aes128Gcm::generate_nonce(self.rng_provider.rng());
+        let dek = Aes128Gcm::generate_key(self.rng_provider.rng());
         let cipher = Aes128Gcm::new(&dek);
 
         let payload = cipher
@@ -409,7 +410,7 @@ impl EncryptionDomainService {
             identity_key: bundle.identity_key,
             pre_key: bundle
                 .pre_keys
-                .choose(&mut thread_rng())
+                .choose(&mut self.rng_provider.rng())
                 .ok_or(anyhow!("No pre_keys available."))?
                 .clone(),
         };

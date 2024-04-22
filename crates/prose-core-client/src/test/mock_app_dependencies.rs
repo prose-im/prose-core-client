@@ -16,7 +16,7 @@ use prose_xmpp::test::IncrementingIDProvider;
 use crate::app::deps::{
     AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
     DynDraftsRepository, DynEncryptionDomainService, DynIDProvider, DynMessageArchiveService,
-    DynMessagesRepository, DynMessagingService, DynRoomAttributesService,
+    DynMessagesRepository, DynMessagingService, DynRngProvider, DynRoomAttributesService,
     DynRoomParticipationService, DynSidebarDomainService, DynTimeProvider,
     DynUserProfileRepository,
 };
@@ -54,6 +54,8 @@ use crate::domain::user_info::services::mocks::MockUserInfoService;
 use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
 use crate::domain::user_profiles::services::mocks::MockUserProfileService;
 use crate::dtos::UserResourceId;
+use crate::infra::general::mocks::StepRngProvider;
+use crate::infra::general::OsRngProvider;
 use crate::test::ConstantTimeProvider;
 use crate::user_resource_id;
 
@@ -107,6 +109,8 @@ pub struct MockAppDependencies {
     pub messages_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
     pub request_handling_service: MockRequestHandlingService,
+    #[derivative(Default(value = "Arc::new(StepRngProvider::default())"))]
+    pub rng_provider: DynRngProvider,
     pub rooms_domain_service: MockRoomsDomainService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
@@ -214,6 +218,7 @@ impl From<MockAppDependencies> for AppDependencies {
             user_profile_repo,
             user_profile_service: Arc::new(mock.user_profile_service),
             contact_list_domain_service: Arc::new(mock.contact_list_domain_service),
+            rng_provider: Arc::new(OsRngProvider),
         }
     }
 }

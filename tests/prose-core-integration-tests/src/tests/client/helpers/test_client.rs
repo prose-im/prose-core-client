@@ -17,6 +17,7 @@ use prose_core_client::dtos::{
     DeviceId, EncryptionKey, IdentityKey, IdentityKeyPair, LocalEncryptionBundle, PreKeyBundle,
     PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SignedPreKeyId, SignedPreKeyRecord, UserId,
 };
+use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
 use prose_core_client::{Client, ClientDelegate, ClientEvent, EncryptionService, FsAvatarCache};
 use prose_xmpp::test::IncrementingIDProvider;
@@ -62,6 +63,7 @@ impl TestClient {
             .set_connector_provider(connector.provider())
             .set_id_provider(IncrementingIDProvider::new("id"))
             .set_short_id_provider(IncrementingIDProvider::new("short-id"))
+            .set_rng_provider(StepRngProvider::default())
             .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
             .set_encryption_service(Arc::new(NoOpEncryptionService {
                 device_id: device_id.clone(),

@@ -38,6 +38,7 @@ use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
 use crate::domain::user_info::services::UserInfoService;
 use crate::domain::user_profiles::repos::UserProfileRepository;
 use crate::domain::user_profiles::services::UserProfileService;
+use crate::infra::general::RngProvider;
 
 pub type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
 pub type DynAppContext = Arc<AppContext>;
@@ -80,6 +81,7 @@ pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
 pub type DynUserProfileService = Arc<dyn UserProfileService>;
+pub type DynRngProvider = Arc<dyn RngProvider>;
 
 pub struct AppDependencies {
     pub account_settings_repo: DynAccountSettingsRepository,
@@ -97,6 +99,7 @@ pub struct AppDependencies {
     pub messages_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
     pub request_handling_service: DynRequestHandlingService,
+    pub rng_provider: DynRngProvider,
     pub room_attributes_service: DynRoomAttributesService,
     pub room_factory: DynRoomFactory,
     pub room_management_service: DynRoomManagementService,
