@@ -42,12 +42,10 @@ impl Connector {
 
     pub async fn receive_next(&self) {
         let Some(connection) = self.current_connection.lock().clone() else {
-            _ = std::panic::take_hook();
             panic!("Tried to receive next stanza, but client is not connected.");
         };
 
         let Some(received_element) = connection.inner.messages.pop_receive() else {
-            _ = std::panic::take_hook();
             panic!("Tried to receive next stanza, but no stanza is queued for reception. Try to call recv! first.");
         };
 
@@ -88,35 +86,24 @@ struct ConnectionInner {
 impl ConnectionTrait for Connection {
     fn send_stanza(&self, sent_element: Element) -> Result<()> {
         let Some((expected_element, file, line)) = self.inner.messages.pop_send() else {
-            std::panic::set_hook(Box::new(move |info| {
-                println!(
-                    "\nUnexpected message sent:\n\n{}",
-                    info.message().unwrap().to_string(),
-                );
-            }));
             panic!(
-                "{}",
+                "Unexpected message sent:\n\n{}",
                 sent_element
                     .to_pretty_printed_xml()
-                    .expect("Failed to convert cached stanza to XML")
+                    .expect("Failed to convert cached stanza to XML"),
             );
         };
 
-        std::panic::set_hook(Box::new(move |info| {
-            println!(
-                "{}\n\nAssertion failed at:\n{}:{}",
-                info.message().unwrap().to_string(),
-                file,
-                line
-            );
-        }));
         assert_eq!(
             expected_element
                 .to_pretty_printed_xml()
                 .expect("Failed to convert cached stanza to XML"),
             sent_element
                 .to_pretty_printed_xml()
-                .expect("Failed to convert received stanza to XML")
+                .expect("Failed to convert received stanza to XML"),
+            "\n\n➡️ Assertion failed at:\n{}:{}",
+            file,
+            line
         );
 
         while let Some(received_element) = self.inner.messages.pop_receive() {

@@ -195,24 +195,13 @@ struct Delegate {
 impl ClientDelegate for Delegate {
     fn handle_event(&self, _client: Client, received_event: ClientEvent) {
         let Some((expected_event, file, line)) = self.messages.pop_event() else {
-            std::panic::set_hook(Box::new(move |info| {
-                println!(
-                    "\nClient sent unexpected event:\n\n{}",
-                    info.message().unwrap().to_string()
-                );
-            }));
-            panic!("{:?}", received_event);
+            panic!("\nClient sent unexpected event:\n\n{:?}", received_event);
         };
-
-        std::panic::set_hook(Box::new(move |info| {
-            println!(
-                "{}Assertion failed at:\n{}:{}",
-                info.message().unwrap().to_string(),
-                file,
-                line
-            );
-        }));
-        assert_eq!(expected_event, received_event);
+        assert_eq!(
+            expected_event, received_event,
+            "\n\n➡️ Assertion failed at:\n{}:{}",
+            file, line
+        );
     }
 }
 
