@@ -277,13 +277,21 @@ impl MessageParser {
                     ParsedMessageBody::EncryptedMessage(body, MessageLikeEncryptionInfo { sender })
                 }
                 Ok(None) => ParsedMessageBody::EmptyMessage,
-                Err(_) => ParsedMessageBody::EncryptedMessage(
-                    message
-                        .body()
-                        .unwrap_or("Message failed to decrypt and did not contain a fallback text.")
-                        .to_string(),
-                    MessageLikeEncryptionInfo { sender },
-                ),
+                Err(error) => {
+                    error!(
+                        "Failed to decrypt message from {sender_id}. {}",
+                        error.to_string()
+                    );
+                    ParsedMessageBody::EncryptedMessage(
+                        message
+                            .body()
+                            .unwrap_or(
+                                "Message failed to decrypt and did not contain a fallback text.",
+                            )
+                            .to_string(),
+                        MessageLikeEncryptionInfo { sender },
+                    )
+                }
             };
             return Ok(Some(parsed_message));
         }
