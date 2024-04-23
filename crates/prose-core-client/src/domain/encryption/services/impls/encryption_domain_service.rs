@@ -25,6 +25,7 @@ use crate::app::deps::{
 use crate::domain::encryption::models::{
     Device, DeviceId, DeviceInfo, DeviceList, DeviceTrust, PreKeyBundle,
 };
+use crate::domain::encryption::services::encryption_domain_service::EncryptionError;
 use crate::domain::messaging::models::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::shared::models::UserId;
@@ -97,7 +98,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         &self,
         recipient_id: &UserId,
         message: String,
-    ) -> Result<EncryptedPayload> {
+    ) -> Result<EncryptedPayload, EncryptionError> {
         let current_user_id = self.ctx.connected_id()?.into_user_id();
 
         let local_device = self
@@ -123,10 +124,16 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         // Instead of encrypting the message for all the user's devices we'll only encrypt it
         // for devices which we have an active session with, i.e. devices that are actually trusted.
         // Otherwise, libsignal will choke later on.
-        let encrypt_message_futures = self
+        let active_device_ids = self
             .encryption_keys_repo
             .get_active_device_ids(&current_user_id)
-            .await?
+            .await?;
+
+        if active_device_ids.is_empty() {
+            return Err(EncryptionError::NoDevices);
+        }
+
+        let encrypt_message_futures = active_device_ids
             .into_iter()
             .filter(|device_id| device_id != &local_device.device_id)
             .map(|device_id| (&current_user_id, device_id))

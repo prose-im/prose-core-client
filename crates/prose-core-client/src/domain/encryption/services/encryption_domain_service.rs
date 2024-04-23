@@ -13,6 +13,14 @@ use crate::domain::messaging::models::{EncryptedPayload, MessageId};
 use crate::domain::shared::models::UserId;
 use crate::dtos::DeviceId;
 
+#[derive(Debug, thiserror::Error)]
+pub enum EncryptionError {
+    #[error("The recipient does not have any OMEMO-enabled devices.")]
+    NoDevices,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
@@ -25,7 +33,7 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         recipient_id: &UserId,
         message: String,
-    ) -> Result<EncryptedPayload>;
+    ) -> Result<EncryptedPayload, EncryptionError>;
 
     /// Decrypts the payload and returns the decrypted message.
     /// - If the payload does not contain an encrypted message, processes the key material and
