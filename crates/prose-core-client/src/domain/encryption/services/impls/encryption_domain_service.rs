@@ -79,21 +79,6 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         Ok(())
     }
 
-    async fn start_session(&self, user_id: &UserId) -> Result<()> {
-        let devices = self.user_device_repo.get_all(user_id).await?;
-
-        join_all(devices.into_iter().map(|device| async move {
-            self.start_session_with_device(user_id.clone(), device.id.clone())
-                .await
-                .with_context(|| format!("Failed to start session with {user_id} ({})", device.id))
-        }))
-        .await
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(())
-    }
-
     async fn encrypt_message(
         &self,
         recipient_id: &UserId,
@@ -606,5 +591,20 @@ impl EncryptionDomainService {
             .as_ref()
             .map(|os| format!("{} ({})", self.ctx.software_version.name, os))
             .unwrap_or(self.ctx.software_version.name.clone())
+    }
+
+    async fn start_session(&self, user_id: &UserId) -> Result<()> {
+        let devices = self.user_device_repo.get_all(user_id).await?;
+
+        join_all(devices.into_iter().map(|device| async move {
+            self.start_session_with_device(user_id.clone(), device.id.clone())
+                .await
+                .with_context(|| format!("Failed to start session with {user_id} ({})", device.id))
+        }))
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(())
     }
 }

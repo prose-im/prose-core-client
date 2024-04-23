@@ -27,8 +27,6 @@ pub enum EncryptionError {
 pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
     async fn initialize(&self) -> Result<()>;
 
-    async fn start_session(&self, user_id: &UserId) -> Result<()>;
-
     async fn encrypt_message(
         &self,
         recipient_id: &UserId,
