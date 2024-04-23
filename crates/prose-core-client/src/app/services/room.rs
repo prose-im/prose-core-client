@@ -202,6 +202,17 @@ impl<Kind> Room<Kind> {
             _ => (),
         }
 
+        let payload = match &self.data.room_id {
+            RoomId::User(user_id) if self.data.encryption_enabled() => {
+                send_message_request::Payload::Encrypted(
+                    self.encryption_domain_service
+                        .encrypt_message(user_id, body.text.clone())
+                        .await?,
+                )
+            }
+            _ => send_message_request::Payload::Plaintext(body.text.clone()),
+        };
+
         let message_id = MessageId::from(self.id_provider.new_id());
 
         // Save the unencrypted message so that we can look it up later…
@@ -217,7 +228,7 @@ impl<Kind> Room<Kind> {
                     from: self.ctx.connected_id()?.into_user_id().into(),
                     timestamp: self.time_provider.now(),
                     payload: MessageLikePayload::Message {
-                        body: body.text.clone(),
+                        body: body.text,
                         attachments: request.attachments.clone(),
                         mentions: body.mentions.clone(),
                         encryption_info: None,
@@ -226,17 +237,6 @@ impl<Kind> Room<Kind> {
                 }],
             )
             .await?;
-
-        let payload = match &self.data.room_id {
-            RoomId::User(user_id) if self.data.encryption_enabled() => {
-                send_message_request::Payload::Encrypted(
-                    self.encryption_domain_service
-                        .encrypt_message(user_id, body.text)
-                        .await?,
-                )
-            }
-            _ => send_message_request::Payload::Plaintext(body.text),
-        };
 
         self.messaging_service
             .send_message(

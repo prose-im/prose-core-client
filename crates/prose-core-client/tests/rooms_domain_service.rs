@@ -541,12 +541,6 @@ async fn test_joins_direct_message() -> Result<()> {
             })
         });
 
-    deps.encryption_domain_service
-        .expect_start_session()
-        .once()
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| Box::pin(async move { Ok(()) }));
-
     deps.connected_rooms_repo
         .expect_set_or_replace()
         .once()
@@ -1041,12 +1035,6 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
                 }))
             })
         });
-
-    deps.encryption_domain_service
-        .expect_start_session()
-        .once()
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| Box::pin(async move { Ok(()) }));
 
     deps.connected_rooms_repo
         .expect_set_or_replace()

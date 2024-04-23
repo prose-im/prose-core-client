@@ -384,8 +384,14 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
         user_id: &UserId,
         device_id: Option<&DeviceId>,
         identity: &IdentityKey,
-        _direction: EncryptionDirection,
+        direction: EncryptionDirection,
     ) -> Result<bool> {
+        // We trust an identity for the purpose of decrypting a received message.
+        // Otherwise decrypting with libsignal would fail.
+        if direction == EncryptionDirection::Receiving {
+            return Ok(true);
+        }
+
         if let Some(device_id) = device_id {
             return Ok(self.get_identity(user_id, device_id).await?.as_ref() == Some(identity));
         };

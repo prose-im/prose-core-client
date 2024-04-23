@@ -188,7 +188,6 @@ impl From<PlatformDependencies> for AppDependencies {
             client_event_dispatcher: client_event_dispatcher.clone(),
             connected_rooms_repo: connected_rooms_repo.clone(),
             ctx: ctx.clone(),
-            encryption_domain_service: encryption_domain_service.clone(),
             id_provider: d.short_id_provider.clone(),
             message_migration_domain_service: message_migration_domain_service.clone(),
             room_attributes_service: d.xmpp.clone(),

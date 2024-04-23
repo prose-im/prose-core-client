@@ -107,6 +107,16 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
+        match self.start_session(recipient_id).await {
+            Ok(_) => (),
+            Err(err) => {
+                error!(
+                    "Failed to start OMEMO session with {recipient_id}. {}",
+                    err.to_string()
+                );
+            }
+        }
+
         let nonce = Aes128Gcm::generate_nonce(self.rng_provider.rng());
         let dek = Aes128Gcm::generate_key(self.rng_provider.rng());
         let cipher = Aes128Gcm::new(&dek);

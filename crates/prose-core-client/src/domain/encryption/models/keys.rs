@@ -64,7 +64,7 @@ pub struct PublicPreKey {
     pub key: PublicKey,
 }
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub enum EncryptionDirection {
     Sending,
     Receiving,

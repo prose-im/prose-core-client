@@ -283,7 +283,6 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
             ctx: Arc::new(value.ctx),
-            encryption_domain_service: Arc::new(value.encryption_domain_service),
             id_provider: Arc::new(value.id_provider),
             message_migration_domain_service: Arc::new(value.message_migration_domain_service),
             room_attributes_service: Arc::new(value.room_attributes_service),
