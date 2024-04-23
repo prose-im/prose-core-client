@@ -12,6 +12,7 @@ use tracing::info;
 
 use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
 use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
     open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarCache,
     PlatformDriver, Secret, SignalServiceHandle,
@@ -275,9 +276,10 @@ impl Client {
             .set_connector_provider(connector::xmpp_rs::Connector::provider())
             .set_store(store.clone())
             .set_avatar_cache(FsAvatarCache::new(&self.cache_dir.join("Avatars"))?)
-            .set_encryption_service(Arc::new(SignalServiceHandle::new(Arc::new(
-                EncryptionKeysRepository::new(store),
-            ))))
+            .set_encryption_service(Arc::new(SignalServiceHandle::new(
+                Arc::new(EncryptionKeysRepository::new(store)),
+                Arc::new(OsRngProvider),
+            )))
             .set_delegate(self.delegate.lock().take())
             .build();
         self.client.write().replace(client.clone());

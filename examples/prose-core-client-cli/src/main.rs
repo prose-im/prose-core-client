@@ -33,6 +33,7 @@ use prose_core_client::dtos::{
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
     open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, PlatformDriver,
     SignalServiceHandle,
@@ -65,9 +66,10 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     let client = Client::builder()
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
-        .set_encryption_service(Arc::new(SignalServiceHandle::new(Arc::new(
-            EncryptionKeysRepository::new(store.clone()),
-        ))))
+        .set_encryption_service(Arc::new(SignalServiceHandle::new(
+            Arc::new(EncryptionKeysRepository::new(store.clone())),
+            Arc::new(OsRngProvider),
+        )))
         .set_store(store)
         .set_avatar_cache(FsAvatarCache::new(&cache_path.join("Avatar"))?)
         .set_delegate(Some(Box::new(Delegate {})))

@@ -9,11 +9,9 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::Utc;
 use libsignal_protocol::{CiphertextMessage, PreKeySignalMessage, ProtocolAddress, SignalMessage};
-use rand::prelude::*;
-use rand::rngs::OsRng;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::app::deps::DynEncryptionKeysRepository;
+use crate::app::deps::{DynEncryptionKeysRepository, DynRngProvider};
 use crate::domain::encryption::models::{
     DeviceId, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey, PublicKey,
     SignedPreKeyId, SignedPreKeyRecord,
@@ -27,6 +25,7 @@ use super::SignalRepoWrapper;
 struct SignalService {
     receiver: mpsc::Receiver<SignalServiceMessage>,
     encryption_keys_repo: DynEncryptionKeysRepository,
+    rng_provider: DynRngProvider,
 }
 enum SignalServiceMessage {
     ProcessPreKeyBundle {
@@ -111,7 +110,7 @@ impl SignalService {
             &mut signal_store.clone(),
             &bundle,
             now,
-            &mut OsRng,
+            &mut self.rng_provider.rng(),
         )
         .await?;
 
@@ -145,7 +144,7 @@ impl SignalService {
             &mut signal_store.clone(),
             &mut signal_store.clone(),
             &mut signal_store.clone(),
-            &mut thread_rng(),
+            &mut self.rng_provider.rng(),
         )
         .await?;
 
@@ -203,14 +202,19 @@ impl SignalService {
 #[derive(Clone)]
 pub struct SignalServiceHandle {
     sender: mpsc::Sender<SignalServiceMessage>,
+    rng_provider: DynRngProvider,
 }
 
 impl SignalServiceHandle {
-    pub fn new(encryption_keys_repo: DynEncryptionKeysRepository) -> Self {
+    pub fn new(
+        encryption_keys_repo: DynEncryptionKeysRepository,
+        rng_provider: DynRngProvider,
+    ) -> Self {
         let (sender, receiver) = mpsc::channel(8);
         let mut actor = SignalService {
             receiver,
             encryption_keys_repo,
+            rng_provider: rng_provider.clone(),
         };
 
         // This feels like overkill, but we need to deal with the fact that the Signal store traits
@@ -231,7 +235,10 @@ impl SignalServiceHandle {
             rt.block_on(local);
         });
 
-        Self { sender }
+        Self {
+            sender,
+            rng_provider,
+        }
     }
 }
 
@@ -242,11 +249,12 @@ impl EncryptionService for SignalServiceHandle {
         device_id: DeviceId,
     ) -> Result<LocalEncryptionBundle> {
         let now = Utc::now();
-        let identity_key_pair = libsignal_protocol::IdentityKeyPair::generate(&mut OsRng);
-        let signed_pre_key = libsignal_protocol::KeyPair::generate(&mut OsRng);
+        let mut rng = self.rng_provider.rng();
+        let identity_key_pair = libsignal_protocol::IdentityKeyPair::generate(&mut rng);
+        let signed_pre_key = libsignal_protocol::KeyPair::generate(&mut rng);
         let signed_pre_key_signature = identity_key_pair
             .private_key()
-            .calculate_signature(&signed_pre_key.public_key.serialize(), &mut OsRng)?;
+            .calculate_signature(&signed_pre_key.public_key.serialize(), &mut rng)?;
 
         let bundle = LocalEncryptionBundle {
             device_id,
@@ -260,7 +268,7 @@ impl EncryptionService for SignalServiceHandle {
             },
             pre_keys: (1u32..101)
                 .map(|i| {
-                    let key_pair = libsignal_protocol::KeyPair::generate(&mut OsRng);
+                    let key_pair = libsignal_protocol::KeyPair::generate(&mut rng);
                     let result = PublicKey::try_from(&key_pair.public_key).and_then(|public_key| {
                         PrivateKey::try_from(&key_pair.private_key)
                             .map(|private_key| (public_key, private_key))
@@ -284,10 +292,11 @@ impl EncryptionService for SignalServiceHandle {
     }
 
     async fn generate_pre_keys_with_ids(&self, ids: Vec<PreKeyId>) -> Result<Vec<PreKeyRecord>> {
+        let mut rng = self.rng_provider.rng();
         let pre_keys = ids
             .into_iter()
             .map(|id| {
-                let key_pair = libsignal_protocol::KeyPair::generate(&mut OsRng);
+                let key_pair = libsignal_protocol::KeyPair::generate(&mut rng);
                 let result = PublicKey::try_from(&key_pair.public_key).and_then(|public_key| {
                     PrivateKey::try_from(&key_pair.private_key)
                         .map(|private_key| (public_key, private_key))
