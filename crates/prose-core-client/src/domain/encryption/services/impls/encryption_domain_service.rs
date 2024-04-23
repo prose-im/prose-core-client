@@ -102,6 +102,17 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             }
         }
 
+        let their_active_device_ids = self
+            .encryption_keys_repo
+            .get_active_device_ids(&recipient_id)
+            .await?
+            .into_iter()
+            .map(|device_id| (recipient_id, device_id));
+
+        if their_active_device_ids.len() == 0 {
+            return Err(EncryptionError::NoDevices);
+        }
+
         let nonce = Aes128Gcm::generate_nonce(self.rng_provider.rng());
         let dek = Aes128Gcm::generate_key(self.rng_provider.rng());
         let cipher = Aes128Gcm::new(&dek);
@@ -119,26 +130,16 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         // Instead of encrypting the message for all the user's devices we'll only encrypt it
         // for devices which we have an active session with, i.e. devices that are actually trusted.
         // Otherwise, libsignal will choke later on.
-        let active_device_ids = self
+        let our_active_device_ids = self
             .encryption_keys_repo
             .get_active_device_ids(&current_user_id)
             .await?;
 
-        if active_device_ids.is_empty() {
-            return Err(EncryptionError::NoDevices);
-        }
-
-        let encrypt_message_futures = active_device_ids
+        let encrypt_message_futures = our_active_device_ids
             .into_iter()
             .filter(|device_id| device_id != &local_device.device_id)
             .map(|device_id| (&current_user_id, device_id))
-            .chain(
-                self.encryption_keys_repo
-                    .get_active_device_ids(&recipient_id)
-                    .await?
-                    .into_iter()
-                    .map(|device_id| (recipient_id, device_id)),
-            )
+            .chain(their_active_device_ids)
             .map(|(user_id, device_id)| async move {
                 self.encryption_service
                     .encrypt_key(user_id, &device_id, &dek_and_mac, &now)
