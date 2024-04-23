@@ -27,9 +27,9 @@ pub struct IncrementingUserDeviceIdProvider {
 
 impl IncrementingUserDeviceIdProvider {
     #[allow(dead_code)]
-    pub fn new() -> Self {
+    pub fn new(value: u32) -> Self {
         IncrementingUserDeviceIdProvider {
-            last_id: Mutex::new(1),
+            last_id: Mutex::new(value),
         }
     }
 }
@@ -37,7 +37,8 @@ impl IncrementingUserDeviceIdProvider {
 impl UserDeviceIdProvider for IncrementingUserDeviceIdProvider {
     fn new_id(&self) -> DeviceId {
         let mut last_id = self.last_id.lock();
+        let id = DeviceId::from(*last_id);
         *last_id += 1;
-        DeviceId::from(*last_id)
+        id
     }
 }

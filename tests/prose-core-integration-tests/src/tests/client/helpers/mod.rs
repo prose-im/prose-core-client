@@ -12,4 +12,5 @@ mod element_ext;
 mod test_client;
 mod test_client_login;
 mod test_client_muc;
+mod test_client_omemo;
 mod test_message_queue;

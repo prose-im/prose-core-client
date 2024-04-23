@@ -6,20 +6,16 @@
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
-use std::time::SystemTime;
 
-use anyhow::Result;
-use async_trait::async_trait;
 use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 
-use prose_core_client::dtos::{
-    DeviceId, EncryptionKey, IdentityKey, IdentityKeyPair, LocalEncryptionBundle, PreKeyBundle,
-    PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SignedPreKeyId, SignedPreKeyRecord, UserId,
-};
+use prose_core_client::domain::encryption::services::IncrementingUserDeviceIdProvider;
+use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId};
+use prose_core_client::infra::encryption::EncryptionKeysRepository;
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
-use prose_core_client::{Client, ClientDelegate, ClientEvent, EncryptionService, FsAvatarCache};
+use prose_core_client::{Client, ClientDelegate, ClientEvent, FsAvatarCache, SignalServiceHandle};
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::IDProvider;
 
@@ -57,7 +53,13 @@ impl TestClient {
         let messages = TestMessageQueue::default();
         let connector = Connector::new(messages.clone());
         let path = tempfile::tempdir().unwrap().path().join("avatars");
-        let device_id = DeviceId::from(12345);
+        let device_id = DeviceId::from(TestClient::device_id());
+        let store = store().await.expect("Failed to set up store.");
+
+        let encryption_service = SignalServiceHandle::new(
+            Arc::new(EncryptionKeysRepository::new(store.clone())),
+            Arc::new(StepRngProvider::default()),
+        );
 
         let client = Client::builder()
             .set_connector_provider(connector.provider())
@@ -65,11 +67,10 @@ impl TestClient {
             .set_short_id_provider(IncrementingIDProvider::new("short-id"))
             .set_rng_provider(StepRngProvider::default())
             .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
-            .set_encryption_service(Arc::new(NoOpEncryptionService {
-                device_id: device_id.clone(),
-            }))
-            .set_store(store().await.expect("Failed to set up store."))
+            .set_encryption_service(Arc::new(encryption_service))
+            .set_store(store)
             .set_time_provider(ConstantTimeProvider::ymd(2024, 02, 19))
+            .set_user_device_id_provider(IncrementingUserDeviceIdProvider::new(12345))
             .set_delegate(Some(Box::new(Delegate {
                 messages: messages.clone(),
             })))
@@ -166,24 +167,24 @@ impl TestClient {
     }
 }
 
-// impl TestClient {
-//     pub async fn get_room(&self, id: impl AsRef<str>) -> RoomEnvelope {
-//         let room_id = RoomId::from_str(id.as_ref()).expect("Could not parse room id");
-//
-//         let Some(item) = self
-//             .client
-//             .sidebar
-//             .sidebar_items()
-//             .await
-//             .into_iter()
-//             .find(|item| item.room.to_generic_room().jid() == &room_id)
-//         else {
-//             panic!("Could not find connected room with id {room_id}")
-//         };
-//
-//         item.room
-//     }
-// }
+impl TestClient {
+    pub async fn get_room(&self, id: impl Into<RoomId>) -> RoomEnvelope {
+        let room_id = id.into();
+
+        let Some(item) = self
+            .client
+            .sidebar
+            .sidebar_items()
+            .await
+            .into_iter()
+            .find(|item| item.room.to_generic_room().jid() == &room_id)
+        else {
+            panic!("Could not find connected room with id {room_id}")
+        };
+
+        item.room
+    }
+}
 
 impl Deref for TestClient {
     type Target = Client;
@@ -207,64 +208,5 @@ impl ClientDelegate for Delegate {
             "\n\n➡️ Assertion failed at:\n{}:{}",
             file, line
         );
-    }
-}
-
-struct NoOpEncryptionService {
-    device_id: DeviceId,
-}
-
-#[async_trait]
-impl EncryptionService for NoOpEncryptionService {
-    async fn generate_local_encryption_bundle(
-        &self,
-        _device_id: DeviceId,
-    ) -> Result<LocalEncryptionBundle> {
-        // We're just silently discarding the generated device id and use our own
-        // to make testing easier…
-
-        Ok(LocalEncryptionBundle {
-            device_id: self.device_id.clone(),
-            identity_key_pair: IdentityKeyPair {
-                identity_key: IdentityKey::from(vec![0u8].as_slice()),
-                private_key: PrivateKey::from(vec![0u8].as_slice()),
-            },
-            signed_pre_key: SignedPreKeyRecord {
-                id: SignedPreKeyId::from(0),
-                public_key: PublicKey::from(vec![0u8].as_slice()),
-                private_key: PrivateKey::from(vec![0u8].as_slice()),
-                signature: Box::new([0u8]),
-                timestamp: 0,
-            },
-            pre_keys: vec![],
-        })
-    }
-
-    async fn generate_pre_keys_with_ids(&self, _ids: Vec<PreKeyId>) -> Result<Vec<PreKeyRecord>> {
-        todo!("generate_pre_keys_with_ids")
-    }
-
-    async fn process_pre_key_bundle(&self, _user_id: &UserId, _bundle: PreKeyBundle) -> Result<()> {
-        todo!("process_pre_key_bundle")
-    }
-
-    async fn encrypt_key(
-        &self,
-        _recipient_id: &UserId,
-        _device_id: &DeviceId,
-        _message: &[u8],
-        _now: &SystemTime,
-    ) -> Result<EncryptionKey> {
-        todo!("encrypt_key")
-    }
-
-    async fn decrypt_key(
-        &self,
-        _sender_id: &UserId,
-        _device_id: &DeviceId,
-        _message: &[u8],
-        _is_pre_key: bool,
-    ) -> Result<Box<[u8]>> {
-        todo!("decrypt_key")
     }
 }

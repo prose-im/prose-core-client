@@ -5,9 +5,10 @@
 
 use anyhow::Result;
 
-use crate::{recv, send};
 use prose_core_client::domain::rooms::services::impls::build_nickname;
-use prose_core_client::dtos::MucId;
+use prose_core_client::dtos::{MucId, RoomEnvelope, UserId};
+
+use crate::{recv, send};
 
 use super::TestClient;
 
@@ -255,5 +256,100 @@ impl TestClient {
         self.rooms.join_room(&room_id, None).await?;
 
         Ok(())
+    }
+
+    pub async fn perform_start_dm(&self, user_id: UserId) -> Result<RoomEnvelope> {
+        send!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="them@prose.org" type="get">
+            <vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0" />
+        </iq>
+        "#
+        );
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="error">
+              <error type="cancel">
+                <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+              </error>
+            </iq>
+            "#
+        );
+
+        send!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="them@prose.org" type="get">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <items max_items="1" node="urn:xmpp:avatar:metadata" />
+          </pubsub>
+        </iq>
+        "#
+        );
+
+        recv!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="error">
+          <error type="cancel">
+            <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+          </error>
+        </iq>
+        "#
+        );
+
+        send!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/bookmark">
+              <item id="them@prose.org">
+                <bookmark xmlns="https://prose.org/protocol/bookmark" jid="them@prose.org" name="Them" sidebar="1" type="dm" />
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+        );
+
+        recv!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/bookmark">
+              <item id="them@prose.org" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#
+        );
+
+        self.rooms.start_conversation(&[user_id.clone()]).await?;
+
+        Ok(self.get_room(user_id).await)
     }
 }
