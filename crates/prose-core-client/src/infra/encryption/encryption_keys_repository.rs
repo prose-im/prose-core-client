@@ -185,13 +185,15 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
             .transaction_for_reading(&[encryption_keys_collections::SESSION_RECORD])
             .await?;
 
+        let key_filter = UserDeviceKey::user_id_filter(user_id);
+
         let collection = tx.readable_collection(encryption_keys_collections::SESSION_RECORD)?;
         let session_ids = collection
             .get_all_filtered::<IdentityKey, _>(
-                Query::from_range(UserDeviceKey::min(user_id)..=UserDeviceKey::max(user_id)),
+                Query::<String>::All,
                 QueryDirection::Forward,
                 None,
-                |key, _| Some(key),
+                |key, _| key_filter(&key).then_some(key),
             )
             .await?;
 
@@ -402,12 +404,19 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
             .await?;
         let collection = tx.readable_collection(encryption_keys_collections::IDENTITY)?;
 
+        let key_filter = UserDeviceKey::user_id_filter(user_id);
+
         let matching_identities = collection
             .get_all_filtered::<IdentityKey, _>(
-                Query::from_range(UserDeviceKey::min(user_id)..=UserDeviceKey::max(user_id)),
+                Query::<String>::All,
                 QueryDirection::Forward,
                 None,
-                |_, value| (&value == identity).then_some(true),
+                |key, value| {
+                    if !key_filter(&key) {
+                        return None;
+                    }
+                    (&value == identity).then_some(true)
+                },
             )
             .await?;
 

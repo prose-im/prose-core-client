@@ -78,12 +78,14 @@ impl Display for SenderDistributionKeyRef<'_, '_, '_> {
 pub struct UserDeviceKey(String);
 
 impl UserDeviceKey {
-    pub fn min(user_id: &UserId) -> Self {
-        Self::new(user_id, &DeviceId::from(u32::MIN))
-    }
-
-    pub fn max(user_id: &UserId) -> Self {
-        Self::new(user_id, &DeviceId::from(u32::MAX))
+    pub fn user_id_filter(user_id: &UserId) -> impl Fn(&str) -> bool {
+        let user_id_string = user_id.to_string();
+        move |key| {
+            let Some((user_id, _)) = key.rsplit_once(".") else {
+                return false;
+            };
+            user_id == user_id_string
+        }
     }
 
     pub fn parse_device_id_from_key(key: &str) -> Result<DeviceId> {
