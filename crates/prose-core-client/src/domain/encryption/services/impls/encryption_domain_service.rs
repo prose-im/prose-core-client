@@ -29,7 +29,7 @@ use crate::domain::encryption::services::encryption_domain_service::EncryptionEr
 use crate::domain::messaging::models::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::shared::models::UserId;
-use crate::dtos::{DeviceBundle, EncryptionDirection, MessageId, PreKeyId, RoomId};
+use crate::dtos::{EncryptionDirection, MessageId, PreKeyId, RoomId};
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
 
@@ -52,29 +52,69 @@ const MAC_SIZE: usize = 16;
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl EncryptionDomainServiceTrait for EncryptionDomainService {
+    /// Generates the local device bundle and publishes it if needed.
     async fn initialize(&self) -> Result<()> {
-        let bundle = self.get_or_initialize_local_encryption_keys().await?;
-        self.publish_device_info_if_needed(bundle).await?;
+        // Initialize local bundle if needed…
+        let bundle = match self
+            .encryption_keys_repo
+            .get_local_device_bundle()
+            .await
+            .context("Failed to load local device bundle.")?
+        {
+            Some(bundle) => bundle,
+            None => {
+                let local_encryption_bundle = self
+                    .encryption_service
+                    .generate_local_encryption_bundle(self.user_device_id_provider.new_id())
+                    .await
+                    .context("Failed to generate local encryption bundle.")?;
+
+                self.encryption_keys_repo
+                    .put_local_encryption_bundle(&local_encryption_bundle)
+                    .await
+                    .context("Failed to save local encryption bundle")?;
+
+                local_encryption_bundle.into_device_bundle()
+            }
+        };
 
         let user_id = self.ctx.connected_id()?.into_user_id();
-        let devices = self.user_device_repo.get_all(&user_id).await?;
 
-        join_all(devices.into_iter().map(|device| {
-            let user_id = user_id.clone();
-            async move {
-                match self
-                    .start_session_with_device(user_id.clone(), device.id.clone())
-                    .await
-                {
-                    Ok(_) => (),
-                    Err(err) => warn!(
-                        "Failed to start OMEMO session with {user_id}'s device {}. Reason: {}",
-                        device, err
-                    ),
-                }
-            }
-        }))
-        .await;
+        let mut devices = self.user_device_repo.get_all(&user_id).await?;
+        // Add our device to our device list if needed…
+        if !devices
+            .iter()
+            .find(|device| device.id == bundle.device_id)
+            .is_some()
+        {
+            info!(
+                "Adding our device {} the list of devices…",
+                bundle.device_id
+            );
+            devices.push(Device {
+                id: bundle.device_id.clone(),
+                label: Some(self.build_local_device_label()),
+            });
+            self.user_device_service
+                .publish_device_list(DeviceList { devices })
+                .await
+                .context("Failed to publish our device list")?;
+        }
+
+        let published_bundle = self
+            .user_device_service
+            .load_device_bundle(&user_id, &bundle.device_id)
+            .await
+            .context("Failed to load our device bundle")?;
+
+        // … and publish our device bundle…
+        if published_bundle.is_none() {
+            info!("Publishing our device bundle…");
+            self.user_device_service
+                .publish_device_bundle(bundle)
+                .await
+                .context("Failed to publish our device bundle")?;
+        }
 
         Ok(())
     }
@@ -92,7 +132,17 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
-        match self.start_session(recipient_id).await {
+        match self.start_sessions_if_needed(&current_user_id).await {
+            Ok(_) => (),
+            Err(err) => {
+                error!(
+                    "Failed to start OMEMO session for our other devices. {}",
+                    err.to_string()
+                );
+            }
+        }
+
+        match self.start_sessions_if_needed(recipient_id).await {
             Ok(_) => (),
             Err(err) => {
                 error!(
@@ -365,69 +415,6 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 }
 
 impl EncryptionDomainService {
-    async fn get_or_initialize_local_encryption_keys(&self) -> Result<DeviceBundle> {
-        if let Some(local_encryption_bundle) = self
-            .encryption_keys_repo
-            .get_local_device_bundle()
-            .await
-            .context("Failed to load local device bundle.")?
-        {
-            return Ok(local_encryption_bundle);
-        }
-
-        let local_encryption_bundle = self
-            .encryption_service
-            .generate_local_encryption_bundle(self.user_device_id_provider.new_id())
-            .await
-            .context("Failed to generate local encryption bundle.")?;
-
-        self.encryption_keys_repo
-            .put_local_encryption_bundle(&local_encryption_bundle)
-            .await
-            .context("Failed to save local encryption bundle")?;
-
-        Ok(local_encryption_bundle.into_device_bundle())
-    }
-
-    async fn start_session_with_device(&self, user_id: UserId, device_id: DeviceId) -> Result<()> {
-        info!("Starting OMEMO session with {user_id} ({device_id})…");
-
-        let Some(bundle) = self
-            .user_device_service
-            .load_device_bundle(&user_id, &device_id)
-            .await
-            .with_context(|| format!("Failed to load device bundle for {user_id} ({device_id})"))?
-        else {
-            info!("No device bundle found for {user_id} ({device_id}).");
-            return Ok(());
-        };
-
-        self.encryption_keys_repo
-            .save_identity(&user_id, &device_id, &bundle.identity_key)
-            .await
-            .with_context(|| format!("Failed to save identity for {user_id} ({device_id})"))?;
-
-        let pre_key_bundle = PreKeyBundle {
-            device_id: device_id.clone(),
-            signed_pre_key: bundle.signed_pre_key,
-            identity_key: bundle.identity_key,
-            pre_key: bundle
-                .pre_keys
-                .choose(&mut self.rng_provider.rng())
-                .ok_or(anyhow!("No pre_keys available."))?
-                .clone(),
-        };
-
-        self.encryption_service
-            .process_pre_key_bundle(&user_id, pre_key_bundle)
-            .await
-            .with_context(|| {
-                format!("Failed to process PreKey bundle for {user_id} ({device_id})")
-            })?;
-
-        Ok(())
-    }
-
     async fn generate_missing_pre_keys(&self) -> Result<()> {
         let pre_keys = self
             .encryption_keys_repo
@@ -469,57 +456,17 @@ impl EncryptionDomainService {
             .context("Failed to save re-generated PreKeys…")?;
 
         info!("Publishing bundle with new PreKeys…");
-        let bundle = self
+        let mut bundle = self
             .encryption_keys_repo
             .get_local_device_bundle()
             .await?
             .ok_or(anyhow!("Missing own device bundle"))?;
+        bundle.pre_keys.sort_by_key(|key| key.id);
+
         self.user_device_service
             .publish_device_bundle(bundle)
             .await
             .context("Failed to publish device bundle with re-generated PreKeys")?;
-
-        Ok(())
-    }
-
-    async fn publish_device_info_if_needed(&self, bundle: DeviceBundle) -> Result<()> {
-        let user_id = self.ctx.connected_id()?.into_user_id();
-
-        let mut devices = self.user_device_repo.get_all(&user_id).await?;
-        // Add our device to our device list if needed…
-        if !devices
-            .iter()
-            .find(|device| device.id == bundle.device_id)
-            .is_some()
-        {
-            info!(
-                "Adding our device {} the list of devices…",
-                bundle.device_id
-            );
-            devices.push(Device {
-                id: bundle.device_id.clone(),
-                label: Some(self.build_local_device_label()),
-            });
-            self.user_device_service
-                .publish_device_list(DeviceList { devices })
-                .await
-                .context("Failed to publish our device list")?;
-        }
-
-        let published_bundle = self
-            .user_device_service
-            .load_device_bundle(&user_id, &bundle.device_id)
-            .await
-            .context("Failed to load our device bundle")?;
-
-        // … and publish our device bundle…
-        if published_bundle.is_none() {
-            info!("Publishing our device bundle…");
-            self.user_device_service
-                .publish_device_bundle(bundle)
-                .await
-                .context("Failed to publish our device bundle")?;
-        }
 
         Ok(())
     }
@@ -594,17 +541,69 @@ impl EncryptionDomainService {
             .unwrap_or(self.ctx.software_version.name.clone())
     }
 
-    async fn start_session(&self, user_id: &UserId) -> Result<()> {
+    async fn start_sessions_if_needed(&self, user_id: &UserId) -> Result<()> {
         let devices = self.user_device_repo.get_all(user_id).await?;
 
         join_all(devices.into_iter().map(|device| async move {
-            self.start_session_with_device(user_id.clone(), device.id.clone())
+            self.start_session_with_device_if_needed(user_id, device.id.clone())
                 .await
                 .with_context(|| format!("Failed to start session with {user_id} ({})", device.id))
         }))
         .await
         .into_iter()
         .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(())
+    }
+
+    async fn start_session_with_device_if_needed(
+        &self,
+        user_id: &UserId,
+        device_id: DeviceId,
+    ) -> Result<()> {
+        if self
+            .encryption_keys_repo
+            .get_session(user_id, &device_id)
+            .await?
+            .is_some()
+        {
+            return Ok(());
+        }
+
+        info!("Starting OMEMO session with {user_id} ({device_id})…");
+
+        let Some(bundle) = self
+            .user_device_service
+            .load_device_bundle(&user_id, &device_id)
+            .await
+            .with_context(|| format!("Failed to load device bundle for {user_id} ({device_id})"))?
+        else {
+            info!("No device bundle found for {user_id} ({device_id}).");
+            return Ok(());
+        };
+
+        self.encryption_keys_repo
+            .save_identity(&user_id, &device_id, &bundle.identity_key)
+            .await
+            .with_context(|| format!("Failed to save identity for {user_id} ({device_id})"))?;
+
+        let pre_key_bundle = PreKeyBundle {
+            device_id: device_id.clone(),
+            signed_pre_key: bundle.signed_pre_key,
+            identity_key: bundle.identity_key,
+            pre_key: bundle
+                .pre_keys
+                .choose(&mut self.rng_provider.rng())
+                .ok_or(anyhow!("No pre_keys available."))?
+                .clone(),
+        };
+
+        self.encryption_service
+            .process_pre_key_bundle(&user_id, pre_key_bundle)
+            .await
+            .with_context(|| {
+                format!("Failed to process PreKey bundle for {user_id} ({device_id})")
+            })?;
 
         Ok(())
     }
