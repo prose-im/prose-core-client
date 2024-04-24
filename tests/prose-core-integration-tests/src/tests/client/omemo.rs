@@ -4,21 +4,22 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use minidom::Element;
 
-use prose_core_client::dtos::{SendMessageRequest, SendMessageRequestBody, UserId};
+use prose_core_client::dtos::{DeviceBundle, SendMessageRequest, SendMessageRequestBody, UserId};
 use prose_core_client::user_id;
 use prose_proc_macros::mt_test;
 
 use crate::{recv, send};
 
-use super::helpers::TestClient;
+use super::helpers::{LoginConfig, TestClient, TestDeviceBundle};
 
 #[mt_test]
 async fn test_receives_device_list_with_current_device_missing() -> Result<()> {
     let client = TestClient::new().await;
 
     client
-        .perform_login(user_id!("user@prose.org"), "secret")
+        .expect_login(user_id!("user@prose.org"), "secret")
         .await?;
 
     recv!(
@@ -93,7 +94,7 @@ async fn test_receives_device_list_with_current_device_included() -> Result<()> 
     let client = TestClient::new().await;
 
     client
-        .perform_login(user_id!("user@prose.org"), "secret")
+        .expect_login(user_id!("user@prose.org"), "secret")
         .await?;
 
     recv!(
@@ -126,11 +127,11 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
     let client = TestClient::new().await;
 
     client
-        .perform_login(user_id!("user@prose.org"), "secret")
+        .expect_login(user_id!("user@prose.org"), "secret")
         .await?;
 
     let room = client
-        .perform_start_dm(user_id!("them@prose.org"))
+        .start_dm(user_id!("them@prose.org"))
         .await?
         .to_generic_room();
 
@@ -162,17 +163,17 @@ async fn test_sending_encrypted_message_fails_if_recipient_has_no_devices() -> R
     let client = TestClient::new().await;
 
     client
-        .perform_login(user_id!("user@prose.org"), "secret")
+        .expect_login(user_id!("user@prose.org"), "secret")
         .await?;
 
     let room = client
-        .perform_start_dm(user_id!("them@prose.org"))
+        .start_dm(user_id!("them@prose.org"))
         .await?
         .to_generic_room();
 
     room.set_encryption_enabled(true);
 
-    client.perform_start_omemo_session(user_id!("them@prose.org"), []);
+    client.expect_load_device_list(&user_id!("them@prose.org"), []);
 
     let result = room
         .send_message(SendMessageRequest {
@@ -195,17 +196,39 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
     let client = TestClient::new().await;
 
     client
-        .perform_login(user_id!("user@prose.org"), "secret")
+        .expect_login_with_config(
+            user_id!("user@prose.org"),
+            "secret",
+            LoginConfig::default()
+                .with_device_bundles([(500.into(), DeviceBundle::test(500).await)]),
+        )
         .await?;
 
     let room = client
-        .perform_start_dm(user_id!("them@prose.org"))
+        .start_dm(user_id!("them@prose.org"))
         .await?
         .to_generic_room();
 
     room.set_encryption_enabled(true);
 
-    client.perform_start_omemo_session(user_id!("them@prose.org"), [111.into(), 222.into()]);
+    // Device list is not loaded here, because it is already cached.
+    client.expect_load_device_bundle(
+        &user_id!("user@prose.org"),
+        &500.into(),
+        Some(DeviceBundle::test(500).await),
+    );
+
+    client.expect_load_device_list(&user_id!("them@prose.org"), [111.into(), 222.into()]);
+    client.expect_load_device_bundle(
+        &user_id!("them@prose.org"),
+        &111.into(),
+        Some(DeviceBundle::test(111).await),
+    );
+    client.expect_load_device_bundle(
+        &user_id!("them@prose.org"),
+        &222.into(),
+        Some(DeviceBundle::test(222).await),
+    );
 
     send!(
         client,
@@ -213,9 +236,10 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
-            <header sid="12345">
-              <key prekey="true" rid="111">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwrF71OY7D2TlW90xkGelF7p4fWb9vdPcryLn4tH8v72CiI5FGhRkoGz/r5ZkbQ02gHDLjGDJNp3wouWAwAA==</key>
-              <key prekey="true" rid="222">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwrF71OY7D2TlW90xkGelF7p4fWb9vdPcryLn4tH8v72CiI5FGhRkoGz/r5ZkbQ02gHDLjGDJNp3wouWAwAA==</key>
+            <header sid="{{USER_DEVICE_ID}}">
+              <key prekey="true" rid="500">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwaeNDn7QTbNfd3kVdI6q1SSL78yHI2fohvZq3XHM+xzGDLjJQGDsaOlkA3gFblk3imzOLObPtCmkouWAwAA==</key>
+              <key prekey="true" rid="111">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwaeNDn7QTbNfd3kVdI6q1SSL78yHI2fohvZq3XHM+xzGDLjJQGDsaOlkA3gFblk3imzOLObPtCmkouWAwAA==</key>
+              <key prekey="true" rid="222">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwaeNDn7QTbNfd3kVdI6q1SSL78yHI2fohvZq3XHM+xzGDLjJQGDsaOlkA3gFblk3imzOLObPtCmkouWAwAA==</key>
               <iv>AQAAAAAAAAACAAAA</iv>
             </header>
             <payload>AgiX8ZA0voKAc/M=</payload>
@@ -235,6 +259,139 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         attachments: vec![],
     })
     .await?;
+
+    // Sessions should only be started once…
+
+    send!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+          <body>[This message is OMEMO encrypted]</body>
+          <encrypted xmlns="eu.siacs.conversations.axolotl">
+            <header sid="{{USER_DEVICE_ID}}">
+              <key prekey="true" rid="500">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAEYACIwl6iMdEngbUMSj+lMfNEg4dgEruhF+Jnlj81us5vNX6WjXZulX3+kAmUi3JuRfjs3lw4pxCbZop0ouWAwAA==</key>
+              <key prekey="true" rid="111">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAEYACIwl6iMdEngbUMSj+lMfNEg4dgEruhF+Jnlj81us5vNX6WjXZulX3+kAmUi3JuRfjs3lw4pxCbZop0ouWAwAA==</key>
+              <key prekey="true" rid="222">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAEYACIwl6iMdEngbUMSj+lMfNEg4dgEruhF+Jnlj81us5vNX6WjXZulX3+kAmUi3JuRfjs3lw4pxCbZop0ouWAwAA==</key>
+              <iv>AQAAAAAAAAACAAAA</iv>
+            </header>
+            <payload>AgiX8ZA0voKAc/MDFA==</payload>
+          </encrypted>
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <active xmlns="http://jabber.org/protocol/chatstates" />
+          <markable xmlns="urn:xmpp:chat-markers:0" />
+        </message>
+        "#
+    );
+
+    room.send_message(SendMessageRequest {
+        body: Some(SendMessageRequestBody {
+            text: "Hello World 2".to_string(),
+            mentions: vec![],
+        }),
+        attachments: vec![],
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_decrypts_received_messages() -> Result<()> {
+    let client = TestClient::new().await;
+
+    client
+        .expect_login(user_id!("user@prose.org"), "secret")
+        .await?;
+
+    let room = client
+        .start_dm(user_id!("them@prose.org"))
+        .await?
+        .to_generic_room();
+
+    let service = TestClient::their_encryption_domain_service(user_id!("them@prose.org")).await;
+    let encrypted_payload = service
+        .encrypt_message(
+            &user_id!("user@prose.org"),
+            "Can you read this?".to_string(),
+        )
+        .await?;
+
+    client.push_ctx(
+        [(
+            "ENCRYPTED_PAYLOAD".into(),
+            String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
+                encrypted_payload,
+            ))),
+        )]
+        .into(),
+    );
+
+    recv!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="them@prose.org" id="my-message-id" to="{{USER_ID}}" type="chat">
+          <body>[This message is OMEMO encrypted]</body>
+          {{ENCRYPTED_PAYLOAD}}
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <active xmlns="http://jabber.org/protocol/chatstates" />
+          <markable xmlns="urn:xmpp:chat-markers:0" />
+        </message>
+        "#
+    );
+
+    // The bundle should be published with a fresh PreKey…
+    let bundle_xml = TestClient::initial_device_bundle_xml().replace(
+        r#"<preKeyPublic preKeyId="1">BW5hMOrNOjAiWAex/RebnNDAq4vFVz30wLGFhBSAdyoy</preKeyPublic>"#,
+        r#"<preKeyPublic preKeyId="1">BTQ9Qr1iZH0bYjwm34NOaKoc3g2bCKMzsqyeNihNgaUx</preKeyPublic>"#,
+    );
+    assert_ne!(bundle_xml, TestClient::initial_device_bundle_xml());
+    client.expect_publish_device_bundle(bundle_xml);
+    client.receive_next().await;
+
+    let messages = room
+        .load_messages_with_ids(&["my-message-id".into()])
+        .await?;
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages.first().unwrap().body, "Can you read this?");
+
+    let encrypted_payload = service
+        .encrypt_message(
+            &user_id!("user@prose.org"),
+            "Can you read this too?".to_string(),
+        )
+        .await?;
+
+    client.push_ctx(
+        [(
+            "ENCRYPTED_PAYLOAD".into(),
+            String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
+                encrypted_payload,
+            ))),
+        )]
+        .into(),
+    );
+
+    recv!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="them@prose.org" id="other-message-id" to="{{USER_ID}}" type="chat">
+          <body>[This message is OMEMO encrypted]</body>
+          {{ENCRYPTED_PAYLOAD}}
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <active xmlns="http://jabber.org/protocol/chatstates" />
+          <markable xmlns="urn:xmpp:chat-markers:0" />
+        </message>
+        "#
+    );
+    client.receive_next().await;
+
+    // Second message should not contain a pre-key, thus the bundle shouldn't be published again.
+
+    let messages = room
+        .load_messages_with_ids(&["other-message-id".into()])
+        .await?;
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages.first().unwrap().body, "Can you read this too?");
 
     Ok(())
 }

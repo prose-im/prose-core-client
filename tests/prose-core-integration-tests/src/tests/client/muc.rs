@@ -16,11 +16,11 @@ async fn test_joins_room() -> Result<()> {
     let client = TestClient::new().await;
 
     client
-        .perform_login(user_id!("user@prose.org"), "secret")
+        .expect_login(user_id!("user@prose.org"), "secret")
         .await?;
 
     client
-        .perform_join_room(muc_id!("room@conference.prose.org"))
+        .join_room(muc_id!("room@conference.prose.org"))
         .await?;
 
     Ok(())

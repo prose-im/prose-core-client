@@ -70,7 +70,7 @@ impl TestClient {
             .set_encryption_service(Arc::new(encryption_service))
             .set_store(store)
             .set_time_provider(ConstantTimeProvider::ymd(2024, 02, 19))
-            .set_user_device_id_provider(IncrementingUserDeviceIdProvider::new(12345))
+            .set_user_device_id_provider(IncrementingUserDeviceIdProvider::new(*device_id.as_ref()))
             .set_delegate(Some(Box::new(Delegate {
                 messages: messages.clone(),
             })))

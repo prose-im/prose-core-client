@@ -13,7 +13,7 @@ use crate::{recv, send};
 use super::TestClient;
 
 impl TestClient {
-    pub async fn perform_join_room(&self, room_id: MucId) -> Result<()> {
+    pub async fn join_room(&self, room_id: MucId) -> Result<()> {
         let nickname = build_nickname(
             &self
                 .client
@@ -258,7 +258,7 @@ impl TestClient {
         Ok(())
     }
 
-    pub async fn perform_start_dm(&self, user_id: UserId) -> Result<RoomEnvelope> {
+    pub async fn start_dm(&self, user_id: UserId) -> Result<RoomEnvelope> {
         send!(
             self,
             r#"

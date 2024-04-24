@@ -5,18 +5,44 @@
 
 use anyhow::Result;
 
-use crate::{recv, send};
-use prose_core_client::dtos::UserId;
+use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
 use prose_core_client::Secret;
 use prose_xmpp::{ConnectionError, IDProvider};
 
+use crate::{recv, send};
+
 use super::TestClient;
 
+#[derive(Default)]
+pub struct LoginConfig {
+    pub device_bundles: Vec<(DeviceId, DeviceBundle)>,
+}
+
+impl LoginConfig {
+    pub fn with_device_bundles(
+        mut self,
+        device_bundles: impl IntoIterator<Item = (DeviceId, DeviceBundle)>,
+    ) -> Self {
+        self.device_bundles = device_bundles.into_iter().collect::<Vec<_>>();
+        self
+    }
+}
+
 impl TestClient {
-    pub async fn perform_login(
+    pub async fn expect_login(
         &self,
         user: UserId,
         password: impl AsRef<str>,
+    ) -> Result<(), ConnectionError> {
+        self.expect_login_with_config(user, password, LoginConfig::default())
+            .await
+    }
+
+    pub async fn expect_login_with_config(
+        &self,
+        user: UserId,
+        password: impl AsRef<str>,
+        config: LoginConfig,
     ) -> Result<(), ConnectionError> {
         self.push_ctx(
             [
@@ -29,7 +55,7 @@ impl TestClient {
             .into(),
         );
 
-        self.perform_load_roster();
+        self.expect_load_roster();
 
         // Initial presence
         send!(
@@ -54,11 +80,15 @@ impl TestClient {
             r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#
         );
 
-        self.perform_request_server_capabilities();
-        self.perform_load_block_list();
-        self.perform_load_device_list();
-        self.perform_publish_device();
-        self.perform_publish_device_bundle();
+        self.expect_request_server_capabilities();
+        self.expect_load_block_list();
+
+        self.expect_load_device_list(
+            &user,
+            config.device_bundles.clone().into_iter().map(|(id, _)| id),
+        );
+        self.expect_publish_device(config.device_bundles.into_iter().map(|(id, _)| id));
+        self.expect_publish_initial_device_bundle();
 
         self.connect(&user, Secret::new(password.as_ref().to_string()))
             .await
@@ -66,7 +96,7 @@ impl TestClient {
 }
 
 impl TestClient {
-    fn perform_load_roster(&self) {
+    fn expect_load_roster(&self) {
         send!(
             self,
             r#"
@@ -85,7 +115,7 @@ impl TestClient {
         );
     }
 
-    fn perform_request_server_capabilities(&self) {
+    fn expect_request_server_capabilities(&self) {
         send!(
             self,
             r#"
@@ -188,7 +218,7 @@ impl TestClient {
         );
     }
 
-    fn perform_load_block_list(&self) {
+    fn expect_load_block_list(&self) {
         send!(
             self,
             r#"
@@ -206,7 +236,15 @@ impl TestClient {
         );
     }
 
-    fn perform_publish_device(&self) {
+    fn expect_publish_device(&self, existing_device_ids: impl IntoIterator<Item = DeviceId>) {
+        let devices = existing_device_ids
+            .into_iter()
+            .map(|id| format!("<device id='{id}'/>"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        self.push_ctx([("EXISTING_DEVICES".into(), devices)].into());
+
         send!(
             self,
             r#"
@@ -215,6 +253,7 @@ impl TestClient {
                 <publish node="eu.siacs.conversations.axolotl.devicelist">
                   <item id="current">
                     <list xmlns='eu.siacs.conversations.axolotl'>
+                      {{EXISTING_DEVICES}}
                       <device id="{{USER_DEVICE_ID}}" label="prose-core-client" />
                     </list>
                   </item>

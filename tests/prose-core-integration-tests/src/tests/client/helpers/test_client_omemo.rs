@@ -3,16 +3,54 @@
 // Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use minidom::Element;
 
+use prose_core_client::app::deps::DynEncryptionDomainService;
+use prose_core_client::domain::connection::models::ConnectionProperties;
+use prose_core_client::domain::encryption::models::Device;
+use prose_core_client::domain::encryption::repos::mocks::MockUserDeviceRepository;
+use prose_core_client::domain::encryption::services::impls::{
+    EncryptionDomainService, EncryptionDomainServiceDependencies,
+};
+use prose_core_client::domain::encryption::services::mocks::MockUserDeviceService;
+use prose_core_client::domain::encryption::services::{
+    EncryptionDomainService as EncryptionDomainServiceTrait, RandUserDeviceIdProvider,
+};
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
+use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::general::mocks::StepRngProvider;
+use prose_core_client::infra::messaging::CachingMessageRepository;
+use prose_core_client::test::ConstantTimeProvider;
+use prose_core_client::SignalServiceHandle;
 
+use crate::tests::client::helpers::element_ext::ElementExt;
+use crate::tests::store;
 use crate::{recv, send};
 
 use super::TestClient;
 
 impl TestClient {
-    pub fn perform_load_device_list(&self) {
+    pub fn expect_load_device_list(
+        &self,
+        user_id: &UserId,
+        device_bundles: impl IntoIterator<Item = DeviceId>,
+    ) {
+        let devices = device_bundles
+            .into_iter()
+            .map(|id| format!("<device id='{id}'/>"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        self.push_ctx(
+            [
+                ("USER_ID".into(), user_id.to_string()),
+                ("DEVICES".into(), devices),
+            ]
+            .into(),
+        );
+
         send!(
             self,
             r#"
@@ -30,16 +68,88 @@ impl TestClient {
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
             <items node="eu.siacs.conversations.axolotl.devicelist">
               <item id="current">
-                <list xmlns="eu.siacs.conversations.axolotl" />
+                <list xmlns="eu.siacs.conversations.axolotl">
+                    {{DEVICES}}
+                </list>
               </item>
             </items>
           </pubsub>
         </iq>
             "#
-        )
+        );
+
+        self.pop_ctx();
     }
 
-    pub fn perform_publish_device_bundle(&self) {
+    pub fn expect_load_device_bundle(
+        &self,
+        user_id: &UserId,
+        device_id: &DeviceId,
+        bundle: Option<DeviceBundle>,
+    ) {
+        self.push_ctx(
+            [
+                ("USER_ID".into(), user_id.to_string()),
+                ("DEVICE_ID".into(), device_id.as_ref().to_string()),
+            ]
+            .into(),
+        );
+
+        send!(
+            self,
+            r#"
+                <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="get">
+                  <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                    <items node="eu.siacs.conversations.axolotl.bundles:{{DEVICE_ID}}" />
+                  </pubsub>
+                </iq>
+                "#
+        );
+
+        if let Some(bundle) = bundle {
+            self.push_ctx(
+                [(
+                    "BUNDLE".into(),
+                    String::from(&Element::from(xmpp_parsers::legacy_omemo::Bundle::from(
+                        bundle,
+                    ))),
+                )]
+                .into(),
+            );
+
+            recv!(
+                self,
+                r#"
+                <iq xmlns='jabber:client' id="{{ID}}" type="result">
+                  <pubsub xmlns='http://jabber.org/protocol/pubsub'>
+                    <items node="eu.siacs.conversations.axolotl.bundles:{{DEVICE_ID}}">
+                      <item xmlns='http://jabber.org/protocol/pubsub' id="current">
+                        {{BUNDLE}}
+                      </item>
+                    </items>
+                  </pubsub>
+                </iq>
+                "#
+            );
+
+            self.pop_ctx();
+        } else {
+            recv!(
+                self,
+                r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="error">
+              <error type="cancel">
+                <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+              </error>
+            </iq>
+            "#
+            );
+        }
+
+        self.pop_ctx()
+    }
+
+    pub fn expect_publish_initial_device_bundle(&self) {
         send!(
             self,
             r#"
@@ -61,13 +171,11 @@ impl TestClient {
             "#
         );
 
-        self.push_ctx(
-            [(
-                "DEVICE_BUNDLE".into(),
-                TestClient::initial_device_bundle_xml().to_string(),
-            )]
-            .into(),
-        );
+        self.expect_publish_device_bundle(TestClient::initial_device_bundle_xml());
+    }
+
+    pub fn expect_publish_device_bundle(&self, bundle_xml: impl Into<String>) {
+        self.push_ctx([("DEVICE_BUNDLE".into(), bundle_xml.into())].into());
 
         send!(
             self,
@@ -109,97 +217,6 @@ impl TestClient {
         "#
         );
     }
-
-    #[allow(dead_code)]
-    pub fn perform_start_omemo_session(
-        &self,
-        user_id: UserId,
-        device_ids: impl IntoIterator<Item = DeviceId>,
-    ) {
-        let device_ids = device_ids.into_iter().collect::<Vec<_>>();
-
-        let devices = device_ids
-            .iter()
-            .map(|id| format!("<device id='{id}'/>"))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        self.push_ctx(
-            [
-                ("OTHER_USER_ID".into(), user_id.to_string()),
-                ("DEVICES".into(), devices),
-            ]
-            .into(),
-        );
-
-        send!(
-            self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
-            <pubsub xmlns='http://jabber.org/protocol/pubsub'>
-                <items node="eu.siacs.conversations.axolotl.devicelist"/>
-            </pubsub>
-        </iq>
-        "#
-        );
-        recv!(
-            self,
-            r#"
-        <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="result">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <items node="eu.siacs.conversations.axolotl.devicelist">
-              <item id="current">
-                <list xmlns="eu.siacs.conversations.axolotl">
-                    {{DEVICES}}
-                </list>
-              </item>
-            </items>
-          </pubsub>
-        </iq>
-            "#
-        );
-
-        for device_id in device_ids {
-            self.push_ctx([("OTHER_DEVICE_ID".into(), device_id.as_ref().to_string())].into());
-
-            send!(
-                self,
-                r#"
-                <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
-                  <pubsub xmlns="http://jabber.org/protocol/pubsub">
-                    <items node="eu.siacs.conversations.axolotl.bundles:{{OTHER_DEVICE_ID}}" />
-                  </pubsub>
-                </iq>
-                "#
-            );
-
-            recv!(
-                self,
-                r#"
-                <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="result">
-                  <pubsub xmlns='http://jabber.org/protocol/pubsub'>
-                    <items node="eu.siacs.conversations.axolotl.bundles:{{OTHER_DEVICE_ID}}">
-                      <item xmlns='http://jabber.org/protocol/pubsub' id="current">
-                        <bundle xmlns='eu.siacs.conversations.axolotl'>
-                          <signedPreKeyPublic signedPreKeyId="0">BRfvVR7ZD/SDtiNP8QNYTGKBp9s7R8TOu4eeHc/y8d4M</signedPreKeyPublic>
-                          <signedPreKeySignature>X+a3qMsIE1oUfgX/HIizPP5aCaIJGhQsNy1mZkjKyrVdCF4J4BTCwe6BM3ZiGYA451xxwYN1hdBrI0HbMXdchQ==</signedPreKeySignature>
-                          <identityKey>BQybsp0hon6CdSflUPYCrj6I0HMNeAQ813ng7GpCgAcx</identityKey>
-                          <prekeys>
-                            <preKeyPublic preKeyId="1">BcEDv0P67b2m58RgRpA2RmfQppqXeDCNHkN8gC2GjXN9</preKeyPublic>
-                          </prekeys>
-                        </bundle>
-                      </item>
-                    </items>
-                  </pubsub>
-                </iq>
-                "#
-            );
-
-            self.pop_ctx();
-        }
-
-        self.pop_ctx();
-    }
 }
 
 impl TestClient {
@@ -207,7 +224,83 @@ impl TestClient {
         12345
     }
 
-    fn initial_device_bundle_xml() -> &'static str {
+    pub async fn their_encryption_domain_service(
+        their_user_id: UserId,
+    ) -> DynEncryptionDomainService {
+        let store = store().await.unwrap();
+
+        let encryption_keys_repo = Arc::new(EncryptionKeysRepository::new(store.clone()));
+        let rng_provider = Arc::new(StepRngProvider::default());
+        let encryption_service = Arc::new(SignalServiceHandle::new(
+            encryption_keys_repo.clone(),
+            rng_provider.clone(),
+        ));
+
+        let connection_props = ConnectionProperties {
+            connected_jid: their_user_id.with_resource("their_device").unwrap(),
+            server_features: Default::default(),
+        };
+
+        let mut user_device_repo = MockUserDeviceRepository::new();
+        {
+            let their_user_id = their_user_id.clone();
+            user_device_repo.expect_get_all().returning(move |user_id| {
+                let device = if user_id == &their_user_id {
+                    Device {
+                        id: 54321.into(),
+                        label: None,
+                    }
+                } else {
+                    Device {
+                        id: TestClient::device_id().into(),
+                        label: None,
+                    }
+                };
+                Box::pin(async move { Ok(vec![device]) })
+            });
+        }
+
+        let mut user_device_service = MockUserDeviceService::new();
+        user_device_service
+            .expect_publish_device_list()
+            .once()
+            .return_once(|_| Box::pin(async { Ok(()) }));
+        user_device_service
+            .expect_load_device_bundle()
+            .returning(move |user_id, _| {
+                let bundle = if user_id == &their_user_id {
+                    None
+                } else {
+                    Some(TestClient::initial_device_bundle())
+                };
+                Box::pin(async { Ok(bundle) })
+            });
+        user_device_service
+            .expect_publish_device_bundle()
+            .once()
+            .return_once(|_| Box::pin(async { Ok(()) }));
+
+        let deps = EncryptionDomainServiceDependencies {
+            ctx: Arc::new(Default::default()),
+            encryption_keys_repo,
+            encryption_service,
+            message_repo: Arc::new(CachingMessageRepository::new(store.clone())),
+            rng_provider,
+            time_provider: Arc::new(ConstantTimeProvider::ymd(2024, 1, 1)),
+            user_device_id_provider: Arc::new(RandUserDeviceIdProvider::default()),
+            user_device_repo: Arc::new(user_device_repo),
+            user_device_service: Arc::new(user_device_service),
+        };
+
+        deps.ctx.set_connection_properties(connection_props);
+
+        let domain_service = Arc::new(EncryptionDomainService::from(deps));
+        domain_service.initialize().await.unwrap();
+
+        domain_service
+    }
+
+    pub fn initial_device_bundle_xml() -> &'static str {
         r#"
         <bundle xmlns='eu.siacs.conversations.axolotl'>
           <signedPreKeyPublic signedPreKeyId="0">BTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJu</signedPreKeyPublic>
@@ -323,9 +416,7 @@ impl TestClient {
         DeviceBundle::try_from((
             TestClient::device_id().into(),
             xmpp_parsers::legacy_omemo::Bundle::try_from(
-                TestClient::initial_device_bundle_xml()
-                    .parse::<Element>()
-                    .unwrap(),
+                Element::from_pretty_printed_xml(TestClient::initial_device_bundle_xml()).unwrap(),
             )
             .unwrap(),
         ))
