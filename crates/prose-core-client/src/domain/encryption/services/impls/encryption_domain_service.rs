@@ -29,7 +29,7 @@ use crate::domain::encryption::services::encryption_domain_service::EncryptionEr
 use crate::domain::messaging::models::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::shared::models::UserId;
-use crate::dtos::{EncryptionDirection, MessageId, PreKeyId, RoomId};
+use crate::dtos::{MessageId, PreKeyId, RoomId};
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
 
@@ -153,7 +153,6 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         }
 
         let their_active_device_ids = self
-            .encryption_keys_repo
             .get_active_device_ids(&recipient_id)
             .await?
             .into_iter()
@@ -180,10 +179,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         // Instead of encrypting the message for all the user's devices we'll only encrypt it
         // for devices which we have an active session with, i.e. devices that are actually trusted.
         // Otherwise, libsignal will choke later on.
-        let our_active_device_ids = self
-            .encryption_keys_repo
-            .get_active_device_ids(&current_user_id)
-            .await?;
+        let our_active_device_ids = self.get_active_device_ids(&current_user_id).await?;
 
         let encrypt_message_futures = our_active_device_ids
             .into_iter()
@@ -271,29 +267,32 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 
         let mut device_infos = vec![];
         for device in device_list {
-            let Some(identity) = self
+            let Some(session) = self
                 .encryption_keys_repo
-                .get_identity(user_id, &device.id)
+                .get_session(user_id, &device.id)
                 .await?
             else {
+                warn!(
+                    "Ignoring device {} for which we do not have a session.",
+                    device.id
+                );
+                continue;
+            };
+
+            if !session.is_active {
+                continue;
+            }
+
+            let is_device_trusted = session.is_trusted_or_undecided();
+            let is_this_device = Some(&device.id) == this_device_id.as_ref();
+
+            let Some(identity) = session.identity else {
                 warn!(
                     "Ignoring device {} for which we do not have an identity.",
                     device.id
                 );
                 continue;
             };
-
-            let is_device_trusted = self
-                .encryption_keys_repo
-                .is_trusted_identity(
-                    user_id,
-                    Some(&device.id),
-                    &identity,
-                    EncryptionDirection::Receiving,
-                )
-                .await?;
-
-            let is_this_device = Some(&device.id) == this_device_id.as_ref();
 
             device_infos.push(DeviceInfo {
                 id: device.id,
@@ -582,11 +581,6 @@ impl EncryptionDomainService {
             return Ok(());
         };
 
-        self.encryption_keys_repo
-            .save_identity(&user_id, &device_id, &bundle.identity_key)
-            .await
-            .with_context(|| format!("Failed to save identity for {user_id} ({device_id})"))?;
-
         let pre_key_bundle = PreKeyBundle {
             device_id: device_id.clone(),
             signed_pre_key: bundle.signed_pre_key,
@@ -606,5 +600,18 @@ impl EncryptionDomainService {
             })?;
 
         Ok(())
+    }
+
+    async fn get_active_device_ids(&self, user_id: &UserId) -> Result<Vec<DeviceId>> {
+        Ok(self
+            .encryption_keys_repo
+            .get_all_sessions(user_id)
+            .await?
+            .into_iter()
+            .filter_map(|session| {
+                (session.is_active && session.is_trusted_or_undecided())
+                    .then_some(session.device_id)
+            })
+            .collect())
     }
 }

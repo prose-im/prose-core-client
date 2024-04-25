@@ -36,7 +36,7 @@ impl SessionStore for SignalRepoWrapper {
             .get_session(&address.prose_user_id()?, &address.prose_device_id())
             .await
             .map_err(map_repo_error)?
-            .map(|record| (&record).try_into())
+            .and_then(|session| session.data.as_ref().map(|data| data.try_into()))
             .transpose()?)
     }
 
@@ -46,10 +46,10 @@ impl SessionStore for SignalRepoWrapper {
         record: &SessionRecord,
     ) -> Result<()> {
         self.repo
-            .put_session(
+            .put_session_data(
                 &address.prose_user_id()?,
                 &address.prose_device_id(),
-                &record.try_into()?,
+                record.try_into()?,
             )
             .await
             .map_err(map_repo_error)?;
@@ -183,10 +183,10 @@ impl IdentityKeyStore for SignalRepoWrapper {
     ) -> Result<bool> {
         let did_exist = self
             .repo
-            .save_identity(
+            .put_identity(
                 &address.prose_user_id()?,
                 &address.prose_device_id(),
-                &identity.try_into()?,
+                identity.try_into()?,
             )
             .await
             .map_err(map_repo_error)?;
@@ -195,30 +195,27 @@ impl IdentityKeyStore for SignalRepoWrapper {
 
     async fn is_trusted_identity(
         &self,
-        address: &ProtocolAddress,
-        identity: &IdentityKey,
-        direction: Direction,
+        _address: &ProtocolAddress,
+        _identity: &IdentityKey,
+        _direction: Direction,
     ) -> Result<bool> {
-        let is_trusted = self
-            .repo
-            .is_trusted_identity(
-                &address.prose_user_id()?,
-                Some(&address.prose_device_id()),
-                &identity.try_into()?,
-                direction.into(),
-            )
-            .await
-            .map_err(map_repo_error)?;
-        Ok(is_trusted)
+        // We handle trust outside of libsignal. Meaning that we always want to decrypt received
+        // messages and do not encrypt messages at all for untrusted devices.
+        Ok(true)
     }
 
     async fn get_identity(&self, address: &ProtocolAddress) -> Result<Option<IdentityKey>> {
         let identity = self
             .repo
-            .get_identity(&address.prose_user_id()?, &address.prose_device_id())
+            .get_session(&address.prose_user_id()?, &address.prose_device_id())
             .await
             .map_err(map_repo_error)?
-            .map(|key| (&key).try_into())
+            .and_then(|session| {
+                session
+                    .identity
+                    .as_ref()
+                    .map(|identity| identity.try_into())
+            })
             .transpose()?;
         Ok(identity)
     }

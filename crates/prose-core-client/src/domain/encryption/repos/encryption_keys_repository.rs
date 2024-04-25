@@ -10,8 +10,8 @@ use uuid::Uuid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::encryption::models::{
-    DeviceId, EncryptionDirection, IdentityKey, KyberPreKeyId, KyberPreKeyRecord, LocalDevice,
-    LocalEncryptionBundle, PreKeyId, PreKeyRecord, SenderKeyRecord, SessionRecord, SignedPreKeyId,
+    DeviceId, IdentityKey, KyberPreKeyId, KyberPreKeyRecord, LocalDevice, LocalEncryptionBundle,
+    PreKeyId, PreKeyRecord, SenderKeyRecord, Session, SessionData, SignedPreKeyId,
     SignedPreKeyRecord,
 };
 use crate::dtos::{DeviceBundle, UserId};
@@ -25,20 +25,26 @@ pub trait EncryptionKeysRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get_local_device_bundle(&self) -> Result<Option<DeviceBundle>>;
     async fn get_local_device(&self) -> Result<Option<LocalDevice>>;
 
-    async fn get_session(
+    async fn get_session(&self, user_id: &UserId, device_id: &DeviceId) -> Result<Option<Session>>;
+    async fn get_all_sessions(&self, user_id: &UserId) -> Result<Vec<Session>>;
+
+    async fn put_session_data(
         &self,
         user_id: &UserId,
         device_id: &DeviceId,
-    ) -> Result<Option<SessionRecord>>;
-    async fn put_session(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        record: &SessionRecord,
+        data: SessionData,
     ) -> Result<()>;
 
-    /// Loads the IDs of the devices we have ongoing and valid sessions with.
-    async fn get_active_device_ids(&self, user_id: &UserId) -> Result<Vec<DeviceId>>;
+    /// Record an identity into the store. The identity is then considered "trusted".
+    ///
+    /// The return value represents whether an existing identity was replaced (`Ok(true)`). If it is
+    /// new or hasn't changed, the return value should be `Ok(false)`.
+    async fn put_identity(
+        &self,
+        user_id: &UserId,
+        device_id: &DeviceId,
+        identity: IdentityKey,
+    ) -> Result<bool>;
 
     async fn get_kyber_pre_key(
         &self,
@@ -76,33 +82,6 @@ pub trait EncryptionKeysRepository: SendUnlessWasm + SyncUnlessWasm {
         device_id: &DeviceId,
         distribution_id: Uuid,
     ) -> Result<Option<SenderKeyRecord>>;
-
-    /// Record an identity into the store. The identity is then considered "trusted".
-    ///
-    /// The return value represents whether an existing identity was replaced (`Ok(true)`). If it is
-    /// new or hasn't changed, the return value should be `Ok(false)`.
-    async fn save_identity(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        identity: &IdentityKey,
-    ) -> Result<bool>;
-
-    /// Return whether an identity is trusted for the role specified by `direction`.
-    async fn is_trusted_identity(
-        &self,
-        user_id: &UserId,
-        device_id: Option<&DeviceId>,
-        identity: &IdentityKey,
-        direction: EncryptionDirection,
-    ) -> Result<bool>;
-
-    /// Return the public identity for the given `address`, if known.
-    async fn get_identity(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-    ) -> Result<Option<IdentityKey>>;
 
     async fn clear_cache(&self) -> Result<()>;
 }

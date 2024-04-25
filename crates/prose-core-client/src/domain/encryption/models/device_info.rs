@@ -7,7 +7,6 @@ use super::{DeviceId, IdentityKey};
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DeviceTrust {
-    Undecided,
     Trusted,
     Untrusted,
 }

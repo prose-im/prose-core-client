@@ -10,6 +10,7 @@ pub use device_info::{DeviceInfo, DeviceTrust};
 pub use keys::*;
 pub use local_device::LocalDevice;
 pub use local_encryption_bundle::LocalEncryptionBundle;
+pub use session::{Session, Trust};
 
 mod device;
 mod device_bundle;
@@ -18,3 +19,4 @@ mod device_info;
 mod keys;
 mod local_device;
 mod local_encryption_bundle;
+mod session;

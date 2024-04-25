@@ -22,7 +22,7 @@ pub use crate::domain::{
     encryption::models::{
         DeviceBundle, DeviceId, DeviceInfo, DeviceTrust, EncryptionDirection, IdentityKey,
         IdentityKeyPair, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey,
-        PublicKey, SessionRecord, SignedPreKeyId, SignedPreKeyRecord,
+        PublicKey, SessionData, SignedPreKeyId, SignedPreKeyRecord,
     },
     general::models::SoftwareVersion,
     messaging::models::{

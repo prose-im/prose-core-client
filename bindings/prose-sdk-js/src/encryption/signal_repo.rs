@@ -3,14 +3,14 @@
 // Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_derive::TryFromJsValue;
 
 use prose_core_client::dtos::{
-    EncryptionDirection, IdentityKey, PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SessionRecord,
-    SignedPreKeyId, SignedPreKeyRecord, UserId,
+    IdentityKey, PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SessionData, SignedPreKeyId,
+    SignedPreKeyRecord,
 };
 use prose_core_client::DynEncryptionKeysRepository;
 
@@ -148,27 +148,13 @@ impl SignalRepo {
     #[wasm_bindgen(js_name = "isTrustedIdentity")]
     pub async fn is_trusted_identity(
         &self,
-        identifier: &str,
-        identity_key: &[u8],
-        direction: Direction,
+        _identifier: &str,
+        _identity_key: &[u8],
+        _direction: Direction,
     ) -> Result<bool> {
-        let user_id = identifier
-            .parse::<UserId>()
-            .with_context(|| format!("Invalid identifier '{identifier}'"))
-            .map_err(WasmError::from)?;
-
-        let is_trusted = self
-            .repo
-            .is_trusted_identity(
-                &user_id,
-                None,
-                &IdentityKey::from(identity_key),
-                EncryptionDirection::from(direction),
-            )
-            .await
-            .map_err(WasmError::from)?;
-
-        Ok(is_trusted)
+        // We handle trust outside of libsignal. Meaning that we always want to decrypt received
+        // messages and do not encrypt messages at all for untrusted devices.
+        Ok(true)
     }
 
     #[wasm_bindgen(js_name = "saveIdentity")]
@@ -181,7 +167,7 @@ impl SignalRepo {
         let (user_id, device_id) = try_decode_address(encoded_address).map_err(WasmError::from)?;
         let did_exist = self
             .repo
-            .save_identity(&user_id, &device_id, &IdentityKey::from(public_key))
+            .put_identity(&user_id, &device_id, IdentityKey::from(public_key))
             .await
             .map_err(WasmError::from)?;
         Ok(did_exist)
@@ -247,10 +233,10 @@ impl SignalRepo {
     pub async fn store_session(&self, encoded_address: &str, record: &str) -> Result<()> {
         let (user_id, device_id) = try_decode_address(encoded_address).map_err(WasmError::from)?;
         self.repo
-            .put_session(
+            .put_session_data(
                 &user_id,
                 &device_id,
-                &SessionRecord::from(record.as_bytes().to_vec().into_boxed_slice()),
+                SessionData::from(record.as_bytes().to_vec().into_boxed_slice()),
             )
             .await
             .map_err(WasmError::from)?;
@@ -265,7 +251,11 @@ impl SignalRepo {
             .get_session(&user_id, &device_id)
             .await
             .map_err(WasmError::from)?
-            .map(|record| String::from_utf8_lossy(record.as_ref()).into_owned());
+            .and_then(|session| {
+                session
+                    .data
+                    .map(|data| String::from_utf8_lossy(data.as_ref()).into_owned())
+            });
         Ok(session)
     }
 

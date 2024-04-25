@@ -81,9 +81,9 @@ pub struct KyberPreKeyRecord(Box<[u8]>);
 #[serde(transparent)]
 pub struct SenderKeyRecord(Box<[u8]>);
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct SessionRecord(Box<[u8]>);
+pub struct SessionData(Box<[u8]>);
 
 impl IdentityKeyPair {
     pub fn fingerprint(&self) -> String {
@@ -154,7 +154,7 @@ impl From<Box<[u8]>> for SenderKeyRecord {
     }
 }
 
-impl From<Box<[u8]>> for SessionRecord {
+impl From<Box<[u8]>> for SessionData {
     fn from(value: Box<[u8]>) -> Self {
         Self(value)
     }
@@ -184,7 +184,7 @@ impl AsRef<[u8]> for SenderKeyRecord {
     }
 }
 
-impl AsRef<[u8]> for SessionRecord {
+impl AsRef<[u8]> for SessionData {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }

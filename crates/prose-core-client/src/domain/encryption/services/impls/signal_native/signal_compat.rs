@@ -9,7 +9,7 @@ use tracing::error;
 
 use crate::domain::encryption::models::{
     DeviceId, EncryptionDirection, IdentityKey, IdentityKeyPair, KyberPreKeyId, KyberPreKeyRecord,
-    PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SenderKeyRecord, SessionRecord, SignedPreKeyId,
+    PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SenderKeyRecord, SessionData, SignedPreKeyId,
     SignedPreKeyRecord,
 };
 use crate::dtos::UserId;
@@ -265,7 +265,7 @@ impl TryFrom<&SenderKeyRecord> for libsignal_protocol::SenderKeyRecord {
     }
 }
 
-impl TryFrom<&libsignal_protocol::SessionRecord> for SessionRecord {
+impl TryFrom<&libsignal_protocol::SessionRecord> for SessionData {
     type Error = SignalError;
 
     fn try_from(value: &libsignal_protocol::SessionRecord) -> SignalResult<Self> {
@@ -273,10 +273,10 @@ impl TryFrom<&libsignal_protocol::SessionRecord> for SessionRecord {
     }
 }
 
-impl TryFrom<&SessionRecord> for libsignal_protocol::SessionRecord {
+impl TryFrom<&SessionData> for libsignal_protocol::SessionRecord {
     type Error = SignalError;
 
-    fn try_from(value: &SessionRecord) -> SignalResult<Self> {
+    fn try_from(value: &SessionData) -> SignalResult<Self> {
         Self::deserialize(value.as_ref())
     }
 }

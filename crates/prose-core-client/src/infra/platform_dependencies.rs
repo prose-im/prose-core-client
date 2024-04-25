@@ -60,7 +60,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 18;
+const DB_VERSION: u32 = 19;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -96,7 +96,7 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
 
         if event.old_version < 16 {
             create_collection::<D, UserDeviceRecord>(&tx)?;
-            tx.create_collection(encryption_keys_collections::IDENTITY)?;
+            tx.create_collection("omemo_identity")?;
             tx.create_collection(encryption_keys_collections::LOCAL_DEVICE)?;
             tx.create_collection(encryption_keys_collections::PRE_KEY)?;
             tx.create_collection(encryption_keys_collections::SENDER_KEY)?;
@@ -106,6 +106,12 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
 
         if event.old_version < 17 {
             tx.create_collection(encryption_keys_collections::KYBER_PRE_KEY)?;
+        }
+
+        if event.old_version < 19 {
+            tx.delete_collection("omemo_identity")?;
+            tx.delete_collection(encryption_keys_collections::SESSION_RECORD)?;
+            tx.create_collection(encryption_keys_collections::SESSION_RECORD)?;
         }
 
         Ok(())

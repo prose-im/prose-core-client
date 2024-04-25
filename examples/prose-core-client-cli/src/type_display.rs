@@ -136,7 +136,6 @@ pub struct DeviceInfoEnvelope(pub DeviceInfo);
 impl Display for DeviceInfoEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let trust = match self.0.trust {
-            DeviceTrust::Undecided => "undecided",
             DeviceTrust::Trusted => "trusted",
             DeviceTrust::Untrusted => "untrusted",
         };
