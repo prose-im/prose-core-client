@@ -296,6 +296,114 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
 }
 
 #[mt_test]
+async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
+    let client = TestClient::new().await;
+
+    client
+        .expect_login(user_id!("user@prose.org"), "secret")
+        .await?;
+
+    let room = client
+        .start_dm(user_id!("them@prose.org"))
+        .await?
+        .to_generic_room();
+
+    room.set_encryption_enabled(true);
+
+    client.expect_load_device_list(&user_id!("them@prose.org"), [111.into()]);
+    client.expect_load_device_bundle(
+        &user_id!("them@prose.org"),
+        &111.into(),
+        Some(DeviceBundle::test(111).await),
+    );
+
+    send!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+          <body>[This message is OMEMO encrypted]</body>
+          <encrypted xmlns="eu.siacs.conversations.axolotl">
+            <header sid="{{USER_DEVICE_ID}}">
+              <key prekey="true" rid="111">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwaeNDn7QTbNfd3kVdI6q1SSL78yHI2fohvZq3XHM+xzGDLjJQGDsaOlkA3gFblk3imzOLObPtCmkouWAwAA==</key>
+              <iv>AQAAAAAAAAACAAAA</iv>
+            </header>
+            <payload>AgiX8ZA0voKAc/M=</payload>
+          </encrypted>
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <active xmlns="http://jabber.org/protocol/chatstates" />
+          <markable xmlns="urn:xmpp:chat-markers:0" />
+        </message>
+        "#
+    );
+
+    room.send_message(SendMessageRequest {
+        body: Some(SendMessageRequestBody {
+            text: "Hello World".to_string(),
+            mentions: vec![],
+        }),
+        attachments: vec![],
+    })
+    .await?;
+
+    recv!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="them@prose.org" id="some-id" to="{{USER_RESOURCE_ID}}" type="headline">
+          <event xmlns="http://jabber.org/protocol/pubsub#event">
+            <items node="eu.siacs.conversations.axolotl.devicelist">
+              <item id="current" publisher="them@prose.org">
+                <list xmlns="eu.siacs.conversations.axolotl">
+                  <device id="111" />
+                  <device id="222" />
+                </list>
+              </item>
+            </items>
+          </event>
+        </message>
+        "#
+    );
+
+    client.receive_next().await;
+
+    client.expect_load_device_bundle(
+        &user_id!("them@prose.org"),
+        &222.into(),
+        Some(DeviceBundle::test(222).await),
+    );
+
+    send!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+          <body>[This message is OMEMO encrypted]</body>
+          <encrypted xmlns="eu.siacs.conversations.axolotl">
+            <header sid="{{USER_DEVICE_ID}}">
+              <key prekey="true" rid="111">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAEYACIwl6iMdEngbUMSj+lMfNEg4dgEruhF+Jnlj81us5vNX6WjXZulX3+kAmUi3JuRfjs3lw4pxCbZop0ouWAwAA==</key>
+              <key prekey="true" rid="222">NAgBEiEFND1CvWJkfRtiPCbfg05oqhzeDZsIozOyrJ42KE2BpTEaIQU0PUK9YmR9G2I8Jt+DTmiqHN4NmwijM7KsnjYoTYGlMSJiNAohBTy2vpu/tngnkcXIepkXEexslHOd/zcO5NssELTdoyJuEAAYACIwaeNDn7QTbNfd3kVdI6q1Sf4/ncqWJNWEKyKT2hw4oH8PJ/AQllR1jun4CNQyBBJgCX29EC2+DSIouWAwAA==</key>
+              <iv>AQAAAAAAAAACAAAA</iv>
+            </header>
+            <payload>AgiX8ZA0voKAc/MDFA==</payload>
+          </encrypted>
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <active xmlns="http://jabber.org/protocol/chatstates" />
+          <markable xmlns="urn:xmpp:chat-markers:0" />
+        </message>
+        "#
+    );
+
+    room.send_message(SendMessageRequest {
+        body: Some(SendMessageRequestBody {
+            text: "Hello World 2".to_string(),
+            mentions: vec![],
+        }),
+        attachments: vec![],
+    })
+    .await?;
+
+    Ok(())
+}
+
+#[mt_test]
 async fn test_decrypts_received_messages() -> Result<()> {
     let client = TestClient::new().await;
 
