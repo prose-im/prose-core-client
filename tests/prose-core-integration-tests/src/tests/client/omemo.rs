@@ -6,7 +6,9 @@
 use anyhow::Result;
 use minidom::Element;
 
-use prose_core_client::dtos::{DeviceBundle, SendMessageRequest, SendMessageRequestBody, UserId};
+use prose_core_client::dtos::{
+    DeviceBundle, DeviceTrust, SendMessageRequest, SendMessageRequestBody, UserId,
+};
 use prose_core_client::user_id;
 use prose_proc_macros::mt_test;
 
@@ -416,6 +418,12 @@ async fn test_decrypts_received_messages() -> Result<()> {
         .await?
         .to_generic_room();
 
+    assert!(client
+        .user_data
+        .load_user_device_infos(&user_id!("them@prose.org"))
+        .await?
+        .is_empty());
+
     let service = TestClient::their_encryption_domain_service(user_id!("them@prose.org")).await;
     let encrypted_payload = service
         .encrypt_message(
@@ -461,6 +469,13 @@ async fn test_decrypts_received_messages() -> Result<()> {
         .await?;
     assert_eq!(messages.len(), 1);
     assert_eq!(messages.first().unwrap().body, "Can you read this?");
+
+    let device_infos = client
+        .user_data
+        .load_user_device_infos(&user_id!("them@prose.org"))
+        .await?;
+    assert_eq!(device_infos.len(), 1);
+    assert_eq!(device_infos[0].trust, DeviceTrust::Undecided);
 
     let encrypted_payload = service
         .encrypt_message(
