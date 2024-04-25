@@ -64,12 +64,6 @@ pub struct PublicPreKey {
     pub key: PublicKey,
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
-pub enum EncryptionDirection {
-    Sending,
-    Receiving,
-}
-
 #[derive(Clone, Debug)]
 pub struct KyberPreKeyId(u32);
 

@@ -4,8 +4,8 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use prose_core_client::dtos::{
-    EncryptionDirection, IdentityKey, IdentityKeyPair, PreKeyBundle, PreKeyRecord, PrivateKey,
-    PublicKey, SignedPreKeyRecord,
+    IdentityKey, IdentityKeyPair, PreKeyBundle, PreKeyRecord, PrivateKey, PublicKey,
+    SignedPreKeyRecord,
 };
 
 use crate::encryption::signal_repo::{
@@ -87,15 +87,6 @@ impl From<PreKeyBundle> for JsPreKeyBundle {
                 public_key: value.pre_key.key.as_ref().into(),
             },
             registration_id: value.device_id.into_inner(),
-        }
-    }
-}
-
-impl From<Direction> for EncryptionDirection {
-    fn from(value: Direction) -> Self {
-        match value {
-            Direction::Sending => EncryptionDirection::Sending,
-            Direction::Receiving => EncryptionDirection::Receiving,
         }
     }
 }

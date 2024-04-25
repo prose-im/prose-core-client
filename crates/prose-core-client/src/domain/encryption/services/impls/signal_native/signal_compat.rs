@@ -8,8 +8,8 @@ use libsignal_protocol::GenericSignedPreKey;
 use tracing::error;
 
 use crate::domain::encryption::models::{
-    DeviceId, EncryptionDirection, IdentityKey, IdentityKeyPair, KyberPreKeyId, KyberPreKeyRecord,
-    PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SenderKeyRecord, SessionData, SignedPreKeyId,
+    DeviceId, IdentityKey, IdentityKeyPair, KyberPreKeyId, KyberPreKeyRecord, PreKeyId,
+    PreKeyRecord, PrivateKey, PublicKey, SenderKeyRecord, SessionData, SignedPreKeyId,
     SignedPreKeyRecord,
 };
 use crate::dtos::UserId;
@@ -278,23 +278,5 @@ impl TryFrom<&SessionData> for libsignal_protocol::SessionRecord {
 
     fn try_from(value: &SessionData) -> SignalResult<Self> {
         Self::deserialize(value.as_ref())
-    }
-}
-
-impl From<libsignal_protocol::Direction> for EncryptionDirection {
-    fn from(value: libsignal_protocol::Direction) -> Self {
-        match value {
-            libsignal_protocol::Direction::Sending => EncryptionDirection::Sending,
-            libsignal_protocol::Direction::Receiving => EncryptionDirection::Receiving,
-        }
-    }
-}
-
-impl From<EncryptionDirection> for libsignal_protocol::Direction {
-    fn from(value: EncryptionDirection) -> Self {
-        match value {
-            EncryptionDirection::Sending => libsignal_protocol::Direction::Sending,
-            EncryptionDirection::Receiving => libsignal_protocol::Direction::Receiving,
-        }
     }
 }
