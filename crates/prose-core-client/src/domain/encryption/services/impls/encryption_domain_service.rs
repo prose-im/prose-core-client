@@ -12,7 +12,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
 use rand::prelude::SliceRandom;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::TimeProvider;
@@ -22,9 +22,7 @@ use crate::app::deps::{
     DynRngProvider, DynTimeProvider, DynUserDeviceIdProvider, DynUserDeviceRepository,
     DynUserDeviceService,
 };
-use crate::domain::encryption::models::{
-    Device, DeviceId, DeviceInfo, DeviceList, DeviceTrust, PreKeyBundle,
-};
+use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
 use crate::domain::encryption::services::encryption_domain_service::EncryptionError;
 use crate::domain::messaging::models::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
@@ -263,49 +261,27 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             None
         };
 
-        let device_list = self.user_device_repo.get_all(user_id).await?;
+        let device_infos = self
+            .encryption_keys_repo
+            .get_all_sessions(user_id)
+            .await?
+            .into_iter()
+            .filter_map(|session| {
+                let Some(identity) = session.identity else {
+                    return None;
+                };
 
-        let mut device_infos = vec![];
-        for device in device_list {
-            let Some(session) = self
-                .encryption_keys_repo
-                .get_session(user_id, &device.id)
-                .await?
-            else {
-                warn!(
-                    "Ignoring device {} for which we do not have a session.",
-                    device.id
-                );
-                continue;
-            };
+                let is_this_device = Some(&session.device_id) == this_device_id.as_ref();
 
-            if !session.is_active {
-                continue;
-            }
-
-            let is_device_trusted = session.is_trusted_or_undecided();
-            let is_this_device = Some(&device.id) == this_device_id.as_ref();
-
-            let Some(identity) = session.identity else {
-                warn!(
-                    "Ignoring device {} for which we do not have an identity.",
-                    device.id
-                );
-                continue;
-            };
-
-            device_infos.push(DeviceInfo {
-                id: device.id,
-                label: device.label,
-                identity,
-                trust: if is_device_trusted {
-                    DeviceTrust::Trusted
-                } else {
-                    DeviceTrust::Untrusted
-                },
-                is_this_device,
-            });
-        }
+                let info = DeviceInfo {
+                    id: session.device_id,
+                    identity,
+                    trust: session.trust,
+                    is_this_device,
+                };
+                Some(info)
+            })
+            .collect();
 
         Ok(device_infos)
     }

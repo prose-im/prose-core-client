@@ -138,21 +138,17 @@ impl Display for DeviceInfoEnvelope {
         let trust = match self.0.trust {
             DeviceTrust::Trusted => "trusted",
             DeviceTrust::Untrusted => "untrusted",
+            DeviceTrust::Undecided => "undecided",
+            DeviceTrust::Verified => "verified",
         };
 
         write!(
             f,
-            "{} {:>10} | {} | trust: {} | {:<50}",
+            "{} {:>10} | {} | trust: {}",
             if self.0.is_this_device { ">" } else { " " },
             self.0.id.as_ref(),
             self.0.fingerprint(),
             trust,
-            self.0
-                .label
-                .as_deref()
-                .unwrap_or("<no label>")
-                .to_string()
-                .truncate_to(50),
         )
     }
 }
