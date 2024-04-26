@@ -37,5 +37,8 @@ pub trait SessionRepository: SendUnlessWasm + SyncUnlessWasm {
         identity: IdentityKey,
     ) -> Result<bool>;
 
+    /// Marks all sessions not included in `device_ids` as inactive.
+    async fn put_active_devices(&self, user_id: &UserId, device_ids: &[DeviceId]) -> Result<()>;
+
     async fn clear_cache(&self) -> Result<()>;
 }

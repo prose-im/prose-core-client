@@ -16,7 +16,7 @@ use crate::app::deps::DynUserDeviceService;
 use crate::domain::encryption::models::{Device, DeviceId};
 use crate::domain::encryption::repos::UserDeviceRepository as UserDeviceRepositoryTrait;
 use crate::dtos::UserId;
-use crate::infra::encryption::UserDeviceKey;
+use crate::infra::encryption::{UserDeviceKey, UserDeviceKeyRef};
 
 pub struct CachingUserDeviceRepository {
     store: Store<PlatformDriver>,
@@ -83,14 +83,38 @@ impl UserDeviceRepositoryTrait for CachingUserDeviceRepository {
             .transaction_for_reading_and_writing(&[UserDeviceRecord::collection()])
             .await?;
         let collection = tx.writeable_collection(UserDeviceRecord::collection())?;
+        let idx = collection.index(UserDeviceRecord::user_id_idx())?;
+
+        let current_device_ids = idx
+            .get_all_values::<UserDeviceRecord>(
+                Query::Only(user_id.clone()),
+                Default::default(),
+                None,
+            )
+            .await?
+            .into_iter()
+            .map(|record| record.device_id)
+            .collect::<HashSet<_>>();
+
+        let mut deleted_device_ids = current_device_ids.clone();
 
         for device in devices {
+            deleted_device_ids.remove(&device.id);
+
+            if current_device_ids.contains(&device.id) {
+                continue;
+            }
+
             collection.put_entity(&UserDeviceRecord {
                 id: UserDeviceKey::new(user_id, &device.id),
                 user_id: user_id.clone(),
                 device_id: device.id,
                 label: device.label,
             })?;
+        }
+
+        for device_id in deleted_device_ids {
+            collection.delete(&UserDeviceKeyRef::new(user_id, &device_id))?;
         }
 
         tx.commit().await?;

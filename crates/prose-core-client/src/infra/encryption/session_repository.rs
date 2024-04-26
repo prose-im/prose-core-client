@@ -3,6 +3,8 @@
 // Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashSet;
+
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -85,6 +87,37 @@ impl SessionRepositoryTrait for SessionRepository {
             session.identity = Some(identity)
         })
         .await
+    }
+
+    async fn put_active_devices(&self, user_id: &UserId, device_ids: &[DeviceId]) -> Result<()> {
+        let tx = self
+            .store
+            .transaction_for_reading_and_writing(&[encryption_keys_collections::SESSION_RECORD])
+            .await?;
+        let collection = tx.writeable_collection(encryption_keys_collections::SESSION_RECORD)?;
+
+        let mut records = collection
+            .get_all_filtered::<SessionRecord, _>(
+                Query::<UserDeviceKey>::All,
+                QueryDirection::Forward,
+                None,
+                |_, record| (&record.user_id == user_id).then_some(record),
+            )
+            .await?;
+
+        let device_ids = device_ids.into_iter().collect::<HashSet<_>>();
+
+        for record in records.iter_mut() {
+            if record.is_active == device_ids.contains(&record.device_id) {
+                continue;
+            }
+
+            record.is_active = !record.is_active;
+            collection.put(&UserDeviceKeyRef::new(user_id, &record.device_id), &record)?;
+        }
+
+        tx.commit().await?;
+        Ok(())
     }
 
     async fn clear_cache(&self) -> Result<()> {

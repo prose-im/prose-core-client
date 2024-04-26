@@ -16,7 +16,7 @@ use prose_core_client::domain::encryption::services::impls::{
 };
 use prose_core_client::domain::encryption::services::mocks::MockUserDeviceService;
 use prose_core_client::domain::encryption::services::{
-    EncryptionDomainService as EncryptionDomainServiceTrait, RandUserDeviceIdProvider,
+    EncryptionDomainService as EncryptionDomainServiceTrait, IncrementingUserDeviceIdProvider,
 };
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
@@ -35,9 +35,9 @@ impl TestClient {
     pub fn expect_load_device_list(
         &self,
         user_id: &UserId,
-        device_bundles: impl IntoIterator<Item = DeviceId>,
+        device_ids: impl IntoIterator<Item = DeviceId>,
     ) {
-        let devices = device_bundles
+        let devices = device_ids
             .into_iter()
             .map(|id| format!("<device id='{id}'/>"))
             .collect::<Vec<_>>()
@@ -224,6 +224,10 @@ impl TestClient {
         12345
     }
 
+    pub fn their_device_id() -> u32 {
+        54321
+    }
+
     pub async fn their_encryption_domain_service(
         their_user_id: UserId,
     ) -> DynEncryptionDomainService {
@@ -249,7 +253,7 @@ impl TestClient {
             user_device_repo.expect_get_all().returning(move |user_id| {
                 let device = if user_id == &their_user_id {
                     Device {
-                        id: 54321.into(),
+                        id: TestClient::their_device_id().into(),
                         label: None,
                     }
                 } else {
@@ -263,10 +267,6 @@ impl TestClient {
         }
 
         let mut user_device_service = MockUserDeviceService::new();
-        user_device_service
-            .expect_publish_device_list()
-            .once()
-            .return_once(|_| Box::pin(async { Ok(()) }));
         user_device_service
             .expect_load_device_bundle()
             .returning(move |user_id, _| {
@@ -290,7 +290,9 @@ impl TestClient {
             rng_provider,
             session_repo,
             time_provider: Arc::new(ConstantTimeProvider::ymd(2024, 1, 1)),
-            user_device_id_provider: Arc::new(RandUserDeviceIdProvider::default()),
+            user_device_id_provider: Arc::new(IncrementingUserDeviceIdProvider::new(
+                Self::their_device_id(),
+            )),
             user_device_repo: Arc::new(user_device_repo),
             user_device_service: Arc::new(user_device_service),
         };

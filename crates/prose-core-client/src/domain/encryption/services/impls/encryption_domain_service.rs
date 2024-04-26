@@ -131,7 +131,17 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
-        match self.start_sessions_if_needed(&current_user_id).await {
+        match self
+            .start_sessions_if_needed(
+                &current_user_id,
+                self.user_device_repo
+                    .get_all(&current_user_id)
+                    .await?
+                    .into_iter()
+                    .filter(|device| device.id != local_device.device_id),
+            )
+            .await
+        {
             Ok(_) => (),
             Err(err) => {
                 error!(
@@ -141,7 +151,13 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             }
         }
 
-        match self.start_sessions_if_needed(recipient_id).await {
+        match self
+            .start_sessions_if_needed(
+                recipient_id,
+                self.user_device_repo.get_all(recipient_id).await?,
+            )
+            .await
+        {
             Ok(_) => (),
             Err(err) => {
                 error!(
@@ -152,7 +168,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         }
 
         let their_active_device_ids = self
-            .get_active_device_ids(&recipient_id)
+            .get_active_and_trusted_device_ids(&recipient_id)
             .await?
             .into_iter()
             .map(|device_id| (recipient_id, device_id));
@@ -178,7 +194,9 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         // Instead of encrypting the message for all the user's devices we'll only encrypt it
         // for devices which we have an active session with, i.e. devices that are actually trusted.
         // Otherwise, libsignal will choke later on.
-        let our_active_device_ids = self.get_active_device_ids(&current_user_id).await?;
+        let our_active_device_ids = self
+            .get_active_and_trusted_device_ids(&current_user_id)
+            .await?;
 
         let encrypt_message_futures = our_active_device_ids
             .into_iter()
@@ -519,13 +537,26 @@ impl EncryptionDomainService {
             .unwrap_or(self.ctx.software_version.name.clone())
     }
 
-    async fn start_sessions_if_needed(&self, user_id: &UserId) -> Result<()> {
-        let devices = self.user_device_repo.get_all(user_id).await?;
+    async fn start_sessions_if_needed(
+        &self,
+        user_id: &UserId,
+        devices: impl IntoIterator<Item = Device>,
+    ) -> Result<()> {
+        let device_ids = devices
+            .into_iter()
+            .map(|device| device.id)
+            .collect::<Vec<_>>();
 
-        join_all(devices.into_iter().map(|device| async move {
-            self.start_session_with_device_if_needed(user_id, device.id.clone())
+        println!("PUT ACTIVE DEVICES {:?}", device_ids);
+
+        self.session_repo
+            .put_active_devices(user_id, device_ids.as_slice())
+            .await?;
+
+        join_all(device_ids.into_iter().map(|device_id| async move {
+            self.start_session_with_device_if_needed(user_id, device_id.clone())
                 .await
-                .with_context(|| format!("Failed to start session with {user_id} ({})", device.id))
+                .with_context(|| format!("Failed to start session with {user_id} ({})", device_id))
         }))
         .await
         .into_iter()
@@ -581,7 +612,7 @@ impl EncryptionDomainService {
         Ok(())
     }
 
-    async fn get_active_device_ids(&self, user_id: &UserId) -> Result<Vec<DeviceId>> {
+    async fn get_active_and_trusted_device_ids(&self, user_id: &UserId) -> Result<Vec<DeviceId>> {
         Ok(self
             .session_repo
             .get_all_sessions(user_id)
