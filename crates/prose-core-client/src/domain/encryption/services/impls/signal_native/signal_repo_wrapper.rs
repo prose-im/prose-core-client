@@ -13,18 +13,25 @@ use libsignal_protocol::{
 };
 use uuid::Uuid;
 
-use crate::app::deps::DynEncryptionKeysRepository;
+use crate::app::deps::{DynEncryptionKeysRepository, DynSessionRepository};
 
 use super::signal_compat::{map_repo_error, ProtocolAddressExt, UnwindSafeError};
 
 #[derive(Clone)]
 pub struct SignalRepoWrapper {
-    repo: DynEncryptionKeysRepository,
+    encryption_keys_repo: DynEncryptionKeysRepository,
+    session_repo: DynSessionRepository,
 }
 
 impl SignalRepoWrapper {
-    pub fn new(repo: DynEncryptionKeysRepository) -> Self {
-        Self { repo }
+    pub fn new(
+        encryption_keys_repo: DynEncryptionKeysRepository,
+        session_repo: DynSessionRepository,
+    ) -> Self {
+        Self {
+            encryption_keys_repo,
+            session_repo,
+        }
     }
 }
 
@@ -32,7 +39,7 @@ impl SignalRepoWrapper {
 impl SessionStore for SignalRepoWrapper {
     async fn load_session(&self, address: &ProtocolAddress) -> Result<Option<SessionRecord>> {
         Ok(self
-            .repo
+            .session_repo
             .get_session(&address.prose_user_id()?, &address.prose_device_id())
             .await
             .map_err(map_repo_error)?
@@ -45,7 +52,7 @@ impl SessionStore for SignalRepoWrapper {
         address: &ProtocolAddress,
         record: &SessionRecord,
     ) -> Result<()> {
-        self.repo
+        self.session_repo
             .put_session_data(
                 &address.prose_user_id()?,
                 &address.prose_device_id(),
@@ -60,7 +67,7 @@ impl SessionStore for SignalRepoWrapper {
 #[async_trait(? Send)]
 impl PreKeyStore for SignalRepoWrapper {
     async fn get_pre_key(&self, prekey_id: PreKeyId) -> Result<PreKeyRecord> {
-        self.repo
+        self.encryption_keys_repo
             .get_pre_key(prekey_id.into())
             .await
             .map_err(map_repo_error)?
@@ -69,7 +76,7 @@ impl PreKeyStore for SignalRepoWrapper {
     }
 
     async fn save_pre_key(&mut self, _prekey_id: PreKeyId, record: &PreKeyRecord) -> Result<()> {
-        self.repo
+        self.encryption_keys_repo
             .put_pre_keys(&[record.try_into()?])
             .await
             .map_err(map_repo_error)?;
@@ -77,7 +84,7 @@ impl PreKeyStore for SignalRepoWrapper {
     }
 
     async fn remove_pre_key(&mut self, prekey_id: PreKeyId) -> Result<()> {
-        self.repo
+        self.encryption_keys_repo
             .delete_pre_key(prekey_id.into())
             .await
             .map_err(map_repo_error)?;
@@ -91,7 +98,7 @@ impl SignedPreKeyStore for SignalRepoWrapper {
         &self,
         signed_prekey_id: SignedPreKeyId,
     ) -> Result<SignedPreKeyRecord> {
-        self.repo
+        self.encryption_keys_repo
             .get_signed_pre_key(signed_prekey_id.into())
             .await
             .map_err(map_repo_error)?
@@ -104,7 +111,7 @@ impl SignedPreKeyStore for SignalRepoWrapper {
         _signed_prekey_id: SignedPreKeyId,
         record: &SignedPreKeyRecord,
     ) -> Result<()> {
-        self.repo
+        self.encryption_keys_repo
             .put_signed_pre_key(&record.try_into()?)
             .await
             .map_err(map_repo_error)?;
@@ -120,7 +127,7 @@ impl SenderKeyStore for SignalRepoWrapper {
         distribution_id: Uuid,
         record: &SenderKeyRecord,
     ) -> Result<()> {
-        self.repo
+        self.encryption_keys_repo
             .put_sender_key(
                 &sender.prose_user_id()?,
                 &sender.prose_device_id(),
@@ -137,7 +144,7 @@ impl SenderKeyStore for SignalRepoWrapper {
         distribution_id: Uuid,
     ) -> Result<Option<SenderKeyRecord>> {
         Ok(self
-            .repo
+            .encryption_keys_repo
             .get_sender_key(
                 &sender.prose_user_id()?,
                 &sender.prose_device_id(),
@@ -153,7 +160,12 @@ impl SenderKeyStore for SignalRepoWrapper {
 #[async_trait(? Send)]
 impl IdentityKeyStore for SignalRepoWrapper {
     async fn get_identity_key_pair(&self) -> Result<IdentityKeyPair> {
-        let Some(local_device) = self.repo.get_local_device().await.map_err(map_repo_error)? else {
+        let Some(local_device) = self
+            .encryption_keys_repo
+            .get_local_device()
+            .await
+            .map_err(map_repo_error)?
+        else {
             return Err(
                 libsignal_protocol::error::SignalProtocolError::ApplicationCallbackError(
                     "Application Error",
@@ -165,7 +177,12 @@ impl IdentityKeyStore for SignalRepoWrapper {
     }
 
     async fn get_local_registration_id(&self) -> Result<u32> {
-        let Some(local_device) = self.repo.get_local_device().await.map_err(map_repo_error)? else {
+        let Some(local_device) = self
+            .encryption_keys_repo
+            .get_local_device()
+            .await
+            .map_err(map_repo_error)?
+        else {
             return Err(
                 libsignal_protocol::error::SignalProtocolError::ApplicationCallbackError(
                     "Application Error",
@@ -182,7 +199,7 @@ impl IdentityKeyStore for SignalRepoWrapper {
         identity: &IdentityKey,
     ) -> Result<bool> {
         let did_exist = self
-            .repo
+            .session_repo
             .put_identity(
                 &address.prose_user_id()?,
                 &address.prose_device_id(),
@@ -206,7 +223,7 @@ impl IdentityKeyStore for SignalRepoWrapper {
 
     async fn get_identity(&self, address: &ProtocolAddress) -> Result<Option<IdentityKey>> {
         let identity = self
-            .repo
+            .session_repo
             .get_session(&address.prose_user_id()?, &address.prose_device_id())
             .await
             .map_err(map_repo_error)?
@@ -224,7 +241,7 @@ impl IdentityKeyStore for SignalRepoWrapper {
 #[async_trait(? Send)]
 impl KyberPreKeyStore for SignalRepoWrapper {
     async fn get_kyber_pre_key(&self, kyber_prekey_id: KyberPreKeyId) -> Result<KyberPreKeyRecord> {
-        self.repo
+        self.encryption_keys_repo
             .get_kyber_pre_key(kyber_prekey_id.into())
             .await
             .map_err(map_repo_error)?
@@ -237,7 +254,7 @@ impl KyberPreKeyStore for SignalRepoWrapper {
         kyber_prekey_id: KyberPreKeyId,
         record: &KyberPreKeyRecord,
     ) -> Result<()> {
-        self.repo
+        self.encryption_keys_repo
             .put_kyber_pre_key(kyber_prekey_id.into(), &record.try_into()?)
             .await
             .map_err(map_repo_error)?;
@@ -245,7 +262,7 @@ impl KyberPreKeyStore for SignalRepoWrapper {
     }
 
     async fn mark_kyber_pre_key_used(&mut self, kyber_prekey_id: KyberPreKeyId) -> Result<()> {
-        self.repo
+        self.encryption_keys_repo
             .delete_kyber_pre_key(kyber_prekey_id.into())
             .await
             .map_err(map_repo_error)?;

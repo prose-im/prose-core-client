@@ -12,7 +12,7 @@ use prose_core_client::dtos::{
     IdentityKey, PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SessionData, SignedPreKeyId,
     SignedPreKeyRecord,
 };
-use prose_core_client::DynEncryptionKeysRepository;
+use prose_core_client::{DynEncryptionKeysRepository, DynSessionRepository};
 
 use crate::encryption::try_decode_address;
 use crate::error::{Result, WasmError};
@@ -112,12 +112,19 @@ pub type SessionRecordType = String;
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct SignalRepo {
-    repo: DynEncryptionKeysRepository,
+    encryption_keys_repo: DynEncryptionKeysRepository,
+    session_repo: DynSessionRepository,
 }
 
 impl SignalRepo {
-    pub fn new(repo: DynEncryptionKeysRepository) -> Self {
-        Self { repo }
+    pub fn new(
+        encryption_keys_repo: DynEncryptionKeysRepository,
+        session_repo: DynSessionRepository,
+    ) -> Self {
+        Self {
+            encryption_keys_repo,
+            session_repo,
+        }
     }
 }
 
@@ -126,7 +133,7 @@ impl SignalRepo {
     #[wasm_bindgen(js_name = "getIdentityKeyPair")]
     pub async fn get_identity_key_pair(&self) -> Result<Option<KeyPairType>> {
         let key_pair = self
-            .repo
+            .encryption_keys_repo
             .get_local_device()
             .await
             .map_err(WasmError::from)?
@@ -137,7 +144,7 @@ impl SignalRepo {
     #[wasm_bindgen(js_name = "getLocalRegistrationId")]
     pub async fn get_local_registration_id(&self) -> Result<Option<u32>> {
         let registration_id = self
-            .repo
+            .encryption_keys_repo
             .get_local_device()
             .await
             .map_err(WasmError::from)?
@@ -166,7 +173,7 @@ impl SignalRepo {
     ) -> Result<bool> {
         let (user_id, device_id) = try_decode_address(encoded_address).map_err(WasmError::from)?;
         let did_exist = self
-            .repo
+            .session_repo
             .put_identity(&user_id, &device_id, IdentityKey::from(public_key))
             .await
             .map_err(WasmError::from)?;
@@ -182,7 +189,7 @@ impl SignalRepo {
             .map_err(WasmError::from)?;
 
         let key_pair = self
-            .repo
+            .encryption_keys_repo
             .get_pre_key(pre_key_id)
             .await
             .map_err(WasmError::from)?
@@ -205,7 +212,7 @@ impl SignalRepo {
             private_key: PrivateKey::from(key_pair.private_key.as_ref()),
         };
 
-        self.repo
+        self.encryption_keys_repo
             .put_pre_keys(&[record])
             .await
             .map_err(WasmError::from)?;
@@ -221,7 +228,7 @@ impl SignalRepo {
             .map(|value| PreKeyId::from(value as u32))
             .map_err(WasmError::from)?;
 
-        self.repo
+        self.encryption_keys_repo
             .delete_pre_key(pre_key_id)
             .await
             .map_err(WasmError::from)?;
@@ -232,7 +239,7 @@ impl SignalRepo {
     #[wasm_bindgen(js_name = "storeSession")]
     pub async fn store_session(&self, encoded_address: &str, record: &str) -> Result<()> {
         let (user_id, device_id) = try_decode_address(encoded_address).map_err(WasmError::from)?;
-        self.repo
+        self.session_repo
             .put_session_data(
                 &user_id,
                 &device_id,
@@ -247,7 +254,7 @@ impl SignalRepo {
     pub async fn load_session(&self, encoded_address: &str) -> Result<Option<SessionRecordType>> {
         let (user_id, device_id) = try_decode_address(encoded_address).map_err(WasmError::from)?;
         let session = self
-            .repo
+            .session_repo
             .get_session(&user_id, &device_id)
             .await
             .map_err(WasmError::from)?
@@ -268,7 +275,7 @@ impl SignalRepo {
             .map_err(WasmError::from)?;
 
         Ok(self
-            .repo
+            .encryption_keys_repo
             .get_signed_pre_key(signed_pre_key_id.into())
             .await
             .map_err(WasmError::from)?
@@ -288,7 +295,7 @@ impl SignalRepo {
             signature: record.signature.clone(),
             timestamp: timestamp as u64,
         };
-        self.repo
+        self.encryption_keys_repo
             .put_signed_pre_key(&record)
             .await
             .map_err(WasmError::from)?;
@@ -302,7 +309,7 @@ impl SignalRepo {
             .ok_or(anyhow!("Invalid signed_pre_key id {:?}", key_id))
             .map(|value| SignedPreKeyId::from(value as u32))
             .map_err(WasmError::from)?;
-        self.repo
+        self.encryption_keys_repo
             .delete_signed_pre_key(signed_pre_key_id)
             .await
             .map_err(WasmError::from)?;

@@ -19,8 +19,8 @@ use prose_xmpp::TimeProvider;
 
 use crate::app::deps::{
     DynAppContext, DynEncryptionKeysRepository, DynEncryptionService, DynMessagesRepository,
-    DynRngProvider, DynTimeProvider, DynUserDeviceIdProvider, DynUserDeviceRepository,
-    DynUserDeviceService,
+    DynRngProvider, DynSessionRepository, DynTimeProvider, DynUserDeviceIdProvider,
+    DynUserDeviceRepository, DynUserDeviceService,
 };
 use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
 use crate::domain::encryption::services::encryption_domain_service::EncryptionError;
@@ -38,6 +38,7 @@ pub struct EncryptionDomainService {
     encryption_service: DynEncryptionService,
     message_repo: DynMessagesRepository,
     rng_provider: DynRngProvider,
+    session_repo: DynSessionRepository,
     time_provider: DynTimeProvider,
     user_device_id_provider: DynUserDeviceIdProvider,
     user_device_repo: DynUserDeviceRepository,
@@ -262,7 +263,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         };
 
         let device_infos = self
-            .encryption_keys_repo
+            .session_repo
             .get_all_sessions(user_id)
             .await?
             .into_iter()
@@ -277,6 +278,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
                     id: session.device_id,
                     identity,
                     trust: session.trust,
+                    is_active: session.is_active,
                     is_this_device,
                 };
                 Some(info)
@@ -385,6 +387,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     async fn clear_cache(&self) -> Result<()> {
         self.user_device_repo.clear_cache().await?;
         self.encryption_keys_repo.clear_cache().await?;
+        self.session_repo.clear_cache().await?;
         Ok(())
     }
 }
@@ -537,7 +540,7 @@ impl EncryptionDomainService {
         device_id: DeviceId,
     ) -> Result<()> {
         if self
-            .encryption_keys_repo
+            .session_repo
             .get_session(user_id, &device_id)
             .await?
             .is_some()
@@ -580,7 +583,7 @@ impl EncryptionDomainService {
 
     async fn get_active_device_ids(&self, user_id: &UserId) -> Result<Vec<DeviceId>> {
         Ok(self
-            .encryption_keys_repo
+            .session_repo
             .get_all_sessions(user_id)
             .await?
             .into_iter()

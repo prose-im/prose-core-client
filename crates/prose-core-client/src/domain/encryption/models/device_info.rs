@@ -10,6 +10,7 @@ pub struct DeviceInfo {
     pub id: DeviceId,
     pub identity: IdentityKey,
     pub trust: Trust,
+    pub is_active: bool,
     pub is_this_device: bool,
 }
 

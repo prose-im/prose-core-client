@@ -17,7 +17,9 @@ use crate::domain::contacts::repos::{
 use crate::domain::contacts::services::{
     BlockListDomainService, BlockListService, ContactListDomainService, ContactListService,
 };
-use crate::domain::encryption::repos::{EncryptionKeysRepository, UserDeviceRepository};
+use crate::domain::encryption::repos::{
+    EncryptionKeysRepository, SessionRepository, UserDeviceRepository,
+};
 use crate::domain::encryption::services::{
     EncryptionDomainService, EncryptionService, UserDeviceIdProvider, UserDeviceService,
 };
@@ -65,11 +67,13 @@ pub type DynMessagesRepository = Arc<dyn MessagesRepository>;
 pub type DynMessagingService = Arc<dyn MessagingService>;
 pub type DynPresenceSubRequestsRepository = Arc<dyn PresenceSubRequestsRepository>;
 pub type DynRequestHandlingService = Arc<dyn RequestHandlingService>;
+pub type DynRngProvider = Arc<dyn RngProvider>;
 pub type DynRoomAttributesService = Arc<dyn RoomAttributesService>;
 pub type DynRoomFactory = RoomFactory;
 pub type DynRoomManagementService = Arc<dyn RoomManagementService>;
 pub type DynRoomParticipationService = Arc<dyn RoomParticipationService>;
 pub type DynRoomsDomainService = Arc<dyn RoomsDomainService>;
+pub type DynSessionRepository = Arc<dyn SessionRepository>;
 pub type DynSidebarDomainService = Arc<dyn SidebarDomainService>;
 pub type DynTimeProvider = Arc<dyn TimeProvider>;
 pub type DynUploadService = Arc<dyn UploadService>;
@@ -81,7 +85,6 @@ pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
 pub type DynUserProfileService = Arc<dyn UserProfileService>;
-pub type DynRngProvider = Arc<dyn RngProvider>;
 
 pub struct AppDependencies {
     pub account_settings_repo: DynAccountSettingsRepository,

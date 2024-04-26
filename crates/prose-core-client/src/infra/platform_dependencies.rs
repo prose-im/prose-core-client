@@ -34,7 +34,7 @@ use crate::infra::contacts::{
 };
 use crate::infra::encryption::{
     encryption_keys_collections, CachingUserDeviceRepository, EncryptionKeysRepository,
-    UserDeviceRecord,
+    SessionRepository, UserDeviceRecord,
 };
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
@@ -180,6 +180,7 @@ impl From<PlatformDependencies> for AppDependencies {
             encryption_service: d.encryption_service,
             message_repo: messages_repo.clone(),
             rng_provider: d.rng_provider.clone(),
+            session_repo: Arc::new(SessionRepository::new(d.store.clone())),
             time_provider: time_provider.clone(),
             user_device_id_provider: d.user_device_id_provider,
             user_device_repo: user_device_repo.clone(),

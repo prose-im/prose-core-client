@@ -12,7 +12,7 @@ use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::encryption::services::IncrementingUserDeviceIdProvider;
 use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId};
-use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
 use prose_core_client::{Client, ClientDelegate, ClientEvent, FsAvatarCache, SignalServiceHandle};
@@ -58,6 +58,7 @@ impl TestClient {
 
         let encryption_service = SignalServiceHandle::new(
             Arc::new(EncryptionKeysRepository::new(store.clone())),
+            Arc::new(SessionRepository::new(store.clone())),
             Arc::new(StepRngProvider::default()),
         );
 

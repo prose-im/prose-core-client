@@ -14,7 +14,7 @@ use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::{MucId, SoftwareVersion, UserStatus};
-use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::{
     open_store, Client as ProseClient, PlatformDriver, Secret, StoreAvatarCache,
 };
@@ -177,6 +177,7 @@ impl Client {
                 .set_encryption_service(Arc::new(EncryptionService::new(
                     encryption_service,
                     Arc::new(EncryptionKeysRepository::new(store.clone())),
+                    Arc::new(SessionRepository::new(store.clone())),
                 )))
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .set_software_version(software_version)

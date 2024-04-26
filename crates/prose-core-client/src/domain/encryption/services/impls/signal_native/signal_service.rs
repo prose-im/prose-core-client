@@ -11,7 +11,7 @@ use chrono::Utc;
 use libsignal_protocol::{CiphertextMessage, PreKeySignalMessage, ProtocolAddress, SignalMessage};
 use tokio::sync::{mpsc, oneshot};
 
-use crate::app::deps::{DynEncryptionKeysRepository, DynRngProvider};
+use crate::app::deps::{DynEncryptionKeysRepository, DynRngProvider, DynSessionRepository};
 use crate::domain::encryption::models::{
     DeviceId, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey, PublicKey,
     SignedPreKeyId, SignedPreKeyRecord,
@@ -25,6 +25,7 @@ use super::SignalRepoWrapper;
 struct SignalService {
     receiver: mpsc::Receiver<SignalServiceMessage>,
     encryption_keys_repo: DynEncryptionKeysRepository,
+    session_repo: DynSessionRepository,
     rng_provider: DynRngProvider,
 }
 enum SignalServiceMessage {
@@ -102,7 +103,8 @@ impl SignalService {
         bundle: libsignal_protocol::PreKeyBundle,
         now: SystemTime,
     ) -> Result<()> {
-        let signal_store = SignalRepoWrapper::new(self.encryption_keys_repo.clone());
+        let signal_store =
+            SignalRepoWrapper::new(self.encryption_keys_repo.clone(), self.session_repo.clone());
 
         libsignal_protocol::process_prekey_bundle(
             &ProtocolAddress::new(user_id.to_string(), device_id.clone().into()),
@@ -134,7 +136,8 @@ impl SignalService {
             CiphertextMessage::SignalMessage(SignalMessage::try_from(encrypted_message.as_ref())?)
         };
 
-        let signal_store = SignalRepoWrapper::new(self.encryption_keys_repo.clone());
+        let signal_store =
+            SignalRepoWrapper::new(self.encryption_keys_repo.clone(), self.session_repo.clone());
 
         let dek_and_mac = libsignal_protocol::message_decrypt(
             &ciphertext_message,
@@ -158,7 +161,8 @@ impl SignalService {
         message: &[u8],
         now: &SystemTime,
     ) -> Result<EncryptionKey> {
-        let signal_store = SignalRepoWrapper::new(self.encryption_keys_repo.clone());
+        let signal_store =
+            SignalRepoWrapper::new(self.encryption_keys_repo.clone(), self.session_repo.clone());
 
         let address = ProtocolAddress::new(user_id.to_string(), device_id.clone().into());
 
@@ -208,12 +212,14 @@ pub struct SignalServiceHandle {
 impl SignalServiceHandle {
     pub fn new(
         encryption_keys_repo: DynEncryptionKeysRepository,
+        session_repo: DynSessionRepository,
         rng_provider: DynRngProvider,
     ) -> Self {
         let (sender, receiver) = mpsc::channel(8);
         let mut actor = SignalService {
             receiver,
             encryption_keys_repo,
+            session_repo,
             rng_provider: rng_provider.clone(),
         };
 

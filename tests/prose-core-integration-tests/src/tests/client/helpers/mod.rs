@@ -6,7 +6,9 @@
 use std::sync::Arc;
 
 pub(self) use element_ext::ElementExt;
-use prose_core_client::domain::encryption::repos::mocks::MockEncryptionKeysRepository;
+use prose_core_client::domain::encryption::repos::mocks::{
+    MockEncryptionKeysRepository, MockSessionRepository,
+};
 use prose_core_client::dtos::{DeviceBundle, DeviceId};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::{EncryptionService, SignalServiceHandle};
@@ -30,6 +32,7 @@ impl TestDeviceBundle for DeviceBundle {
     async fn test(device_id: impl Into<DeviceId>) -> DeviceBundle {
         let service = SignalServiceHandle::new(
             Arc::new(MockEncryptionKeysRepository::new()),
+            Arc::new(MockSessionRepository::new()),
             Arc::new(StepRngProvider::default()),
         );
         service

@@ -32,7 +32,7 @@ use prose_core_client::dtos::{
     Utf8Index,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
-use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
     open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, PlatformDriver,
@@ -68,6 +68,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
         .set_connector_provider(connector::xmpp_rs::Connector::provider())
         .set_encryption_service(Arc::new(SignalServiceHandle::new(
             Arc::new(EncryptionKeysRepository::new(store.clone())),
+            Arc::new(SessionRepository::new(store.clone())),
             Arc::new(OsRngProvider),
         )))
         .set_store(store)

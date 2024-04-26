@@ -11,15 +11,14 @@ use uuid::Uuid;
 use prose_store::prelude::*;
 
 use crate::domain::encryption::models::{
-    DeviceId, IdentityKey, KyberPreKeyId, KyberPreKeyRecord, LocalDevice, LocalEncryptionBundle,
-    PreKeyId, PreKeyRecord, SenderKeyRecord, Session, SessionData, SignedPreKeyId,
-    SignedPreKeyRecord, Trust,
+    DeviceId, KyberPreKeyId, KyberPreKeyRecord, LocalDevice, LocalEncryptionBundle, PreKeyId,
+    PreKeyRecord, SenderKeyRecord, SignedPreKeyId, SignedPreKeyRecord,
 };
 use crate::domain::encryption::repos::EncryptionKeysRepository as EncryptionKeysRepositoryTrait;
 use crate::dtos::{DeviceBundle, UserId};
-use crate::infra::encryption::encryption_key_records::{LocalDeviceRecord, SessionRecord};
+use crate::infra::encryption::encryption_key_records::LocalDeviceRecord;
+use crate::infra::encryption::encryption_keys_collections;
 use crate::infra::encryption::user_device_key::SenderDistributionKeyRef;
-use crate::infra::encryption::{encryption_keys_collections, UserDeviceKey, UserDeviceKeyRef};
 
 pub struct EncryptionKeysRepository {
     store: Store<PlatformDriver>,
@@ -138,66 +137,6 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
         };
 
         Ok(local_device.map(LocalDevice::from))
-    }
-
-    async fn get_session(&self, user_id: &UserId, device_id: &DeviceId) -> Result<Option<Session>> {
-        let tx = self
-            .store
-            .transaction_for_reading(&[encryption_keys_collections::SESSION_RECORD])
-            .await?;
-        let collection = tx.readable_collection(encryption_keys_collections::SESSION_RECORD)?;
-
-        let key = UserDeviceKeyRef::new(user_id, device_id);
-        let session = collection.get::<_, SessionRecord>(&key).await?;
-
-        Ok(session.map(Session::from))
-    }
-
-    async fn get_all_sessions(&self, user_id: &UserId) -> Result<Vec<Session>> {
-        let tx = self
-            .store
-            .transaction_for_reading(&[encryption_keys_collections::SESSION_RECORD])
-            .await?;
-        let collection = tx.readable_collection(encryption_keys_collections::SESSION_RECORD)?;
-
-        let records = collection
-            .get_all_filtered::<SessionRecord, _>(
-                Query::<UserDeviceKey>::All,
-                QueryDirection::Forward,
-                None,
-                |_, record| {
-                    if &record.user_id != user_id {
-                        return None;
-                    }
-                    return Some(Session::from(record));
-                },
-            )
-            .await?;
-
-        Ok(records)
-    }
-
-    async fn put_session_data(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        data: SessionData,
-    ) -> Result<()> {
-        self.upsert_session(user_id, device_id, move |session| session.data = Some(data))
-            .await?;
-        Ok(())
-    }
-
-    async fn put_identity(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        identity: IdentityKey,
-    ) -> Result<bool> {
-        self.upsert_session(user_id, device_id, move |session| {
-            session.identity = Some(identity)
-        })
-        .await
     }
 
     async fn get_kyber_pre_key(
@@ -359,7 +298,6 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
                 encryption_keys_collections::LOCAL_DEVICE,
                 encryption_keys_collections::PRE_KEY,
                 encryption_keys_collections::SENDER_KEY,
-                encryption_keys_collections::SESSION_RECORD,
                 encryption_keys_collections::SIGNED_PRE_KEY,
             ])
             .await?;
@@ -368,60 +306,9 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
             encryption_keys_collections::LOCAL_DEVICE,
             encryption_keys_collections::PRE_KEY,
             encryption_keys_collections::SENDER_KEY,
-            encryption_keys_collections::SESSION_RECORD,
             encryption_keys_collections::SIGNED_PRE_KEY,
         ])?;
         tx.commit().await?;
         Ok(())
-    }
-}
-
-impl EncryptionKeysRepository {
-    /// The return value represents whether an existing identity was replaced (Ok(true)). If it is
-    /// new or hasn't changed, the return value should be Ok(false).
-    async fn upsert_session<F: FnOnce(&mut SessionRecord)>(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        handler: F,
-    ) -> Result<bool> {
-        let tx = self
-            .store
-            .transaction_for_reading_and_writing(&[encryption_keys_collections::SESSION_RECORD])
-            .await?;
-        let collection = tx.writeable_collection(encryption_keys_collections::SESSION_RECORD)?;
-
-        let key = UserDeviceKeyRef::new(user_id, device_id);
-
-        let existing_session_changed = match collection.get::<_, SessionRecord>(&key).await? {
-            Some(session) => {
-                let mut updated_session = session.clone();
-                handler(&mut updated_session);
-
-                if updated_session != session {
-                    collection.put(&key, &updated_session)?;
-                    tx.commit().await?;
-                    true
-                } else {
-                    false
-                }
-            }
-            None => {
-                let mut session = SessionRecord {
-                    user_id: user_id.clone(),
-                    device_id: device_id.clone(),
-                    trust: Trust::Undecided,
-                    is_active: true,
-                    data: None,
-                    identity: None,
-                };
-                handler(&mut session);
-                collection.put(&key, &session)?;
-                tx.commit().await?;
-                false
-            }
-        };
-
-        Ok(existing_session_changed)
     }
 }

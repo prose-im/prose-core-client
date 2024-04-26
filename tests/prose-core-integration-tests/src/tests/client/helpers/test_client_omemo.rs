@@ -19,7 +19,7 @@ use prose_core_client::domain::encryption::services::{
     EncryptionDomainService as EncryptionDomainServiceTrait, RandUserDeviceIdProvider,
 };
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
-use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::ConstantTimeProvider;
@@ -230,9 +230,11 @@ impl TestClient {
         let store = store().await.unwrap();
 
         let encryption_keys_repo = Arc::new(EncryptionKeysRepository::new(store.clone()));
+        let session_repo = Arc::new(SessionRepository::new(store.clone()));
         let rng_provider = Arc::new(StepRngProvider::default());
         let encryption_service = Arc::new(SignalServiceHandle::new(
             encryption_keys_repo.clone(),
+            session_repo.clone(),
             rng_provider.clone(),
         ));
 
@@ -286,6 +288,7 @@ impl TestClient {
             encryption_service,
             message_repo: Arc::new(CachingMessageRepository::new(store.clone())),
             rng_provider,
+            session_repo,
             time_provider: Arc::new(ConstantTimeProvider::ymd(2024, 1, 1)),
             user_device_id_provider: Arc::new(RandUserDeviceIdProvider::default()),
             user_device_repo: Arc::new(user_device_repo),

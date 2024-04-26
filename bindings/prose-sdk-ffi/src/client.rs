@@ -11,7 +11,7 @@ use parking_lot::{Mutex, RwLock};
 use tracing::info;
 
 use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
-use prose_core_client::infra::encryption::EncryptionKeysRepository;
+use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
     open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarCache,
@@ -277,7 +277,8 @@ impl Client {
             .set_store(store.clone())
             .set_avatar_cache(FsAvatarCache::new(&self.cache_dir.join("Avatars"))?)
             .set_encryption_service(Arc::new(SignalServiceHandle::new(
-                Arc::new(EncryptionKeysRepository::new(store)),
+                Arc::new(EncryptionKeysRepository::new(store.clone())),
+                Arc::new(SessionRepository::new(store)),
                 Arc::new(OsRngProvider),
             )))
             .set_delegate(self.delegate.lock().take())

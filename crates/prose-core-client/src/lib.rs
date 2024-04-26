@@ -7,7 +7,7 @@ extern crate core;
 
 pub use secrecy::Secret;
 
-pub use app::deps::DynEncryptionKeysRepository;
+pub use app::deps::{DynEncryptionKeysRepository, DynSessionRepository};
 pub use app::{dtos, services};
 pub use client::{Client, ClientDelegate};
 pub use client_event::{ClientEvent, ClientRoomEventType, ConnectionEvent};

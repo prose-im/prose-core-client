@@ -17,7 +17,9 @@ use prose_core_client::dtos::{
     DeviceId, EncryptionKey, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord,
     SignedPreKeyRecord, UserId,
 };
-use prose_core_client::{DynEncryptionKeysRepository, EncryptionService as EncryptionServiceTrait};
+use prose_core_client::{
+    DynEncryptionKeysRepository, DynSessionRepository, EncryptionService as EncryptionServiceTrait,
+};
 
 use super::{
     EncryptedMessage as JsEncryptedMessage, LocalEncryptionBundle as JsLocalEncryptionBundle,
@@ -98,12 +100,21 @@ extern "C" {
 
 pub struct EncryptionService {
     inner: JsEncryptionService,
-    repo: DynEncryptionKeysRepository,
+    encryption_keys_repo: DynEncryptionKeysRepository,
+    session_repo: DynSessionRepository,
 }
 
 impl EncryptionService {
-    pub fn new(inner: JsEncryptionService, repo: DynEncryptionKeysRepository) -> Self {
-        Self { inner, repo }
+    pub fn new(
+        inner: JsEncryptionService,
+        encryption_keys_repo: DynEncryptionKeysRepository,
+        session_repo: DynSessionRepository,
+    ) -> Self {
+        Self {
+            inner,
+            encryption_keys_repo,
+            session_repo,
+        }
     }
 }
 
@@ -150,7 +161,7 @@ impl EncryptionServiceTrait for EncryptionService {
 
     async fn process_pre_key_bundle(&self, user_id: &UserId, bundle: PreKeyBundle) -> Result<()> {
         await_promise(self.inner.process_pre_key_bundle(
-            SignalRepo::new(self.repo.clone()),
+            SignalRepo::new(self.encryption_keys_repo.clone(), self.session_repo.clone()),
             user_id.to_string(),
             *bundle.device_id.as_ref(),
             JsPreKeyBundle::from(bundle),
@@ -168,7 +179,7 @@ impl EncryptionServiceTrait for EncryptionService {
     ) -> Result<EncryptionKey> {
         let value = JsEncryptedMessage::try_from(
             &await_promise(self.inner.encrypt_key(
-                SignalRepo::new(self.repo.clone()),
+                SignalRepo::new(self.encryption_keys_repo.clone(), self.session_repo.clone()),
                 recipient_id.to_string(),
                 *device_id.as_ref(),
                 message.into(),
@@ -193,7 +204,7 @@ impl EncryptionServiceTrait for EncryptionService {
     ) -> Result<Box<[u8]>> {
         let value = Uint8Array::from(
             await_promise(self.inner.decrypt_key(
-                SignalRepo::new(self.repo.clone()),
+                SignalRepo::new(self.encryption_keys_repo.clone(), self.session_repo.clone()),
                 sender_id.to_string(),
                 *device_id.as_ref(),
                 message.into(),

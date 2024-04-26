@@ -10,9 +10,8 @@ use uuid::Uuid;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::encryption::models::{
-    DeviceId, IdentityKey, KyberPreKeyId, KyberPreKeyRecord, LocalDevice, LocalEncryptionBundle,
-    PreKeyId, PreKeyRecord, SenderKeyRecord, Session, SessionData, SignedPreKeyId,
-    SignedPreKeyRecord,
+    DeviceId, KyberPreKeyId, KyberPreKeyRecord, LocalDevice, LocalEncryptionBundle, PreKeyId,
+    PreKeyRecord, SenderKeyRecord, SignedPreKeyId, SignedPreKeyRecord,
 };
 use crate::dtos::{DeviceBundle, UserId};
 
@@ -24,27 +23,6 @@ pub trait EncryptionKeysRepository: SendUnlessWasm + SyncUnlessWasm {
 
     async fn get_local_device_bundle(&self) -> Result<Option<DeviceBundle>>;
     async fn get_local_device(&self) -> Result<Option<LocalDevice>>;
-
-    async fn get_session(&self, user_id: &UserId, device_id: &DeviceId) -> Result<Option<Session>>;
-    async fn get_all_sessions(&self, user_id: &UserId) -> Result<Vec<Session>>;
-
-    async fn put_session_data(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        data: SessionData,
-    ) -> Result<()>;
-
-    /// Record an identity into the store. The identity is then considered "trusted".
-    ///
-    /// The return value represents whether an existing identity was replaced (`Ok(true)`). If it is
-    /// new or hasn't changed, the return value should be `Ok(false)`.
-    async fn put_identity(
-        &self,
-        user_id: &UserId,
-        device_id: &DeviceId,
-        identity: IdentityKey,
-    ) -> Result<bool>;
 
     async fn get_kyber_pre_key(
         &self,
