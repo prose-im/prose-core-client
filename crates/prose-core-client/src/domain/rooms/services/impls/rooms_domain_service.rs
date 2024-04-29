@@ -8,7 +8,6 @@ use std::iter;
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
-use futures::join;
 use jid::{BareJid, NodePart};
 use tracing::{debug, error, info, warn};
 
@@ -414,10 +413,8 @@ impl RoomsDomainService {
             Some(room) => return Ok(room),
         }
 
-        let (contact_name, user_info) = join!(
-            self.user_profile_repo.get_display_name(participant),
-            self.user_info_repo.get_user_info(participant)
-        );
+        let contact_name = self.user_profile_repo.get_display_name(participant).await;
+        let user_info = self.user_info_repo.get_user_info(participant).await;
 
         // Let's ignore potential errors here since the information we're gathering is optional…
         let contact_name = contact_name
