@@ -145,6 +145,7 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
           <body>Hello World</body>
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -250,6 +251,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -282,6 +284,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -335,6 +338,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -390,6 +394,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -449,6 +454,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -519,6 +525,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -585,6 +592,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -658,6 +666,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -707,6 +716,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -769,6 +779,7 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );
@@ -829,6 +840,7 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
+          <store xmlns="urn:xmpp:hints" />
         </message>
         "#
     );

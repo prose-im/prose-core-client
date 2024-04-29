@@ -38,7 +38,8 @@ impl MessagingService for XMPPClient {
             .set_to(room_id.clone().into_bare())
             .set_message_body(request.body)
             .set_chat_state(Some(ChatState::Active))
-            .set_markable();
+            .set_markable()
+            .set_store(true);
         message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
@@ -64,7 +65,8 @@ impl MessagingService for XMPPClient {
             .set_from(from)
             .set_to(room_id.clone().into_bare())
             .set_message_body(request.body)
-            .set_replace(message_id.clone().into_inner().into());
+            .set_replace(message_id.clone().into_inner().into())
+            .set_store(true);
         message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
