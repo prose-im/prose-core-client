@@ -547,8 +547,6 @@ impl EncryptionDomainService {
             .map(|device| device.id)
             .collect::<Vec<_>>();
 
-        println!("PUT ACTIVE DEVICES {:?}", device_ids);
-
         self.session_repo
             .put_active_devices(user_id, device_ids.as_slice())
             .await?;
