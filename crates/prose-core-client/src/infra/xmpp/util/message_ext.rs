@@ -27,6 +27,7 @@ pub trait MessageExt {
     /// The latter can happen even for 'chat' messages, e.g. for private messages in a MUC room.
     fn is_groupchat_message(&self) -> bool;
     fn set_message_body(self, body: Option<Body>) -> Self;
+    fn set_omemo_payload(self, payload: impl Into<legacy_omemo::Encrypted>) -> Self;
 }
 
 impl MessageExt for Message {
@@ -104,19 +105,22 @@ impl MessageExt for Message {
 
         match body.payload {
             Payload::Plaintext(message) => self.set_body(message),
-            Payload::Encrypted(encrypted_payload) => {
-                self.payloads
-                    .push(legacy_omemo::Encrypted::from(encrypted_payload).into());
-                self.payloads.push(
-                    eme::ExplicitMessageEncryption {
-                        namespace: ns::LEGACY_OMEMO.to_string(),
-                        name: Some("OMEMO".to_string()),
-                    }
-                    .into(),
-                );
-                self.set_body("[This message is OMEMO encrypted]")
-            }
+            Payload::Encrypted(encrypted_payload) => self
+                .set_omemo_payload(encrypted_payload)
+                .set_body("[This message is OMEMO encrypted]"),
         }
+    }
+
+    fn set_omemo_payload(mut self, payload: impl Into<legacy_omemo::Encrypted>) -> Self {
+        self.payloads.push(Element::from(payload.into()));
+        self.payloads.push(
+            eme::ExplicitMessageEncryption {
+                namespace: ns::LEGACY_OMEMO.to_string(),
+                name: Some("OMEMO".to_string()),
+            }
+            .into(),
+        );
+        self
     }
 }
 

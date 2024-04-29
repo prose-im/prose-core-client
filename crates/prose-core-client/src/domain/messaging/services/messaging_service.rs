@@ -9,7 +9,9 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
-use crate::domain::messaging::models::{Emoji, MessageId, SendMessageRequest, StanzaId};
+use crate::domain::messaging::models::{
+    Emoji, KeyTransportPayload, MessageId, SendMessageRequest, StanzaId,
+};
 use crate::domain::shared::models::RoomId;
 use crate::dtos::{MucId, UserId};
 
@@ -18,6 +20,12 @@ use crate::dtos::{MucId, UserId};
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait MessagingService: SendUnlessWasm + SyncUnlessWasm {
     async fn send_message(&self, room_id: &RoomId, request: SendMessageRequest) -> Result<()>;
+
+    async fn send_key_transport_message(
+        &self,
+        user_id: &UserId,
+        message: KeyTransportPayload,
+    ) -> Result<()>;
 
     async fn update_message(
         &self,

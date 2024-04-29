@@ -6,6 +6,12 @@
 use crate::dtos::DeviceId;
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum EncryptedMessage {
+    Message(EncryptedPayload),
+    KeyTransport(KeyTransportPayload),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct EncryptedPayload {
     /// The device id of the sender
     pub device_id: DeviceId,
@@ -18,7 +24,20 @@ pub struct EncryptedPayload {
     pub keys: Vec<EncryptionKey>,
 
     /// The encrypted message body, unless empty when the message is used for a key exchange.
-    pub payload: Option<Box<[u8]>>,
+    pub payload: Box<[u8]>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeyTransportPayload {
+    /// The device id of the sender
+    pub device_id: DeviceId,
+
+    /// IV used for payload encryption
+    pub iv: Box<[u8]>,
+
+    /// The key that the payload message is encrypted with, separately
+    /// encrypted for each recipient device.
+    pub keys: Vec<EncryptionKey>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,4 +53,16 @@ pub struct EncryptionKey {
     /// and encrypted using the corresponding long-standing SignalProtocol
     /// session
     pub data: Box<[u8]>,
+}
+
+impl EncryptedPayload {
+    pub fn get_key(&self, device_id: &DeviceId) -> Option<&EncryptionKey> {
+        self.keys.iter().find(|key| &key.device_id == device_id)
+    }
+}
+
+impl KeyTransportPayload {
+    pub fn get_key(&self, device_id: &DeviceId) -> Option<&EncryptionKey> {
+        self.keys.iter().find(|key| &key.device_id == device_id)
+    }
 }

@@ -17,8 +17,8 @@ use prose_xmpp::stanza::Message;
 use crate::app::deps::DynEncryptionDomainService;
 use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
-    MessageLike, MessageLikeEncryptionInfo, MessageLikeId, MessageTargetId, StanzaId,
-    StanzaParseError,
+    EncryptedMessage, MessageLike, MessageLikeEncryptionInfo, MessageLikeId, MessageTargetId,
+    StanzaId, StanzaParseError,
 };
 use crate::dtos::{DeviceId, Mention, MessageId, OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
@@ -258,25 +258,34 @@ impl MessageParser {
             (from, message.omemo_element())
         {
             let sender = DeviceId::from(omemo_element.header.sid);
+            let encrypted_message = EncryptedMessage::from(omemo_element);
+            let message_id = message.id.as_ref().map(|id| MessageId::from(id.clone()));
 
-            let decryption_result = self
-                .encryption_domain_service
-                .decrypt_message(
-                    sender_id,
-                    message
-                        .id
-                        .as_ref()
-                        .map(|id| MessageId::from(id.clone()))
-                        .as_ref(),
-                    omemo_element.into(),
-                )
-                .await;
+            let decryption_result = match encrypted_message {
+                EncryptedMessage::Message(message) => {
+                    self.encryption_domain_service
+                        .decrypt_message(sender_id, message_id.as_ref(), message)
+                        .await
+                }
+                EncryptedMessage::KeyTransport(payload) => {
+                    let res = self
+                        .encryption_domain_service
+                        .handle_received_key_transport_message(sender_id, payload)
+                        .await;
+                    if let Err(error) = res {
+                        error!(
+                            "Failed to handle KeyTransportMessage from {sender_id}. {}",
+                            error.to_string()
+                        );
+                    };
+                    return Ok(Some(ParsedMessageBody::EmptyMessage));
+                }
+            };
 
             let parsed_message = match decryption_result {
-                Ok(Some(body)) => {
+                Ok(body) => {
                     ParsedMessageBody::EncryptedMessage(body, MessageLikeEncryptionInfo { sender })
                 }
-                Ok(None) => ParsedMessageBody::EmptyMessage,
                 Err(error) => {
                     error!(
                         "Failed to decrypt message from {sender_id}. {}",

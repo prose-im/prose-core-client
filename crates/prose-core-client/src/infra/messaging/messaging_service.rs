@@ -14,7 +14,7 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::Message;
 
 use crate::domain::messaging::models::{
-    Emoji, MessageId, SendMessageRequest, StanzaId, StanzaParseError,
+    Emoji, KeyTransportPayload, MessageId, SendMessageRequest, StanzaId, StanzaParseError,
 };
 use crate::domain::messaging::services::MessagingService;
 use crate::dtos::{MucId, RoomId, UserId};
@@ -43,6 +43,29 @@ impl MessagingService for XMPPClient {
         message.append_attachments(request.attachments);
 
         chat.send_raw_message(message, true)?;
+
+        Ok(())
+    }
+
+    async fn send_key_transport_message(
+        &self,
+        user_id: &UserId,
+        message: KeyTransportPayload,
+    ) -> Result<()> {
+        let chat = self.client.get_mod::<mods::Chat>();
+
+        let from = self.connected_jid().ok_or(anyhow::anyhow!(
+            "Failed to read the user's JID since the client is not connected."
+        ))?;
+
+        let message = Message::new()
+            .set_type(MessageType::Chat)
+            .set_from(from)
+            .set_to(user_id.clone().into_inner())
+            .set_omemo_payload(message)
+            .set_store(true);
+
+        chat.send_raw_message(message, false)?;
 
         Ok(())
     }

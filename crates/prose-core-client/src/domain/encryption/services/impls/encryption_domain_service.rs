@@ -19,15 +19,15 @@ use prose_xmpp::TimeProvider;
 
 use crate::app::deps::{
     DynAppContext, DynEncryptionKeysRepository, DynEncryptionService, DynMessagesRepository,
-    DynRngProvider, DynSessionRepository, DynTimeProvider, DynUserDeviceIdProvider,
-    DynUserDeviceRepository, DynUserDeviceService,
+    DynMessagingService, DynRngProvider, DynSessionRepository, DynTimeProvider,
+    DynUserDeviceIdProvider, DynUserDeviceRepository, DynUserDeviceService,
 };
 use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
 use crate::domain::encryption::services::encryption_domain_service::EncryptionError;
-use crate::domain::messaging::models::EncryptedPayload;
 use crate::domain::messaging::models::MessageLikePayload;
+use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload};
 use crate::domain::shared::models::UserId;
-use crate::dtos::{MessageId, PreKeyId, RoomId};
+use crate::dtos::{EncryptionKey, MessageId, PreKeyId, RoomId};
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
 
@@ -37,6 +37,7 @@ pub struct EncryptionDomainService {
     encryption_keys_repo: DynEncryptionKeysRepository,
     encryption_service: DynEncryptionService,
     message_repo: DynMessagesRepository,
+    messaging_service: DynMessagingService,
     rng_provider: DynRngProvider,
     session_repo: DynSessionRepository,
     time_provider: DynTimeProvider,
@@ -218,7 +219,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             device_id: local_device.device_id,
             iv: nonce.as_slice().into(),
             keys: messages,
-            payload: Some(payload[..message.len()].into()),
+            payload: payload[..message.len()].into(),
         };
 
         Ok(payload)
@@ -229,23 +230,14 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         sender_id: &UserId,
         message_id: Option<&MessageId>,
         payload: EncryptedPayload,
-    ) -> Result<Option<String>> {
-        let message_is_empty = payload.payload.is_none();
-
+    ) -> Result<String> {
         // First try to decrypt the message. If that succeeds, great!
-        let error = match self._decrypt_message(sender_id, payload).await {
+        let error = match self.decrypt_payload(sender_id, payload).await {
             Ok(message) => return Ok(message),
             Err(error) => error,
         };
 
-        // If it did not succeed, but the message was empty anyway (i.e. used for transferring
-        // key material), we'll treat it like we had successfully decrypted an empty message.
-        // Our user wouldn't be able to act on this anyway.
-        if message_is_empty {
-            return Ok(None);
-        }
-
-        // If it failed and is not empty however, we'll have a look at our message cache to see if
+        // If it failed we'll have a look at our message cache to see if
         // we may have decrypted the message in the past.
         let Some(message_id) = message_id else {
             return Err(error);
@@ -267,7 +259,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             return Err(error);
         };
 
-        Ok(Some(body.to_string()))
+        Ok(body.to_string())
     }
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
@@ -350,6 +342,32 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         Ok(())
     }
 
+    async fn handle_received_key_transport_message(
+        &self,
+        sender_id: &UserId,
+        payload: KeyTransportPayload,
+    ) -> Result<()> {
+        let local_device = self
+            .encryption_keys_repo
+            .get_local_device()
+            .await?
+            .ok_or(anyhow!("Missing local encryption bundle"))?;
+
+        let key = payload.get_key(&local_device.device_id).ok_or(anyhow!(
+            "KeyTransportMessage was not encrypted for current device."
+        ))?;
+
+        self.decrypt_key(&key, sender_id, &payload.device_id)
+            .await?;
+
+        if key.is_pre_key {
+            self.did_receive_pre_key_message(&local_device.device_id, sender_id, &payload.device_id)
+                .await
+        }
+
+        Ok(())
+    }
+
     async fn handle_received_device_list(
         &self,
         user_id: &UserId,
@@ -411,7 +429,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 }
 
 impl EncryptionDomainService {
-    async fn generate_missing_pre_keys(&self) -> Result<()> {
+    async fn generate_and_publish_missing_pre_keys(&self) -> Result<()> {
         let pre_keys = self
             .encryption_keys_repo
             .get_all_pre_keys()
@@ -467,28 +485,17 @@ impl EncryptionDomainService {
         Ok(())
     }
 
-    async fn _decrypt_message(
+    async fn decrypt_key(
         &self,
+        key: &EncryptionKey,
         sender_id: &UserId,
-        payload: EncryptedPayload,
-    ) -> Result<Option<String>> {
-        let local_device = self
-            .encryption_keys_repo
-            .get_local_device()
-            .await?
-            .ok_or(anyhow!("Missing local encryption bundle"))?;
-
-        let key = payload
-            .keys
-            .into_iter()
-            .find(|message| message.device_id == local_device.device_id)
-            .ok_or(anyhow!("Message was not encrypted for current device."))?;
-
+        sender_device_id: &DeviceId,
+    ) -> Result<Box<[u8]>> {
         let dek_and_mac = self
             .encryption_service
             .decrypt_key(
                 sender_id,
-                &payload.device_id,
+                &sender_device_id,
                 &key.data.as_ref(),
                 key.is_pre_key,
             )
@@ -498,34 +505,106 @@ impl EncryptionDomainService {
             bail!("Invalid DEK and MAC size");
         }
 
-        let message = if let Some(encrypted_message) = payload.payload {
-            let dek = aes_gcm::Key::<Aes128Gcm>::from_slice(&dek_and_mac[..KEY_SIZE]);
-            let mac = &dek_and_mac[KEY_SIZE..KEY_SIZE + MAC_SIZE];
-            let mut payload_and_mac = Vec::with_capacity(encrypted_message.len() + mac.len());
-            payload_and_mac.extend_from_slice(encrypted_message.as_ref());
-            payload_and_mac.extend(mac);
+        Ok(dek_and_mac)
+    }
 
-            let cipher = Aes128Gcm::new(&dek);
-            let nonce = aes_gcm::Nonce::<<Aes128Gcm as AeadCore>::NonceSize>::from_slice(
-                payload.iv.as_ref(),
-            );
-            let message = String::from_utf8(
-                cipher
-                    .decrypt(nonce, payload_and_mac.as_slice())
-                    .map_err(|err| anyhow!("{err}"))?,
-            )?;
-            Some(message)
-        } else {
-            None
-        };
+    async fn decrypt_payload(
+        &self,
+        sender_id: &UserId,
+        payload: EncryptedPayload,
+    ) -> Result<String> {
+        let local_device = self
+            .encryption_keys_repo
+            .get_local_device()
+            .await?
+            .ok_or(anyhow!("Missing local encryption bundle"))?;
+
+        let key = payload
+            .get_key(&local_device.device_id)
+            .ok_or(anyhow!("Message was not encrypted for current device."))?;
+
+        let dek_and_mac = self
+            .decrypt_key(&key, sender_id, &payload.device_id)
+            .await?;
+
+        let dek = aes_gcm::Key::<Aes128Gcm>::from_slice(&dek_and_mac[..KEY_SIZE]);
+        let mac = &dek_and_mac[KEY_SIZE..KEY_SIZE + MAC_SIZE];
+        let mut payload_and_mac = Vec::with_capacity(payload.payload.len() + mac.len());
+        payload_and_mac.extend_from_slice(payload.payload.as_ref());
+        payload_and_mac.extend(mac);
+
+        let cipher = Aes128Gcm::new(&dek);
+        let nonce =
+            aes_gcm::Nonce::<<Aes128Gcm as AeadCore>::NonceSize>::from_slice(payload.iv.as_ref());
+        let message = String::from_utf8(
+            cipher
+                .decrypt(nonce, payload_and_mac.as_slice())
+                .map_err(|err| anyhow!("{err}"))?,
+        )?;
 
         if key.is_pre_key {
-            if let Err(err) = self.generate_missing_pre_keys().await {
-                error!("Failed to generate missing prekeys. {}", err.to_string())
-            }
+            self.did_receive_pre_key_message(&local_device.device_id, sender_id, &payload.device_id)
+                .await
         }
 
         Ok(message)
+    }
+
+    async fn did_receive_pre_key_message(
+        &self,
+        local_device_id: &DeviceId,
+        sender_id: &UserId,
+        sender_device_id: &DeviceId,
+    ) {
+        if let Err(err) = self.generate_and_publish_missing_pre_keys().await {
+            error!("Failed to generate missing prekeys. {}", err.to_string())
+        }
+
+        if let Err(err) = self
+            .complete_session(&local_device_id, sender_id, sender_device_id)
+            .await
+        {
+            error!(
+                "Failed to complete session with {sender_id}. {}",
+                err.to_string()
+            )
+        }
+    }
+
+    async fn complete_session(
+        &self,
+        local_device_id: &DeviceId,
+        sender_id: &UserId,
+        sender_device_id: &DeviceId,
+    ) -> Result<()> {
+        let nonce = Aes128Gcm::generate_nonce(self.rng_provider.rng());
+        let dek = Aes128Gcm::generate_key(self.rng_provider.rng());
+
+        let mut dek_and_mac = [0u8; KEY_SIZE + MAC_SIZE];
+        dek_and_mac[..KEY_SIZE].copy_from_slice(&dek);
+
+        let encrypted_key = self
+            .encryption_service
+            .encrypt_key(
+                sender_id,
+                sender_device_id,
+                &dek_and_mac,
+                &SystemTime::from(self.time_provider.now()),
+            )
+            .await?;
+
+        self.messaging_service
+            .send_key_transport_message(
+                sender_id,
+                KeyTransportPayload {
+                    device_id: local_device_id.clone(),
+                    iv: nonce.as_slice().into(),
+                    keys: vec![encrypted_key],
+                },
+            )
+            .await?;
+
+        Ok(())
     }
 
     fn build_local_device_label(&self) -> String {

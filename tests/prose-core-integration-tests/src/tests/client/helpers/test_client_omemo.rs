@@ -18,6 +18,7 @@ use prose_core_client::domain::encryption::services::mocks::MockUserDeviceServic
 use prose_core_client::domain::encryption::services::{
     EncryptionDomainService as EncryptionDomainServiceTrait, IncrementingUserDeviceIdProvider,
 };
+use prose_core_client::domain::messaging::services::mocks::MockMessagingService;
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::mocks::StepRngProvider;
@@ -287,6 +288,7 @@ impl TestClient {
             encryption_keys_repo,
             encryption_service,
             message_repo: Arc::new(CachingMessageRepository::new(store.clone())),
+            messaging_service: Arc::new(MockMessagingService::new()),
             rng_provider,
             session_repo,
             time_provider: Arc::new(ConstantTimeProvider::ymd(2024, 1, 1)),

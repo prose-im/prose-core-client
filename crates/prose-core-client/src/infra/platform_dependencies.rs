@@ -179,6 +179,7 @@ impl From<PlatformDependencies> for AppDependencies {
             encryption_keys_repo: Arc::new(EncryptionKeysRepository::new(d.store.clone())),
             encryption_service: d.encryption_service,
             message_repo: messages_repo.clone(),
+            messaging_service: d.xmpp.clone(),
             rng_provider: d.rng_provider.clone(),
             session_repo: Arc::new(SessionRepository::new(d.store.clone())),
             time_provider: time_provider.clone(),

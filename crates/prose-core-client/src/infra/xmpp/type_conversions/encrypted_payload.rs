@@ -5,7 +5,10 @@
 
 use xmpp_parsers::legacy_omemo;
 
-use crate::domain::messaging::models::{EncryptedPayload, EncryptionKey};
+use crate::domain::messaging::models::{
+    EncryptedMessage, EncryptedPayload, EncryptionKey, KeyTransportPayload,
+};
+use crate::dtos::DeviceId;
 
 impl From<EncryptedPayload> for legacy_omemo::Encrypted {
     fn from(value: EncryptedPayload) -> Self {
@@ -21,25 +24,56 @@ impl From<EncryptedPayload> for legacy_omemo::Encrypted {
                     data: value.iv.into_vec(),
                 },
             },
-            payload: value.payload.map(|payload| legacy_omemo::Payload {
-                data: payload.into_vec(),
+            payload: Some(legacy_omemo::Payload {
+                data: value.payload.into_vec(),
             }),
         }
     }
 }
 
-impl From<legacy_omemo::Encrypted> for EncryptedPayload {
-    fn from(value: legacy_omemo::Encrypted) -> Self {
+impl From<KeyTransportPayload> for legacy_omemo::Encrypted {
+    fn from(value: KeyTransportPayload) -> Self {
         Self {
-            device_id: value.header.sid.into(),
-            iv: value.header.iv.data.into(),
-            keys: value
-                .header
-                .keys
-                .into_iter()
-                .map(EncryptionKey::from)
-                .collect(),
-            payload: value.payload.map(|payload| payload.data.into()),
+            header: legacy_omemo::Header {
+                sid: value.device_id.into(),
+                keys: value
+                    .keys
+                    .into_iter()
+                    .map(legacy_omemo::Key::from)
+                    .collect(),
+                iv: legacy_omemo::IV {
+                    data: value.iv.into_vec(),
+                },
+            },
+            payload: None,
+        }
+    }
+}
+
+impl From<legacy_omemo::Encrypted> for EncryptedMessage {
+    fn from(value: legacy_omemo::Encrypted) -> Self {
+        let device_id = DeviceId::from(value.header.sid);
+        let iv = value.header.iv.data.into_boxed_slice();
+        let keys = value
+            .header
+            .keys
+            .into_iter()
+            .map(EncryptionKey::from)
+            .collect::<Vec<_>>();
+
+        if let Some(payload) = value.payload {
+            EncryptedMessage::Message(EncryptedPayload {
+                device_id,
+                iv,
+                keys,
+                payload: payload.data.into_boxed_slice(),
+            })
+        } else {
+            EncryptedMessage::KeyTransport(KeyTransportPayload {
+                device_id,
+                iv,
+                keys,
+            })
         }
     }
 }

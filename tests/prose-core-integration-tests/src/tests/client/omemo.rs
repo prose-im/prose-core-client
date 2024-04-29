@@ -791,6 +791,23 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
     );
     assert_ne!(bundle_xml, TestClient::initial_device_bundle_xml());
     client.expect_publish_device_bundle(bundle_xml);
+
+    send!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="user@prose.org/short-id-1" to="them@prose.org" type="chat">
+          <encrypted xmlns="eu.siacs.conversations.axolotl">
+            <header sid="12345">
+              <key rid="54321">NAohBTQ9Qr1iZH0bYjwm34NOaKoc3g2bCKMzsqyeNihNgaUxEAAYACIw7ZO7UG52jDS1YjzpynOptmzLu8URBehnmeuWPRP1YXbZ4NlaJMCoxcsKweRglZtbu6zdIVXext0=</key>
+              <iv>AQAAAAAAAAACAAAA</iv>
+            </header>
+          </encrypted>
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <store xmlns="urn:xmpp:hints" />
+        </message>
+        "#
+    );
+
     client.receive_next().await;
 
     let messages = room
@@ -844,6 +861,23 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         </message>
         "#
     );
+
+    send!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="user@prose.org/short-id-1" to="them@prose.org" type="chat">
+          <encrypted xmlns="eu.siacs.conversations.axolotl">
+            <header sid="12345">
+              <key rid="54321">NAohBTQ9Qr1iZH0bYjwm34NOaKoc3g2bCKMzsqyeNihNgaUxEAEYACIwUu7QgsZvpXMb0riDHio8fWTCbiyCDLRswhbCpYly4bhed9ZgyYuenxIq7kE+q4g0nWh4Pjd1QSQ=</key>
+              <iv>AQAAAAAAAAACAAAA</iv>
+            </header>
+          </encrypted>
+          <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
+          <store xmlns="urn:xmpp:hints" />
+        </message>
+        "#
+    );
+
     client.receive_next().await;
 
     // Second message should not contain a pre-key, thus the bundle shouldn't be published again.
