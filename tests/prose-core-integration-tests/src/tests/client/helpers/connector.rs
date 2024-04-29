@@ -12,6 +12,7 @@ use minidom::Element;
 use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 
+use crate::tests::client::helpers::test_message_queue::MessageType;
 use prose_core_client::Secret;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
@@ -86,12 +87,32 @@ struct ConnectionInner {
 impl ConnectionTrait for Connection {
     fn send_stanza(&self, sent_element: Element) -> Result<()> {
         let Some((expected_element, file, line)) = self.inner.messages.pop_send() else {
-            panic!(
+            let mut panic_message = format!(
                 "Unexpected message sent:\n\n{}",
                 sent_element
                     .to_pretty_printed_xml()
                     .expect("Failed to convert cached stanza to XML"),
             );
+
+            if let Some((message, file, line)) = self.inner.messages.pop_message() {
+                let element = match message {
+                    MessageType::In(elem) => elem
+                        .to_pretty_printed_xml()
+                        .expect("Failed to convert cached stanza to XML"),
+                    MessageType::Out(elem) => elem
+                        .to_pretty_printed_xml()
+                        .expect("Failed to convert cached stanza to XML"),
+                    MessageType::Event(event) => format!("{:?}", event),
+                };
+
+                panic_message.push_str(&format!(
+                    "\n\nNext expected message is:\n\n{element}\n\nScheduled at:\n{file}:{line}",
+                ))
+            } else {
+                panic_message.push_str("\n\nThere were no further messages scheduled.")
+            }
+
+            panic!("{}", panic_message);
         };
 
         assert_eq!(

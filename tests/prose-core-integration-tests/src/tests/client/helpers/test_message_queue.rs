@@ -21,7 +21,7 @@ struct Message {
 }
 
 #[derive(Debug)]
-enum MessageType {
+pub enum MessageType {
     In(Element),
     Out(Element),
     Event(ClientEvent),
@@ -163,5 +163,12 @@ impl TestMessageQueue {
             }
             MessageType::Event(event) => Some((event, message.file, message.line)),
         }
+    }
+
+    pub fn pop_message(&self) -> Option<(MessageType, String, u32)> {
+        let Some(message) = self.messages.lock().pop_front() else {
+            return None;
+        };
+        Some((message.r#type, message.file, message.line))
     }
 }
