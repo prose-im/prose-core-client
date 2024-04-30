@@ -131,6 +131,13 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
                 return None;
             };
             let field_type = &field.ty;
+
+            let type_str = quote! {#field_type};
+            // Skip all fields that have types which do not start with 'Dyn' (i.e. not DynAppContext, etc.)
+            if !format!("{type_str}").starts_with("Dyn") {
+                return None;
+            }
+
             Some(quote! { pub #ident: #field_type })
         })
         .collect::<Vec<_>>();
@@ -142,7 +149,16 @@ pub fn dependencies_struct(stream: TokenStream) -> TokenStream {
             let Some(ref ident) = field.ident else {
                 return None;
             };
-            Some(quote! { #ident: deps.#ident })
+
+            let field_type = &field.ty;
+            let type_str = quote! {#field_type};
+
+            // Skip all fields that have types which do not start with 'Dyn' (i.e. not DynAppContext, etc.)
+            if format!("{type_str}").starts_with("Dyn") {
+                Some(quote! { #ident: deps.#ident })
+            } else {
+                Some(quote! { #ident: Default::default() })
+            }
         })
         .collect::<Vec<_>>();
 

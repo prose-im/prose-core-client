@@ -11,6 +11,7 @@ use aes_gcm::{AeadCore, Aes128Gcm, KeyInit};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use futures::future::join_all;
+use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 use tracing::{error, info, warn};
 
@@ -44,6 +45,8 @@ pub struct EncryptionDomainService {
     user_device_id_provider: DynUserDeviceIdProvider,
     user_device_repo: DynUserDeviceRepository,
     user_device_service: DynUserDeviceService,
+
+    unpublish_device_attempts: Mutex<HashSet<DeviceId>>,
 }
 
 const KEY_SIZE: usize = 16;
@@ -662,7 +665,12 @@ impl EncryptionDomainService {
         else {
             info!("No device bundle found for {user_id} ({device_id}).");
 
-            if user_id == &self.ctx.connected_id()?.into_user_id() {
+            if user_id == &self.ctx.connected_id()?.into_user_id()
+                && self
+                    .unpublish_device_attempts
+                    .lock()
+                    .insert(device_id.clone())
+            {
                 _ = self.unpublish_device(&device_id).await
             }
 
@@ -688,7 +696,12 @@ impl EncryptionDomainService {
         {
             Ok(_) => (),
             Err(err) => {
-                if user_id == &self.ctx.connected_id()?.into_user_id() {
+                if user_id == &self.ctx.connected_id()?.into_user_id()
+                    && self
+                        .unpublish_device_attempts
+                        .lock()
+                        .insert(device_id.clone())
+                {
                     _ = self.unpublish_device(&device_id).await
                 }
                 return Err(err);
