@@ -405,6 +405,7 @@ impl<Kind> Room<Kind> {
             // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
                 let parsed_message = match MessageParser::new(
+                    Some(self.data.clone()),
                     Default::default(),
                     self.encryption_domain_service.clone(),
                 )

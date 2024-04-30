@@ -261,6 +261,19 @@ impl ParticipantList {
         }
     }
 
+    pub fn get_user_id(&self, anon_occupant_id: &AnonOccupantId) -> Option<UserId> {
+        let Some(participant_id) = self
+            .anon_occupant_id_to_participant_id_map
+            .get(anon_occupant_id)
+        else {
+            return None;
+        };
+
+        self.participants_map
+            .get(participant_id)
+            .and_then(|participant| participant.real_id.clone())
+    }
+
     /// Removes the participant. Does nothing if the participant doesn't exist.
     pub fn remove(&mut self, id: &ParticipantId) {
         self.participants_map.remove(id);

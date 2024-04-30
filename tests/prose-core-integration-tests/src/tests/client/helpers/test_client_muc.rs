@@ -4,9 +4,11 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use minidom::IntoAttributeValue;
 
 use prose_core_client::domain::rooms::services::impls::build_nickname;
-use prose_core_client::dtos::{MucId, RoomEnvelope, UserId};
+use prose_core_client::domain::sidebar::models::BookmarkType;
+use prose_core_client::dtos::{MucId, RoomEnvelope, RoomId, UserId};
 
 use crate::{recv, send};
 
@@ -22,11 +24,13 @@ impl TestClient {
                 .into_user_id(),
         );
         let occupant_id = room_id.occupant_id_with_nickname(nickname)?;
+        let room_name = "general";
 
         self.push_ctx(
             [
                 ("OCCUPANT_ID".into(), occupant_id.to_string()),
                 ("ROOM_ID".into(), room_id.to_string()),
+                ("ROOM_NAME".into(), room_name.to_string()),
             ]
             .into(),
         );
@@ -94,7 +98,7 @@ impl TestClient {
             <feature var="http://jabber.org/protocol/muc" />
             <feature var="http://jabber.org/protocol/muc#stable_id" />
             <feature var="http://jabber.org/protocol/muc#self-ping-optimization" />
-            <identity category="conference" name="general" type="text" />
+            <identity category="conference" name="{{ROOM_NAME}}" type="text" />
             <feature var="muc_nonanonymous" />
             <x xmlns="jabber:x:data" type="result">
               <field type="hidden" var="FORM_TYPE">
@@ -119,7 +123,7 @@ impl TestClient {
                 <value />
               </field>
               <field label="Title" type="text-single" var="muc#roomconfig_roomname">
-                <value>general</value>
+                <value>{{ROOM_NAME}}</value>
               </field>
             </x>
           </query>
@@ -208,47 +212,10 @@ impl TestClient {
         </iq>"#
         );
 
-        send!(
-            self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" type="set">
-            <pubsub xmlns='http://jabber.org/protocol/pubsub'>
-                <publish node="https://prose.org/protocol/bookmark">
-                    <item id="{{ROOM_ID}}">
-                        <bookmark
-                            xmlns='https://prose.org/protocol/bookmark'
-                            jid="{{ROOM_ID}}"
-                            name="general"
-                            sidebar="1"
-                            type="public-channel"
-                        />
-                    </item>
-                </publish>
-                <publish-options>
-                    <x xmlns='jabber:x:data' type="submit">
-                        <field type="hidden" var="FORM_TYPE">
-                            <value>http://jabber.org/protocol/pubsub#publish-options</value>
-                        </field>
-                        <field type="boolean" var="pubsub#persist_items">
-                            <value>true</value>
-                        </field>
-                        <field var="pubsub#access_model">
-                            <value>whitelist</value>
-                        </field>
-                        <field var="pubsub#max_items">
-                            <value>256</value>
-                        </field>
-                        <field type="list-single" var="pubsub#send_last_published_item">
-                            <value>never</value>
-                        </field>
-                    </x>
-                </publish-options>
-            </pubsub>
-        </iq>"#
-        );
-        recv!(
-            self,
-            r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#
+        self.expect_set_bookmark(
+            &RoomId::Muc(room_id.clone()),
+            room_name,
+            BookmarkType::PublicChannel,
         );
 
         self.pop_ctx();
@@ -301,14 +268,40 @@ impl TestClient {
         "#
         );
 
+        self.expect_set_bookmark(
+            &RoomId::User(user_id.clone()),
+            user_id.formatted_username(),
+            BookmarkType::DirectMessage,
+        );
+
+        self.rooms.start_conversation(&[user_id.clone()]).await?;
+
+        Ok(self.get_room(user_id).await)
+    }
+
+    pub fn expect_set_bookmark(
+        &self,
+        room_id: &RoomId,
+        name: impl Into<String>,
+        kind: BookmarkType,
+    ) {
+        self.push_ctx(
+            [
+                ("ROOM_ID".into(), room_id.to_string()),
+                ("BOOKMARK_NAME".into(), name.into()),
+                ("BOOKMARK_TYPE".into(), kind.into_attribute_value().unwrap()),
+            ]
+            .into(),
+        );
+
         send!(
             self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" type="set">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
             <publish node="https://prose.org/protocol/bookmark">
-              <item id="them@prose.org">
-                <bookmark xmlns="https://prose.org/protocol/bookmark" jid="them@prose.org" name="Them" sidebar="1" type="dm" />
+              <item id="{{ROOM_ID}}">
+                <bookmark xmlns="https://prose.org/protocol/bookmark" jid="{{ROOM_ID}}" name="{{BOOKMARK_NAME}}" sidebar="1" type="{{BOOKMARK_TYPE}}" />
               </item>
             </publish>
             <publish-options>
@@ -341,15 +334,13 @@ impl TestClient {
         <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
             <publish node="https://prose.org/protocol/bookmark">
-              <item id="them@prose.org" />
+              <item id="{{ROOM_ID}}" />
             </publish>
           </pubsub>
         </iq>
         "#
         );
 
-        self.rooms.start_conversation(&[user_id.clone()]).await?;
-
-        Ok(self.get_room(user_id).await)
+        self.pop_ctx();
     }
 }

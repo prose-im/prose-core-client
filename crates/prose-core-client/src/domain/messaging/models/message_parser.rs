@@ -20,18 +20,26 @@ use crate::domain::messaging::models::{
     EncryptedMessage, MessageLike, MessageLikeEncryptionInfo, MessageLikeId, MessageTargetId,
     StanzaId, StanzaParseError,
 };
+use crate::domain::rooms::models::Room;
+use crate::domain::shared::models::AnonOccupantId;
 use crate::dtos::{DeviceId, Mention, MessageId, OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
 
 pub struct MessageParser {
+    room: Option<Room>,
     timestamp: DateTime<Utc>,
     encryption_domain_service: DynEncryptionDomainService,
 }
 
 impl MessageParser {
-    pub fn new(now: DateTime<Utc>, encryption_domain_service: DynEncryptionDomainService) -> Self {
+    pub fn new(
+        room: Option<Room>,
+        now: DateTime<Utc>,
+        encryption_domain_service: DynEncryptionDomainService,
+    ) -> Self {
         Self {
+            room,
             timestamp: now,
             encryption_domain_service,
         }
@@ -112,6 +120,16 @@ impl MessageParser {
                     return Ok(ParticipantId::User(jid.to_bare().into()));
                 }
             }
+
+            if let Some(anon_occupant_id) = &message.occupant_id() {
+                if let Some(user_id) = self.room.as_ref().and_then(|room| {
+                    room.participants()
+                        .get_user_id(&AnonOccupantId::from(anon_occupant_id.id.clone()))
+                }) {
+                    return Ok(ParticipantId::User(user_id));
+                }
+            }
+
             let Jid::Full(from) = from else {
                 return Err(StanzaParseError::ParseError {
                     error: "Expected `from` attribute to contain FullJid for groupchat message"

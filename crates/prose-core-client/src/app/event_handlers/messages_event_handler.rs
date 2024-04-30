@@ -185,8 +185,10 @@ impl MessagesEventHandler {
         };
 
         let room_id = from.to_room_id();
+        let room = self.connected_rooms_repo.get(room_id.as_ref());
 
         let parser = MessageParser::new(
+            room.clone(),
             self.time_provider.now(),
             self.encryption_domain_service.clone(),
         );
@@ -223,7 +225,7 @@ impl MessagesEventHandler {
             }
         }
 
-        let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
+        let Some(room) = room else {
             error!("Received message from sender ('{room_id}') for which we do not have a room.");
             return Ok(());
         };
@@ -269,6 +271,7 @@ impl MessagesEventHandler {
         };
 
         let parser = MessageParser::new(
+            Some(room.clone()),
             self.time_provider.now(),
             self.encryption_domain_service.clone(),
         );

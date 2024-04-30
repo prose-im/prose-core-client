@@ -11,7 +11,7 @@ use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::encryption::services::IncrementingUserDeviceIdProvider;
-use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId};
+use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId, UserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
@@ -184,6 +184,34 @@ impl TestClient {
         };
 
         item.room
+    }
+}
+
+impl TestClient {
+    pub fn expect_send_vard_request(&self, user_id: &UserId) {
+        self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
+              <vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0" />
+            </iq>
+            "#
+        );
+        self.pop_ctx();
+    }
+
+    pub fn receive_not_found_iq_response(&self) {
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" type="error">
+              <error type="cancel">
+                <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+              </error>
+            </iq>
+            "#
+        );
     }
 }
 

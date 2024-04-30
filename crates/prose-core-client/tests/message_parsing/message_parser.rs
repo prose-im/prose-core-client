@@ -45,6 +45,7 @@ async fn test_parse_chat_message() -> Result<()> {
         .add_references([reference]);
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )
@@ -90,6 +91,7 @@ async fn test_parse_groupchat_message() -> Result<()> {
         });
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )
@@ -138,6 +140,7 @@ async fn test_parse_sent_carbon_message() -> Result<()> {
     });
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )
@@ -189,6 +192,7 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
     };
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )
@@ -245,6 +249,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
     };
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )
@@ -296,6 +301,7 @@ async fn test_parse_mam_chat_message() -> Result<()> {
     };
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )
@@ -343,6 +349,7 @@ async fn test_parse_delayed_message() -> Result<()> {
         .set_body("Hello");
 
     let parsed_message = MessageParser::new(
+        None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
     )

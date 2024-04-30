@@ -13,6 +13,7 @@ use xmpp_parsers::delay::Delay;
 use xmpp_parsers::legacy_omemo;
 use xmpp_parsers::message::{Message as RawMessage, MessagePayload};
 use xmpp_parsers::message_correct::Replace;
+use xmpp_parsers::occupant_id::OccupantId;
 use xmpp_parsers::stanza_error::StanzaError;
 
 use prose_utils::id_string;
@@ -151,6 +152,10 @@ impl Message {
 
     pub fn muc_user(&self) -> Option<MucUser> {
         self.typed_payload("x", ns::MUC_USER)
+    }
+
+    pub fn occupant_id(&self) -> Option<OccupantId> {
+        self.typed_payload("occupant-id", ns::OCCUPANT_ID)
     }
 
     pub fn muc_invite(&self) -> Option<MucInvite> {
