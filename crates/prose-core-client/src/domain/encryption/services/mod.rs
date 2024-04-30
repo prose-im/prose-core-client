@@ -3,7 +3,7 @@
 // Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use encryption_domain_service::{EncryptionDomainService, EncryptionError};
+pub use encryption_domain_service::{DecryptionError, EncryptionDomainService, EncryptionError};
 pub use encryption_service::EncryptionService;
 pub use user_device_id_provider::{RandUserDeviceIdProvider, UserDeviceIdProvider};
 pub use user_device_service::UserDeviceService;

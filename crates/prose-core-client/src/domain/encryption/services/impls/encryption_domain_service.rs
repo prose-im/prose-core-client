@@ -24,7 +24,9 @@ use crate::app::deps::{
     DynUserDeviceIdProvider, DynUserDeviceRepository, DynUserDeviceService,
 };
 use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
-use crate::domain::encryption::services::encryption_domain_service::EncryptionError;
+use crate::domain::encryption::services::encryption_domain_service::{
+    DecryptionError, EncryptionError,
+};
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload};
 use crate::domain::shared::models::UserId;
@@ -47,6 +49,7 @@ pub struct EncryptionDomainService {
     user_device_service: DynUserDeviceService,
 
     unpublish_device_attempts: Mutex<HashSet<DeviceId>>,
+    repair_session_attempts: Mutex<HashSet<(UserId, DeviceId)>>,
 }
 
 const KEY_SIZE: usize = 16;
@@ -57,6 +60,9 @@ const MAC_SIZE: usize = 16;
 impl EncryptionDomainServiceTrait for EncryptionDomainService {
     /// Generates the local device bundle and publishes it if needed.
     async fn initialize(&self) -> Result<()> {
+        self.unpublish_device_attempts.lock().clear();
+        self.repair_session_attempts.lock().clear();
+
         // Initialize local bundle if needed…
         let bundle = match self
             .encryption_keys_repo
@@ -233,7 +239,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         sender_id: &UserId,
         message_id: Option<&MessageId>,
         payload: EncryptedPayload,
-    ) -> Result<String> {
+    ) -> Result<String, DecryptionError> {
         // First try to decrypt the message. If that succeeds, great!
         let error = match self.decrypt_payload(sender_id, payload).await {
             Ok(message) => return Ok(message),
@@ -515,7 +521,7 @@ impl EncryptionDomainService {
         &self,
         sender_id: &UserId,
         payload: EncryptedPayload,
-    ) -> Result<String> {
+    ) -> Result<String, DecryptionError> {
         let local_device = self
             .encryption_keys_repo
             .get_local_device()
@@ -524,11 +530,28 @@ impl EncryptionDomainService {
 
         let key = payload
             .get_key(&local_device.device_id)
-            .ok_or(anyhow!("Message was not encrypted for current device."))?;
+            .ok_or(DecryptionError::NotEncryptedForThisDevice)?;
 
-        let dek_and_mac = self
-            .decrypt_key(&key, sender_id, &payload.device_id)
-            .await?;
+        let dek_and_mac = match self.decrypt_key(&key, sender_id, &payload.device_id).await {
+            Ok(data) => data,
+            Err(err) => {
+                // While we would usually only try to repair a session for certain error types,
+                // i.e. InvalidMessageException and NoSessionException, there's no way to get
+                // a typed error out of the outdated libsignal-protocol-javascript. This is
+                // something to improve after we switch to WASI and can share the native libsignal
+                // library between web and native.
+                if self
+                    .repair_session_attempts
+                    .lock()
+                    .insert((sender_id.clone(), payload.device_id.clone()))
+                {
+                    _ = self
+                        .start_session_with_device(sender_id, payload.device_id)
+                        .await;
+                }
+                return Err(err.into());
+            }
+        };
 
         let dek = aes_gcm::Key::<Aes128Gcm>::from_slice(&dek_and_mac[..KEY_SIZE]);
         let mac = &dek_and_mac[KEY_SIZE..KEY_SIZE + MAC_SIZE];
@@ -543,7 +566,8 @@ impl EncryptionDomainService {
             cipher
                 .decrypt(nonce, payload_and_mac.as_slice())
                 .map_err(|err| anyhow!("{err}"))?,
-        )?;
+        )
+        .map_err(|err| anyhow!(err))?;
 
         if key.is_pre_key {
             self.did_receive_pre_key_message(&local_device.device_id, sender_id, &payload.device_id)

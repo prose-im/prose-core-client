@@ -21,6 +21,14 @@ pub enum EncryptionError {
     Other(#[from] anyhow::Error),
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum DecryptionError {
+    #[error("The message was not encrypted for this device.")]
+    NotEncryptedForThisDevice,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
@@ -43,7 +51,7 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         sender_id: &UserId,
         message_id: Option<&MessageId>,
         payload: EncryptedPayload,
-    ) -> Result<String>;
+    ) -> Result<String, DecryptionError>;
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>>;
     async fn delete_device(&self, device_id: &DeviceId) -> Result<()>;
