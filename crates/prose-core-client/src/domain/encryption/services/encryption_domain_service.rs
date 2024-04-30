@@ -17,6 +17,8 @@ use crate::dtos::DeviceId;
 pub enum EncryptionError {
     #[error("The recipient does not have any OMEMO-enabled devices.")]
     NoDevices,
+    #[error("The recipient does not have any trusted OMEMO-enabled devices.")]
+    NoTrustedDevices,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

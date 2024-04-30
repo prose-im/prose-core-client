@@ -177,13 +177,28 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             }
         }
 
-        let their_active_device_ids = self
-            .get_active_and_trusted_device_ids(&recipient_id)
+        let their_sessions = self
+            .session_repo
+            .get_all_sessions(&recipient_id)
             .await?
             .into_iter()
-            .map(|device_id| (recipient_id, device_id));
+            .filter(|session| session.is_active)
+            .collect::<Vec<_>>();
 
-        if their_active_device_ids.len() == 0 {
+        if their_sessions.is_empty() {
+            return Err(EncryptionError::NoDevices);
+        }
+
+        let their_active_device_ids = their_sessions
+            .into_iter()
+            .filter_map(|session| {
+                session
+                    .is_trusted_or_undecided()
+                    .then_some((recipient_id, session.device_id))
+            })
+            .collect::<Vec<_>>();
+
+        if their_active_device_ids.is_empty() {
             return Err(EncryptionError::NoDevices);
         }
 
