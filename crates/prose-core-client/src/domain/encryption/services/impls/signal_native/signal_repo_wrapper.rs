@@ -218,6 +218,7 @@ impl IdentityKeyStore for SignalRepoWrapper {
     ) -> Result<bool> {
         // We handle trust outside of libsignal. Meaning that we always want to decrypt received
         // messages and do not encrypt messages at all for untrusted devices.
+        // TODO: Should we at least check if the identity is still the same?
         Ok(true)
     }
 
