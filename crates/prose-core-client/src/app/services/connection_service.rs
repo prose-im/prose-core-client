@@ -12,7 +12,7 @@ use prose_xmpp::{ConnectionError, IDProvider};
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynBlockListDomainService,
     DynClientEventDispatcher, DynConnectionService, DynContactListDomainService,
-    DynEncryptionDomainService, DynIDProvider, DynUserAccountService,
+    DynEncryptionDomainService, DynIDProvider, DynUserAccountService, DynUserProfileRepository,
 };
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
@@ -39,6 +39,8 @@ pub struct ConnectionService {
     client_event_dispatcher: DynClientEventDispatcher,
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
+    #[inject]
+    user_profile_repo: DynUserProfileRepository,
 }
 
 impl ConnectionService {
@@ -135,6 +137,8 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
+
+        self.user_profile_repo.reset_after_reconnect().await;
 
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::ConnectionStatusChanged {

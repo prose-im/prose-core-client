@@ -3,8 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::HashSet;
+
 use anyhow::Result;
 use async_trait::async_trait;
+use parking_lot::Mutex;
 
 use prose_store::prelude::*;
 
@@ -22,6 +25,7 @@ pub struct UserProfileRecord {
 pub struct CachingUserProfileRepository {
     store: Store<PlatformDriver>,
     user_profile_service: DynUserProfileService,
+    requested_user_profiles: Mutex<HashSet<UserId>>,
 }
 
 impl CachingUserProfileRepository {
@@ -29,6 +33,7 @@ impl CachingUserProfileRepository {
         Self {
             store,
             user_profile_service,
+            requested_user_profiles: Default::default(),
         }
     }
 }
@@ -36,24 +41,11 @@ impl CachingUserProfileRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserProfileRepository for CachingUserProfileRepository {
-    async fn get(&self, jid: &UserId) -> Result<Option<UserProfile>> {
-        let tx = self
-            .store
-            .transaction_for_reading(&[UserProfileRecord::collection()])
-            .await?;
-        let collection = tx.readable_collection(UserProfileRecord::collection())?;
-        let record = collection.get::<_, UserProfileRecord>(&jid).await?;
-
-        if let Some(record) = record {
-            return Ok(Some(record.payload));
-        };
-
-        let Some(profile) = self.user_profile_service.load_profile(&jid).await? else {
-            return Ok(None);
-        };
-
-        self.set(jid, &profile).await?;
-        Ok(Some(profile))
+    async fn get(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
+        if self.requested_user_profiles.lock().insert(user_id.clone()) {
+            return self.load_and_cache_user_profile(user_id).await;
+        }
+        self.load_cached_user_profile(user_id).await
     }
 
     async fn set(&self, jid: &UserId, profile: &UserProfile) -> Result<()> {
@@ -90,6 +82,10 @@ impl UserProfileRepository for CachingUserProfileRepository {
             .and_then(|p| p.full_name().or(p.nickname)))
     }
 
+    async fn reset_after_reconnect(&self) {
+        self.requested_user_profiles.lock().clear();
+    }
+
     async fn clear_cache(&self) -> Result<()> {
         let tx = self
             .store
@@ -98,5 +94,26 @@ impl UserProfileRepository for CachingUserProfileRepository {
         tx.truncate_collections(&[UserProfileRecord::collection()])?;
         tx.commit().await?;
         Ok(())
+    }
+}
+
+impl CachingUserProfileRepository {
+    async fn load_cached_user_profile(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[UserProfileRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(UserProfileRecord::collection())?;
+        let record = collection.get::<_, UserProfileRecord>(&user_id).await?;
+        Ok(record.map(|record| record.payload))
+    }
+
+    async fn load_and_cache_user_profile(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
+        let Some(profile) = self.user_profile_service.load_profile(&user_id).await? else {
+            _ = self.delete(user_id).await;
+            return Ok(None);
+        };
+        self.set(user_id, &profile).await?;
+        return Ok(Some(profile));
     }
 }

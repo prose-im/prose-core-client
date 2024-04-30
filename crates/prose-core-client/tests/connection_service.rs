@@ -28,6 +28,11 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .once()
         .return_once(|| Box::pin(async { Ok(()) }));
 
+    deps.user_profile_repo
+        .expect_reset_after_reconnect()
+        .once()
+        .return_once(|| Box::pin(async {}));
+
     deps.short_id_provider = Arc::new(ConstantIDProvider::new("resource-id"));
 
     deps.account_settings_repo
@@ -135,6 +140,11 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .expect_initialize()
         .once()
         .return_once(|| Box::pin(async { Ok(()) }));
+
+    deps.user_profile_repo
+        .expect_reset_after_reconnect()
+        .once()
+        .return_once(|| Box::pin(async {}));
 
     deps.account_settings_repo
         .expect_get()

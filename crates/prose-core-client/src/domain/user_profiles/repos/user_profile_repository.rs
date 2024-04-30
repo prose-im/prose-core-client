@@ -23,5 +23,6 @@ pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
     /// and nickname;
     async fn get_display_name(&self, jid: &UserId) -> Result<Option<String>>;
 
+    async fn reset_after_reconnect(&self);
     async fn clear_cache(&self) -> Result<()>;
 }
