@@ -15,7 +15,9 @@ use prose_core_client::domain::shared::models::{MucId, OccupantId, UserId, UserR
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType};
 use prose_core_client::domain::sidebar::services::impls::SidebarDomainService;
 use prose_core_client::domain::sidebar::services::SidebarDomainService as SidebarDomainServiceTrait;
-use prose_core_client::dtos::{Availability, Mention, Participant, RoomState, UnicodeScalarIndex};
+use prose_core_client::dtos::{
+    Availability, Mention, Participant, RoomId, RoomState, UnicodeScalarIndex,
+};
 use prose_core_client::test::{
     DisconnectedState, MessageBuilder, MockSidebarDomainServiceDependencies,
 };
@@ -565,7 +567,12 @@ async fn test_insert_item_for_received_group_message_if_needed() -> Result<()> {
         .build_message_like();
 
     let service = SidebarDomainService::from(deps.into_deps());
-    service.handle_received_message(&message).await?;
+    service
+        .handle_received_message(
+            &RoomId::Muc(muc_id!("group@conference.prose.org")),
+            &message,
+        )
+        .await?;
 
     assert_eq!(room.sidebar_state(), RoomSidebarState::InSidebar);
     assert_eq!(room.unread_count(), 1);
@@ -621,6 +628,7 @@ async fn test_increases_unread_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::User(user_id!("dm@prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(user_id!("dm@prose.org"))
                 .build_message_like(),
@@ -630,6 +638,7 @@ async fn test_increases_unread_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("private_channel@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("private_channel@conf.prose.org/user"))
                 .build_message_like(),
@@ -639,6 +648,7 @@ async fn test_increases_unread_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("public_channel@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("public_channel@conf.prose.org/user"))
                 .build_message_like(),
@@ -648,6 +658,7 @@ async fn test_increases_unread_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("group@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("group@conf.prose.org/user"))
                 .build_message_like(),
@@ -723,6 +734,7 @@ async fn test_increases_mentions_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::User(user_id!("dm@prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(user_id!("dm@prose.org"))
                 .set_payload(MessageLikePayload::Message {
@@ -752,6 +764,7 @@ async fn test_increases_mentions_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::User(user_id!("dm@prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(user_id!("dm@prose.org"))
                 .set_payload(MessageLikePayload::Message {
@@ -771,6 +784,7 @@ async fn test_increases_mentions_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("private_channel@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("private_channel@conf.prose.org/user"))
                 .set_payload(MessageLikePayload::Message {
@@ -790,6 +804,7 @@ async fn test_increases_mentions_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("private_channel@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("private_channel@conf.prose.org/user"))
                 .set_payload(MessageLikePayload::Message {
@@ -809,6 +824,7 @@ async fn test_increases_mentions_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("public_channel@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("public_channel@conf.prose.org/user"))
                 .set_payload(MessageLikePayload::Message {
@@ -828,6 +844,7 @@ async fn test_increases_mentions_count() -> Result<()> {
 
     service
         .handle_received_message(
+            &RoomId::Muc(muc_id!("group@conf.prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(occupant_id!("group@conf.prose.org/user"))
                 .set_payload(MessageLikePayload::Message {
@@ -897,6 +914,7 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
     let service = SidebarDomainService::from(deps.into_deps());
     service
         .handle_received_message(
+            &RoomId::User(user_id!("contact@prose.org")),
             &MessageBuilder::new_with_index(1)
                 .set_from(user_id!("contact@prose.org"))
                 .build_message_like(),

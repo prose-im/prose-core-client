@@ -46,15 +46,6 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
             .return_once(|_| Some(room));
     }
 
-    deps.sidebar_domain_service
-        .expect_handle_received_message()
-        .once()
-        .in_sequence(&mut seq)
-        .with(predicate::function(|msg: &MessageLike| {
-            msg.from == ParticipantId::Occupant(occupant_id!("group@conference.prose.org/user"))
-        }))
-        .return_once(|_| Box::pin(async { Ok(()) }));
-
     {
         let room = room.clone();
         deps.connected_rooms_repo
@@ -64,6 +55,18 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
             .with(predicate::eq(bare!("group@conference.prose.org")))
             .return_once(|_| Some(room));
     }
+
+    deps.sidebar_domain_service
+        .expect_handle_received_message()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(RoomId::Muc(muc_id!("group@conference.prose.org"))),
+            predicate::function(|msg: &MessageLike| {
+                msg.from == ParticipantId::Occupant(occupant_id!("group@conference.prose.org/user"))
+            }),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
         .expect_contains()
@@ -113,15 +116,6 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
 
     let room = Room::direct_message(user_id!("jane.doe@prose.org"), Availability::Unavailable);
 
-    deps.sidebar_domain_service
-        .expect_handle_received_message()
-        .once()
-        .in_sequence(&mut seq)
-        .with(predicate::function(|msg: &MessageLike| {
-            msg.from == ParticipantId::User(user_id!("jane.doe@prose.org"))
-        }))
-        .return_once(|_| Box::pin(async { Ok(()) }));
-
     {
         let room = room.clone();
         deps.connected_rooms_repo
@@ -131,6 +125,18 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
             .with(predicate::eq(bare!("jane.doe@prose.org")))
             .return_once(|_| Some(room));
     }
+
+    deps.sidebar_domain_service
+        .expect_handle_received_message()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(RoomId::User(user_id!("jane.doe@prose.org"))),
+            predicate::function(|msg: &MessageLike| {
+                msg.from == ParticipantId::User(user_id!("jane.doe@prose.org"))
+            }),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
         .expect_contains()
@@ -291,12 +297,6 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
 
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 09, 11));
 
-    deps.sidebar_domain_service
-        .expect_handle_received_message()
-        .once()
-        .in_sequence(&mut seq)
-        .return_once(|_| Box::pin(async { Ok(()) }));
-
     {
         let room = room.clone();
         deps.connected_rooms_repo
@@ -306,6 +306,12 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
             .with(predicate::eq(bare!("room@conference.prose.org")))
             .return_once(|_| Some(room));
     }
+
+    deps.sidebar_domain_service
+        .expect_handle_received_message()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
         .expect_contains()
@@ -353,7 +359,7 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
     deps.sidebar_domain_service
         .expect_handle_received_message()
         .once()
-        .return_once(|_| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     {
         let room = room.clone();
@@ -526,7 +532,7 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
     deps.sidebar_domain_service
         .expect_handle_received_message()
         .once()
-        .return_once(|_| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     {
         let room = room.clone();

@@ -212,7 +212,7 @@ impl MessagesEventHandler {
         if message.payload.is_message() {
             match self
                 .sidebar_domain_service
-                .handle_received_message(&message)
+                .handle_received_message(&room_id, &message)
                 .await
             {
                 Ok(_) => (),

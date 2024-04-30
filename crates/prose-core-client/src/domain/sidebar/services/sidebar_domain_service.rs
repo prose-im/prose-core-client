@@ -58,7 +58,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// corresponding bookmark. It will also update the unread count of the affected room.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_received_message(&self, message: &MessageLike) -> Result<()>;
+    async fn handle_received_message(&self, room_id: &RoomId, message: &MessageLike) -> Result<()>;
 
     /// Destroys the room identified by `room_id` and the associated bookmark.
     /// `ClientEvent::SidebarChanged` will be dispatched after processing.

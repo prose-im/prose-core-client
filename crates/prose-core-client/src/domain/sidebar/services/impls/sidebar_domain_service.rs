@@ -278,9 +278,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     /// corresponding bookmark.
     ///
     /// Dispatches a `ClientEvent::SidebarChanged` event after processing.
-    async fn handle_received_message(&self, message: &MessageLike) -> Result<()> {
-        let room_id = message.from.to_room_id();
-
+    async fn handle_received_message(&self, room_id: &RoomId, message: &MessageLike) -> Result<()> {
         let room = match message.from {
             // We do not need to create or join a room here since we couldn't have received
             // a message from a room we're not connected to. Also, we always stay connected to rooms
@@ -296,7 +294,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                 self.rooms_domain_service
                     .create_or_join_room(
                         CreateOrEnterRoomRequest::JoinDirectMessage {
-                            participant: UserId::from(room_id.into_bare()),
+                            participant: UserId::from(room_id.clone().into_bare()),
                         },
                         RoomSidebarState::NotInSidebar,
                     )
