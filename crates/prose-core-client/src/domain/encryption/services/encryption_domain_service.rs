@@ -8,10 +8,9 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::encryption::models::{DeviceInfo, DeviceList};
+use crate::domain::encryption::models::{DeviceId, DeviceInfo, DeviceList};
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload, MessageId};
 use crate::domain::shared::models::UserId;
-use crate::dtos::DeviceId;
 
 #[derive(Debug, thiserror::Error)]
 pub enum EncryptionError {
