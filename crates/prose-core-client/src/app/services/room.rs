@@ -174,27 +174,13 @@ impl<Kind> Room<Kind> {
 
 impl<Kind> Room<Kind> {
     pub async fn send_message(&self, request: SendMessageRequestDTO) -> Result<()> {
-        let Some(body) = request.body else {
-            return self
-                .messaging_service
-                .send_message(
-                    &self.data.room_id,
-                    SendMessageRequest {
-                        id: self.id_provider.new_id().into(),
-                        body: None,
-                        attachments: request.attachments,
-                    },
-                )
-                .await;
-        };
-
-        match body.text.as_str() {
-            "/omemo enable" => {
+        match request.body.as_ref().map(|body| body.text.as_str()) {
+            Some("/omemo enable") => {
                 self.data.set_encryption_enabled(true);
                 self.show_system_message("OMEMO is now enabled.").await?;
                 return Ok(());
             }
-            "/omemo disable" => {
+            Some("/omemo disable") => {
                 self.data.set_encryption_enabled(false);
                 self.show_system_message("OMEMO is now disabled.").await?;
                 return Ok(());
@@ -202,53 +188,10 @@ impl<Kind> Room<Kind> {
             _ => (),
         }
 
-        let payload = match &self.data.room_id {
-            RoomId::User(user_id) if self.data.encryption_enabled() => {
-                send_message_request::Payload::Encrypted(
-                    self.encryption_domain_service
-                        .encrypt_message(user_id, body.text.clone())
-                        .await?,
-                )
-            }
-            _ => send_message_request::Payload::Plaintext(body.text.clone()),
-        };
-
-        let message_id = MessageId::from(self.id_provider.new_id());
-
-        // Save the unencrypted message so that we can look it up later…
-        // TODO: Can we move this into EncryptionDomainService as well?
-        self.message_repo
-            .append(
-                &self.data.room_id,
-                &[MessageLike {
-                    id: MessageLikeId::new(Some(message_id.clone())),
-                    stanza_id: None,
-                    target: None,
-                    to: None,
-                    from: self.ctx.connected_id()?.into_user_id().into(),
-                    timestamp: self.time_provider.now(),
-                    payload: MessageLikePayload::Message {
-                        body: body.text,
-                        attachments: request.attachments.clone(),
-                        mentions: body.mentions.clone(),
-                        encryption_info: None,
-                        is_transient: false,
-                    },
-                }],
-            )
-            .await?;
-
         self.messaging_service
             .send_message(
                 &self.data.room_id,
-                SendMessageRequest {
-                    id: message_id,
-                    body: Some(send_message_request::Body {
-                        payload,
-                        mentions: body.mentions,
-                    }),
-                    attachments: request.attachments,
-                },
+                self.encrypt_message_if_needed(request).await?,
             )
             .await
     }
@@ -258,19 +201,12 @@ impl<Kind> Room<Kind> {
         id: MessageId,
         request: SendMessageRequestDTO,
     ) -> Result<()> {
-        // TODO: Encrypt updates as well…
-
-        let request = SendMessageRequest {
-            id: self.id_provider.new_id().into(),
-            body: request.body.map(|body| send_message_request::Body {
-                payload: send_message_request::Payload::Plaintext(body.text),
-                mentions: body.mentions,
-            }),
-            attachments: request.attachments,
-        };
-
         self.messaging_service
-            .update_message(&self.data.room_id, &id, request)
+            .update_message(
+                &self.data.room_id,
+                &id,
+                self.encrypt_message_if_needed(request).await?,
+            )
             .await
     }
 
@@ -639,6 +575,64 @@ impl<Kind> Room<Kind> {
         );
 
         Ok(())
+    }
+
+    async fn encrypt_message_if_needed(
+        &self,
+        request: SendMessageRequestDTO,
+    ) -> Result<SendMessageRequest> {
+        let Some(body) = request.body else {
+            return Ok(SendMessageRequest {
+                id: self.id_provider.new_id().into(),
+                body: None,
+                attachments: request.attachments,
+            });
+        };
+
+        let payload = match &self.data.room_id {
+            RoomId::User(user_id) if self.data.encryption_enabled() => {
+                send_message_request::Payload::Encrypted(
+                    self.encryption_domain_service
+                        .encrypt_message(user_id, body.text.clone())
+                        .await?,
+                )
+            }
+            _ => send_message_request::Payload::Plaintext(body.text.clone()),
+        };
+
+        let message_id = MessageId::from(self.id_provider.new_id());
+
+        // Save the unencrypted message so that we can look it up later…
+        // TODO: Can we move this into EncryptionDomainService as well?
+        self.message_repo
+            .append(
+                &self.data.room_id,
+                &[MessageLike {
+                    id: MessageLikeId::new(Some(message_id.clone())),
+                    stanza_id: None,
+                    target: None,
+                    to: None,
+                    from: self.ctx.connected_id()?.into_user_id().into(),
+                    timestamp: self.time_provider.now(),
+                    payload: MessageLikePayload::Message {
+                        body: body.text,
+                        attachments: request.attachments.clone(),
+                        mentions: body.mentions.clone(),
+                        encryption_info: None,
+                        is_transient: false,
+                    },
+                }],
+            )
+            .await?;
+
+        Ok(SendMessageRequest {
+            id: message_id,
+            body: Some(send_message_request::Body {
+                payload,
+                mentions: body.mentions,
+            }),
+            attachments: request.attachments,
+        })
     }
 }
 
