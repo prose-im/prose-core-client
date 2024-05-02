@@ -28,8 +28,7 @@ use url::Url;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
     Address, Attachment, AttachmentType, Availability, Mention, RoomEnvelope, RoomId,
-    SendMessageRequest, SendMessageRequestBody, StanzaId, StringIndexRangeExt, UploadSlot, UserId,
-    Utf8Index,
+    SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt, UploadSlot, UserId, Utf8Index,
 };
 use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
@@ -45,9 +44,9 @@ use crate::type_display::{
     UserBasicInfoEnvelope,
 };
 use crate::type_selection::{
-    select_contact, select_contact_or_self, select_device, select_file, select_item_from_list,
-    select_muc_room, select_multiple_contacts, select_multiple_jids_from_list,
-    select_public_channel, select_room, select_sidebar_item,
+    load_messages, select_contact, select_contact_or_self, select_device, select_file,
+    select_item_from_list, select_message, select_muc_room, select_multiple_contacts,
+    select_multiple_jids_from_list, select_public_channel, select_room, select_sidebar_item,
 };
 
 mod type_display;
@@ -375,36 +374,6 @@ async fn load_contacts(client: &Client) -> Result<()> {
     Ok(())
 }
 
-async fn load_messages(client: &Client) -> Result<()> {
-    let Some(room) = select_room(client, |_| true).await? else {
-        return Ok(());
-    };
-
-    let mut stanza_id: Option<StanzaId> = None;
-
-    let room = room.to_generic_room();
-
-    loop {
-        let messages = if let Some(stanza_id) = &stanza_id {
-            room.load_messages_before(stanza_id).await
-        } else {
-            room.load_latest_messages().await
-        }?;
-
-        stanza_id = messages.last_message_id.clone();
-
-        for message in messages.into_iter().rev() {
-            println!("{}", MessageEnvelope(message));
-        }
-
-        if stanza_id.is_none() {
-            break;
-        }
-    }
-
-    Ok(())
-}
-
 async fn send_message(client: &Client) -> Result<()> {
     let Some(room) = select_room(client, |_| true).await? else {
         return Ok(());
@@ -625,6 +594,8 @@ enum Selection {
     SendMessageToAnyone,
     #[strum(serialize = "Load messages")]
     LoadMessages,
+    #[strum(serialize = "Update message")]
+    UpdateMessage,
     #[strum(serialize = "Delete cached data")]
     DeleteCachedData,
     #[strum(serialize = "Start conversation")]
@@ -858,7 +829,40 @@ async fn main() -> Result<()> {
                     .await?;
             }
             Selection::LoadMessages => {
-                load_messages(&client).await?;
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+
+                let messages = load_messages(&room.to_generic_room(), 0).await?;
+                for message in messages {
+                    println!("{}", MessageEnvelope(message));
+                }
+            }
+            Selection::UpdateMessage => {
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+
+                let room = room.to_generic_room();
+                let message_id = select_message(&room).await?;
+
+                let body: String = Input::with_theme(&ColorfulTheme::default())
+                    .with_prompt("Enter updated message")
+                    .allow_empty(false)
+                    .interact_text()
+                    .unwrap();
+
+                room.update_message(
+                    message_id,
+                    SendMessageRequest {
+                        body: Some(SendMessageRequestBody {
+                            text: body,
+                            mentions: vec![],
+                        }),
+                        attachments: vec![],
+                    },
+                )
+                .await?;
             }
             Selection::DeleteCachedData => {
                 println!("Cleaning cache…");

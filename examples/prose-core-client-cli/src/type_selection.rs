@@ -6,16 +6,22 @@
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
 use jid::BareJid;
 
-use prose_core_client::dtos::{DeviceId, PublicRoomInfo, RoomEnvelope, SidebarItem, UserId};
+use prose_core_client::dtos::{
+    DeviceId, Message, MessageId, PublicRoomInfo, RoomEnvelope, RoomId, SidebarItem, StanzaId,
+    UserId,
+};
+use prose_core_client::services::{Generic, Room};
 use prose_core_client::Client;
 
 use crate::compare_room_envelopes;
-use crate::type_display::{DeviceInfoEnvelope, JidWithName};
+use crate::type_display::{
+    CompactMessageEnvelope, DeviceInfoEnvelope, JidWithName, MessageEnvelope,
+};
 
 #[allow(dead_code)]
 pub async fn select_contact(client: &Client) -> Result<UserId> {
@@ -113,6 +119,15 @@ pub async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
     .await
 }
 
+pub async fn select_message(room: &Room<Generic>) -> Result<MessageId> {
+    let messages = load_messages(room, 1).await?;
+    let message =
+        select_item_from_list(messages, |message| CompactMessageEnvelope(message.clone()));
+    Ok(message
+        .id
+        .ok_or(anyhow!("Selected message does not have an ID"))?)
+}
+
 pub async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
     let rooms = client.rooms.load_public_rooms().await?;
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
@@ -181,4 +196,28 @@ pub fn select_file(prompt: &str) -> Option<PathBuf> {
     }
 
     Some(Path::new(path.trim()).to_path_buf())
+}
+
+pub async fn load_messages(room: &Room<Generic>, pages: u32) -> Result<Vec<Message>> {
+    let mut stanza_id: Option<StanzaId> = None;
+    let mut messages = vec![];
+    let mut page = 0;
+
+    loop {
+        let result_set = if let Some(stanza_id) = &stanza_id {
+            room.load_messages_before(stanza_id).await
+        } else {
+            room.load_latest_messages().await
+        }?;
+
+        stanza_id = result_set.last_message_id.clone();
+        messages.extend(&mut result_set.into_iter().rev());
+        page += 1;
+
+        if page == pages || stanza_id.is_none() {
+            break;
+        }
+    }
+
+    Ok(messages)
 }

@@ -203,3 +203,22 @@ impl Display for MessageEnvelope {
         )
     }
 }
+
+pub struct CompactMessageEnvelope(pub Message);
+
+impl Display for CompactMessageEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} | {:<36} | {:<20} | {}",
+            self.0.timestamp.format("%Y/%m/%d %H:%M:%S"),
+            self.0
+                .id
+                .as_ref()
+                .map(|id| id.clone().into_inner())
+                .unwrap_or("<no-id>".to_string()),
+            self.0.from.id.to_opaque_identifier().truncate_to(20),
+            self.0.body.truncate_to(40),
+        )
+    }
+}
