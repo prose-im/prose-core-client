@@ -3,11 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
 use jid::Jid;
 use pretty_assertions::assert_eq;
-use std::sync::Arc;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::date::DateTime as XMPPDateTime;
 use xmpp_parsers::delay::Delay;
@@ -19,7 +20,10 @@ use prose_core_client::domain::encryption::services::mocks::MockEncryptionDomain
 use prose_core_client::domain::messaging::models::{
     MessageLike, MessageLikePayload, MessageParser,
 };
-use prose_core_client::dtos::{Mention, OccupantId, ParticipantId, UnicodeScalarIndex, UserId};
+use prose_core_client::dtos::{
+    Attachment, AttachmentType, Mention, OccupantId, ParticipantId, UnicodeScalarIndex, UserId,
+};
+use prose_core_client::infra::xmpp::util::MessageExt;
 use prose_core_client::{occupant_id, user_id};
 use prose_proc_macros::mt_test;
 use prose_xmpp::mods::chat::Carbon;
@@ -367,6 +371,57 @@ async fn test_parse_delayed_message() -> Result<()> {
             payload: MessageLikePayload::Message {
                 body: "Hello".to_string(),
                 attachments: vec![],
+                mentions: vec![],
+                encryption_info: None,
+                is_transient: false,
+            },
+        },
+        parsed_message
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_message_with_attachment_and_empty_body() -> Result<()> {
+    let mut message = Message::new()
+        .set_id("message-id-1".into())
+        .set_type(MessageType::Chat)
+        .set_to(bare!("me@prose.org"))
+        .set_from(full!("them@prose.org/resource"));
+    message.append_attachments(vec![Attachment {
+        r#type: AttachmentType::Image { thumbnail: None },
+        url: "https://uploads.prose.org/file.jpg".parse()?,
+        media_type: mime::IMAGE_JPEG,
+        file_name: "file.jpg".to_string(),
+        file_size: Some(250),
+    }]);
+
+    let parsed_message = MessageParser::new(
+        None,
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+    )
+    .parse_message(message)
+    .await?;
+
+    assert_eq!(
+        MessageLike {
+            id: "message-id-1".into(),
+            stanza_id: None,
+            target: None,
+            to: Some(bare!("me@prose.org")),
+            from: ParticipantId::User(user_id!("them@prose.org")),
+            timestamp: Default::default(),
+            payload: MessageLikePayload::Message {
+                body: "".to_string(),
+                attachments: vec![Attachment {
+                    r#type: AttachmentType::Image { thumbnail: None },
+                    url: "https://uploads.prose.org/file.jpg".parse()?,
+                    media_type: mime::IMAGE_JPEG,
+                    file_name: "file.jpg".to_string(),
+                    file_size: Some(250),
+                }],
                 mentions: vec![],
                 encryption_info: None,
                 is_transient: false,

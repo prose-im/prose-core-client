@@ -215,12 +215,34 @@ impl MessageParser {
             });
         }
 
-        if let Some(parsed_body) = self.parse_message_body(from, message).await? {
+        // If the message doesn't have a body but does have attachments, we'll use an
+        // empty string for the body.
+        let parsed_body = self.parse_message_body(from, message).await?.or_else(|| {
+            (!message.attachments().is_empty())
+                .then_some(ParsedMessageBody::Plaintext("".to_string()))
+        });
+
+        if let Some(parsed_body) = parsed_body {
             let (body, encryption_info) = match parsed_body {
                 ParsedMessageBody::Plaintext(body) => (body, None),
                 ParsedMessageBody::EncryptedMessage(body, info) => (body, Some(info)),
                 ParsedMessageBody::EmptyMessage => return Err(MessageLikeError::NoPayload.into()),
             };
+
+            let mentions = message
+                .mentions()
+                .into_iter()
+                .filter_map(|r| match Mention::try_from(r) {
+                    Ok(mention) => Some(mention),
+                    Err(err) => {
+                        warn!(
+                            "Failed to parse mention from reference. {}",
+                            err.to_string()
+                        );
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
 
             if let Some(replace_id) = message.replace() {
                 return Ok(TargetedPayload {
@@ -228,6 +250,7 @@ impl MessageParser {
                     payload: Payload::Correction {
                         body: body.to_string(),
                         attachments: message.attachments(),
+                        mentions,
                         encryption_info,
                     },
                 });
