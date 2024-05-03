@@ -52,6 +52,7 @@ pub enum Payload {
     Correction {
         body: String,
         attachments: Vec<Attachment>,
+        mentions: Vec<Mention>,
         // Set if the message was encrypted
         encryption_info: Option<EncryptionInfo>,
     },

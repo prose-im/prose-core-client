@@ -172,9 +172,11 @@ impl Message {
                 MessageLikePayload::Correction {
                     body,
                     attachments,
+                    mentions,
                     encryption_info,
                 } => {
                     message.body = body;
+                    message.mentions = mentions;
                     message.is_edited = true;
                     message.attachments = attachments;
                     message.is_encrypted = encryption_info.is_some()

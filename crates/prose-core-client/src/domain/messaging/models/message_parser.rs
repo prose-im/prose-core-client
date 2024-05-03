@@ -238,20 +238,7 @@ impl MessageParser {
                 payload: Payload::Message {
                     body: body.to_string(),
                     attachments: message.attachments(),
-                    mentions: message
-                        .mentions()
-                        .into_iter()
-                        .filter_map(|r| match Mention::try_from(r) {
-                            Ok(mention) => Some(mention),
-                            Err(err) => {
-                                warn!(
-                                    "Failed to parse mention from reference. {}",
-                                    err.to_string()
-                                );
-                                None
-                            }
-                        })
-                        .collect(),
+                    mentions,
                     encryption_info,
                     // A message that we consider a groupchat message but is of type 'chat' is
                     // usually a private message. We'll treat them as transient messages.
