@@ -228,6 +228,12 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
     }
 
     deps.messages_repo
+        .expect_contains()
+        .with(predicate::eq(MessageId::from("message-id")))
+        .once()
+        .return_once(|_| Box::pin(async { Ok(false) }));
+
+    deps.messages_repo
         .expect_append()
         .once()
         .in_sequence(&mut seq)
@@ -425,6 +431,12 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
     // sidebar_domain_service.handle_received_message should not be called
 
     deps.messages_repo
+        .expect_contains()
+        .with(predicate::eq(MessageId::from("message-id")))
+        .once()
+        .return_once(|_| Box::pin(async { Ok(false) }));
+
+    deps.messages_repo
         .expect_append()
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
@@ -486,6 +498,12 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
     }
 
     // sidebar_domain_service.handle_received_message should not be called
+
+    deps.messages_repo
+        .expect_contains()
+        .with(predicate::eq(MessageId::from("message-id")))
+        .once()
+        .return_once(|_| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
@@ -652,6 +670,12 @@ async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_m
             .once()
             .returning(move |_| Some(room.clone()));
     }
+
+    deps.messages_repo
+        .expect_contains()
+        .with(predicate::eq(MessageId::from("message-id")))
+        .once()
+        .return_once(|_| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()

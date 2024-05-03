@@ -8,7 +8,7 @@ use std::ops::Deref;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::Jid;
-use tracing::{debug, error, warn};
+use tracing::{error, warn};
 use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
@@ -22,11 +22,12 @@ use crate::app::deps::{
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
-    MessageLike, MessageLikeError, MessageLikePayload, MessageParser, MessageTargetId,
+    MessageLike, MessageLikeError, MessageLikeId, MessageLikePayload, MessageParser,
+    MessageTargetId,
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{RoomId, UserEndpointId};
-use crate::dtos::{OccupantId, ParticipantId};
+use crate::dtos::{MessageId, OccupantId, ParticipantId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
 
@@ -230,32 +231,7 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        let is_message_update = if let Some(message_id) = message.id.original_id() {
-            self.messages_repo
-                .contains(message_id)
-                .await
-                .unwrap_or(false)
-        } else {
-            false
-        };
-
-        debug!("Caching received message…");
-        let messages = [message];
-        self.messages_repo.append(&room_id, &messages).await?;
-
-        let [message] = messages;
-
-        if is_message_update {
-            self.client_event_dispatcher.dispatch_room_event(
-                room.clone(),
-                ClientRoomEventType::MessagesUpdated {
-                    message_ids: vec![message.id.id().clone()],
-                },
-            )
-        } else {
-            self.dispatch_event_for_message(room, message).await;
-        }
-
+        self.save_message_and_dispatch_event(room, message).await?;
         Ok(())
     }
 
@@ -293,37 +269,53 @@ impl MessagesEventHandler {
         // take our connected jid and plug it into the `from`.
         parsed_message.from = ParticipantId::User(self.ctx.connected_id()?.into_user_id());
 
-        debug!("Caching sent message…");
-        let messages = [parsed_message];
-        self.messages_repo.append(&room_id, &messages).await?;
-        let [parsed_message] = messages;
-
-        self.dispatch_event_for_message(room, parsed_message).await;
-
+        self.save_message_and_dispatch_event(room, parsed_message)
+            .await?;
         Ok(())
     }
 
-    async fn dispatch_event_for_message(&self, room: Room, message: MessageLike) {
+    async fn save_message_and_dispatch_event(
+        &self,
+        room: Room,
+        message: MessageLike,
+    ) -> Result<()> {
+        let is_message_update = if let Some(message_id) = message.id.original_id() {
+            self.messages_repo
+                .contains(message_id)
+                .await
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        let messages = [message];
+        self.messages_repo.append(&room.room_id, &messages).await?;
+        let [message] = messages;
+
+        if is_message_update {
+            let message_id = if let Some(target_id) = message.target {
+                self.resolve_message_target_id(&room.room_id, &message.id, target_id)
+                    .await
+            } else {
+                None
+            }
+            .unwrap_or_else(|| message.id.id().clone());
+
+            self.client_event_dispatcher.dispatch_room_event(
+                room.clone(),
+                ClientRoomEventType::MessagesUpdated {
+                    message_ids: vec![message_id],
+                },
+            );
+            return Ok(());
+        }
+
         let event_type = if let Some(target) = message.target {
-            let message_id = match target {
-                MessageTargetId::MessageId(id) => id,
-                MessageTargetId::StanzaId(stanza_id) => {
-                    match self
-                        .messages_repo
-                        .resolve_message_id(&room.room_id, &stanza_id)
-                        .await
-                    {
-                        Ok(Some(id)) => id,
-                        Ok(None) => {
-                            warn!("Not dispatching event for message with id '{}'. Failed to look up targeted MessageId from StanzaId '{}'.", message.id, stanza_id);
-                            return;
-                        }
-                        Err(err) => {
-                            error!("Not dispatching event for message with id '{}'. Encountered error while looking up StanzaId '{}': {}", message.id, stanza_id, err.to_string());
-                            return;
-                        }
-                    }
-                }
+            let Some(message_id) = self
+                .resolve_message_target_id(&room.room_id, &message.id, target)
+                .await
+            else {
+                return Ok(());
             };
 
             if message.payload == MessageLikePayload::Retraction {
@@ -343,5 +335,35 @@ impl MessagesEventHandler {
 
         self.client_event_dispatcher
             .dispatch_room_event(room, event_type);
+
+        Ok(())
+    }
+
+    async fn resolve_message_target_id(
+        &self,
+        room_id: &RoomId,
+        message_id: &MessageLikeId,
+        target_id: MessageTargetId,
+    ) -> Option<MessageId> {
+        match target_id {
+            MessageTargetId::MessageId(id) => Some(id),
+            MessageTargetId::StanzaId(stanza_id) => {
+                match self
+                    .messages_repo
+                    .resolve_message_id(&room_id, &stanza_id)
+                    .await
+                {
+                    Ok(Some(id)) => Some(id),
+                    Ok(None) => {
+                        warn!("Not dispatching event for message with id '{}'. Failed to look up targeted MessageId from StanzaId '{}'.", message_id, stanza_id);
+                        None
+                    }
+                    Err(err) => {
+                        error!("Not dispatching event for message with id '{}'. Encountered error while looking up StanzaId '{}': {}", message_id, stanza_id, err.to_string());
+                        None
+                    }
+                }
+            }
+        }
     }
 }
