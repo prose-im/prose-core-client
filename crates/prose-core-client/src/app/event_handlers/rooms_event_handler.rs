@@ -228,8 +228,17 @@ impl RoomsEventHandler {
     }
 
     async fn handle_user_status_event(&self, event: UserStatusEvent) -> Result<()> {
-        let is_self_event =
-            event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id());
+        let room = self.get_room(&event.user_id.to_room_id()).ok();
+
+        let is_self_event = room
+            .and_then(|room| {
+                room.participants()
+                    .get(&event.user_id.to_participant_id())
+                    .map(|participant| Ok(participant.is_self))
+            })
+            .unwrap_or_else(|| -> Result<bool> {
+                Ok(event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id()))
+            })?;
 
         match event.r#type {
             UserStatusEventType::AvailabilityChanged {

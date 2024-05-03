@@ -43,7 +43,7 @@ async fn test_adds_participant() -> Result<()> {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .times(2)
+            .times(3)
             .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
@@ -194,7 +194,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .times(2)
+            .times(3)
             .with(predicate::eq(bare!("room@conference.prose.org")))
             .returning(move |_| Some(room.clone()));
     }
@@ -375,9 +375,9 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .once()
+            .times(2)
             .with(predicate::eq(bare!("room@conference.prose.org")))
-            .return_once(move |_| Some(room.clone()));
+            .returning(move |_| Some(room.clone()));
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
     deps.client_event_dispatcher
@@ -448,9 +448,9 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .once()
+            .times(2)
             .with(predicate::eq(bare!("contact@prose.org")))
-            .return_once(move |_| Some(room.clone()));
+            .returning(move |_| Some(room.clone()));
     }
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 01, 04));
     deps.client_event_dispatcher
@@ -549,9 +549,9 @@ async fn test_handles_user_presence() -> Result<()> {
     let room = room.clone();
     deps.connected_rooms_repo
         .expect_get()
-        .once()
+        .times(2)
         .with(predicate::eq(bare!("sender@prose.org")))
-        .return_once(move |_| Some(room.clone()));
+        .returning(move |_| Some(room.clone()));
 
     deps.user_info_repo
         .expect_set_user_presence()
@@ -612,9 +612,9 @@ async fn test_handles_occupant_presence() -> Result<()> {
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .once()
+            .times(2)
             .with(predicate::eq(bare!("room@muc.prose.org")))
-            .return_once(move |_| Some(room.clone()));
+            .returning(move |_| Some(room.clone()));
     }
 
     {
@@ -666,9 +666,9 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
 
     deps.connected_rooms_repo
         .expect_get()
-        .once()
+        .times(2)
         .with(predicate::eq(bare!("sender@prose.org")))
-        .return_once(move |_| None);
+        .returning(move |_| None);
 
     deps.user_info_repo
         .expect_set_user_presence()
@@ -715,12 +715,12 @@ async fn test_swallows_self_presence() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
-        connected_jid: user_resource_id!("hello@prose.org/res"),
+        connected_jid: user_resource_id!("us@prose.org/res"),
         server_features: Default::default(),
     });
 
     let room = Room::for_direct_message(
-        &user_id!("hello@prose.org"),
+        &user_id!("them@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
@@ -729,15 +729,15 @@ async fn test_swallows_self_presence() -> Result<()> {
     let room = room.clone();
     deps.connected_rooms_repo
         .expect_get()
-        .once()
-        .with(predicate::eq(bare!("hello@prose.org")))
-        .return_once(move |_| Some(room.clone()));
+        .times(2)
+        .with(predicate::eq(bare!("us@prose.org")))
+        .returning(move |_| Some(room.clone()));
 
     deps.user_info_repo
         .expect_set_user_presence()
         .once()
         .with(
-            predicate::eq(UserOrResourceId::from(user_id!("hello@prose.org"))),
+            predicate::eq(UserOrResourceId::from(user_id!("us@prose.org"))),
             predicate::eq(Presence {
                 availability: Availability::Available,
                 ..Default::default()
@@ -748,7 +748,7 @@ async fn test_swallows_self_presence() -> Result<()> {
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
     assert!(event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
-            user_id: user_id!("hello@prose.org").into(),
+            user_id: user_id!("us@prose.org").into(),
             r#type: UserStatusEventType::AvailabilityChanged {
                 availability: Availability::Available,
                 priority: 0
