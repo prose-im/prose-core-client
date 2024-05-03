@@ -17,6 +17,7 @@ pub use test_client_login::LoginConfig;
 pub(self) use test_message_queue::TestMessageQueue;
 
 mod connector;
+mod delegate;
 mod element_ext;
 mod test_client;
 mod test_client_login;

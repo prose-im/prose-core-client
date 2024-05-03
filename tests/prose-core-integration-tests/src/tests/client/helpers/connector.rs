@@ -102,7 +102,7 @@ impl ConnectionTrait for Connection {
                     MessageType::Out(elem) => elem
                         .to_pretty_printed_xml()
                         .expect("Failed to convert cached stanza to XML"),
-                    MessageType::Event(event) => format!("{:?}", event),
+                    MessageType::Event(_) => "An event".to_string(),
                 };
 
                 panic_message.push_str(&format!(

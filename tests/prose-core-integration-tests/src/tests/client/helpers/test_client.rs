@@ -15,10 +15,13 @@ use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId, UserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
-use prose_core_client::{Client, ClientDelegate, ClientEvent, FsAvatarCache, SignalServiceHandle};
+use prose_core_client::{
+    Client, ClientEvent, ClientRoomEventType, FsAvatarCache, SignalServiceHandle,
+};
 use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::IDProvider;
 
+use crate::tests::client::helpers::delegate::Delegate;
 use crate::tests::store;
 
 use super::{connector::Connector, test_message_queue::TestMessageQueue};
@@ -72,9 +75,7 @@ impl TestClient {
             .set_store(store)
             .set_time_provider(ConstantTimeProvider::ymd(2024, 02, 19))
             .set_user_device_id_provider(IncrementingUserDeviceIdProvider::new(*device_id.as_ref()))
-            .set_delegate(Some(Box::new(Delegate {
-                messages: messages.clone(),
-            })))
+            .set_delegate(Some(Box::new(Delegate::new(messages.clone()))))
             .build();
 
         let client = Self {
@@ -114,6 +115,20 @@ macro_rules! event(
     )
 );
 
+#[macro_export]
+macro_rules! room_event(
+    ($client:ident, $room_id:expr, $event_type:expr) => (
+        $client.room_event($room_id, $event_type, file!(), line!())
+    )
+);
+
+#[macro_export]
+macro_rules! any_event(
+    ($client:ident) => (
+        $client.any_event(file!(), line!())
+    )
+);
+
 #[allow(dead_code)]
 impl TestClient {
     pub fn send(&self, xml: impl Into<String>, file: &str, line: u32) {
@@ -144,6 +159,21 @@ impl TestClient {
         self.messages.event(event, file, line);
     }
 
+    pub fn room_event(
+        &self,
+        room_id: impl Into<RoomId>,
+        event_type: ClientRoomEventType,
+        file: &str,
+        line: u32,
+    ) {
+        self.messages
+            .room_event(room_id.into(), event_type, file, line);
+    }
+
+    pub fn any_event(&self, file: &str, line: u32) {
+        self.messages.any_event(file, line)
+    }
+
     pub async fn receive_next(&self) {
         self.connector.receive_next().await
     }
@@ -168,6 +198,7 @@ impl TestClient {
     }
 }
 
+#[allow(dead_code)]
 impl TestClient {
     pub async fn get_room(&self, id: impl Into<RoomId>) -> RoomEnvelope {
         let room_id = id.into();
@@ -184,6 +215,14 @@ impl TestClient {
         };
 
         item.room
+    }
+
+    pub fn get_last_id(&self) -> String {
+        self.id_provider.last_id()
+    }
+
+    pub fn get_next_id(&self) -> String {
+        self.id_provider.next_id()
     }
 }
 
@@ -220,22 +259,5 @@ impl Deref for TestClient {
 
     fn deref(&self) -> &Self::Target {
         &self.client
-    }
-}
-
-struct Delegate {
-    messages: TestMessageQueue,
-}
-
-impl ClientDelegate for Delegate {
-    fn handle_event(&self, _client: Client, received_event: ClientEvent) {
-        let Some((expected_event, file, line)) = self.messages.pop_event() else {
-            panic!("\nClient sent unexpected event:\n\n{:?}", received_event);
-        };
-        assert_eq!(
-            expected_event, received_event,
-            "\n\n➡️ Assertion failed at:\n{}:{}",
-            file, line
-        );
     }
 }

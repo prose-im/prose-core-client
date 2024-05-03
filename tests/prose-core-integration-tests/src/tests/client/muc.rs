@@ -20,7 +20,11 @@ async fn test_joins_room() -> Result<()> {
         .await?;
 
     client
-        .join_room(muc_id!("room@conference.prose.org"))
+        .join_room(muc_id!("room@conference.prose.org"), "anon-id")
+        .await?;
+
+    Ok(())
+}
         .await?;
 
     Ok(())

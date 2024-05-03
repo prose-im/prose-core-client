@@ -8,6 +8,7 @@ pub mod avatars;
 pub mod connection;
 pub mod contacts;
 pub mod encryption;
+pub mod events;
 pub mod general;
 pub mod messaging;
 pub mod platform_dependencies;

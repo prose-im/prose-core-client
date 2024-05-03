@@ -7,15 +7,17 @@ use anyhow::Result;
 use minidom::IntoAttributeValue;
 
 use prose_core_client::domain::rooms::services::impls::build_nickname;
+use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::dtos::{MucId, RoomEnvelope, RoomId, UserId};
+use prose_core_client::dtos::{MucId, OccupantId, RoomEnvelope, RoomId, UserId};
+use prose_core_client::ClientEvent;
 
-use crate::{recv, send};
+use crate::{event, recv, send};
 
 use super::TestClient;
 
 impl TestClient {
-    pub async fn join_room(&self, room_id: MucId) -> Result<()> {
+    pub fn build_occupant_id(&self, room_id: &MucId) -> OccupantId {
         let nickname = build_nickname(
             &self
                 .client
@@ -23,14 +25,24 @@ impl TestClient {
                 .expect("You're not connected")
                 .into_user_id(),
         );
-        let occupant_id = room_id.occupant_id_with_nickname(nickname)?;
+        room_id.occupant_id_with_nickname(nickname).unwrap()
+    }
+
+    pub async fn join_room(
+        &self,
+        room_id: MucId,
+        anon_occupant_id: impl Into<AnonOccupantId>,
+    ) -> Result<()> {
+        let occupant_id = self.build_occupant_id(&room_id);
         let room_name = "general";
+        let anon_occupant_id = anon_occupant_id.into();
 
         self.push_ctx(
             [
                 ("OCCUPANT_ID".into(), occupant_id.to_string()),
                 ("ROOM_ID".into(), room_id.to_string()),
                 ("ROOM_NAME".into(), room_name.to_string()),
+                ("ANON_OCCUPANT_ID".into(), anon_occupant_id.to_string()),
             ]
             .into(),
         );
@@ -54,7 +66,7 @@ impl TestClient {
         <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
           <show>chat</show>
           <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
-          <occupant-id xmlns="urn:xmpp:occupant-id:0" id="LlY4x7k0T+udxUmRfaIuYJB1pzlFu4yEziE7hzxaeYI=" />
+          <occupant-id xmlns="urn:xmpp:occupant-id:0" id="{{ANON_OCCUPANT_ID}}" />
           <x xmlns="http://jabber.org/protocol/muc#user">
             <status code="100" />
             <item affiliation="owner" jid="m@nsm.chat/tnFAvzAb" role="moderator" />
@@ -218,6 +230,8 @@ impl TestClient {
             BookmarkType::PublicChannel,
         );
 
+        event!(self, ClientEvent::SidebarChanged);
+
         self.pop_ctx();
 
         self.rooms.join_room(&room_id, None).await?;
@@ -273,6 +287,8 @@ impl TestClient {
             user_id.formatted_username(),
             BookmarkType::DirectMessage,
         );
+
+        event!(self, ClientEvent::SidebarChanged);
 
         self.rooms.start_conversation(&[user_id.clone()]).await?;
 

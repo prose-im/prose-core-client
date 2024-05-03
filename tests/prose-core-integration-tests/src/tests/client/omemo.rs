@@ -6,16 +6,15 @@
 use anyhow::Result;
 use minidom::Element;
 
-use prose_core_client::domain::rooms::services::impls::build_nickname;
 use prose_core_client::domain::sidebar::models::BookmarkType;
 use prose_core_client::dtos::{
     DeviceBundle, DeviceId, DeviceInfo, DeviceTrust, MucId, RoomId, SendMessageRequest,
     SendMessageRequestBody, UserId,
 };
-use prose_core_client::{muc_id, user_id};
+use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
 
-use crate::{recv, send};
+use crate::{event, recv, room_event, send};
 
 use super::helpers::{LoginConfig, TestClient, TestDeviceBundle};
 
@@ -152,6 +151,14 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
         "#
     );
 
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
+    );
+
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
             text: "Hello World".to_string(),
@@ -258,6 +265,14 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         "#
     );
 
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
+    );
+
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
             text: "Hello World".to_string(),
@@ -289,6 +304,14 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
           <store xmlns="urn:xmpp:hints" />
         </message>
         "#
+    );
+
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
     );
 
     room.send_message(SendMessageRequest {
@@ -345,6 +368,14 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
         "#
     );
 
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
+    );
+
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
             text: "Hello World".to_string(),
@@ -399,6 +430,14 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
           <store xmlns="urn:xmpp:hints" />
         </message>
         "#
+    );
+
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
     );
 
     room.send_message(SendMessageRequest {
@@ -459,6 +498,14 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
           <store xmlns="urn:xmpp:hints" />
         </message>
         "#
+    );
+
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
     );
 
     room.send_message(SendMessageRequest {
@@ -532,6 +579,14 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
         "#
     );
 
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
+    );
+
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
             text: "Hello World".to_string(),
@@ -597,6 +652,14 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
           <store xmlns="urn:xmpp:hints" />
         </message>
         "#
+    );
+
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
     );
 
     room.send_message(SendMessageRequest {
@@ -673,6 +736,14 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
         "#
     );
 
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
+    );
+
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
             text: "Hello World".to_string(),
@@ -723,6 +794,14 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
         "#
     );
 
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec![client.get_last_id().into()]
+        }
+    );
+
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
             text: "Hello World".to_string(),
@@ -757,7 +836,7 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
     let service = TestClient::their_encryption_domain_service(user_id!("them@prose.org")).await;
     let encrypted_payload = service
         .encrypt_message(
-            &user_id!("user@prose.org"),
+            vec![user_id!("user@prose.org")],
             "Can you read this?".to_string(),
         )
         .await?;
@@ -810,6 +889,15 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         "#
     );
 
+    event!(client, ClientEvent::SidebarChanged);
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec!["my-message-id".into()]
+        }
+    );
+
     client.receive_next().await;
 
     let messages = room
@@ -835,7 +923,7 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
 
     let encrypted_payload = service
         .encrypt_message(
-            &user_id!("user@prose.org"),
+            vec![user_id!("user@prose.org")],
             "Can you read this too?".to_string(),
         )
         .await?;
@@ -880,6 +968,15 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         "#
     );
 
+    event!(client, ClientEvent::SidebarChanged);
+    room_event!(
+        client,
+        room.jid().clone(),
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec!["other-message-id".into()]
+        }
+    );
+
     client.receive_next().await;
 
     // Second message should not contain a pre-key, thus the bundle shouldn't be published again.
@@ -903,13 +1000,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
 
     let room_id = muc_id!("room@prose.org");
     let room_name = "omemo-private-channel";
-    let nickname = build_nickname(
-        &client
-            .connected_user_id()
-            .expect("You're not connected")
-            .into_user_id(),
-    );
-    let occupant_id = room_id.occupant_id_with_nickname(nickname)?;
+    let occupant_id = client.build_occupant_id(&room_id);
 
     client.push_ctx(
         [
@@ -1112,6 +1203,8 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
         BookmarkType::PrivateChannel,
     );
 
+    event!(client, ClientEvent::SidebarChanged);
+
     client.rooms.join_room(&room_id, None).await?;
 
     let room = client
@@ -1128,7 +1221,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
     let service = TestClient::their_encryption_domain_service(user_id!("user2@prose.org")).await;
     let encrypted_payload = service
         .encrypt_message(
-            &user_id!("user@prose.org"),
+            vec![user_id!("user@prose.org")],
             "Can you read this?".to_string(),
         )
         .await?;
@@ -1177,6 +1270,15 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
           <store xmlns="urn:xmpp:hints" />
         </message>
         "#
+    );
+
+    event!(client, ClientEvent::SidebarChanged);
+    room_event!(
+        client,
+        room_id,
+        ClientRoomEventType::MessagesAppended {
+            message_ids: vec!["my-message-id".into()]
+        }
     );
 
     client.receive_next().await;

@@ -14,9 +14,9 @@ use crate::app::deps::{
     DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::event_handlers::{
-    BlockListEventHandler, BookmarksEventHandler, ClientEventDispatcher, ConnectionEventHandler,
-    ContactListEventHandler, MessagesEventHandler, RequestsEventHandler, RoomsEventHandler,
-    ServerEventHandlerQueue, UserDevicesEventHandler, UserStateEventHandler,
+    BlockListEventHandler, BookmarksEventHandler, ConnectionEventHandler, ContactListEventHandler,
+    MessagesEventHandler, RequestsEventHandler, RoomsEventHandler, ServerEventHandlerQueue,
+    UserDevicesEventHandler, UserStateEventHandler,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactListService, RoomsService, UserDataService,
@@ -233,7 +233,14 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             .build(),
         );
 
-        let event_dispatcher = Arc::new(ClientEventDispatcher::new(self.delegate));
+        #[cfg(feature = "test")]
+        let event_dispatcher = Arc::new(crate::infra::events::ImmediateClientEventDispatcher::new(
+            self.delegate,
+        ));
+        #[cfg(not(feature = "test"))]
+        let event_dispatcher = Arc::new(
+            crate::infra::events::CoalescingClientEventDispatcher::new(self.delegate),
+        );
 
         let dependencies: AppDependencies = PlatformDependencies {
             ctx: AppContext::new(capabilities, self.software_version),

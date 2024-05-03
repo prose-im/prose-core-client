@@ -20,13 +20,13 @@ use crate::domain::shared::models::RoomType;
 use crate::util::coalesce_client_events;
 use crate::{Client, ClientDelegate, ClientEvent, ClientRoomEventType};
 
-pub struct ClientEventDispatcher {
+pub struct CoalescingClientEventDispatcher {
     client_inner: Arc<OnceLock<Weak<ClientInner>>>,
     room_factory: OnceLock<DynRoomFactory>,
     sender: Sender<ClientEvent>,
 }
 
-impl ClientEventDispatcher {
+impl CoalescingClientEventDispatcher {
     pub fn new(delegate: Option<Box<dyn ClientDelegate>>) -> Self {
         let (tx, rx) = channel(50);
 
@@ -78,7 +78,7 @@ impl ClientEventDispatcher {
     }
 }
 
-impl ClientEventDispatcherTrait for ClientEventDispatcher {
+impl ClientEventDispatcherTrait for CoalescingClientEventDispatcher {
     fn dispatch_event(&self, event: ClientEvent) {
         debug!(event = ?event, "Enqueuing event");
         _ = self.sender.try_send(event);

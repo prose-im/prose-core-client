@@ -6,10 +6,10 @@
 use anyhow::Result;
 
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
-use prose_core_client::Secret;
+use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
 use prose_xmpp::{ConnectionError, IDProvider};
 
-use crate::{recv, send};
+use crate::{event, recv, send};
 
 use super::TestClient;
 
@@ -89,6 +89,15 @@ impl TestClient {
         );
         self.expect_publish_device(config.device_bundles.into_iter().map(|(id, _)| id));
         self.expect_publish_initial_device_bundle();
+
+        event!(
+            self,
+            ClientEvent::ConnectionStatusChanged {
+                event: ConnectionEvent::Connect,
+            }
+        );
+
+        event!(self, ClientEvent::AccountInfoChanged);
 
         self.connect(&user, Secret::new(password.as_ref().to_string()))
             .await

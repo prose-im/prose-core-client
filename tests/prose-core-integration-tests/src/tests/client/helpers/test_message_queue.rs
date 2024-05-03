@@ -8,23 +8,79 @@ use std::sync::Arc;
 
 use minidom::Element;
 use parking_lot::Mutex;
+use pretty_assertions::assert_eq;
 
-use prose_core_client::ClientEvent;
+use prose_core_client::dtos::RoomId;
+use prose_core_client::{ClientEvent, ClientRoomEventType};
 
 use super::element_ext::ElementExt;
 
-#[derive(Debug)]
 struct Message {
     file: String,
     line: u32,
     r#type: MessageType,
 }
 
-#[derive(Debug)]
 pub enum MessageType {
     In(Element),
     Out(Element),
-    Event(ClientEvent),
+    Event(ClientEventMatcher),
+}
+
+pub struct ClientEventMatcher {
+    matcher: Box<dyn FnOnce(ClientEvent, String, u32) + Send>,
+}
+
+impl ClientEventMatcher {
+    pub fn event(expected_event: ClientEvent) -> Self {
+        Self {
+            matcher: Box::new(move |event, file, line| {
+                assert_eq!(
+                    expected_event, event,
+                    "\n\n➡️ Assertion failed at:\n{}:{}",
+                    file, line
+                )
+            }),
+        }
+    }
+
+    pub fn room_event(room_id: RoomId, expected_type: ClientRoomEventType) -> Self {
+        Self {
+            matcher: Box::new(move |event, file, line| {
+                let ClientEvent::RoomChanged {
+                    room,
+                    r#type: event_type,
+                } = event
+                else {
+                    panic!("Expected to receive a ClientEvent::RoomChanged. Received: \n{:?}\n\n➡️ Assertion failed at:\n{}:{}", event, file, line);
+                };
+
+                assert_eq!(
+                    &room_id,
+                    room.to_generic_room().jid(),
+                    "\n\n➡️ Assertion failed at:\n{}:{}",
+                    file,
+                    line
+                );
+
+                assert_eq!(
+                    expected_type, event_type,
+                    "\n\n➡️ Assertion failed at:\n{}:{}",
+                    file, line
+                )
+            }),
+        }
+    }
+
+    pub fn any() -> Self {
+        Self {
+            matcher: Box::new(|_, _, _| {}),
+        }
+    }
+
+    pub fn assert_event(self, event: ClientEvent, file: String, line: u32) {
+        (self.matcher)(event, file, line)
+    }
 }
 
 #[derive(Default, Clone)]
@@ -71,7 +127,29 @@ impl TestMessageQueue {
         self.messages.lock().push_back(Message {
             file: file.to_string(),
             line,
-            r#type: MessageType::Event(event),
+            r#type: MessageType::Event(ClientEventMatcher::event(event)),
+        })
+    }
+
+    pub fn room_event(
+        &self,
+        room_id: RoomId,
+        event_type: ClientRoomEventType,
+        file: &str,
+        line: u32,
+    ) {
+        self.messages.lock().push_back(Message {
+            file: file.to_string(),
+            line,
+            r#type: MessageType::Event(ClientEventMatcher::room_event(room_id, event_type)),
+        })
+    }
+
+    pub fn any_event(&self, file: &str, line: u32) {
+        self.messages.lock().push_back(Message {
+            file: file.to_string(),
+            line,
+            r#type: MessageType::Event(ClientEventMatcher::any()),
         })
     }
 
@@ -137,7 +215,7 @@ impl TestMessageQueue {
         }
     }
 
-    pub fn pop_event(&self) -> Option<(ClientEvent, String, u32)> {
+    pub fn pop_event(&self) -> Option<(ClientEventMatcher, String, u32)> {
         let mut guard = self.messages.lock();
 
         let Some(message) = guard.pop_front() else {

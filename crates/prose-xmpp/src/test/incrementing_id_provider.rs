@@ -26,6 +26,11 @@ impl IncrementingIDProvider {
         *last_id = 0;
     }
 
+    pub fn next_id(&self) -> String {
+        let last_id = self.last_id.lock().unwrap();
+        format!("{}-{}", self.prefix, *last_id + 1)
+    }
+
     pub fn last_id(&self) -> String {
         let last_id = self.last_id.lock().unwrap();
         format!("{}-{}", self.prefix, *last_id)
