@@ -16,3 +16,13 @@ pub struct Body {
     pub text: String,
     pub mentions: Vec<Mention>,
 }
+
+impl SendMessageRequest {
+    pub fn is_empty(&self) -> bool {
+        self.body
+            .as_ref()
+            .map(|body| body.text.is_empty())
+            .unwrap_or(true)
+            && self.attachments.is_empty()
+    }
+}

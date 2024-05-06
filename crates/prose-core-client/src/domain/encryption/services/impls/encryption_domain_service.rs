@@ -130,7 +130,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 
     async fn encrypt_message(
         &self,
-        recipient_id: &UserId,
+        recipient_ids: Vec<UserId>,
         message: String,
     ) -> Result<EncryptedPayload, EncryptionError> {
         let current_user_id = self.ctx.connected_id()?.into_user_id();
@@ -161,46 +161,58 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             }
         }
 
-        match self
-            .start_sessions_if_needed(
-                recipient_id,
-                self.user_device_repo.get_all(recipient_id).await?,
-            )
-            .await
-        {
-            Ok(_) => (),
-            Err(err) => {
-                error!(
-                    "Failed to start OMEMO session with {recipient_id}. {}",
-                    err.to_string()
-                );
+        for recipient_id in &recipient_ids {
+            match self
+                .start_sessions_if_needed(
+                    recipient_id,
+                    self.user_device_repo.get_all(recipient_id).await?,
+                )
+                .await
+            {
+                Ok(_) => (),
+                Err(err) => {
+                    error!(
+                        "Failed to start OMEMO session with {recipient_id}. {}",
+                        err.to_string()
+                    );
+                }
             }
         }
 
-        let their_sessions = self
-            .session_repo
-            .get_all_sessions(&recipient_id)
-            .await?
-            .into_iter()
-            .filter(|session| session.is_active)
-            .collect::<Vec<_>>();
+        let their_active_device_ids = {
+            let mut all_active_device_ids = vec![];
 
-        if their_sessions.is_empty() {
-            return Err(EncryptionError::NoDevices);
-        }
+            for recipient_id in &recipient_ids {
+                let sessions = self
+                    .session_repo
+                    .get_all_sessions(&recipient_id)
+                    .await?
+                    .into_iter()
+                    .filter(|session| session.is_active)
+                    .collect::<Vec<_>>();
 
-        let their_active_device_ids = their_sessions
-            .into_iter()
-            .filter_map(|session| {
-                session
-                    .is_trusted_or_undecided()
-                    .then_some((recipient_id, session.device_id))
-            })
-            .collect::<Vec<_>>();
+                if sessions.is_empty() {
+                    return Err(EncryptionError::NoDevices(recipient_id.clone()));
+                }
 
-        if their_active_device_ids.is_empty() {
-            return Err(EncryptionError::NoDevices);
-        }
+                let active_device_ids = sessions
+                    .into_iter()
+                    .filter_map(|session| {
+                        session
+                            .is_trusted_or_undecided()
+                            .then_some((recipient_id, session.device_id))
+                    })
+                    .collect::<Vec<_>>();
+
+                if active_device_ids.is_empty() {
+                    return Err(EncryptionError::NoDevices(recipient_id.clone()));
+                }
+
+                all_active_device_ids.extend(active_device_ids);
+            }
+
+            all_active_device_ids
+        };
 
         let nonce = Aes128Gcm::generate_nonce(self.rng_provider.rng());
         let dek = Aes128Gcm::generate_key(self.rng_provider.rng());

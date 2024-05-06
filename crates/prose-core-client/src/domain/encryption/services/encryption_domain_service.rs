@@ -15,9 +15,9 @@ use crate::domain::shared::models::UserId;
 #[derive(Debug, thiserror::Error)]
 pub enum EncryptionError {
     #[error("The recipient does not have any OMEMO-enabled devices.")]
-    NoDevices,
+    NoDevices(UserId),
     #[error("The recipient does not have any trusted OMEMO-enabled devices.")]
-    NoTrustedDevices,
+    NoTrustedDevices(UserId),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -38,7 +38,7 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn encrypt_message(
         &self,
-        recipient_id: &UserId,
+        recipient_ids: Vec<UserId>,
         message: String,
     ) -> Result<EncryptedPayload, EncryptionError>;
 

@@ -42,7 +42,7 @@ impl MessagingService for XMPPClient {
             .set_store(true);
         message.append_attachments(request.attachments);
 
-        chat.send_raw_message(message, true)?;
+        chat.send_raw_message(message, false)?;
 
         Ok(())
     }
@@ -92,7 +92,7 @@ impl MessagingService for XMPPClient {
             .set_store(true);
         message.append_attachments(request.attachments);
 
-        chat.send_raw_message(message, true)?;
+        chat.send_raw_message(message, false)?;
         Ok(())
     }
 

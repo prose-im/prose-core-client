@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::collections::VecDeque;
+use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
 use minidom::Element;
@@ -15,12 +16,14 @@ use prose_core_client::{ClientEvent, ClientRoomEventType};
 
 use super::element_ext::ElementExt;
 
+#[derive(Debug)]
 struct Message {
     file: String,
     line: u32,
     r#type: MessageType,
 }
 
+#[derive(Debug)]
 pub enum MessageType {
     In(Element),
     Out(Element),
@@ -29,6 +32,12 @@ pub enum MessageType {
 
 pub struct ClientEventMatcher {
     matcher: Box<dyn FnOnce(ClientEvent, String, u32) + Send>,
+}
+
+impl Debug for ClientEventMatcher {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ClientEvent")
+    }
 }
 
 impl ClientEventMatcher {
@@ -83,7 +92,7 @@ impl ClientEventMatcher {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, Debug)]
 pub struct TestMessageQueue {
     messages: Arc<Mutex<VecDeque<Message>>>,
 }
