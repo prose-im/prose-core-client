@@ -11,7 +11,7 @@ categories = ["network-programming"]
 authors = ["Marc Bauer <mb@nesium.com>"]
 
 [lib]
-proc_macro = true
+proc-macro = true
 
 [dependencies]
 convert_case = "0.6"
