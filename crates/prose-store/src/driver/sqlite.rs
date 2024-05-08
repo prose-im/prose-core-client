@@ -1,27 +1,33 @@
-use super::Driver;
-use crate::driver::{ReadMode, ReadOnly, ReadWrite, WriteMode};
-use crate::prelude::Error::NotMemberOfTransaction;
-use crate::{
-    Collection, Database, IndexSpec, IndexedCollection, KeyType, Query, QueryDirection, RawKey,
-    ReadTransaction, ReadableCollection, StoreError, Transaction, UpgradeTransaction,
-    VersionChangeEvent, WritableCollection, WriteTransaction,
-};
+use std::collections::{HashMap, HashSet};
+use std::iter::zip;
+use std::marker::PhantomData;
+use std::ops::Bound;
+use std::path::PathBuf;
+use std::sync::{Arc, PoisonError};
+
 use async_trait::async_trait;
 use deadpool_sqlite::{
     Config, CreatePoolError, Hook, InteractError, Manager, Pool, PoolError, Runtime,
 };
 use parking_lot::RwLock;
-use prose_wasm_utils::SendUnlessWasm;
-use rusqlite::{params, DropBehavior, OptionalExtension, ToSql, TransactionBehavior};
+use rusqlite::{
+    params, params_from_iter, DropBehavior, OptionalExtension, ToSql, TransactionBehavior,
+};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
-use std::marker::PhantomData;
-use std::ops::Bound;
-use std::path::PathBuf;
-use std::sync::{Arc, PoisonError};
 use tracing::debug;
+
+use prose_wasm_utils::SendUnlessWasm;
+
+use crate::driver::{ReadMode, ReadOnly, ReadWrite, WriteMode};
+use crate::prelude::Error::NotMemberOfTransaction;
+use crate::{
+    Collection, Database, IndexSpec, IndexedCollection, KeyTuple, KeyType, Query, QueryDirection,
+    RawKey, ReadTransaction, ReadableCollection, StoreError, Transaction, UpgradeTransaction,
+    VersionChangeEvent, WritableCollection, WriteTransaction,
+};
+
+use super::Driver;
 
 const SETTINGS_TABLE: &str = "__store_settings";
 
@@ -123,8 +129,8 @@ impl Driver for SqliteDriver {
             sql_conn.execute_batch(&format!(
                 r#"
             CREATE TABLE IF NOT EXISTS "{}" (
-                "key" TEXT PRIMARY KEY,
-                "value" BLOB NOT NULL
+                `key` TEXT PRIMARY KEY,
+                `value` BLOB NOT NULL
             )"#,
                 SETTINGS_TABLE
             ))?;
@@ -132,7 +138,7 @@ impl Driver for SqliteDriver {
             let current_version = sql_conn
                 .query_row(
                     &format!(
-                        r#"SELECT `value` FROM "{}" WHERE `key` = "version""#,
+                        r#"SELECT "value" FROM "{}" WHERE "key" = "version""#,
                         SETTINGS_TABLE
                     ),
                     [],
@@ -173,7 +179,7 @@ impl Driver for SqliteDriver {
             let sql_conn = tx.obj.lock()?;
             sql_conn.execute(
                 &format!(
-                    r#"INSERT OR REPLACE INTO "{}" (`key`, `value`) VALUES ('version', ?)"#,
+                    r#"INSERT OR REPLACE INTO "{}" ("key", "value") VALUES ('version', ?)"#,
                     SETTINGS_TABLE
                 ),
                 params![version],
@@ -432,9 +438,8 @@ where
 }
 
 pub struct SqliteCollection<'tx, Mode> {
-    is_index: bool,
     name: String,
-    key_column: String,
+    qualified_columns: Vec<String>,
     obj: Arc<deadpool::managed::Object<Manager>>,
     description: DatabaseDescription,
     phantom: PhantomData<&'tx Mode>,
@@ -447,46 +452,53 @@ impl<'tx, Mode> SqliteCollection<'tx, Mode> {
         description: DatabaseDescription,
     ) -> Self {
         Self {
-            is_index: false,
             name,
-            key_column: "key".to_string(),
+            qualified_columns: vec![r#""key""#.to_string()],
             obj,
             description,
             phantom: Default::default(),
         }
     }
 
-    fn qualified_key_column(&self) -> Cow<String> {
-        if self.is_index {
-            Cow::Owned(format!("json_extract(`data`, '$.{}')", self.key_column))
-        } else {
-            Cow::Borrowed(&self.key_column)
+    fn new_index(
+        name: String,
+        columns: &[&str],
+        obj: Arc<deadpool::managed::Object<Manager>>,
+        description: DatabaseDescription,
+    ) -> Self {
+        Self {
+            name,
+            qualified_columns: columns
+                .iter()
+                .map(|column| format!(r#"json_extract("data", '$.{}')"#, column))
+                .collect(),
+            obj,
+            description,
+            phantom: Default::default(),
         }
     }
 
+    fn qualified_key_columns(&self) -> &[String] {
+        self.qualified_columns.as_slice()
+    }
+
     #[cfg(feature = "test")]
-    pub fn explain_query_plan<Key: KeyType + Send>(
+    pub fn explain_query_plan<Key: KeyTuple + Send>(
         &self,
         query: Query<Key>,
     ) -> Result<String, Error> {
         let conn = self.obj.lock()?;
 
-        let (sql, params) = query.to_sql(
+        let (sql, params) = query.into_sql(
             &self.name,
-            &self.qualified_key_column(),
+            &self.qualified_key_columns(),
             QueryDirection::Forward,
             None,
         );
 
-        let params = params
-            .into_iter()
-            .map(|key| key.to_raw_key())
-            .collect::<Vec<_>>();
-        let params: Vec<&dyn ToSql> = params.iter().map(|k| k as &dyn ToSql).collect();
-
         Ok(conn.query_row(
             &format!("EXPLAIN QUERY PLAN {sql}"),
-            params.as_slice(),
+            params_from_iter(params),
             |row| row.get::<_, String>(3),
         )?)
     }
@@ -502,22 +514,25 @@ where
 {
     type Index<'coll> = SqliteCollection<'coll, Mode> where Self: 'coll;
 
-    fn index(&self, name: &str) -> Result<Self::Index<'_>, Self::Error> {
-        if !self.description.table_contains_index(&self.name, name) {
+    fn index(&self, columns: &[&str]) -> Result<Self::Index<'_>, Self::Error> {
+        let index_name = columns.join("_");
+
+        if !self
+            .description
+            .table_contains_index(&self.name, &index_name)
+        {
             return Err(Error::UnknownIndex {
                 collection: self.name.to_string(),
-                index: name.to_string(),
+                index: index_name,
             });
         }
 
-        Ok(SqliteCollection {
-            is_index: true,
-            name: self.name.clone(),
-            key_column: name.to_string(),
-            obj: self.obj.clone(),
-            description: self.description.clone(),
-            phantom: Default::default(),
-        })
+        Ok(SqliteCollection::new_index(
+            self.name.clone(),
+            columns,
+            self.obj.clone(),
+            self.description.clone(),
+        ))
     }
 }
 
@@ -526,42 +541,72 @@ impl<'tx, Mode: Send + Sync> ReadableCollection<'tx> for SqliteCollection<'tx, M
 where
     Mode: ReadMode + Sync,
 {
-    async fn get<K: KeyType + ?Sized, V: DeserializeOwned>(
+    async fn get<K: KeyTuple + ?Sized, V: DeserializeOwned>(
         &self,
         key: &K,
     ) -> Result<Option<V>, Self::Error> {
-        let conn = self.obj.lock()?;
-        let sql = format!(
-            "SELECT `data` FROM '{}' WHERE {} = ?;",
-            self.name,
-            self.qualified_key_column()
+        let values = key.to_raw_keys();
+        let columns = self.qualified_key_columns();
+
+        assert_eq!(
+            values.len(),
+            columns.len(),
+            "The number of tuple fields should match the number of columns in the index"
         );
+
+        let sql = format!(
+            r#"SELECT "data" FROM "{}" WHERE {} LIMIT 1"#,
+            self.name,
+            columns
+                .iter()
+                .map(|column| format!("{column} = ?"))
+                .collect::<Vec<_>>()
+                .join(" AND ")
+        );
+
+        let conn = self.obj.lock()?;
         let mut statement = conn.prepare(&sql)?;
         let data = statement
-            .query_row(params![key.to_raw_key()], |row| row.get::<_, String>(0))
+            .query_row(params_from_iter(values), |row| row.get::<_, String>(0))
             .optional()?;
         let result = data.map(|data| serde_json::from_str(&data)).transpose()?;
 
         Ok(result)
     }
 
-    async fn contains_key<K: KeyType + ?Sized>(&self, key: &K) -> Result<bool, Self::Error> {
+    async fn contains_key<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<bool, Self::Error> {
+        let values = key.to_raw_keys();
+        let columns = self.qualified_key_columns();
+
+        assert_eq!(
+            values.len(),
+            columns.len(),
+            "The number of tuple fields should match the number of columns in the index"
+        );
+
         let conn = self.obj.lock()?;
         let mut statement = conn.prepare(&format!(
-            "SELECT EXISTS(SELECT 1 FROM '{}' WHERE {} = ?);",
+            "SELECT EXISTS(SELECT 1 FROM '{}' WHERE {})",
             self.name,
-            self.qualified_key_column()
+            columns
+                .iter()
+                .map(|column| format!("{column} = ?"))
+                .collect::<Vec<_>>()
+                .join(" AND ")
         ))?;
-        Ok(statement.query_row(params![key.to_raw_key()], |row| row.get(0))?)
+        Ok(statement.query_row(params_from_iter(values), |row| row.get(0))?)
     }
 
     async fn all_keys(&self) -> Result<Vec<String>, Self::Error> {
+        let columns = self.qualified_key_columns();
+        assert_eq!(
+            columns.len(),
+            1,
+            "all_keys is not supported for multi-column indexes."
+        );
+
         let conn = self.obj.lock()?;
-        let mut statement = conn.prepare(&format!(
-            "SELECT {} FROM '{}'",
-            self.qualified_key_column(),
-            self.name
-        ))?;
+        let mut statement = conn.prepare(&format!("SELECT {} FROM '{}'", columns[0], self.name))?;
         let result = statement
             .query_map(params![], |row| row.get::<_, String>(0))?
             .collect::<Result<Vec<_>, _>>()?;
@@ -570,7 +615,7 @@ where
 
     async fn get_all<Value: DeserializeOwned + Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
     ) -> Result<Vec<(String, Value)>, Self::Error> {
@@ -586,7 +631,7 @@ where
 
     async fn get_all_filtered<Value: DeserializeOwned + Send, T: Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
         filter: impl FnMut(String, Value) -> Option<T> + SendUnlessWasm,
@@ -600,7 +645,7 @@ impl<'tx, Mode> SqliteCollection<'tx, Mode>
 where
     Mode: ReadMode + Sync,
 {
-    async fn _get_all_filtered<Key: KeyType, Value: DeserializeOwned + Send, T: Send>(
+    async fn _get_all_filtered<Key: KeyTuple, Value: DeserializeOwned + Send, T: Send>(
         &self,
         query: Query<Key>,
         mut filter: impl FnMut(String, Value) -> Option<T> + Send,
@@ -609,20 +654,15 @@ where
         limit_query: bool,
     ) -> Result<Vec<T>, Error> {
         let conn = self.obj.lock()?;
-        let (sql, params) = query.to_sql(
+        let (sql, params) = query.into_sql(
             &self.name,
-            &self.qualified_key_column(),
+            self.qualified_key_columns(),
             direction,
             if limit_query { limit } else { None },
         );
-        let params = params
-            .into_iter()
-            .map(|key| key.to_raw_key())
-            .collect::<Vec<_>>();
-        let params: Vec<&dyn ToSql> = params.iter().map(|k| k as &dyn ToSql).collect();
 
         let mut statement = conn.prepare(&sql)?;
-        let rows = statement.query_map(params.as_slice(), |row| {
+        let rows = statement.query_map(params_from_iter(params), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
 
@@ -655,15 +695,21 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
     fn add_index(&self, idx: IndexSpec) -> Result<(), Self::Error> {
         let conn = self.obj.lock()?;
         let index_type = if idx.unique { "UNIQUE INDEX" } else { "INDEX" };
+        let index_name = idx.keys.join("_");
+        let columns = idx
+            .keys
+            .into_iter()
+            .map(|key| format!(r#"json_extract("data", '$.{key}')"#))
+            .collect::<Vec<_>>()
+            .join(", ");
+
         let sql = &format!(
-            "CREATE {index_type} 'prose_{index_name}_idx' ON '{table_name}'(json_extract(`data`, '$.{index_column}'))",
-            index_name = idx.key,
+            "CREATE {index_type} 'prose_{index_name}_idx' ON '{table_name}'({columns})",
             table_name = self.name,
-            index_column = idx.key
         );
         let mut statement = conn.prepare(&sql)?;
         statement.execute(params![])?;
-        self.description.add_index(&self.name, &idx.key);
+        self.description.add_index(&self.name, &index_name);
         Ok(())
     }
 
@@ -674,7 +720,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
     ) -> Result<(), Self::Error> {
         let conn = self.obj.lock()?;
         let mut statement = conn.prepare(&format!(
-            r#"INSERT INTO "{}" (`key`, `data`) VALUES (?, ?)"#,
+            r#"INSERT INTO "{}" ("key", "data") VALUES (?, ?)"#,
             self.name
         ))?;
         statement.execute(params![key.to_raw_key(), &serde_json::to_string(value)?])?;
@@ -688,7 +734,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
     ) -> Result<(), Self::Error> {
         let conn = self.obj.lock()?;
         let mut statement = conn.prepare(&format!(
-            r#"INSERT OR REPLACE INTO "{}" (`key`, `data`) VALUES (?, ?)"#,
+            r#"INSERT OR REPLACE INTO "{}" ("key", "data") VALUES (?, ?)"#,
             self.name
         ))?;
         statement.execute(params![key.to_raw_key(), &serde_json::to_string(value)?])?;
@@ -698,7 +744,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
     fn delete<K: KeyType + ?Sized>(&self, key: &K) -> Result<(), Self::Error> {
         let conn = self.obj.lock()?;
         let mut statement =
-            conn.prepare(&format!(r#"DELETE FROM '{}' WHERE `key` = ?"#, self.name))?;
+            conn.prepare(&format!(r#"DELETE FROM '{}' WHERE "key" = ?"#, self.name))?;
         statement.execute(params![key.to_raw_key()])?;
         Ok(())
     }
@@ -762,8 +808,9 @@ impl ConnectionExt for rusqlite::Connection {
         let mut tables_to_indexes_map = HashMap::new();
 
         // Order the rows so that type=table comes before type=index…
-        let mut statement = self
-            .prepare("SELECT `type`, `name`, `tbl_name` FROM sqlite_schema ORDER BY `type` DESC")?;
+        let mut statement = self.prepare(
+            r#"SELECT "type", "name", "tbl_name" FROM sqlite_schema ORDER BY "type" DESC"#,
+        )?;
         let mut rows = statement.query([])?;
 
         while let Some(row) = rows.next()? {
@@ -801,43 +848,198 @@ impl ConnectionExt for rusqlite::Connection {
     }
 }
 
-impl<T: KeyType> Query<T> {
-    fn to_sql(
-        &self,
+impl<T: KeyTuple> Query<T> {
+    fn into_sql(
+        self,
         table: &str,
-        column: &str,
+        columns: &[String],
         direction: QueryDirection,
         limit: Option<usize>,
-    ) -> (String, Vec<&T>) {
+    ) -> (String, Vec<RawKey>) {
         let order = match direction {
             QueryDirection::Forward => "ASC",
             QueryDirection::Backward => "DESC",
         };
 
+        let (predicates, params) = match self {
+            Query::All => (vec![], vec![]),
+            Query::Range { start, end } => {
+                fn into_bounds<A: KeyTuple, B: KeyTuple>(
+                    tuple1: A,
+                    bound1: impl Fn(RawKey) -> Bound<RawKey>,
+                    tuple2: B,
+                    bound2: impl Fn(RawKey) -> Bound<RawKey>,
+                ) -> (Vec<Bound<RawKey>>, Vec<Bound<RawKey>>) {
+                    (
+                        tuple1.to_raw_keys().into_iter().map(bound1).collect(),
+                        tuple2.to_raw_keys().into_iter().map(bound2).collect(),
+                    )
+                }
+
+                let (start, end) = match (start, end) {
+                    (Bound::Included(start), Bound::Included(end)) => {
+                        into_bounds(start, Bound::Included, end, Bound::Included)
+                    }
+                    (Bound::Included(start), Bound::Excluded(end)) => {
+                        into_bounds(start, Bound::Included, end, Bound::Excluded)
+                    }
+                    (Bound::Included(start), Bound::Unbounded) => {
+                        let start = start
+                            .to_raw_keys()
+                            .into_iter()
+                            .map(Bound::Included)
+                            .collect::<Vec<_>>();
+                        let mut end = vec![];
+                        end.resize_with(start.len(), || Bound::Unbounded);
+                        (start, end)
+                    }
+                    (Bound::Excluded(start), Bound::Excluded(end)) => {
+                        into_bounds(start, Bound::Excluded, end, Bound::Excluded)
+                    }
+                    (Bound::Excluded(start), Bound::Included(end)) => {
+                        into_bounds(start, Bound::Excluded, end, Bound::Included)
+                    }
+                    (Bound::Excluded(start), Bound::Unbounded) => {
+                        let start = start
+                            .to_raw_keys()
+                            .into_iter()
+                            .map(Bound::Excluded)
+                            .collect::<Vec<_>>();
+                        let mut end = vec![];
+                        end.resize_with(start.len(), || Bound::Unbounded);
+                        (start, end)
+                    }
+                    (Bound::Unbounded, Bound::Unbounded) => (vec![], vec![]),
+                    (Bound::Unbounded, Bound::Included(end)) => {
+                        let end = end
+                            .to_raw_keys()
+                            .into_iter()
+                            .map(Bound::Included)
+                            .collect::<Vec<_>>();
+                        let mut start = vec![];
+                        start.resize_with(end.len(), || Bound::Unbounded);
+                        (start, end)
+                    }
+                    (Bound::Unbounded, Bound::Excluded(end)) => {
+                        let end = end
+                            .to_raw_keys()
+                            .into_iter()
+                            .map(Bound::Excluded)
+                            .collect::<Vec<_>>();
+                        let mut start = vec![];
+                        start.resize_with(end.len(), || Bound::Unbounded);
+                        (start, end)
+                    }
+                };
+
+                assert_eq!(
+                    start.len(),
+                    end.len(),
+                    "Both bounds should have the same number of tuple fields."
+                );
+                assert!(
+                    start.is_empty() || start.len() == columns.len(),
+                    "The number of tuple fields should match the number of columns in the index"
+                );
+
+                zip(zip(start, end), columns).into_iter().fold(
+                    (vec![], vec![]),
+                    |(mut predicates_vec, mut params_vec), ((start, end), column)| {
+                        let (predicate, params) =
+                            Query::Range { start, end }.into_where_clause(column);
+
+                        if !predicate.is_empty() {
+                            predicates_vec.push(predicate);
+                            params_vec.extend(params);
+                        }
+
+                        (predicates_vec, params_vec)
+                    },
+                )
+            }
+            Query::Only(values) => zip(values.to_raw_keys(), columns).into_iter().fold(
+                (vec![], vec![]),
+                |(mut predicates_vec, mut params_vec), (value, column)| {
+                    let (predicate, params) = Query::Only(value).into_where_clause(column);
+                    predicates_vec.push(predicate);
+                    params_vec.extend(params);
+                    (predicates_vec, params_vec)
+                },
+            ),
+        };
+
+        let mut sql = format!(r#"SELECT "key", "data" FROM "{table}""#);
+
+        if !predicates.is_empty() {
+            sql.push_str(&format!(
+                " WHERE {predicate}",
+                predicate = predicates.join(" AND ")
+            ));
+        }
+
+        sql.push_str(&format!(
+            " ORDER BY {column_order}",
+            column_order = columns
+                .iter()
+                .map(|column| format!(r#"{column} {order}"#))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+
+        if let Some(limit) = limit {
+            sql.push_str(&format!(" LIMIT {limit}"))
+        }
+
+        (sql, params)
+    }
+}
+
+impl Query<RawKey> {
+    fn into_where_clause(self, column: &str) -> (String, Vec<RawKey>) {
         let (predicate, params) = match self {
             Query::All => ("".to_string(), vec![]),
 
             Query::Range {
                 start: Bound::Included(start),
                 end: Bound::Included(end),
-            } => (format!("{column} >= ? AND {column} <= ?"), vec![start, end]),
+            } => (
+                format!("({column} >= ? AND {column} <= ?)"),
+                vec![start, end],
+            ),
             Query::Range {
                 start: Bound::Included(start),
                 end: Bound::Excluded(end),
-            } => (format!("{column} >= ? AND {column} < ?"), vec![start, end]),
+            } if start == end => (format!("{column} = ?"), vec![start]),
+            Query::Range {
+                start: Bound::Included(start),
+                end: Bound::Excluded(end),
+            } => (
+                format!("({column} >= ? AND {column} < ?)"),
+                vec![start, end],
+            ),
             Query::Range {
                 start: Bound::Included(start),
                 end: Bound::Unbounded,
             } => (format!("{column} >= ?"), vec![start]),
-
             Query::Range {
                 start: Bound::Excluded(start),
                 end: Bound::Included(end),
-            } => (format!("{column} > ? AND {column} <= ?"), vec![start, end]),
+            } if start == end => (format!("{column} = ?"), vec![start]),
+            Query::Range {
+                start: Bound::Excluded(start),
+                end: Bound::Included(end),
+            } => (
+                format!("({column} > ? AND {column} <= ?)"),
+                vec![start, end],
+            ),
             Query::Range {
                 start: Bound::Excluded(start),
                 end: Bound::Excluded(end),
-            } => (format!("{column} > ? AND {column} < ?"), vec![start, end]),
+            } if start == end => (format!("{column} != ?"), vec![start]),
+            Query::Range {
+                start: Bound::Excluded(start),
+                end: Bound::Excluded(end),
+            } => (format!("({column} > ? AND {column} < ?)"), vec![start, end]),
             Query::Range {
                 start: Bound::Excluded(start),
                 end: Bound::Unbounded,
@@ -859,19 +1061,7 @@ impl<T: KeyType> Query<T> {
             Query::Only(value) => (format!("{column} = ?"), vec![value]),
         };
 
-        let mut sql = format!("SELECT `key`, `data` FROM '{table}'");
-
-        if !predicate.is_empty() {
-            sql.push_str(&format!(" WHERE {predicate}"));
-        }
-
-        sql.push_str(&format!(" ORDER BY {column} {order}"));
-
-        if let Some(limit) = limit {
-            sql.push_str(&format!(" LIMIT {limit}"))
-        }
-
-        (sql, params)
+        (predicate, params)
     }
 }
 
@@ -884,5 +1074,55 @@ impl ToSql for RawKey {
             RawKey::Real(value) => Ok(ToSqlOutput::Borrowed(ValueRef::Real(value.clone()))),
             RawKey::Text(value) => Ok(ToSqlOutput::Borrowed(ValueRef::Text(value.as_bytes()))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_to_where_clause() {
+        let table = "table";
+        let columns = &["account".to_string(), "user_id".to_string()];
+
+        let query = Query::from_range(("a@prose.org", 2)..("a@prose.org", 3));
+        assert_eq!(
+            r#"SELECT "key", "data" FROM "table" WHERE account = ? AND (user_id >= ? AND user_id < ?) ORDER BY account ASC, user_id ASC"#,
+            &query.into_sql(table, columns, Default::default(), None).0
+        );
+
+        let query = Query::from_range(("a@prose.org", 2)..("a@prose.org", 2));
+        assert_eq!(
+            r#"SELECT "key", "data" FROM "table" WHERE account = ? AND user_id = ? ORDER BY account ASC, user_id ASC"#,
+            &query.into_sql(table, columns, Default::default(), None).0
+        );
+
+        let query = Query::from_range(("a@prose.org", 2)..("b@prose.org", 3));
+        assert_eq!(
+            r#"SELECT "key", "data" FROM "table" WHERE (account >= ? AND account < ?) AND (user_id >= ? AND user_id < ?) ORDER BY account ASC, user_id ASC"#,
+            &query.into_sql(table, columns, Default::default(), None).0
+        );
+
+        let query = Query::from_range(..=("b@prose.org", 3));
+        assert_eq!(
+            r#"SELECT "key", "data" FROM "table" WHERE account <= ? AND user_id <= ? ORDER BY account ASC, user_id ASC"#,
+            &query.into_sql(table, columns, Default::default(), None).0
+        );
+
+        let query = Query::<(&str, u32)>::from_range(..);
+        assert_eq!(
+            r#"SELECT "key", "data" FROM "table" ORDER BY account ASC, user_id ASC"#,
+            &query.into_sql(table, columns, Default::default(), None).0
+        );
+
+        let query = Query::Range {
+            start: Bound::Excluded(("a@prose.org", 2)),
+            end: Bound::Excluded(("a@prose.org", 4)),
+        };
+        assert_eq!(
+            r#"SELECT "key", "data" FROM "table" WHERE account != ? AND (user_id > ? AND user_id < ?) ORDER BY account ASC, user_id ASC"#,
+            &query.into_sql(table, columns, Default::default(), None).0
+        );
     }
 }

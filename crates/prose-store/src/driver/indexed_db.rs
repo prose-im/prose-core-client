@@ -1,20 +1,24 @@
-use crate::driver::{Driver, ReadMode, ReadOnly, ReadWrite, WriteMode};
-use crate::{
-    Collection, Database, IndexSpec, IndexedCollection, KeyType, Query, QueryDirection,
-    ReadTransaction, ReadableCollection, StoreError, Transaction, UpgradeTransaction,
-    VersionChangeEvent, WritableCollection, WriteTransaction,
-};
-use async_trait::async_trait;
-use gloo_utils::format::JsValueSerdeExt;
-use indexed_db_futures::prelude::*;
-use indexed_db_futures::web_sys::{DomException, IdbKeyRange};
-use prose_wasm_utils::SendUnlessWasm;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Bound;
+
+use async_trait::async_trait;
+use gloo_utils::format::JsValueSerdeExt;
+use indexed_db_futures::js_sys::Array;
+use indexed_db_futures::prelude::*;
+use indexed_db_futures::web_sys::{DomException, IdbKeyRange};
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 use wasm_bindgen::JsValue;
+
+use prose_wasm_utils::SendUnlessWasm;
+
+use crate::driver::{Driver, ReadMode, ReadOnly, ReadWrite, WriteMode};
+use crate::{
+    Collection, Database, IndexSpec, IndexedCollection, KeyTuple, KeyType, Query, QueryDirection,
+    ReadTransaction, ReadableCollection, StoreError, Transaction, UpgradeTransaction,
+    VersionChangeEvent, WritableCollection, WriteTransaction,
+};
 
 pub struct IndexedDBDriver {
     db_name: String,
@@ -233,8 +237,9 @@ where
 {
     type Index<'coll> = IndexedDBCollection<'coll, IdbIndex<'coll>, ReadOnly> where Self: 'coll;
 
-    fn index(&self, name: &str) -> Result<Self::Index<'_>, Self::Error> {
-        Ok(IndexedDBCollection::new(self.store.index(name)?))
+    fn index(&self, columns: &[&str]) -> Result<Self::Index<'_>, Self::Error> {
+        let index_name = columns.join("_");
+        Ok(IndexedDBCollection::new(self.store.index(&index_name)?))
     }
 }
 
@@ -244,21 +249,21 @@ impl<'tx, QuerySource: IdbQuerySource, Mode> ReadableCollection<'tx>
 where
     Mode: ReadMode,
 {
-    async fn get<K: KeyType + ?Sized, V: DeserializeOwned>(
+    async fn get<K: KeyTuple + ?Sized, V: DeserializeOwned>(
         &self,
         key: &K,
     ) -> Result<Option<V>, Self::Error> {
         let value: Option<V> = self
             .store
-            .get(&key.to_js_value()?)?
+            .get(&key.to_idb_key()?)?
             .await?
             .map(|value| JsValueSerdeExt::into_serde(&value))
             .transpose()?;
         Ok(value)
     }
 
-    async fn contains_key<K: KeyType + ?Sized>(&self, key: &K) -> Result<bool, Self::Error> {
-        let contains_key = self.store.get_key(&key.to_js_value()?)?.await?.is_some();
+    async fn contains_key<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<bool, Self::Error> {
+        let contains_key = self.store.get_key(&key.to_idb_key()?)?.await?.is_some();
         Ok(contains_key)
     }
 
@@ -271,7 +276,7 @@ where
 
     async fn get_all<Value: DeserializeOwned + Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
     ) -> Result<Vec<(String, Value)>, Self::Error> {
@@ -281,7 +286,7 @@ where
 
     async fn get_all_filtered<Value: DeserializeOwned + Send, T: Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
         mut filter: impl FnMut(String, Value) -> Option<T> + SendUnlessWasm,
@@ -340,11 +345,27 @@ where
 #[async_trait(? Send)]
 impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'tx>, ReadWrite> {
     fn add_index(&self, idx: IndexSpec) -> Result<(), Self::Error> {
-        self.store.create_index_with_params(
-            &idx.key,
-            &IdbKeyPath::str(&idx.key),
-            IdbIndexParameters::new().unique(idx.unique),
-        )?;
+        let index_name = idx.keys.join("_");
+
+        if idx.keys.len() == 1 {
+            self.store.create_index_with_params(
+                &index_name,
+                &IdbKeyPath::str(&idx.keys[0]),
+                IdbIndexParameters::new().unique(idx.unique),
+            )?;
+        } else {
+            let column_slices = idx
+                .keys
+                .iter()
+                .map(|column| column.as_str())
+                .collect::<Vec<_>>();
+
+            self.store.create_index_with_params(
+                &index_name,
+                &IdbKeyPath::str_sequence(&column_slices),
+                IdbIndexParameters::new().unique(idx.unique),
+            )?;
+        }
 
         Ok(())
     }
@@ -391,7 +412,7 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
     }
 }
 
-impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
+impl<T: KeyTuple> TryFrom<Query<T>> for Option<IdbKeyRange> {
     type Error = Error;
 
     fn try_from(value: Query<T>) -> Result<Option<IdbKeyRange>, Self::Error> {
@@ -403,8 +424,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Included(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &start.to_js_value()?,
-                    &end.to_js_value()?,
+                    &start.to_idb_key()?,
+                    &end.to_idb_key()?,
                     false,
                     false,
                 )
@@ -420,8 +441,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Excluded(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &start.to_js_value()?,
-                    &end.to_js_value()?,
+                    &start.to_idb_key()?,
+                    &end.to_idb_key()?,
                     false,
                     true,
                 )
@@ -436,7 +457,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Included(start),
                 end: Bound::Unbounded,
             } => Some(
-                IdbKeyRange::lower_bound_with_open(&start.to_js_value()?, false).map_err(|_| {
+                IdbKeyRange::lower_bound_with_open(&start.to_idb_key()?, false).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::lowerBound (false) from {:?}",
                         start
@@ -449,8 +470,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Included(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &start.to_js_value()?,
-                    &end.to_js_value()?,
+                    &start.to_idb_key()?,
+                    &end.to_idb_key()?,
                     true,
                     false,
                 )
@@ -466,8 +487,8 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Excluded(end),
             } => Some(
                 IdbKeyRange::bound_with_lower_open_and_upper_open(
-                    &start.to_js_value()?,
-                    &end.to_js_value()?,
+                    &start.to_idb_key()?,
+                    &end.to_idb_key()?,
                     true,
                     true,
                 )
@@ -482,7 +503,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Excluded(start),
                 end: Bound::Unbounded,
             } => Some(
-                IdbKeyRange::lower_bound_with_open(&start.to_js_value()?, true).map_err(|_| {
+                IdbKeyRange::lower_bound_with_open(&start.to_idb_key()?, true).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::lowerBound (true) from {:?}",
                         start
@@ -494,7 +515,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Unbounded,
                 end: Bound::Included(end),
             } => Some(
-                IdbKeyRange::upper_bound_with_open(&end.to_js_value()?, false).map_err(|_| {
+                IdbKeyRange::upper_bound_with_open(&end.to_idb_key()?, false).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::upperBound (false) from {:?}",
                         false
@@ -505,7 +526,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 start: Bound::Unbounded,
                 end: Bound::Excluded(end),
             } => Some(
-                IdbKeyRange::upper_bound_with_open(&end.to_js_value()?, true).map_err(|_| {
+                IdbKeyRange::upper_bound_with_open(&end.to_idb_key()?, true).map_err(|_| {
                     Error::IndexedDB(format!(
                         "Failed to build IdbKeyRange::upperBound (false) from {:?}",
                         false
@@ -517,7 +538,7 @@ impl<T: KeyType> TryFrom<Query<T>> for Option<IdbKeyRange> {
                 end: Bound::Unbounded,
             } => None,
 
-            Query::Only(value) => Some(IdbKeyRange::only(&value.to_js_value()?).map_err(|_| {
+            Query::Only(value) => Some(IdbKeyRange::only(&value.to_idb_key()?).map_err(|_| {
                 Error::IndexedDB(format!(
                     "Failed to build IdbKeyRange::only from {:?}",
                     value
@@ -537,5 +558,34 @@ impl<T: KeyType + ?Sized> KeyTypeExt for T {
     fn to_js_value(&self) -> Result<JsValue, Error> {
         <JsValue as JsValueSerdeExt>::from_serde(&self.to_raw_key())
             .map_err(|_| Error::IndexedDB(format!("Failed to convert {:?} to a JsValue.", self)))
+    }
+}
+
+trait KeyTupleExt {
+    fn to_idb_key(&self) -> Result<JsValue, Error>;
+}
+
+impl<T: KeyTuple + ?Sized> KeyTupleExt for T {
+    fn to_idb_key(&self) -> Result<JsValue, Error> {
+        let raw_values = self.to_raw_keys();
+
+        if raw_values.len() == 1 {
+            return <JsValue as JsValueSerdeExt>::from_serde(&raw_values[0]).map_err(|_| {
+                Error::IndexedDB(format!(
+                    "Failed to convert {:?} to a JsValue.",
+                    raw_values[0]
+                ))
+            });
+        }
+
+        let js_values = raw_values
+            .iter()
+            .map(|value| {
+                <JsValue as JsValueSerdeExt>::from_serde(&value).map_err(|_| {
+                    Error::IndexedDB(format!("Failed to convert {:?} to a JsValue.", value))
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Array::from_iter(js_values).into())
     }
 }

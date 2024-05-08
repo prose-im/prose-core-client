@@ -40,8 +40,8 @@ impl MessagesRepository for CachingMessageRepository {
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
 
-        let stanza_idx = collection.index(MessageRecord::stanza_id_target_idx())?;
-        let message_idx = collection.index(MessageRecord::message_id_target_idx())?;
+        let stanza_idx = collection.index(&[MessageRecord::stanza_id_target_idx()])?;
+        let message_idx = collection.index(&[MessageRecord::message_id_target_idx()])?;
 
         let mut messages: Vec<MessageLike> = vec![];
         for id in ids {
@@ -94,8 +94,8 @@ impl MessagesRepository for CachingMessageRepository {
             .await?;
 
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let stanza_idx = collection.index(MessageRecord::stanza_id_target_idx())?;
-        let message_idx = collection.index(MessageRecord::message_id_target_idx())?;
+        let stanza_idx = collection.index(&[MessageRecord::stanza_id_target_idx()])?;
+        let message_idx = collection.index(&[MessageRecord::message_id_target_idx()])?;
 
         let mut messages: Vec<MessageLike> = vec![];
         for id in targeted_ids {
@@ -175,7 +175,7 @@ impl MessagesRepository for CachingMessageRepository {
             .transaction_for_reading(&[MessageRecord::collection()])
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let idx = collection.index(MessageRecord::stanza_id_idx())?;
+        let idx = collection.index(&[MessageRecord::stanza_id_idx()])?;
         let message = idx.get::<_, MessageRecord>(stanza_id).await?;
         Ok(message.and_then(|m| m.id.into_original_id()))
     }

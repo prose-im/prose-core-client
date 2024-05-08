@@ -1,8 +1,9 @@
-use crate::tests::{collections, store, Person};
+use crate::tests::{collections, platform_driver, store, Person};
 use anyhow::Result;
 use chrono::NaiveDate;
 use insta::assert_snapshot;
 use prose_store::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -98,7 +99,7 @@ async fn test_query_uses_index() -> Result<()> {
         .transaction_for_reading(&[collections::PERSON])
         .await?;
     let people = tx.readable_collection(collections::PERSON)?;
-    let birthdays = people.index(collections::person::BIRTHDAY)?;
+    let birthdays = people.index(&[collections::person::BIRTHDAY])?;
 
     let sql = birthdays.explain_query_plan(Query::from_range(
         NaiveDate::from_ymd_opt(2020, 01, 02).unwrap()
@@ -107,4 +108,41 @@ async fn test_query_uses_index() -> Result<()> {
 
     assert_snapshot!(sql);
     Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_query_uses_multicolumn_index() -> Result<()> {
+    let driver = platform_driver("multi-column-index");
+    let store = Store::open(driver, 1, |event| {
+        let tx = &event.tx;
+
+        let collection = tx.create_collection("device_record")?;
+        collection.add_index(
+            IndexSpec::builder()
+                .add_column("account")
+                .add_column("user_id")
+                .build(),
+        )?;
+
+        Ok(())
+    })
+    .await?;
+
+    let tx = store.transaction_for_reading(&["device_record"]).await?;
+    let records = tx.readable_collection("device_record")?;
+    let idx = records.index(&["account", "user_id"])?;
+
+    let sql = idx.explain_query_plan(Query::Only(("b@prose.org", 1)))?;
+
+    assert_snapshot!(sql);
+
+    Ok(())
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct DeviceRecord {
+    account: String,
+    user_id: u32,
+    id: u32,
+    name: String,
 }

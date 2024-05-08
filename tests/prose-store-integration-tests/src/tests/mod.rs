@@ -3,19 +3,19 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-mod repository;
-#[cfg(not(target_arch = "wasm32"))]
-mod sqlite;
-
 use anyhow::Result;
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
-use prose_store::prelude::*;
 use serde::{Deserialize, Serialize};
-
 #[cfg(not(target_arch = "wasm32"))]
 pub use tokio::test as async_test;
 #[cfg(target_arch = "wasm32")]
 pub use wasm_bindgen_test::wasm_bindgen_test as async_test;
+
+use prose_store::prelude::*;
+
+mod repository;
+#[cfg(not(target_arch = "wasm32"))]
+mod sqlite;
 
 pub mod collections {
     pub const PERSON: &str = "person";
@@ -107,17 +107,26 @@ async fn store() -> Result<Store<PlatformDriver>> {
 
     let store = Store::open(driver, 1, |event| {
         let store = event.tx.create_collection(collections::PERSON)?;
-        store.add_index(IndexSpec::builder(collections::person::BIRTHDAY).build())?;
+        store.add_index(
+            IndexSpec::builder()
+                .add_column(collections::person::BIRTHDAY)
+                .build(),
+        )?;
 
         event.tx.create_collection(collections::CAMERA)?;
 
         let store = event.tx.create_collection(collections::BOOK)?;
         store.add_index(
-            IndexSpec::builder(collections::book::TITLE)
+            IndexSpec::builder()
+                .add_column(collections::book::TITLE)
                 .unique()
                 .build(),
         )?;
-        store.add_index(IndexSpec::builder(collections::book::PUBLISHED_AT).build())?;
+        store.add_index(
+            IndexSpec::builder()
+                .add_column(collections::book::PUBLISHED_AT)
+                .build(),
+        )?;
 
         let mut names = event.tx.collection_names()?;
         names.sort();
@@ -222,7 +231,7 @@ async fn test_access_invalid_index() -> Result<()> {
         .await?;
     let people = tx.readable_collection(collections::PERSON)?;
 
-    let result = people.index("does-not-exist");
+    let result = people.index(&["does-not-exist"]);
     assert!(result.is_err());
 
     Ok(())
@@ -292,7 +301,7 @@ async fn test_get_from_collection_and_index() -> Result<()> {
         .await?;
 
     let people = tx.readable_collection(collections::PERSON)?;
-    let birthdays = people.index(collections::person::BIRTHDAY)?;
+    let birthdays = people.index(&[collections::person::BIRTHDAY])?;
 
     assert_eq!(
         people.get("id-1").await?,
@@ -404,7 +413,7 @@ async fn test_chrono_types() -> Result<()> {
 
     let store = Store::open(platform_driver("chrono-types"), 1, |event| {
         let collection = event.tx.create_collection("chrono-types")?;
-        collection.add_index(IndexSpec::builder("value").build())?;
+        collection.add_index(IndexSpec::builder().add_column("value").build())?;
         Ok(())
     })
     .await?;
@@ -414,7 +423,7 @@ async fn test_chrono_types() -> Result<()> {
         .transaction_for_reading_and_writing(&["chrono-types"])
         .await?;
     let collection = tx.writeable_collection("chrono-types")?;
-    let values = collection.index("value")?;
+    let values = collection.index(&["value"])?;
 
     collection
         .set(
@@ -878,7 +887,7 @@ async fn test_index_keys() -> Result<()> {
         .transaction_for_reading(&[collections::PERSON])
         .await?;
     let people = tx.readable_collection(collections::PERSON)?;
-    let birthdays = people.index(collections::person::BIRTHDAY)?;
+    let birthdays = people.index(&[collections::person::BIRTHDAY])?;
 
     let values = birthdays
         .get_all::<Person>(
@@ -990,7 +999,7 @@ async fn test_index() -> Result<()> {
         .await?;
 
     let people = tx.readable_collection(collections::PERSON)?;
-    let birthdays = people.index(collections::person::BIRTHDAY)?;
+    let birthdays = people.index(&[collections::person::BIRTHDAY])?;
 
     let values = birthdays
         .get_all_values::<Person>(
@@ -1019,6 +1028,181 @@ async fn test_index() -> Result<()> {
                 birthday: NaiveDate::from_ymd_opt(2020, 01, 04).unwrap(),
             }
         ]
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_multicolumn_index() -> Result<()> {
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    struct DeviceRecord {
+        account: String,
+        user_id: u32,
+        id: u32,
+        name: String,
+    }
+
+    let driver = platform_driver("multi-column-index");
+    let store = Store::open(driver, 1, |event| {
+        let tx = &event.tx;
+
+        let collection = tx.create_collection("device_record")?;
+        collection.add_index(
+            IndexSpec::builder()
+                .add_column("account")
+                .add_column("user_id")
+                .add_column("id")
+                .unique()
+                .build(),
+        )?;
+        collection.add_index(
+            IndexSpec::builder()
+                .add_column("account")
+                .add_column("user_id")
+                .build(),
+        )?;
+
+        Ok(())
+    })
+    .await?;
+    store.truncate_all_collections().await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&["device_record"])
+        .await?;
+    {
+        let records = tx.writeable_collection("device_record")?;
+        records
+            .set(
+                &0,
+                &DeviceRecord {
+                    account: "a@prose.org".to_string(),
+                    user_id: 1,
+                    id: 1,
+                    name: "Device 1 (A)".to_string(),
+                },
+            )
+            .await?;
+        records
+            .set(
+                &1,
+                &DeviceRecord {
+                    account: "a@prose.org".to_string(),
+                    user_id: 2,
+                    id: 2,
+                    name: "Device 2 (A)".to_string(),
+                },
+            )
+            .await?;
+        records
+            .set(
+                &2,
+                &DeviceRecord {
+                    account: "a@prose.org".to_string(),
+                    user_id: 2,
+                    id: 3,
+                    name: "Device 3 (A)".to_string(),
+                },
+            )
+            .await?;
+        records
+            .set(
+                &3,
+                &DeviceRecord {
+                    account: "a@prose.org".to_string(),
+                    user_id: 3,
+                    id: 4,
+                    name: "Device 4 (A)".to_string(),
+                },
+            )
+            .await?;
+        records
+            .set(
+                &4,
+                &DeviceRecord {
+                    account: "b@prose.org".to_string(),
+                    user_id: 1,
+                    id: 1,
+                    name: "Device 1 (B)".to_string(),
+                },
+            )
+            .await?;
+        records
+            .set(
+                &5,
+                &DeviceRecord {
+                    account: "b@prose.org".to_string(),
+                    user_id: 1,
+                    id: 2,
+                    name: "Device 2 (B)".to_string(),
+                },
+            )
+            .await?;
+        records
+            .set(
+                &6,
+                &DeviceRecord {
+                    account: "b@prose.org".to_string(),
+                    user_id: 2,
+                    id: 3,
+                    name: "Device 3 (B)".to_string(),
+                },
+            )
+            .await?;
+    }
+    tx.commit().await?;
+
+    let tx = store.transaction_for_reading(&["device_record"]).await?;
+    let records = tx.readable_collection("device_record")?;
+    let idx = records.index(&["account", "user_id"])?;
+
+    let records = idx
+        .get_all_values::<DeviceRecord>(Query::Only(("b@prose.org", 1)), Default::default(), None)
+        .await?;
+
+    assert_eq!(
+        vec![
+            DeviceRecord {
+                account: "b@prose.org".to_string(),
+                user_id: 1,
+                id: 1,
+                name: "Device 1 (B)".to_string(),
+            },
+            DeviceRecord {
+                account: "b@prose.org".to_string(),
+                user_id: 1,
+                id: 2,
+                name: "Device 2 (B)".to_string(),
+            }
+        ],
+        records
+    );
+
+    let records = idx
+        .get_all_values::<DeviceRecord>(
+            Query::from_range(("a@prose.org", 2)..("a@prose.org", 3)),
+            Default::default(),
+            None,
+        )
+        .await?;
+
+    assert_eq!(
+        vec![
+            DeviceRecord {
+                account: "a@prose.org".to_string(),
+                user_id: 2,
+                id: 2,
+                name: "Device 2 (A)".to_string(),
+            },
+            DeviceRecord {
+                account: "a@prose.org".to_string(),
+                user_id: 2,
+                id: 3,
+                name: "Device 3 (A)".to_string(),
+            }
+        ],
+        records
     );
 
     Ok(())

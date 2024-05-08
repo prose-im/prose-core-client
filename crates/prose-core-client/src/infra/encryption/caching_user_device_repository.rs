@@ -60,7 +60,7 @@ impl Entity for UserDeviceRecord {
     }
 
     fn indexes() -> Vec<IndexSpec> {
-        vec![IndexSpec::builder(Self::user_id_idx()).build()]
+        vec![IndexSpec::builder().add_column(Self::user_id_idx()).build()]
     }
 }
 
@@ -83,7 +83,7 @@ impl UserDeviceRepositoryTrait for CachingUserDeviceRepository {
             .transaction_for_reading_and_writing(&[UserDeviceRecord::collection()])
             .await?;
         let collection = tx.writeable_collection(UserDeviceRecord::collection())?;
-        let idx = collection.index(UserDeviceRecord::user_id_idx())?;
+        let idx = collection.index(&[UserDeviceRecord::user_id_idx()])?;
 
         let current_device_ids = idx
             .get_all_values::<UserDeviceRecord>(
@@ -143,7 +143,7 @@ impl CachingUserDeviceRepository {
             .transaction_for_reading(&[UserDeviceRecord::collection()])
             .await?;
         let collection = tx.readable_collection(UserDeviceRecord::collection())?;
-        let idx = collection.index(UserDeviceRecord::user_id_idx())?;
+        let idx = collection.index(&[UserDeviceRecord::user_id_idx()])?;
 
         let devices = idx
             .get_all_values::<UserDeviceRecord>(

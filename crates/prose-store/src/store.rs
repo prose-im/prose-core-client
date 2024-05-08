@@ -1,6 +1,6 @@
 use crate::{
-    driver::Driver, Database, KeyType, ReadTransaction, ReadableCollection, VersionChangeEvent,
-    WritableCollection, WriteTransaction,
+    driver::Driver, Database, KeyTuple, KeyType, ReadTransaction, ReadableCollection,
+    VersionChangeEvent, WritableCollection, WriteTransaction,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -107,7 +107,7 @@ impl<D: Driver> Store<D> {
         collection.delete(key)
     }
 
-    pub async fn get<K: KeyType + ?Sized, V: DeserializeOwned>(
+    pub async fn get<K: KeyTuple + ?Sized, V: DeserializeOwned>(
         &self,
         collection_name: &str,
         key: &K,
@@ -117,7 +117,7 @@ impl<D: Driver> Store<D> {
         collection.get(key).await
     }
 
-    pub async fn contains_key<K: KeyType + ?Sized>(
+    pub async fn contains_key<K: KeyTuple + ?Sized>(
         &self,
         collection_name: &str,
         key: &K,

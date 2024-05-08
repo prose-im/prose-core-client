@@ -54,9 +54,15 @@ impl Entity for MessageRecord {
 
     fn indexes() -> Vec<IndexSpec> {
         vec![
-            IndexSpec::builder(Self::stanza_id_idx()).build(),
-            IndexSpec::builder(Self::stanza_id_target_idx()).build(),
-            IndexSpec::builder(Self::message_id_target_idx()).build(),
+            IndexSpec::builder()
+                .add_column(Self::stanza_id_idx())
+                .build(),
+            IndexSpec::builder()
+                .add_column(Self::stanza_id_target_idx())
+                .build(),
+            IndexSpec::builder()
+                .add_column(Self::message_id_target_idx())
+                .build(),
         ]
     }
 }

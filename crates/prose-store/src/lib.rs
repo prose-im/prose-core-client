@@ -1,3 +1,5 @@
+extern crate core;
+
 use std::error::Error;
 use std::fmt::Debug;
 use std::marker::PhantomData;
@@ -122,18 +124,18 @@ pub trait IndexedCollection<'tx>: Collection<'tx> {
     where
         Self: 'coll;
 
-    fn index(&self, name: &str) -> Result<Self::Index<'_>, Self::Error>;
+    fn index(&self, columns: &[&str]) -> Result<Self::Index<'_>, Self::Error>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 pub trait ReadableCollection<'tx>: Collection<'tx> {
-    async fn get<K: KeyType + ?Sized, V: DeserializeOwned>(
+    async fn get<K: KeyTuple + ?Sized, V: DeserializeOwned>(
         &self,
         key: &K,
     ) -> Result<Option<V>, Self::Error>;
 
-    async fn contains_key<K: KeyType + ?Sized>(&self, key: &K) -> Result<bool, Self::Error>;
+    async fn contains_key<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<bool, Self::Error>;
     async fn all_keys(&self) -> Result<Vec<String>, Self::Error>;
 
     /// Collects all items matching `query`.
@@ -143,14 +145,14 @@ pub trait ReadableCollection<'tx>: Collection<'tx> {
     /// IdbCursor can only be iterated asynchronously.
     async fn get_all<Value: DeserializeOwned + Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
     ) -> Result<Vec<(String, Value)>, Self::Error>;
 
     async fn get_all_filtered<Value: DeserializeOwned + Send, T: Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
         filter: impl FnMut(String, Value) -> Option<T> + SendUnlessWasm,
@@ -158,7 +160,7 @@ pub trait ReadableCollection<'tx>: Collection<'tx> {
 
     async fn get_all_values<Value: DeserializeOwned + Send>(
         &self,
-        query: Query<impl KeyType>,
+        query: Query<impl KeyTuple>,
         direction: QueryDirection,
         limit: Option<usize>,
     ) -> Result<Vec<Value>, Self::Error> {
@@ -196,21 +198,21 @@ pub trait WritableCollection<'tx>: Collection<'tx> {
 pub trait ReadWriteTransaction<'tx>: ReadTransaction<'tx> + WriteTransaction<'tx> {}
 
 pub struct IndexSpec {
-    pub key: String,
+    pub keys: Vec<String>,
     pub unique: bool,
 }
 
 pub struct IndexSpecBuilder {
-    key: String,
+    keys: Vec<String>,
     unique: bool,
 }
 
 impl IndexSpec {
     /// Creates a new index with the name `name`. Note that the name must match the name of a field
     /// of the `Collection`'s type.
-    pub fn builder(key: impl Into<String>) -> IndexSpecBuilder {
+    pub fn builder() -> IndexSpecBuilder {
         IndexSpecBuilder {
-            key: key.into(),
+            keys: vec![],
             unique: false,
         }
     }
@@ -221,12 +223,17 @@ impl IndexSpecBuilder {
         self.unique = true;
         self
     }
+
+    pub fn add_column(mut self, column: impl Into<String>) -> Self {
+        self.keys.push(column.into());
+        self
+    }
 }
 
 impl IndexSpecBuilder {
     pub fn build(self) -> IndexSpec {
         IndexSpec {
-            key: self.key,
+            keys: self.keys,
             unique: self.unique,
         }
     }
@@ -265,7 +272,7 @@ macro_rules! to_raw_key_str(
     )
 );
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum RawKey {
     Integer(i64),
     Real(f64),
@@ -402,17 +409,60 @@ mod jid {
     to_raw_key_str!(&Jid);
 }
 
-pub enum Query<T: KeyType> {
+pub enum Query<T> {
     All,
     Range { start: Bound<T>, end: Bound<T> },
     Only(T),
 }
 
-impl<T: KeyType + Clone> Query<T> {
+impl<T: KeyTuple + Clone> Query<T> {
     pub fn from_range<B: RangeBounds<T>>(range: B) -> Self {
         Self::Range {
             start: range.start_bound().cloned(),
             end: range.end_bound().cloned(),
         }
+    }
+}
+
+pub trait KeyTuple: Send + Sync + Debug {
+    fn to_raw_keys(&self) -> Vec<RawKey>;
+}
+
+impl<A: KeyType, B: KeyType> KeyTuple for (A, B) {
+    fn to_raw_keys(&self) -> Vec<RawKey> {
+        vec![self.0.to_raw_key(), self.1.to_raw_key()]
+    }
+}
+
+impl<A: KeyType, B: KeyType, C: KeyType> KeyTuple for (A, B, C) {
+    fn to_raw_keys(&self) -> Vec<RawKey> {
+        vec![
+            self.0.to_raw_key(),
+            self.1.to_raw_key(),
+            self.2.to_raw_key(),
+        ]
+    }
+}
+
+impl<A: KeyType, B: KeyType, C: KeyType, D: KeyType> KeyTuple for (A, B, C, D) {
+    fn to_raw_keys(&self) -> Vec<RawKey> {
+        vec![
+            self.0.to_raw_key(),
+            self.1.to_raw_key(),
+            self.2.to_raw_key(),
+            self.3.to_raw_key(),
+        ]
+    }
+}
+
+impl<T: KeyType> KeyTuple for T {
+    fn to_raw_keys(&self) -> Vec<RawKey> {
+        vec![self.to_raw_key()]
+    }
+}
+
+impl KeyTuple for str {
+    fn to_raw_keys(&self) -> Vec<RawKey> {
+        vec![RawKey::Text(self.to_string())]
     }
 }
