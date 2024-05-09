@@ -352,11 +352,16 @@ impl KeyType for u32 {
     }
 }
 
+impl<T: KeyType> KeyType for &T {
+    fn to_raw_key(&self) -> RawKey {
+        (*self).to_raw_key()
+    }
+}
+
 to_raw_key!(i32);
 to_raw_key!(i64);
 to_raw_key!(f32);
 to_raw_key!(f64);
-to_raw_key!(&String);
 to_raw_key!(&str);
 
 #[cfg(feature = "chrono")]
@@ -402,11 +407,8 @@ mod jid {
     use super::{KeyType, RawKey};
 
     to_raw_key_str!(BareJid);
-    to_raw_key_str!(&BareJid);
     to_raw_key_str!(FullJid);
-    to_raw_key_str!(&FullJid);
     to_raw_key_str!(Jid);
-    to_raw_key_str!(&Jid);
 }
 
 pub enum Query<T> {

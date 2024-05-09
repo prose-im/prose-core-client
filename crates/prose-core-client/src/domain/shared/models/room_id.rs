@@ -78,12 +78,6 @@ impl RoomId {
 
 impl KeyType for RoomId {
     fn to_raw_key(&self) -> RawKey {
-        (&self).to_raw_key()
-    }
-}
-
-impl KeyType for &RoomId {
-    fn to_raw_key(&self) -> RawKey {
         match self {
             RoomId::User(id) => RawKey::Text(id.to_string()),
             RoomId::Muc(id) => RawKey::Text(id.to_string()),

@@ -106,12 +106,6 @@ impl KeyType for UserId {
     }
 }
 
-impl KeyType for &UserId {
-    fn to_raw_key(&self) -> RawKey {
-        RawKey::Text(self.0.to_string())
-    }
-}
-
 impl PartialOrd for UserId {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
