@@ -5,11 +5,10 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 
 use prose_store::prelude::*;
 
-use crate::domain::messaging::repos::DraftsRepository as DomainDraftsRepository;
+use crate::domain::messaging::repos::DraftsRepository as DraftsRepositoryTrait;
 use crate::dtos::RoomId;
 
 pub struct DraftsRepository {
@@ -24,13 +23,13 @@ impl DraftsRepository {
 
 #[entity]
 pub struct DraftsRecord {
-    pub id: BareJid,
+    pub id: RoomId,
     pub text: String,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl DomainDraftsRepository for DraftsRepository {
+impl DraftsRepositoryTrait for DraftsRepository {
     async fn get(&self, room_id: &RoomId) -> Result<Option<String>> {
         let tx = self
             .store
@@ -50,7 +49,7 @@ impl DomainDraftsRepository for DraftsRepository {
 
         if let Some(draft) = draft {
             collection.put_entity(&DraftsRecord {
-                id: room_id.clone().into_bare(),
+                id: room_id.clone(),
                 text: draft.to_string(),
             })?;
         } else {

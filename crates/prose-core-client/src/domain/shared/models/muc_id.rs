@@ -9,11 +9,13 @@ use std::str::FromStr;
 
 use jid::{BareJid, Jid};
 use minidom::IntoAttributeValue;
+use serde::{Deserialize, Serialize};
 
 use crate::dtos::OccupantId;
 use crate::infra::xmpp::util::{JidExt, JidParseError};
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 /// Represents the BareJid of a MUC room.
 pub struct MucId(BareJid);
 

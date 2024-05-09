@@ -6,6 +6,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use jid::BareJid;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use prose_store::{KeyType, RawKey};
 
@@ -76,12 +77,18 @@ impl RoomId {
     }
 }
 
+impl RoomId {
+    fn to_raw_key_string(&self) -> String {
+        match self {
+            RoomId::User(id) => format!("user:{id}"),
+            RoomId::Muc(id) => format!("muc:{id}"),
+        }
+    }
+}
+
 impl KeyType for RoomId {
     fn to_raw_key(&self) -> RawKey {
-        match self {
-            RoomId::User(id) => RawKey::Text(id.to_string()),
-            RoomId::Muc(id) => RawKey::Text(id.to_string()),
-        }
+        RawKey::Text(self.to_raw_key_string())
     }
 }
 
@@ -100,5 +107,63 @@ impl AsRef<BareJid> for RoomId {
             RoomId::User(id) => id.as_ref(),
             RoomId::Muc(id) => id.as_ref(),
         }
+    }
+}
+
+impl Serialize for RoomId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.to_raw_key_string().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for RoomId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s: String = Deserialize::deserialize(deserializer)?;
+
+        match s {
+            _ if s.starts_with("user:") => Ok(RoomId::User(
+                s[5..].parse().map_err(serde::de::Error::custom)?,
+            )),
+            _ if s.starts_with("muc:") => Ok(RoomId::Muc(
+                s[4..].parse().map_err(serde::de::Error::custom)?,
+            )),
+            _ => Err(serde::de::Error::custom("Scheme should be 'user' or 'muc'")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use crate::{muc_id, user_id};
+
+    use super::*;
+
+    #[test]
+    fn test_serializes_to_json() -> Result<()> {
+        let room_id_str = r#""user:hello@prose.org""#;
+        let room_id = RoomId::User(user_id!("hello@prose.org"));
+
+        assert_eq!(room_id, serde_json::from_str(room_id_str)?);
+        assert_eq!(room_id_str, &serde_json::to_string(&room_id)?);
+        assert_eq!(
+            RawKey::Text("user:hello@prose.org".to_string()),
+            room_id.to_raw_key()
+        );
+
+        let room_id_str = r#""muc:room@conf.prose.org""#;
+        let room_id = RoomId::Muc(muc_id!("room@conf.prose.org"));
+
+        assert_eq!(room_id, serde_json::from_str(room_id_str)?);
+        assert_eq!(room_id_str, &serde_json::to_string(&room_id)?);
+
+        Ok(())
     }
 }

@@ -19,6 +19,7 @@ use crate::util::StringExt;
 use super::UserResourceId;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
 /// Represents a unique XMPP user identifier without resource specification.
 pub struct UserId(BareJid);
 
