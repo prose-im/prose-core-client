@@ -6,12 +6,14 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use tracing::warn;
 
 use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{MessageId, MessageLike, MessageTargetId, StanzaId};
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::RoomId;
+use crate::dtos::UserId;
 use crate::infra::messaging::MessageRecord;
 
 // TODO: Incorporate MessageArchiveService, cache complete pages loaded from the server
@@ -29,28 +31,44 @@ impl CachingMessageRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl MessagesRepository for CachingMessageRepository {
-    async fn get(&self, room_id: &RoomId, id: &MessageId) -> Result<Vec<MessageLike>> {
-        Ok(self.get_all(room_id, &[id.clone()]).await?)
+    async fn get(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        id: &MessageId,
+    ) -> Result<Vec<MessageLike>> {
+        Ok(self.get_all(account, room_id, &[id.clone()]).await?)
     }
 
-    async fn get_all(&self, _room_id: &RoomId, ids: &[MessageId]) -> Result<Vec<MessageLike>> {
+    async fn get_all(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        ids: &[MessageId],
+    ) -> Result<Vec<MessageLike>> {
+        warn!("Getting {} {} {:?}", account, room_id, ids);
+
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
 
-        let stanza_idx = collection.index(&[MessageRecord::stanza_id_target_idx()])?;
-        let message_idx = collection.index(&[MessageRecord::message_id_target_idx()])?;
+        let stanza_id_target_idx = collection.index(&MessageRecord::stanza_id_target_idx())?;
+        let message_id_target_idx = collection.index(&MessageRecord::message_id_target_idx())?;
+        let message_id_idx = collection.index(&MessageRecord::message_id_idx())?;
 
         let mut messages: Vec<MessageLike> = vec![];
+
         for id in ids {
-            let message = collection.get::<_, MessageRecord>(id).await?;
+            let message = message_id_idx
+                .get::<_, MessageRecord>(&(account, room_id, id))
+                .await?;
 
             messages.extend(
-                &mut message_idx
+                &mut message_id_target_idx
                     .get_all_values::<MessageRecord>(
-                        Query::Only((*id).clone()),
+                        Query::Only((account.clone(), room_id.clone(), id.clone())),
                         Default::default(),
                         None,
                     )
@@ -61,9 +79,9 @@ impl MessagesRepository for CachingMessageRepository {
 
             if let Some(stanza_id) = message.as_ref().and_then(|m| m.stanza_id.as_ref()) {
                 messages.extend(
-                    &mut stanza_idx
+                    &mut stanza_id_target_idx
                         .get_all_values::<MessageRecord>(
-                            Query::Only(stanza_id.clone()),
+                            Query::Only((account.clone(), room_id.clone(), stanza_id.clone())),
                             Default::default(),
                             None,
                         )
@@ -84,7 +102,8 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn get_messages_targeting(
         &self,
-        _room_id: &RoomId,
+        account: &UserId,
+        room_id: &RoomId,
         targeted_ids: &[MessageTargetId],
         newer_than: &DateTime<Utc>,
     ) -> Result<Vec<MessageLike>> {
@@ -94,8 +113,8 @@ impl MessagesRepository for CachingMessageRepository {
             .await?;
 
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let stanza_idx = collection.index(&[MessageRecord::stanza_id_target_idx()])?;
-        let message_idx = collection.index(&[MessageRecord::message_id_target_idx()])?;
+        let stanza_idx = collection.index(&MessageRecord::stanza_id_target_idx())?;
+        let message_idx = collection.index(&MessageRecord::message_id_target_idx())?;
 
         let mut messages: Vec<MessageLike> = vec![];
         for id in targeted_ids {
@@ -103,7 +122,7 @@ impl MessagesRepository for CachingMessageRepository {
                 MessageTargetId::MessageId(id) => {
                     message_idx
                         .get_all_values::<MessageRecord>(
-                            Query::Only((*id).clone()),
+                            Query::Only((account.clone(), room_id.clone(), id.clone())),
                             Default::default(),
                             None,
                         )
@@ -112,7 +131,7 @@ impl MessagesRepository for CachingMessageRepository {
                 MessageTargetId::StanzaId(id) => {
                     stanza_idx
                         .get_all_values::<MessageRecord>(
-                            Query::Only((*id).clone()),
+                            Query::Only((account.clone(), room_id.clone(), id.clone())),
                             Default::default(),
                             None,
                         )
@@ -132,30 +151,42 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(messages)
     }
 
-    async fn contains(&self, id: &MessageId) -> Result<bool> {
+    async fn contains(&self, account: &UserId, room_id: &RoomId, id: &MessageId) -> Result<bool> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let flag = collection.contains_key(id).await?;
+        let idx = collection.index(&MessageRecord::message_id_idx())?;
+        let flag = idx
+            .contains_key(&(account.clone(), room_id.clone(), id.clone()))
+            .await?;
         Ok(flag)
     }
 
-    async fn append(&self, _room_id: &RoomId, messages: &[MessageLike]) -> Result<()> {
+    async fn append(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        messages: &[MessageLike],
+    ) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[MessageRecord::collection()])
             .await?;
         let collection = tx.writeable_collection(MessageRecord::collection())?;
         for message in messages {
-            collection.put_entity(&MessageRecord::from(message.clone()))?;
+            collection.put_entity(&MessageRecord::from_message(
+                account.clone(),
+                room_id.clone(),
+                message.clone(),
+            ))?;
         }
         tx.commit().await?;
         Ok(())
     }
 
-    async fn clear_cache(&self) -> Result<()> {
+    async fn clear_cache(&self, _account: &UserId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[MessageRecord::collection()])
@@ -167,7 +198,8 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn resolve_message_id(
         &self,
-        _room_id: &RoomId,
+        account: &UserId,
+        room_id: &RoomId,
         stanza_id: &StanzaId,
     ) -> Result<Option<MessageId>> {
         let tx = self
@@ -175,8 +207,10 @@ impl MessagesRepository for CachingMessageRepository {
             .transaction_for_reading(&[MessageRecord::collection()])
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let idx = collection.index(&[MessageRecord::stanza_id_idx()])?;
-        let message = idx.get::<_, MessageRecord>(stanza_id).await?;
+        let stanza_idx = collection.index(&MessageRecord::stanza_id_idx())?;
+        let message = stanza_idx
+            .get::<_, MessageRecord>(&(account.clone(), room_id.clone(), stanza_id.clone()))
+            .await?;
         Ok(message.and_then(|m| m.id.into_original_id()))
     }
 }

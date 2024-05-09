@@ -3,7 +3,7 @@ use anyhow::Result;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAccountSettingsRepository, DynAvatarRepository, DynBlockListDomainService,
+    DynAccountSettingsRepository, DynAppContext, DynAvatarRepository, DynBlockListDomainService,
     DynContactListDomainService, DynDraftsRepository, DynEncryptionDomainService,
     DynMessagesRepository, DynSidebarDomainService, DynUserInfoRepository,
     DynUserProfileRepository,
@@ -11,6 +11,8 @@ use crate::app::deps::{
 
 #[derive(InjectDependencies)]
 pub struct CacheService {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     account_settings_repo: DynAccountSettingsRepository,
     #[inject]
@@ -35,13 +37,15 @@ pub struct CacheService {
 
 impl CacheService {
     pub async fn clear_cache(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         self.account_settings_repo.clear_cache().await?;
         self.avatar_repo.clear_cache().await?;
         self.block_list_domain_service.clear_cache().await?;
         self.contact_list_domain_service.clear_cache().await?;
         self.drafts_repo.clear_cache().await?;
         self.encryption_domain_service.clear_cache().await?;
-        self.messages_repo.clear_cache().await?;
+        self.messages_repo.clear_cache(&account).await?;
         self.sidebar_domain_service.clear_cache().await?;
         self.user_info_repo.clear_cache().await?;
         self.user_profile_repo.clear_cache().await?;

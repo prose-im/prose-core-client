@@ -7,7 +7,9 @@ use anyhow::Result;
 use chrono::{DateTime, TimeZone, Utc};
 use pretty_assertions::assert_eq;
 
-use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId};
+use prose_core_client::domain::messaging::models::{
+    MessageLike, MessageLikePayload, MessageTargetId,
+};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::shared::models::{RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
@@ -23,13 +25,19 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
     let room_id = RoomId::from(user_id!("a@prose.org"));
     let message = MessageBuilder::new_with_index(123).build_message_like();
 
-    repo.append(&room_id, &[message.clone()]).await?;
-    repo.append(&room_id, &[message.clone()]).await?;
+    repo.append(&user_id!("account@prose.org"), &room_id, &[message.clone()])
+        .await?;
+    repo.append(&user_id!("account@prose.org"), &room_id, &[message.clone()])
+        .await?;
 
     assert_eq!(
-        repo.get_all(&room_id, &[message.id.clone().into_original_id().unwrap()])
-            .await?,
-        vec![message]
+        vec![message.clone()],
+        repo.get_all(
+            &user_id!("account@prose.org"),
+            &room_id,
+            &[message.id.clone().into_original_id().unwrap()]
+        )
+        .await?,
     );
 
     Ok(())
@@ -48,12 +56,30 @@ async fn test_loads_message_with_reactions() -> Result<()> {
 
     let messages = vec![message1, message2];
 
-    repo.append(&room_id, messages.as_slice()).await?;
+    repo.append(
+        &user_id!("account@prose.org"),
+        &room_id,
+        messages.as_slice(),
+    )
+    .await?;
 
     assert_eq!(
-        repo.get_all(&room_id, &[MessageBuilder::id_for_index(1)])
-            .await?,
-        messages
+        messages,
+        repo.get_all(
+            &user_id!("account@prose.org"),
+            &room_id,
+            &[MessageBuilder::id_for_index(1)]
+        )
+        .await?
+    );
+    assert_eq!(
+        Vec::<MessageLike>::new(),
+        repo.get_all(
+            &user_id!("other_account@prose.org"),
+            &room_id,
+            &[MessageBuilder::id_for_index(1)]
+        )
+        .await?
     );
 
     Ok(())
@@ -79,12 +105,21 @@ async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
     };
 
     let messages = vec![message1, message2];
-    repo.append(&room_id, messages.as_slice()).await?;
+    repo.append(
+        &user_id!("account@prose.org"),
+        &room_id,
+        messages.as_slice(),
+    )
+    .await?;
 
     assert_eq!(
-        repo.get_all(&room_id, &[MessageBuilder::id_for_index(1)])
-            .await?,
-        messages
+        messages,
+        repo.get_all(
+            &user_id!("account@prose.org"),
+            &room_id,
+            &[MessageBuilder::id_for_index(1)]
+        )
+        .await?
     );
 
     Ok(())
@@ -118,10 +153,17 @@ async fn test_load_messages_targeting() -> Result<()> {
         message1, message2, message3, message4, message5, message6, message7,
     ];
 
-    repo.append(&room_id, messages.as_slice()).await?;
+    repo.append(
+        &user_id!("account@prose.org"),
+        &room_id,
+        messages.as_slice(),
+    )
+    .await?;
 
     assert_eq!(
+        messages,
         repo.get_all(
+            &user_id!("account@prose.org"),
             &room_id,
             &[
                 MessageBuilder::id_for_index(1),
@@ -129,8 +171,7 @@ async fn test_load_messages_targeting() -> Result<()> {
                 MessageBuilder::id_for_index(5)
             ]
         )
-        .await?,
-        messages
+        .await?
     );
 
     Ok(())
@@ -175,6 +216,7 @@ async fn test_load_only_messages_targeting() -> Result<()> {
         .build_message_like();
 
     repo.append(
+        &user_id!("account@prose.org"),
         &room_id,
         &[
             message1.clone(),
@@ -191,6 +233,7 @@ async fn test_load_only_messages_targeting() -> Result<()> {
     assert_eq!(
         vec![message4, message6],
         repo.get_messages_targeting(
+            &user_id!("account@prose.org"),
             &room_id,
             &[
                 MessageTargetId::MessageId(MessageBuilder::id_for_index(1)),
@@ -229,6 +272,7 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
         .build_message_like();
 
     repo.append(
+        &user_id!("account@prose.org"),
         &room_id,
         &[message1.clone(), message2.clone(), message3.clone()],
     )
@@ -237,6 +281,7 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
     assert_eq!(
         vec![message3, message1, message2],
         repo.get_messages_targeting(
+            &user_id!("account@prose.org"),
             &room_id,
             &[MessageTargetId::MessageId(MessageBuilder::id_for_index(
                 100
@@ -256,18 +301,27 @@ async fn test_resolves_message_id() -> Result<()> {
     let room_id = RoomId::from(user_id!("a@prose.org"));
     let message = MessageBuilder::new_with_index(101).build_message_like();
 
-    repo.append(&room_id, &[message]).await?;
+    repo.append(&user_id!("account@prose.org"), &room_id, &[message])
+        .await?;
 
     assert_eq!(
-        repo.resolve_message_id(&room_id, &MessageBuilder::stanza_id_for_index(101))
-            .await?,
-        Some(MessageBuilder::id_for_index(101))
+        Some(MessageBuilder::id_for_index(101)),
+        repo.resolve_message_id(
+            &user_id!("account@prose.org"),
+            &room_id,
+            &MessageBuilder::stanza_id_for_index(101)
+        )
+        .await?
     );
 
     assert_eq!(
-        repo.resolve_message_id(&room_id, &MessageBuilder::stanza_id_for_index(1))
-            .await?,
-        None
+        None,
+        repo.resolve_message_id(
+            &user_id!("account@prose.org"),
+            &room_id,
+            &MessageBuilder::stanza_id_for_index(1)
+        )
+        .await?
     );
 
     Ok(())

@@ -27,7 +27,7 @@ use crate::domain::messaging::models::{
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{RoomId, UserEndpointId};
-use crate::dtos::{MessageId, OccupantId, ParticipantId};
+use crate::dtos::{MessageId, OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
 
@@ -279,9 +279,11 @@ impl MessagesEventHandler {
         room: Room,
         message: MessageLike,
     ) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         let is_message_update = if let Some(message_id) = message.id.original_id() {
             self.messages_repo
-                .contains(message_id)
+                .contains(&account, &room.room_id, message_id)
                 .await
                 .unwrap_or(false)
         } else {
@@ -289,12 +291,14 @@ impl MessagesEventHandler {
         };
 
         let messages = [message];
-        self.messages_repo.append(&room.room_id, &messages).await?;
+        self.messages_repo
+            .append(&account, &room.room_id, &messages)
+            .await?;
         let [message] = messages;
 
         if is_message_update {
             let message_id = if let Some(target_id) = message.target {
-                self.resolve_message_target_id(&room.room_id, &message.id, target_id)
+                self.resolve_message_target_id(&account, &room.room_id, &message.id, target_id)
                     .await
             } else {
                 None
@@ -312,7 +316,7 @@ impl MessagesEventHandler {
 
         let event_type = if let Some(target) = message.target {
             let Some(message_id) = self
-                .resolve_message_target_id(&room.room_id, &message.id, target)
+                .resolve_message_target_id(&account, &room.room_id, &message.id, target)
                 .await
             else {
                 return Ok(());
@@ -341,6 +345,7 @@ impl MessagesEventHandler {
 
     async fn resolve_message_target_id(
         &self,
+        account: &UserId,
         room_id: &RoomId,
         message_id: &MessageLikeId,
         target_id: MessageTargetId,
@@ -350,7 +355,7 @@ impl MessagesEventHandler {
             MessageTargetId::StanzaId(stanza_id) => {
                 match self
                     .messages_repo
-                    .resolve_message_id(&room_id, &stanza_id)
+                    .resolve_message_id(account, &room_id, &stanza_id)
                     .await
                 {
                     Ok(Some(id)) => Some(id),

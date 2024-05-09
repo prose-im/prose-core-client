@@ -264,6 +264,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     async fn decrypt_message(
         &self,
         sender_id: &UserId,
+        room_id: &RoomId,
         message_id: Option<&MessageId>,
         payload: EncryptedPayload,
     ) -> Result<String, DecryptionError> {
@@ -281,7 +282,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 
         let Ok(messages) = self
             .message_repo
-            .get(&RoomId::User(sender_id.clone()), message_id)
+            .get(&self.ctx.connected_account()?, room_id, message_id)
             .await
         else {
             return Err(error);

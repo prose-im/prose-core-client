@@ -46,7 +46,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     deps.message_repo
         .expect_get_all()
         .once()
-        .return_once(|_, _| {
+        .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(vec![
                     MessageBuilder::new_with_index(1)
@@ -161,7 +161,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     deps.message_repo
         .expect_append()
         .once()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps).build(internals).to_generic_room();
 
@@ -200,11 +200,12 @@ async fn test_toggle_reaction_in_direct_message() -> Result<()> {
     deps.message_repo
         .expect_get()
         .with(
+            predicate::always(),
             predicate::eq(RoomId::User(user_id!("user@prose.org"))),
             predicate::eq(MessageBuilder::id_for_index(1)),
         )
         .once()
-        .return_once(|_, _| {
+        .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(vec![
                     MessageBuilder::new_with_index(1).build_message_like(),
@@ -279,11 +280,12 @@ async fn test_toggle_reaction_in_muc_room() -> Result<()> {
     deps.message_repo
         .expect_get()
         .with(
+            predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("room@conference.prose.org"))),
             predicate::eq(MessageBuilder::id_for_index(1)),
         )
         .once()
-        .return_once(|_, _| Box::pin(async { Ok(vec![message1, message2, message3]) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(vec![message1, message2, message3]) }));
 
     deps.messaging_service
         .expect_react_to_muc_message()
@@ -458,7 +460,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
 
     deps.message_repo
         .expect_append()
-        .returning(|_, _| Box::pin(async { Ok(()) }));
+        .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
         .build(Room::public_channel(muc_id!("room@conference.prose.org")))
@@ -629,7 +631,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
 
     deps.message_repo
         .expect_append()
-        .returning(|_, _| Box::pin(async { Ok(()) }));
+        .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
         .build(Room::public_channel(muc_id!("room@conference.prose.org")))
@@ -707,7 +709,7 @@ async fn test_stops_at_last_page() -> Result<()> {
 
     deps.message_repo
         .expect_append()
-        .returning(|_, _| Box::pin(async { Ok(()) }));
+        .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
         .build(Room::public_channel(muc_id!("room@conference.prose.org")))
@@ -766,6 +768,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .expect_get_messages_targeting()
         .once()
         .with(
+            predicate::always(),
             predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
             predicate::eq(vec![
                 MessageBuilder::id_for_index(5).into(),
@@ -779,7 +782,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
             ]),
             predicate::eq(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap()),
         )
-        .return_once(|_, _, _| {
+        .return_once(|_, _, _, _| {
             Box::pin(async {
                 Ok(vec![
                     MessageBuilder::new_with_index(6)
@@ -830,7 +833,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
 
     deps.message_repo
         .expect_append()
-        .returning(|_, _| Box::pin(async { Ok(()) }));
+        .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
     let room = RoomFactory::from(deps)
         .build(Room::public_channel(muc_id!("room@conference.prose.org")))

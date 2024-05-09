@@ -11,7 +11,7 @@ use parking_lot::RwLock;
 
 use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
-use crate::dtos::UserResourceId;
+use crate::dtos::{UserId, UserResourceId};
 
 pub struct AppConfig {
     /// The number of messages to return in a MessageResultSet.
@@ -58,6 +58,10 @@ impl AppContext {
             .ok_or(anyhow::anyhow!(
                 "Failed to read the user's JID since the client is not connected."
             ))
+    }
+
+    pub fn connected_account(&self) -> Result<UserId> {
+        Ok(self.connected_id()?.into_user_id())
     }
 
     pub fn muc_service(&self) -> Result<BareJid> {

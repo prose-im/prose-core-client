@@ -22,7 +22,7 @@ use crate::domain::messaging::models::{
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::AnonOccupantId;
-use crate::dtos::{DeviceId, Mention, MessageId, OccupantId, ParticipantId, UserId};
+use crate::dtos::{DeviceId, Mention, MessageId, OccupantId, ParticipantId, RoomId, UserId};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
 
@@ -84,9 +84,17 @@ impl MessageParser {
         let stanza_id = message
             .stanza_id()
             .map(|sid| StanzaId::from(sid.id.into_inner()));
-        let from = self.parse_from(&message)?;
-        let TargetedPayload { target, payload } =
-            self.parse_message_payload(&from, &message).await?;
+        let (participant_id, user_id) = self.parse_sender(&message)?;
+        // We're going to prefer the id of our associated room here, so that we'll even resolve
+        // the correct id for sent messages where the from might be our JID.
+        let room_id = self
+            .room
+            .as_ref()
+            .map(|room| room.room_id.clone())
+            .unwrap_or_else(|| participant_id.to_room_id());
+        let TargetedPayload { target, payload } = self
+            .parse_message_payload(user_id.as_ref(), &room_id, &message)
+            .await?;
         let timestamp = message
             .delay()
             .map(|delay| delay.stamp.0.into())
@@ -101,7 +109,7 @@ impl MessageParser {
             stanza_id,
             target,
             to,
-            from,
+            from: user_id.map(ParticipantId::User).unwrap_or(participant_id),
             timestamp,
             payload,
         })
@@ -109,26 +117,30 @@ impl MessageParser {
 }
 
 impl MessageParser {
-    fn parse_from(&self, message: &Message) -> Result<ParticipantId, StanzaParseError> {
+    fn parse_sender(
+        &self,
+        message: &Message,
+    ) -> Result<(ParticipantId, Option<UserId>), StanzaParseError> {
         let Some(from) = &message.from else {
             return Err(StanzaParseError::missing_attribute("from"));
         };
 
         if message.is_groupchat_message() {
-            if let Some(muc_user) = &message.muc_user() {
-                if let Some(jid) = &muc_user.jid {
-                    return Ok(ParticipantId::User(jid.to_bare().into()));
-                }
-            }
-
-            if let Some(anon_occupant_id) = &message.occupant_id() {
-                if let Some(user_id) = self.room.as_ref().and_then(|room| {
-                    room.participants()
-                        .get_user_id(&AnonOccupantId::from(anon_occupant_id.id.clone()))
-                }) {
-                    return Ok(ParticipantId::User(user_id));
-                }
-            }
+            let user_id = message
+                .muc_user()
+                .and_then(|muc_user| muc_user.jid)
+                .map(|jid| jid.to_bare().into())
+                .or_else(|| {
+                    self.room
+                        .as_ref()
+                        .and_then(|room| {
+                            message.occupant_id().map(|occupant_id| (room, occupant_id))
+                        })
+                        .and_then(|(room, occupant_id)| {
+                            room.participants()
+                                .get_user_id(&AnonOccupantId::from(occupant_id.id.clone()))
+                        })
+                });
 
             let Jid::Full(from) = from else {
                 return Err(StanzaParseError::ParseError {
@@ -136,9 +148,13 @@ impl MessageParser {
                         .to_string(),
                 });
             };
-            Ok(ParticipantId::Occupant(OccupantId::from(from.clone())))
+            Ok((
+                ParticipantId::Occupant(OccupantId::from(from.clone())),
+                user_id,
+            ))
         } else {
-            Ok(ParticipantId::User(UserId::from(from.to_bare())))
+            let user_id = UserId::from(from.to_bare());
+            Ok((ParticipantId::User(user_id.clone()), Some(user_id)))
         }
     }
 }
@@ -157,7 +173,8 @@ pub enum MessageLikeError {
 impl MessageParser {
     async fn parse_message_payload(
         &self,
-        from: &ParticipantId,
+        sender_id: Option<&UserId>,
+        room_id: &RoomId,
         message: &Message,
     ) -> Result<TargetedPayload> {
         if let Some(error) = &message.error() {
@@ -217,10 +234,13 @@ impl MessageParser {
 
         // If the message doesn't have a body but does have attachments, we'll use an
         // empty string for the body.
-        let parsed_body = self.parse_message_body(from, message).await?.or_else(|| {
-            (!message.attachments().is_empty())
-                .then_some(ParsedMessageBody::Plaintext("".to_string()))
-        });
+        let parsed_body = self
+            .parse_message_body(sender_id, room_id, message)
+            .await?
+            .or_else(|| {
+                (!message.attachments().is_empty())
+                    .then_some(ParsedMessageBody::Plaintext("".to_string()))
+            });
 
         if let Some(parsed_body) = parsed_body {
             let (body, encryption_info) = match parsed_body {
@@ -277,14 +297,13 @@ impl MessageParser {
 
     async fn parse_message_body(
         &self,
-        from: &ParticipantId,
+        sender_id: Option<&UserId>,
+        room_id: &RoomId,
         message: &Message,
     ) -> Result<Option<ParsedMessageBody>> {
         // If the message contains an encrypted payload, try to decrypt it. Otherwise, fall back
         // to the default body.
-        if let (ParticipantId::User(sender_id), Some(omemo_element)) =
-            (from, message.omemo_element())
-        {
+        if let (Some(sender_id), Some(omemo_element)) = (sender_id, message.omemo_element()) {
             let sender = DeviceId::from(omemo_element.header.sid);
             let encrypted_message = EncryptedMessage::from(omemo_element);
             let message_id = message.id.as_ref().map(|id| MessageId::from(id.clone()));
@@ -292,7 +311,7 @@ impl MessageParser {
             let decryption_result = match encrypted_message {
                 EncryptedMessage::Message(message) => {
                     self.encryption_domain_service
-                        .decrypt_message(sender_id, message_id.as_ref(), message)
+                        .decrypt_message(sender_id, room_id, message_id.as_ref(), message)
                         .await
                 }
                 EncryptedMessage::KeyTransport(payload) => {

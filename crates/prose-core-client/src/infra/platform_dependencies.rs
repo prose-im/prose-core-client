@@ -60,7 +60,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 19;
+const DB_VERSION: u32 = 20;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -112,6 +112,13 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             tx.delete_collection("omemo_identity")?;
             tx.delete_collection(encryption_keys_collections::SESSION_RECORD)?;
             tx.create_collection(encryption_keys_collections::SESSION_RECORD)?;
+        }
+
+        if event.old_version < 20 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
+            tx.delete_collection(DraftsRecord::collection())?;
+            create_collection::<D, DraftsRecord>(&tx)?;
         }
 
         Ok(())

@@ -261,6 +261,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
     .await?;
 
     assert_eq!(
+        parsed_message,
         MessageLike {
             id: "message-id-1".into(),
             stanza_id: Some("FbGQI-iEUNysr8pdD2PP9mmU".into()),
@@ -275,8 +276,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
                 encryption_info: None,
                 is_transient: false,
             },
-        },
-        parsed_message
+        }
     );
 
     Ok(())

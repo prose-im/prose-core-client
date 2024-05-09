@@ -72,14 +72,18 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
         .expect_contains()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(MessageId::from("message-id")))
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("message-id")),
+        )
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -141,14 +145,18 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
     deps.messages_repo
         .expect_contains()
         .once()
-        .with(predicate::eq(MessageId::from("message-id")))
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("message-id")),
+        )
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -229,19 +237,24 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
 
     deps.messages_repo
         .expect_contains()
-        .with(predicate::eq(MessageId::from("message-id")))
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("message-id")),
+        )
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
         .once()
         .in_sequence(&mut seq)
         .with(
+            predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("room@conference.prose.org"))),
             predicate::eq([expected_saved_message]),
         )
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -322,17 +335,18 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
     deps.messages_repo
         .expect_contains()
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
         .once()
         .in_sequence(&mut seq)
         .with(
+            predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("room@conference.prose.org"))),
             predicate::eq([expected_saved_message]),
         )
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -377,11 +391,11 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
     deps.messages_repo
         .expect_contains()
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -432,13 +446,17 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
 
     deps.messages_repo
         .expect_contains()
-        .with(predicate::eq(MessageId::from("message-id")))
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("message-id")),
+        )
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -501,13 +519,17 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
 
     deps.messages_repo
         .expect_contains()
-        .with(predicate::eq(MessageId::from("message-id")))
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("message-id")),
+        )
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -562,11 +584,11 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
     deps.messages_repo
         .expect_contains()
         .once()
-        .return_once(|_| Box::pin(async { Ok(true) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(true) }));
 
     deps.messages_repo
         .expect_append()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -611,20 +633,21 @@ async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()>
     deps.messages_repo
         .expect_contains()
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
         .once()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
         .expect_resolve_message_id()
         .with(
+            predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
             predicate::eq(StanzaId::from("stanza-id-100")),
         )
-        .return_once(|_, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -673,22 +696,27 @@ async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_m
 
     deps.messages_repo
         .expect_contains()
-        .with(predicate::eq(MessageId::from("message-id")))
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("message-id")),
+        )
         .once()
-        .return_once(|_| Box::pin(async { Ok(false) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
         .expect_append()
         .once()
-        .return_once(|_, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
         .expect_resolve_message_id()
         .with(
+            predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
             predicate::eq(StanzaId::from("stanza-id-100")),
         )
-        .return_once(|_, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
+        .return_once(|_, _, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()

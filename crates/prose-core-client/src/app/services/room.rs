@@ -216,6 +216,7 @@ impl<Kind> Room<Kind> {
         // Save the unencrypted message so that we can look it up later…
         self.message_repo
             .append(
+                &self.ctx.connected_account()?,
                 &self.data.room_id,
                 &[MessageLike {
                     id: MessageLikeId::new(Some(message_id.clone())),
@@ -274,6 +275,7 @@ impl<Kind> Room<Kind> {
         // Save the unencrypted message so that we can look it up later…
         self.message_repo
             .append(
+                &self.ctx.connected_account()?,
                 &self.data.room_id,
                 &[MessageLike {
                     id: MessageLikeId::new(Some(message_id.clone())),
@@ -302,8 +304,12 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
-        let user_jid = ParticipantId::from(self.ctx.connected_id()?.to_user_id());
-        let messages = self.message_repo.get(&self.data.room_id, &id).await?;
+        let account = self.ctx.connected_account()?;
+        let messages = self
+            .message_repo
+            .get(&account, &self.data.room_id, &id)
+            .await?;
+        let user_jid = ParticipantId::from(account);
 
         let mut message = Message::reducing_messages(messages)
             .pop()
@@ -339,7 +345,10 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<MessageDTO>> {
-        let messages = self.message_repo.get_all(&self.data.room_id, ids).await?;
+        let messages = self
+            .message_repo
+            .get_all(&self.ctx.connected_account()?, &self.data.room_id, ids)
+            .await?;
         Ok(self.reduce_messages_and_add_sender(messages).await)
     }
 
@@ -403,6 +412,7 @@ impl<Kind> Room<Kind> {
 
 impl<Kind> Room<Kind> {
     async fn load_messages(&self, before: Option<&StanzaId>) -> Result<MessageResultSet> {
+        let account = self.ctx.connected_account()?;
         let message_page_size = self.ctx.config.message_page_size;
         let max_message_pages_to_load = self.ctx.config.max_message_pages_to_load as usize;
 
@@ -487,6 +497,7 @@ impl<Kind> Room<Kind> {
             if let Some(newest_message_timestamp) = messages.first().as_ref().map(|m| m.timestamp) {
                 self.message_repo
                     .get_messages_targeting(
+                        &account,
                         &self.data.room_id,
                         &text_message_ids,
                         &newest_message_timestamp,
@@ -501,7 +512,7 @@ impl<Kind> Room<Kind> {
 
         debug!("Found {} messages. Saving to cache…", messages.len());
         self.message_repo
-            .append(&self.data.room_id, &messages)
+            .append(&account, &self.data.room_id, &messages)
             .await?;
 
         // So we have our `messages` in the order from newest to oldest (6, 5, 4, …) and need
@@ -639,6 +650,7 @@ impl<Kind> Room<Kind> {
 
         self.message_repo
             .append(
+                &self.ctx.connected_account()?,
                 &self.data.room_id,
                 &[MessageLike {
                     id: id.clone(),
