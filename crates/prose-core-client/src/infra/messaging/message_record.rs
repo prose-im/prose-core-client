@@ -17,12 +17,13 @@ use crate::dtos::{MessageId, ParticipantId, RoomId, StanzaId, UserId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MessageRecord {
+    pub id: String,
     pub account: UserId,
     pub room_id: RoomId,
-    pub id: MessageLikeId,
+    pub message_id: MessageLikeId,
+    pub message_id_target: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
     pub stanza_id_target: Option<StanzaId>,
-    pub message_id_target: Option<MessageId>,
     pub to: Option<BareJid>,
     pub from: ParticipantId,
     pub timestamp: DateTime<Utc>,
@@ -34,11 +35,15 @@ mod columns {
     pub const ROOM_ID: &str = "room_id";
     pub const STANZA_ID: &str = "stanza_id";
     pub const STANZA_ID_TARGET: &str = "stanza_id_target";
-    pub const MESSAGE_ID: &str = "id";
+    pub const MESSAGE_ID: &str = "message_id";
     pub const MESSAGE_ID_TARGET: &str = "message_id_target";
 }
 
 impl MessageRecord {
+    pub fn account_idx() -> [&'static str; 1] {
+        [columns::ACCOUNT]
+    }
+
     pub fn stanza_id_idx() -> [&'static str; 3] {
         [columns::ACCOUNT, columns::ROOM_ID, columns::STANZA_ID]
     }
@@ -65,7 +70,7 @@ impl MessageRecord {
 }
 
 impl Entity for MessageRecord {
-    type ID = MessageLikeId;
+    type ID = String;
 
     fn id(&self) -> &Self::ID {
         &self.id
@@ -77,6 +82,7 @@ impl Entity for MessageRecord {
 
     fn indexes() -> Vec<IndexSpec> {
         vec![
+            IndexSpec::builder().add_column(columns::ACCOUNT).build(),
             IndexSpec::builder()
                 .add_column(columns::ACCOUNT)
                 .add_column(columns::ROOM_ID)
@@ -129,13 +135,16 @@ impl MessageRecord {
             None => (None, None),
         };
 
+        let id = format!("{account}-{}-{}", room_id.to_raw_key_string(), value.id);
+
         Self {
             account,
             room_id,
-            id: value.id,
+            id,
+            message_id: value.id,
+            message_id_target,
             stanza_id: value.stanza_id,
             stanza_id_target,
-            message_id_target,
             to: value.to,
             from: value.from,
             timestamp: value.timestamp,
@@ -153,7 +162,7 @@ impl From<MessageRecord> for MessageLike {
         };
 
         Self {
-            id: value.id,
+            id: value.message_id,
             stanza_id: value.stanza_id,
             target,
             to: value.to,

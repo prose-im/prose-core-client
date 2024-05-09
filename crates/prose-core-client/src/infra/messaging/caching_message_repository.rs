@@ -186,13 +186,17 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(())
     }
 
-    async fn clear_cache(&self, _account: &UserId) -> Result<()> {
+    async fn clear_cache(&self, account: &UserId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[MessageRecord::collection()])
             .await?;
-        tx.truncate_collections(&[MessageRecord::collection()])?;
+        let collection = tx.writeable_collection(MessageRecord::collection())?;
+        collection
+            .delete_all_in_index(&MessageRecord::account_idx(), Query::Only(account.clone()))
+            .await?;
         tx.commit().await?;
+
         Ok(())
     }
 
@@ -211,6 +215,6 @@ impl MessagesRepository for CachingMessageRepository {
         let message = stanza_idx
             .get::<_, MessageRecord>(&(account.clone(), room_id.clone(), stanza_id.clone()))
             .await?;
-        Ok(message.and_then(|m| m.id.into_original_id()))
+        Ok(message.and_then(|m| m.message_id.into_original_id()))
     }
 }

@@ -326,3 +326,104 @@ async fn test_resolves_message_id() -> Result<()> {
 
     Ok(())
 }
+
+#[async_test]
+async fn test_clears_cache() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    repo.append(
+        &user_id!("a@prose.org"),
+        &user_id!("room1@prose.org").into(),
+        &[MessageBuilder::new_with_index(1).build_message_like()],
+    )
+    .await?;
+    repo.append(
+        &user_id!("a@prose.org"),
+        &user_id!("room2@prose.org").into(),
+        &[MessageBuilder::new_with_index(2).build_message_like()],
+    )
+    .await?;
+    repo.append(
+        &user_id!("b@prose.org"),
+        &user_id!("room1@prose.org").into(),
+        &[MessageBuilder::new_with_index(1).build_message_like()],
+    )
+    .await?;
+    repo.append(
+        &user_id!("b@prose.org"),
+        &user_id!("room2@prose.org").into(),
+        &[MessageBuilder::new_with_index(2).build_message_like()],
+    )
+    .await?;
+
+    assert_eq!(
+        vec![MessageBuilder::new_with_index(1).build_message_like()],
+        repo.get_all(
+            &user_id!("a@prose.org"),
+            &user_id!("room1@prose.org").into(),
+            &[
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2)
+            ]
+        )
+        .await?
+    );
+    assert_eq!(
+        vec![MessageBuilder::new_with_index(2).build_message_like()],
+        repo.get_all(
+            &user_id!("a@prose.org"),
+            &user_id!("room2@prose.org").into(),
+            &[
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2)
+            ]
+        )
+        .await?
+    );
+
+    repo.clear_cache(&user_id!("a@prose.org")).await?;
+
+    assert!(repo
+        .get_all(
+            &user_id!("a@prose.org"),
+            &user_id!("room1@prose.org").into(),
+            &[
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2)
+            ]
+        )
+        .await?
+        .is_empty());
+    assert!(repo
+        .get_all(
+            &user_id!("a@prose.org"),
+            &user_id!("room2@prose.org").into(),
+            &[
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2),
+            ],
+        )
+        .await?
+        .is_empty());
+
+    assert_eq!(
+        vec![MessageBuilder::new_with_index(1).build_message_like()],
+        repo.get_all(
+            &user_id!("b@prose.org"),
+            &user_id!("room1@prose.org").into(),
+            &[MessageBuilder::id_for_index(1)]
+        )
+        .await?
+    );
+    assert_eq!(
+        vec![MessageBuilder::new_with_index(2).build_message_like()],
+        repo.get_all(
+            &user_id!("b@prose.org"),
+            &user_id!("room2@prose.org").into(),
+            &[MessageBuilder::id_for_index(2)]
+        )
+        .await?
+    );
+
+    Ok(())
+}

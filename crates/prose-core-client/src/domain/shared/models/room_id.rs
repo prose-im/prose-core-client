@@ -78,7 +78,7 @@ impl RoomId {
 }
 
 impl RoomId {
-    fn to_raw_key_string(&self) -> String {
+    pub fn to_raw_key_string(&self) -> String {
         match self {
             RoomId::User(id) => format!("user:{id}"),
             RoomId::Muc(id) => format!("muc:{id}"),
