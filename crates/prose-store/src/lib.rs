@@ -183,6 +183,12 @@ pub trait WritableCollection<'tx>: Collection<'tx> {
         -> Result<(), Self::Error>;
     fn delete<K: KeyType + ?Sized>(&self, key: &K) -> Result<(), Self::Error>;
 
+    async fn delete_all_in_index(
+        &self,
+        columns: &[&str],
+        query: Query<impl KeyTuple>,
+    ) -> Result<(), Self::Error>;
+
     /// Deletes all entries in the collection.
     fn truncate(&self) -> Result<(), Self::Error>;
 

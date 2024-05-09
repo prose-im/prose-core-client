@@ -749,6 +749,31 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
         Ok(())
     }
 
+    async fn delete_all_in_index(
+        &self,
+        columns: &[&str],
+        query: Query<impl KeyTuple>,
+    ) -> Result<(), Self::Error> {
+        let conn = self.obj.lock()?;
+        let qualified_columns = columns
+            .iter()
+            .map(|column| format!(r#"json_extract("data", '$.{}')"#, column))
+            .collect::<Vec<_>>();
+
+        let mut sql = format!("DELETE FROM '{}'", self.name);
+        let params = match query.into_sql_predicate(&qualified_columns) {
+            Some((predicate, params)) => {
+                sql.push_str(&format!(" WHERE {predicate}"));
+                params
+            }
+            None => vec![],
+        };
+
+        let mut statement = conn.prepare(&sql)?;
+        statement.execute(params_from_iter(params))?;
+        Ok(())
+    }
+
     fn truncate(&self) -> Result<(), Self::Error> {
         let conn = self.obj.lock()?;
         let mut statement = conn.prepare(&format!(r#"DELETE FROM '{}'"#, self.name))?;
@@ -861,6 +886,33 @@ impl<T: KeyTuple> Query<T> {
             QueryDirection::Backward => "DESC",
         };
 
+        let mut sql = format!(r#"SELECT "key", "data" FROM "{table}""#);
+
+        let params = match self.into_sql_predicate(columns) {
+            Some((predicate, params)) => {
+                sql.push_str(&format!(" WHERE {predicate}"));
+                params
+            }
+            None => vec![],
+        };
+
+        sql.push_str(&format!(
+            " ORDER BY {column_order}",
+            column_order = columns
+                .iter()
+                .map(|column| format!(r#"{column} {order}"#))
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+
+        if let Some(limit) = limit {
+            sql.push_str(&format!(" LIMIT {limit}"))
+        }
+
+        (sql, params)
+    }
+
+    fn into_sql_predicate(self, columns: &[impl AsRef<str>]) -> Option<(String, Vec<RawKey>)> {
         let (predicates, params) = match self {
             Query::All => (vec![], vec![]),
             Query::Range { start, end } => {
@@ -946,7 +998,7 @@ impl<T: KeyTuple> Query<T> {
                     (vec![], vec![]),
                     |(mut predicates_vec, mut params_vec), ((start, end), column)| {
                         let (predicate, params) =
-                            Query::Range { start, end }.into_where_clause(column);
+                            Query::Range { start, end }.into_where_clause(column.as_ref());
 
                         if !predicate.is_empty() {
                             predicates_vec.push(predicate);
@@ -960,7 +1012,7 @@ impl<T: KeyTuple> Query<T> {
             Query::Only(values) => zip(values.to_raw_keys(), columns).into_iter().fold(
                 (vec![], vec![]),
                 |(mut predicates_vec, mut params_vec), (value, column)| {
-                    let (predicate, params) = Query::Only(value).into_where_clause(column);
+                    let (predicate, params) = Query::Only(value).into_where_clause(column.as_ref());
                     predicates_vec.push(predicate);
                     params_vec.extend(params);
                     (predicates_vec, params_vec)
@@ -968,29 +1020,11 @@ impl<T: KeyTuple> Query<T> {
             ),
         };
 
-        let mut sql = format!(r#"SELECT "key", "data" FROM "{table}""#);
+        if predicates.is_empty() {
+            return None;
+        };
 
-        if !predicates.is_empty() {
-            sql.push_str(&format!(
-                " WHERE {predicate}",
-                predicate = predicates.join(" AND ")
-            ));
-        }
-
-        sql.push_str(&format!(
-            " ORDER BY {column_order}",
-            column_order = columns
-                .iter()
-                .map(|column| format!(r#"{column} {order}"#))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-
-        if let Some(limit) = limit {
-            sql.push_str(&format!(" LIMIT {limit}"))
-        }
-
-        (sql, params)
+        Some((predicates.join(" AND "), params))
     }
 }
 

@@ -406,6 +406,35 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
         Ok(())
     }
 
+    async fn delete_all_in_index(
+        &self,
+        columns: &[&str],
+        query: Query<impl KeyTuple>,
+    ) -> Result<(), Self::Error> {
+        let range: Option<IdbKeyRange> = query.try_into()?;
+
+        let index_name = columns.join("_");
+        let index = self.store.index(&index_name)?;
+
+        let cursor = range
+            .map(|range| index.open_cursor_with_range(&range))
+            .unwrap_or_else(|| index.open_cursor())?
+            .await?;
+
+        let Some(cursor) = cursor else { return Ok(()) };
+
+        loop {
+            let key = cursor.primary_key().ok_or(Error::InvalidDBKey)?;
+            self.store.delete(&key)?;
+
+            if !cursor.continue_cursor()?.await? {
+                break;
+            }
+        }
+
+        Ok(())
+    }
+
     fn truncate(&self) -> Result<(), Self::Error> {
         self.store.clear()?;
         Ok(())
