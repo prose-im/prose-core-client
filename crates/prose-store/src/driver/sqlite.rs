@@ -619,7 +619,7 @@ where
         direction: QueryDirection,
         limit: Option<usize>,
     ) -> Result<Vec<(String, Value)>, Self::Error> {
-        self._get_all_filtered(
+        self.fold_into_vec(
             query,
             |key, value| Some((key, value)),
             direction,
@@ -636,8 +636,24 @@ where
         limit: Option<usize>,
         filter: impl FnMut(String, Value) -> Option<T> + SendUnlessWasm,
     ) -> Result<Vec<T>, Self::Error> {
-        self._get_all_filtered(query, filter, direction, limit, false)
+        self.fold_into_vec(query, filter, direction, limit, false)
             .await
+    }
+
+    async fn fold<Value: DeserializeOwned + Send, T: Send>(
+        &self,
+        query: Query<impl KeyTuple>,
+        init: T,
+        mut f: impl FnMut(T, (String, Value)) -> T + SendUnlessWasm,
+    ) -> Result<T, Self::Error> {
+        self._fold(
+            query,
+            QueryDirection::default(),
+            None,
+            init,
+            |result, args, _| f(result, args),
+        )
+        .await
     }
 }
 
@@ -645,7 +661,7 @@ impl<'tx, Mode> SqliteCollection<'tx, Mode>
 where
     Mode: ReadMode + Sync,
 {
-    async fn _get_all_filtered<Key: KeyTuple, Value: DeserializeOwned + Send, T: Send>(
+    async fn fold_into_vec<Key: KeyTuple, Value: DeserializeOwned + Send, T: Send>(
         &self,
         query: Query<Key>,
         mut filter: impl FnMut(String, Value) -> Option<T> + Send,
@@ -653,40 +669,60 @@ where
         limit: Option<usize>,
         limit_query: bool,
     ) -> Result<Vec<T>, Error> {
-        let conn = self.obj.lock()?;
-        let (sql, params) = query.into_sql(
-            &self.name,
-            self.qualified_key_columns(),
-            direction,
-            if limit_query { limit } else { None },
-        );
+        if limit == Some(0) {
+            return Ok(vec![]);
+        }
 
+        let db_limit = if limit_query { limit } else { None };
+        let limit = limit.unwrap_or(usize::MAX);
+
+        self._fold(
+            query,
+            direction,
+            db_limit,
+            vec![],
+            |mut result, (key, value), stop| {
+                if let Some(transformed_value) = filter(key, value) {
+                    result.push(transformed_value);
+                }
+                if result.len() == limit {
+                    *stop = true;
+                }
+                result
+            },
+        )
+        .await
+    }
+
+    async fn _fold<Key: KeyTuple, Value: DeserializeOwned + Send, T: Send>(
+        &self,
+        query: Query<Key>,
+        direction: QueryDirection,
+        limit: Option<usize>,
+        init: T,
+        mut f: impl FnMut(T, (String, Value), &mut bool) -> T + SendUnlessWasm,
+    ) -> Result<T, Error> {
+        let conn = self.obj.lock()?;
+        let (sql, params) =
+            query.into_sql(&self.name, self.qualified_key_columns(), direction, limit);
         let mut statement = conn.prepare(&sql)?;
         let rows = statement.query_map(params_from_iter(params), |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
 
-        let limit = limit.unwrap_or(usize::MAX);
-        if limit == 0 {
-            return Ok(vec![]);
-        }
-
-        let mut result = vec![];
+        let mut last_value = init;
 
         for row in rows {
             let (key, data) = row?;
             let value = serde_json::from_str(&data)?;
-
-            if let Some(transformed_value) = (filter)(key, value) {
-                result.push(transformed_value)
-            }
-
-            if result.len() == limit {
+            let mut stop = false;
+            last_value = f(last_value, (key, value), &mut stop);
+            if stop {
                 break;
             }
         }
 
-        Ok(result)
+        Ok(last_value)
     }
 }
 

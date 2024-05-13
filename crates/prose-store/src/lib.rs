@@ -167,6 +167,13 @@ pub trait ReadableCollection<'tx>: Collection<'tx> {
         self.get_all_filtered(query, direction, limit, |_, value| Some(value))
             .await
     }
+
+    async fn fold<Value: DeserializeOwned + Send, T: Send>(
+        &self,
+        query: Query<impl KeyTuple>,
+        init: T,
+        f: impl FnMut(T, (String, Value)) -> T + SendUnlessWasm,
+    ) -> Result<T, Self::Error>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

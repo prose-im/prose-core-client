@@ -291,6 +291,53 @@ where
         limit: Option<usize>,
         mut filter: impl FnMut(String, Value) -> Option<T> + SendUnlessWasm,
     ) -> Result<Vec<T>, Self::Error> {
+        if limit == Some(0) {
+            return Ok(vec![]);
+        }
+
+        let limit = limit.unwrap_or(usize::MAX);
+
+        self._fold(
+            query,
+            direction,
+            vec![],
+            |mut result, (key, value), stop| {
+                if let Some(transformed_value) = filter(key, value) {
+                    result.push(transformed_value);
+                }
+                if result.len() == limit {
+                    *stop = true;
+                }
+                result
+            },
+        )
+        .await
+    }
+
+    async fn fold<Value: DeserializeOwned + Send, T: Send>(
+        &self,
+        query: Query<impl KeyTuple>,
+        init: T,
+        mut f: impl FnMut(T, (String, Value)) -> T + SendUnlessWasm,
+    ) -> Result<T, Self::Error> {
+        self._fold(
+            query,
+            QueryDirection::default(),
+            init,
+            |result, args, _stop| f(result, args),
+        )
+        .await
+    }
+}
+
+impl<'tx, QuerySource: IdbQuerySource, Mode> IndexedDBCollection<'tx, QuerySource, Mode> {
+    async fn _fold<Value: DeserializeOwned + Send, T: Send>(
+        &self,
+        query: Query<impl KeyTuple>,
+        direction: QueryDirection,
+        init: T,
+        mut f: impl FnMut(T, (String, Value), &mut bool) -> T + SendUnlessWasm,
+    ) -> Result<T, Error> {
         let range: Option<IdbKeyRange> = query.try_into()?;
         let direction = match direction {
             QueryDirection::Forward => IdbCursorDirection::Next,
@@ -305,18 +352,14 @@ where
         }?
         .await?;
 
+        let mut stop = false;
+        let mut last_result = init;
+
         let Some(cursor) = cursor else {
-            return Ok(vec![]);
+            return Ok(last_result);
         };
 
-        let mut result = vec![];
-        let limit = limit.unwrap_or(usize::MAX);
-
-        if limit == 0 {
-            return Ok(vec![]);
-        }
-
-        while result.len() <= limit {
+        while !stop {
             let key = cursor
                 .primary_key()
                 .and_then(|key| match key {
@@ -329,16 +372,14 @@ where
                 .ok_or(Error::InvalidDBKey)?;
             let value = JsValueSerdeExt::into_serde(&cursor.value())?;
 
-            if let Some(transformed_value) = (filter)(key, value) {
-                result.push(transformed_value);
-            }
+            last_result = f(last_result, (key, value), &mut stop);
 
-            if result.len() == limit || !cursor.continue_cursor()?.await? {
+            if !cursor.continue_cursor()?.await? {
                 break;
             }
         }
 
-        Ok(result)
+        Ok(last_result)
     }
 }
 
