@@ -33,7 +33,7 @@ use crate::domain::rooms::services::{
     RoomAttributesService, RoomFactory, RoomManagementService, RoomParticipationService,
     RoomsDomainService,
 };
-use crate::domain::settings::repos::AccountSettingsRepository;
+use crate::domain::settings::repos::{AccountSettingsRepository, LocalRoomSettingsRepository};
 use crate::domain::sidebar::services::{BookmarksService, SidebarDomainService};
 use crate::domain::uploads::services::UploadService;
 use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
@@ -61,6 +61,7 @@ pub type DynEncryptionDomainService = Arc<dyn EncryptionDomainService>;
 pub type DynEncryptionKeysRepository = Arc<dyn EncryptionKeysRepository>;
 pub type DynEncryptionService = Arc<dyn EncryptionService>;
 pub type DynIDProvider = Arc<dyn IDProvider>;
+pub type DynLocalRoomSettingsRepository = Arc<dyn LocalRoomSettingsRepository>;
 pub type DynMessageArchiveService = Arc<dyn MessageArchiveService>;
 pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 pub type DynMessagesRepository = Arc<dyn MessagesRepository>;

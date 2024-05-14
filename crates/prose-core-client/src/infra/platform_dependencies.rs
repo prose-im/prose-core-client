@@ -40,7 +40,9 @@ use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
 };
 use crate::infra::rooms::InMemoryConnectedRoomsRepository;
-use crate::infra::settings::{AccountSettingsRecord, AccountSettingsRepository};
+use crate::infra::settings::{
+    AccountSettingsRecord, AccountSettingsRepository, LocalRoomSettingsRecord,
+};
 use crate::infra::user_info::caching_avatar_repository::CachingAvatarRepository;
 use crate::infra::user_info::{CachingUserInfoRepository, UserInfoRecord};
 use crate::infra::user_profile::{CachingUserProfileRepository, UserProfileRecord};
@@ -60,7 +62,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 22;
+const DB_VERSION: u32 = 23;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -131,6 +133,10 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, MessageRecord>(&tx)?;
             tx.delete_collection(UserDeviceRecord::collection())?;
             create_collection::<D, UserDeviceRecord>(&tx)?;
+        }
+
+        if event.old_version < 23 {
+            create_collection::<D, LocalRoomSettingsRecord>(&tx)?;
         }
 
         Ok(())

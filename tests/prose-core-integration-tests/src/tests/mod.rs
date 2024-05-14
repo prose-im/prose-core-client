@@ -17,6 +17,7 @@ mod account_settings_repository;
 mod client;
 mod contacts_repository;
 mod drafts_repository;
+mod local_room_settings_repository;
 mod messages_repository;
 mod user_info_repository;
 
