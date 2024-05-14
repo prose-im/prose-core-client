@@ -80,6 +80,11 @@ impl MessageBuilder {
         }
     }
 
+    pub fn set_stanza_id(mut self, stanza_id: Option<StanzaId>) -> Self {
+        self.stanza_id = stanza_id;
+        self
+    }
+
     pub fn set_timestamp(mut self, ts: DateTime<Utc>) -> Self {
         self.timestamp = ts;
         self

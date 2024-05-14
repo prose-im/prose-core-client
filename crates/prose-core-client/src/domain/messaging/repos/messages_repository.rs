@@ -9,7 +9,9 @@ use chrono::{DateTime, Utc};
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::messaging::models::{MessageId, MessageLike, MessageTargetId, StanzaId};
+use crate::domain::messaging::models::{
+    MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
+};
 use crate::domain::shared::models::RoomId;
 use crate::dtos::UserId;
 
@@ -31,7 +33,7 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         room_id: &RoomId,
         ids: &[MessageId],
     ) -> Result<Vec<MessageLike>>;
-    /// Returns all messages that target any IDs contained in `targeted_ids` and are newer
+    /// Returns all messages that target any IDs contained in `targeted_id` and are newer
     /// than `newer_than`.
     async fn get_messages_targeting(
         &self,
@@ -57,4 +59,13 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         room_id: &RoomId,
         stanza_id: &StanzaId,
     ) -> Result<Option<MessageId>>;
+
+    /// Returns the latest message, if available, that has a `stanza_id` set and was received
+    /// before `before` (if set).
+    async fn get_last_received_message(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        before: Option<DateTime<Utc>>,
+    ) -> Result<Option<MessageRef>>;
 }

@@ -17,6 +17,7 @@ pub use message_like::{
     Payload as MessageLikePayload,
 };
 pub use message_parser::{MessageLikeError, MessageParser};
+pub use message_ref::MessageRef;
 pub use send_message_request::SendMessageRequest;
 
 mod attachment;
@@ -27,4 +28,5 @@ mod message;
 mod message_id;
 mod message_like;
 mod message_parser;
+mod message_ref;
 pub mod send_message_request;

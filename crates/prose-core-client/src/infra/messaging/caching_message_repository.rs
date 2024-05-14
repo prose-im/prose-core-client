@@ -10,7 +10,9 @@ use tracing::warn;
 
 use prose_store::prelude::*;
 
-use crate::domain::messaging::models::{MessageId, MessageLike, MessageTargetId, StanzaId};
+use crate::domain::messaging::models::{
+    MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
+};
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::RoomId;
 use crate::dtos::UserId;
@@ -216,5 +218,59 @@ impl MessagesRepository for CachingMessageRepository {
             .get::<_, MessageRecord>(&(account.clone(), room_id.clone(), stanza_id.clone()))
             .await?;
         Ok(message.and_then(|m| m.message_id.into_original_id()))
+    }
+
+    async fn get_last_received_message(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        before: Option<DateTime<Utc>>,
+    ) -> Result<Option<MessageRef>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessageRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessageRecord::collection())?;
+        let room_idx = collection.index(&MessageRecord::room_idx())?;
+        let before = before.unwrap_or(DateTime::<Utc>::MAX_UTC);
+        let (message_ref, is_placeholder) = room_idx
+            .fold::<MessageRecord, (MessageRef, bool)>(
+                Query::Only((account, room_id)),
+                (
+                    MessageRef {
+                        message_id: "".into(),
+                        stanza_id: "".into(),
+                        timestamp: DateTime::<Utc>::MIN_UTC,
+                    },
+                    true,
+                ),
+                |(result, is_placeholder), (_, message)| {
+                    if message.timestamp >= before || message.timestamp <= result.timestamp {
+                        return (result, is_placeholder);
+                    }
+
+                    let (Some(message_id), Some(stanza_id)) =
+                        (message.message_id.into_original_id(), message.stanza_id)
+                    else {
+                        return (result, is_placeholder);
+                    };
+
+                    (
+                        MessageRef {
+                            message_id,
+                            stanza_id,
+                            timestamp: message.timestamp,
+                        },
+                        false,
+                    )
+                },
+            )
+            .await?;
+
+        if is_placeholder {
+            return Ok(None);
+        }
+
+        Ok(Some(message_ref))
     }
 }

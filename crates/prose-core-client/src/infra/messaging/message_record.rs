@@ -44,6 +44,10 @@ impl MessageRecord {
         [columns::ACCOUNT]
     }
 
+    pub fn room_idx() -> [&'static str; 2] {
+        [columns::ACCOUNT, columns::ROOM_ID]
+    }
+
     pub fn stanza_id_idx() -> [&'static str; 3] {
         [columns::ACCOUNT, columns::ROOM_ID, columns::STANZA_ID]
     }
@@ -83,6 +87,10 @@ impl Entity for MessageRecord {
     fn indexes() -> Vec<IndexSpec> {
         vec![
             IndexSpec::builder().add_column(columns::ACCOUNT).build(),
+            IndexSpec::builder()
+                .add_column(columns::ACCOUNT)
+                .add_column(columns::ROOM_ID)
+                .build(),
             IndexSpec::builder()
                 .add_column(columns::ACCOUNT)
                 .add_column(columns::ROOM_ID)
