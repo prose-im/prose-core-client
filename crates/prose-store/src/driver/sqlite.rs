@@ -49,6 +49,9 @@ pub enum Error {
     #[error("Index {index} does not exist on collection {collection}")]
     UnknownIndex { collection: String, index: String },
 
+    #[error("Index {index} on collection {collection} is invalid.")]
+    InvalidIndex { collection: String, index: String },
+
     #[error("Collection {collection} is not a member of the current transaction")]
     NotMemberOfTransaction { collection: String },
 
@@ -740,7 +743,7 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
             .join(", ");
 
         let sql = &format!(
-            "CREATE {index_type} 'prose_{index_name}_idx' ON '{table_name}'({columns})",
+            "CREATE {index_type} 'prose_{table_name}_{index_name}_idx' ON '{table_name}'({columns})",
             table_name = self.name,
         );
         let mut statement = conn.prepare(&sql)?;
@@ -861,11 +864,11 @@ impl DatabaseDescription {
 }
 
 trait ConnectionExt {
-    fn database_description(&self) -> rusqlite::Result<DatabaseDescription>;
+    fn database_description(&self) -> Result<DatabaseDescription, Error>;
 }
 
 impl ConnectionExt for rusqlite::Connection {
-    fn database_description(&self) -> rusqlite::Result<DatabaseDescription> {
+    fn database_description(&self) -> Result<DatabaseDescription, Error> {
         let mut tables_to_indexes_map = HashMap::new();
 
         // Order the rows so that type=table comes before type=index…
@@ -890,10 +893,19 @@ impl ConnectionExt for rusqlite::Connection {
                         continue;
                     }
 
-                    // e.g: prose_field_idx
-                    let idx_name = &name[6..name.len() - 4];
-
                     let table_name = row.get::<_, String>(2)?;
+                    let table_name_prefix = table_name.clone() + "_";
+
+                    // e.g: prose_{table_name}_field_idx
+                    if !name[6..].starts_with(&table_name_prefix) {
+                        return Err(Error::InvalidIndex {
+                            collection: table_name,
+                            index: name,
+                        });
+                    }
+
+                    let idx_name = &name[(6 + table_name_prefix.len())..name.len() - 4];
+
                     tables_to_indexes_map
                         .entry(table_name)
                         .or_insert(HashSet::new())

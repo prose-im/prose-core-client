@@ -3,4 +3,4 @@ source: tests/prose-store-integration-tests/src/tests/sqlite.rs
 assertion_line: 137
 expression: sql
 ---
-SEARCH device_record USING INDEX prose_account_user_id_idx (<expr>=? AND <expr>=?)
+SEARCH device_record USING INDEX prose_device_record_account_user_id_idx (<expr>=? AND <expr>=?)

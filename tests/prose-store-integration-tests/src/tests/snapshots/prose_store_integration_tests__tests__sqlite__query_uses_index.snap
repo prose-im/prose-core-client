@@ -1,6 +1,6 @@
 ---
 source: tests/prose-store-integration-tests/src/tests/sqlite.rs
-assertion_line: 108
+assertion_line: 109
 expression: sql
 ---
-SEARCH person USING INDEX prose_birthday_idx (<expr>>? AND <expr><?)
+SEARCH person USING INDEX prose_person_birthday_idx (<expr>>? AND <expr><?)

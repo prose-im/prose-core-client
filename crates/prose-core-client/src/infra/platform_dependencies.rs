@@ -60,7 +60,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 21;
+const DB_VERSION: u32 = 22;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -124,6 +124,13 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         if event.old_version < 21 {
             tx.delete_collection(MessageRecord::collection())?;
             create_collection::<D, MessageRecord>(&tx)?;
+        }
+
+        if event.old_version < 22 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
+            tx.delete_collection(UserDeviceRecord::collection())?;
+            create_collection::<D, UserDeviceRecord>(&tx)?;
         }
 
         Ok(())
