@@ -225,6 +225,62 @@ impl TestClient {
         </iq>
         "#
         );
+
+        send!(
+            self,
+            r#"
+        <iq xmlns='jabber:client' id="{{ID}}" to="{{USER_ID}}" type="get">
+            <query xmlns='http://jabber.org/protocol/disco#info'/>
+        </iq>"#
+        );
+        recv!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" from="{{USER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/disco#info">
+            <identity category="account" type="registered" />
+            <feature var="urn:xmpp:mam:2" />
+            <feature var="urn:xmpp:mam:2#extended" />
+            <feature var="urn:xmpp:sid:0" />
+            <feature var="urn:xmpp:pep-vcard-conversion:0" />
+            <identity category="pubsub" type="pep" />
+            <feature var="http://jabber.org/protocol/pubsub" />
+            <feature var="http://jabber.org/protocol/pubsub#publish" />
+            <feature var="http://jabber.org/protocol/pubsub#presence-subscribe" />
+            <feature var="http://jabber.org/protocol/pubsub#filtered-notifications" />
+            <feature var="http://jabber.org/protocol/pubsub#delete-items" />
+            <feature var="http://jabber.org/protocol/pubsub#retrieve-subscriptions" />
+            <feature var="http://jabber.org/protocol/pubsub#purge-nodes" />
+            <feature var="http://jabber.org/protocol/pubsub#publisher-affiliation" />
+            <feature var="http://jabber.org/protocol/pubsub#item-ids" />
+            <feature var="http://jabber.org/protocol/pubsub#retrieve-default" />
+            <feature var="http://jabber.org/protocol/pubsub#config-node" />
+            <feature var="http://jabber.org/protocol/pubsub#instant-nodes" />
+            <feature var="http://jabber.org/protocol/pubsub#subscription-options" />
+            <feature var="http://jabber.org/protocol/pubsub#config-node-max" />
+            <feature var="http://jabber.org/protocol/pubsub#presence-notifications" />
+            <feature var="http://jabber.org/protocol/pubsub#create-and-configure" />
+            <feature var="http://jabber.org/protocol/pubsub#delete-nodes" />
+            <feature var="http://jabber.org/protocol/pubsub#persistent-items" />
+            <feature var="http://jabber.org/protocol/pubsub#modify-affiliations" />
+            <feature var="http://jabber.org/protocol/pubsub#retrieve-items" />
+            <feature var="http://jabber.org/protocol/pubsub#auto-subscribe" />
+            <feature var="http://jabber.org/protocol/pubsub#access-presence" />
+            <feature var="http://jabber.org/protocol/pubsub#member-affiliation" />
+            <feature var="http://jabber.org/protocol/pubsub#auto-create" />
+            <feature var="http://jabber.org/protocol/pubsub#subscribe" />
+            <feature var="http://jabber.org/protocol/pubsub#create-nodes" />
+            <feature var="http://jabber.org/protocol/pubsub#publish-options" />
+            <feature var="http://jabber.org/protocol/pubsub#outcast-affiliation" />
+            <feature var="http://jabber.org/protocol/pubsub#meta-data" />
+            <feature var="http://jabber.org/protocol/pubsub#multi-items" />
+            <feature var="http://jabber.org/protocol/pubsub#last-published" />
+            <feature var="http://jabber.org/protocol/pubsub#retract-items" />
+            <feature var="urn:ietf:params:xml:ns:vcard-4.0" />
+          </query>
+        </iq>
+        "#
+        );
     }
 
     fn expect_load_block_list(&self) {

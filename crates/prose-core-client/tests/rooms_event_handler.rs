@@ -442,6 +442,7 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
+        Default::default(),
     );
 
     {
@@ -544,6 +545,7 @@ async fn test_handles_user_presence() -> Result<()> {
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
+        Default::default(),
     );
 
     let room = room.clone();
@@ -724,6 +726,7 @@ async fn test_swallows_self_presence() -> Result<()> {
         "Janice Doe",
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
+        Default::default(),
     );
 
     let room = room.clone();

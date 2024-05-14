@@ -22,6 +22,7 @@ impl Room {
             &jid.formatted_username(),
             availability,
             RoomSidebarState::InSidebar,
+            Default::default(),
         )
     }
 
@@ -38,6 +39,7 @@ impl Room {
             room_id: jid.into(),
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::Group,
+            features: Default::default(),
         })
     }
 
@@ -46,6 +48,7 @@ impl Room {
             room_id: jid.into(),
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PublicChannel,
+            features: Default::default(),
         })
     }
 
@@ -54,6 +57,7 @@ impl Room {
             room_id: jid.into(),
             user_nickname: mock_data::account_jid().username().to_string(),
             r#type: RoomType::PrivateChannel,
+            features: Default::default(),
         })
     }
 

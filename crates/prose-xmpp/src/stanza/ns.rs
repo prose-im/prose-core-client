@@ -72,3 +72,8 @@ pub const JINGLE_FT_4: &str = "urn:xmpp:jingle:apps:file-transfer:4";
 
 /// Audio Duration in seconds
 pub const PROSE_AUDIO_DURATION: &str = "https://prose.org/protocol/audio-duration";
+
+pub const MAM0: &str = "urn:xmpp:mam:0";
+pub const MAM1: &str = "urn:xmpp:mam:1";
+pub const MAM2: &str = "urn:xmpp:mam:2";
+pub const MAM2_EXTENDED: &str = "urn:xmpp:mam:2#extended";

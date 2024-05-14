@@ -6,6 +6,8 @@
 use xmpp_parsers::disco;
 use xmpp_parsers::disco::DiscoInfoResult;
 
+use crate::domain::rooms::models::RoomFeatures;
+use crate::domain::shared::models::MamVersion;
 use prose_xmpp::stanza::muc;
 use prose_xmpp::{ns, parse_bool, ParseError};
 
@@ -65,6 +67,8 @@ pub struct Features {
     pub supports_self_ping_optimization: bool,
     /// This MUC will reflect the original message 'id' in 'groupchat' messages.
     pub supports_stable_id: bool,
+    /// The supported MAM version
+    pub mam_version: Option<MamVersion>,
 }
 
 impl TryFrom<DiscoInfoResult> for RoomInfo {
@@ -144,10 +148,45 @@ impl From<&[disco::Feature]> for Features {
                 feat::TEMPORARY => result.is_temporary = true,
                 feat::UNMODERATED => result.is_unmoderated = true,
                 feat::UNSECURED => result.is_unsecured = true,
+                ns::MAM0 => {
+                    result.mam_version = Some(
+                        result
+                            .mam_version
+                            .map_or(MamVersion::Mam0, |v| v.max(MamVersion::Mam0)),
+                    )
+                }
+                ns::MAM1 => {
+                    result.mam_version = Some(
+                        result
+                            .mam_version
+                            .map_or(MamVersion::Mam1, |v| v.max(MamVersion::Mam1)),
+                    )
+                }
+                ns::MAM2 => {
+                    result.mam_version = Some(
+                        result
+                            .mam_version
+                            .map_or(MamVersion::Mam2, |v| v.max(MamVersion::Mam2)),
+                    )
+                }
+                ns::MAM2_EXTENDED => {
+                    result.mam_version =
+                        Some(result.mam_version.map_or(MamVersion::Mam2Extended, |v| {
+                            v.max(MamVersion::Mam2Extended)
+                        }))
+                }
                 _ => (),
             }
         }
 
         result
+    }
+}
+
+impl From<Features> for RoomFeatures {
+    fn from(value: Features) -> Self {
+        Self {
+            mam_version: value.mam_version,
+        }
     }
 }

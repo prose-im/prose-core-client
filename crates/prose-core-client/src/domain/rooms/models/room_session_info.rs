@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::domain::rooms::models::room_features::RoomFeatures;
 use crate::domain::rooms::models::RoomAffiliation;
 use crate::domain::shared::models::{
     AnonOccupantId, Availability, MucId, OccupantId, RoomType, UserId,
@@ -25,6 +26,7 @@ pub struct RoomConfig {
     pub room_name: Option<String>,
     pub room_description: Option<String>,
     pub room_type: RoomType,
+    pub features: RoomFeatures,
 }
 
 #[derive(Debug, PartialEq, Clone)]

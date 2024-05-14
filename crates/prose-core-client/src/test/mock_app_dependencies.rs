@@ -79,6 +79,7 @@ impl Default for AppContext {
                 server_features: ServerFeatures {
                     muc_service: Some(mock_muc_service()),
                     http_upload_service: None,
+                    mam_version: None,
                 },
             })),
             capabilities: Capabilities::new("Prose", "https://prose.org", vec![]),

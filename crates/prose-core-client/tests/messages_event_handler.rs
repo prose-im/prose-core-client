@@ -504,6 +504,7 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
         room_id: RoomId::Muc(muc_id!("room@groups.prose.org")),
         user_nickname: "me".to_string(),
         r#type: RoomType::PrivateChannel,
+        features: Default::default(),
     });
 
     {

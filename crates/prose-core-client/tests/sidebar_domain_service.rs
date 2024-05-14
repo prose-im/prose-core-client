@@ -589,6 +589,7 @@ async fn test_increases_unread_count() -> Result<()> {
         "user",
         Availability::Available,
         RoomSidebarState::InSidebar,
+        Default::default(),
     );
     let private_channel = Room::private_channel(muc_id!("private_channel@conf.prose.org"))
         .with_sidebar_state(RoomSidebarState::InSidebar);
@@ -683,6 +684,7 @@ async fn test_increases_mentions_count() -> Result<()> {
         "user",
         Availability::Available,
         RoomSidebarState::InSidebar,
+        Default::default(),
     );
     let private_channel = Room::private_channel(muc_id!("private_channel@conf.prose.org"))
         .with_sidebar_state(RoomSidebarState::InSidebar)

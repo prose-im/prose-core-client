@@ -11,6 +11,7 @@ use parking_lot::RwLock;
 
 use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
+use crate::domain::shared::models::MamVersion;
 use crate::dtos::{UserId, UserResourceId};
 
 pub struct AppConfig {
@@ -80,6 +81,13 @@ impl AppContext {
             .ok_or(anyhow::anyhow!(
                 "Server does not support HTTP uploads (XEP-0363)"
             ))
+    }
+
+    pub fn mam_version(&self) -> Option<MamVersion> {
+        self.connection_properties
+            .read()
+            .as_ref()
+            .and_then(|p| p.server_features.mam_version.clone())
     }
 }
 

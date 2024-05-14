@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use minidom::Element;
 use secrecy::Secret;
@@ -13,6 +13,7 @@ use prose_xmpp::{mods, ns, ConnectionError};
 
 use crate::domain::connection::models::{HttpUploadService, ServerFeatures};
 use crate::domain::connection::services::ConnectionService;
+use crate::domain::shared::models::MamVersion;
 use crate::dtos::UserResourceId;
 use crate::infra::xmpp::XMPPClient;
 
@@ -88,6 +89,44 @@ impl ConnectionService for XMPPClient {
                     });
                 }
                 _ => continue,
+            }
+        }
+
+        let disco_info = caps
+            .query_disco_info(
+                self.connected_jid()
+                    .ok_or(anyhow!("Not connected"))?
+                    .into_bare(),
+                None,
+            )
+            .await?;
+
+        for feature in disco_info.features {
+            match feature.var.as_ref() {
+                ns::MAM1 => {
+                    server_features.mam_version = Some(
+                        server_features
+                            .mam_version
+                            .map_or(MamVersion::Mam1, |v| v.max(MamVersion::Mam1)),
+                    )
+                }
+                ns::MAM2 => {
+                    server_features.mam_version = Some(
+                        server_features
+                            .mam_version
+                            .map_or(MamVersion::Mam2, |v| v.max(MamVersion::Mam2)),
+                    )
+                }
+                ns::MAM2_EXTENDED => {
+                    server_features.mam_version = Some(
+                        server_features
+                            .mam_version
+                            .map_or(MamVersion::Mam2Extended, |v| {
+                                v.max(MamVersion::Mam2Extended)
+                            }),
+                    )
+                }
+                _ => (),
             }
         }
 

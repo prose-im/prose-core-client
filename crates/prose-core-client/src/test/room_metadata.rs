@@ -41,6 +41,7 @@ impl RoomSessionInfo {
                 room_name: None,
                 room_description: None,
                 room_type,
+                features: Default::default(),
             },
             topic: None,
             user_nickname: mock_data::account_jid().username().to_string(),

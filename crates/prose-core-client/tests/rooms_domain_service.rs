@@ -97,6 +97,7 @@ async fn test_joins_room() -> Result<()> {
                         room_name: Some("Room Name".to_string()),
                         room_description: None,
                         room_type: RoomType::PrivateChannel,
+                        features: Default::default(),
                     },
                     topic: Some("The Room Topic".to_string()),
                     user_nickname: "user#3dea7f2".to_string(),
@@ -550,6 +551,7 @@ async fn test_joins_direct_message() -> Result<()> {
             "Jennifer Doe",
             Availability::Available,
             RoomSidebarState::InSidebar,
+            Default::default(),
         )))
         .return_once(|_| None);
 
@@ -594,6 +596,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         server_features: ServerFeatures {
             muc_service: Some(bare!("conference.prose.org")),
             http_upload_service: None,
+            mam_version: None,
         },
     });
 
@@ -656,6 +659,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
                 room_id: muc_id!("org.prose.channel.hash-1@conference.prose.org").into(),
                 user_nickname: "jane.doe#3c1234b".to_string(),
                 r#type: RoomType::PublicChannel,
+                features: Default::default(),
             }))
         });
 
@@ -1045,6 +1049,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             "Jennifer Doe",
             Availability::Available,
             RoomSidebarState::InSidebar,
+            Default::default(),
         )))
         .return_once(|_| Some(pending_room));
 
@@ -1132,6 +1137,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
                         room_name: Some("Updated Channel Name".to_string()),
                         room_description: None,
                         room_type: RoomType::PublicChannel,
+                        features: Default::default(),
                     },
                     topic: None,
                     user_nickname: "user#3dea7f2".to_string(),

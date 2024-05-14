@@ -22,7 +22,7 @@ use crate::app::deps::{
 };
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
-    RegisteredMember, Room, RoomAffiliation, RoomError, RoomInfo, RoomSessionInfo,
+    RegisteredMember, Room, RoomAffiliation, RoomError, RoomFeatures, RoomInfo, RoomSessionInfo,
     RoomSessionMember, RoomSidebarState, RoomSpec,
 };
 use crate::domain::rooms::services::rooms_domain_service::{
@@ -427,6 +427,9 @@ impl RoomsDomainService {
             &contact_name,
             user_info.availability,
             sidebar_state,
+            RoomFeatures {
+                mam_version: self.ctx.mam_version(),
+            },
         );
 
         self.connected_rooms_repo.set_or_replace(room.clone());
@@ -745,6 +748,7 @@ impl RoomsDomainService {
             room_id: RoomId::Muc(info.room_id.clone()),
             user_nickname: info.user_nickname,
             r#type: info.config.room_type,
+            features: info.config.features,
         };
 
         let Some(room) = self.connected_rooms_repo.update(info.room_id.as_ref(), {

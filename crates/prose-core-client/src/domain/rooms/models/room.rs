@@ -10,7 +10,9 @@ use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
 
-use crate::domain::rooms::models::{ParticipantList, RegisteredMember, RoomSessionParticipant};
+use crate::domain::rooms::models::{
+    ParticipantList, RegisteredMember, RoomFeatures, RoomSessionParticipant,
+};
 use crate::domain::shared::models::{Availability, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::OccupantId;
@@ -61,6 +63,8 @@ pub struct RoomInfo {
     pub user_nickname: String,
     /// The type of the room.
     pub r#type: RoomType,
+    /// The room's supported features.
+    pub features: RoomFeatures,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -208,6 +212,7 @@ impl Room {
                 room_id: bookmark.jid.clone(),
                 user_nickname: nickname.to_string(),
                 r#type: bookmark.r#type.into(),
+                features: Default::default(),
             },
             RoomDetails {
                 name: Some(bookmark.name.clone()),
@@ -229,6 +234,7 @@ impl Room {
                 room_id: room_id.clone(),
                 user_nickname: nickname.to_string(),
                 r#type: RoomType::Unknown,
+                features: Default::default(),
             },
             RoomDetails {
                 name: None,
@@ -279,6 +285,7 @@ impl Room {
                 room_id: self.room_id.clone(),
                 user_nickname: self.user_nickname.clone(),
                 r#type: new_type,
+                features: self.features.clone(),
             },
             self.inner.details.read().clone(),
         )
@@ -291,12 +298,14 @@ impl Room {
         contact_name: &str,
         availability: Availability,
         sidebar_state: RoomSidebarState,
+        features: RoomFeatures,
     ) -> Self {
         Self::new(
             RoomInfo {
                 room_id: RoomId::from(contact_id.clone()),
                 user_nickname: "no_nickname".to_string(),
                 r#type: RoomType::DirectMessage,
+                features,
             },
             RoomDetails {
                 name: Some(contact_name.to_string()),
@@ -376,6 +385,7 @@ mod tests {
             "Jane Doe",
             Availability::Available,
             RoomSidebarState::Favorite,
+            Default::default(),
         );
 
         assert_eq!(
@@ -385,6 +395,7 @@ mod tests {
                     room_id: user_id!("contact@prose.org").into(),
                     user_nickname: "no_nickname".to_string(),
                     r#type: RoomType::DirectMessage,
+                    features: Default::default(),
                 },
                 RoomDetails {
                     name: Some("Jane Doe".to_string()),
