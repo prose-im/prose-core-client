@@ -192,6 +192,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
     let mut seq = Sequence::new();
 
     *deps.ctx.connection_properties.write() = Some(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("from@prose.org/res"),
         server_features: Default::default(),
     });
@@ -284,6 +285,7 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
     let mut seq = Sequence::new();
 
     *deps.ctx.connection_properties.write() = Some(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user@prose.org/res"),
         server_features: Default::default(),
     });
@@ -428,6 +430,7 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     *deps.ctx.connection_properties.write() = Some(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("me@prose.org/res2"),
         server_features: Default::default(),
     });

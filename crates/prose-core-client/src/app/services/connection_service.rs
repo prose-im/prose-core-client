@@ -3,16 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use chrono::{DateTime, Utc};
 use secrecy::Secret;
 use tracing::error;
 
 use prose_proc_macros::InjectDependencies;
-use prose_xmpp::{ConnectionError, IDProvider};
+use prose_xmpp::{ConnectionError, IDProvider, TimeProvider};
 
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynBlockListDomainService,
     DynClientEventDispatcher, DynConnectionService, DynContactListDomainService,
-    DynEncryptionDomainService, DynIDProvider, DynUserAccountService, DynUserProfileRepository,
+    DynEncryptionDomainService, DynIDProvider, DynTimeProvider, DynUserAccountService,
+    DynUserProfileRepository,
 };
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
@@ -41,6 +43,8 @@ pub struct ConnectionService {
     encryption_domain_service: DynEncryptionDomainService,
     #[inject]
     user_profile_repo: DynUserProfileRepository,
+    #[inject]
+    time_provider: DynTimeProvider,
 }
 
 impl ConnectionService {
@@ -65,10 +69,14 @@ impl ConnectionService {
             .with_resource(&resource)
             .expect("Failed to build FullJid with generated ID as resource.");
 
-        self.ctx.set_connection_properties(ConnectionProperties {
+        let mut connection_properties = ConnectionProperties {
             connected_jid: full_jid.clone(),
             server_features: Default::default(),
-        });
+            connection_timestamp: DateTime::<Utc>::MIN_UTC,
+        };
+
+        self.ctx
+            .set_connection_properties(connection_properties.clone());
 
         let connection_result = self.connection_service.connect(&full_jid, password).await;
         match connection_result {
@@ -78,6 +86,10 @@ impl ConnectionService {
                 return Err(err);
             }
         }
+
+        connection_properties.connection_timestamp = self.time_provider.now();
+        self.ctx
+            .set_connection_properties(connection_properties.clone());
 
         // https://xmpp.org/rfcs/rfc6121.html#roster-login
         if let Err(error) = self.contact_list_domain_service.load_contacts().await {
@@ -109,10 +121,10 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
-        self.ctx.set_connection_properties(ConnectionProperties {
-            connected_jid: full_jid.clone(),
-            server_features,
-        });
+
+        connection_properties.server_features = server_features;
+        self.ctx
+            .set_connection_properties(connection_properties.clone());
 
         self.account_settings_repo
             .update(

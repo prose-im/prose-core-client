@@ -43,6 +43,7 @@ async fn test_extend_items_inserts_items() -> Result<()> {
         .with_sidebar_state(RoomSidebarState::NotInSidebar);
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
     });
@@ -675,6 +676,7 @@ async fn test_increases_mentions_count() -> Result<()> {
     let mut deps = MockSidebarDomainServiceDependencies::default();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: Default::default(),
     });
@@ -1248,6 +1250,7 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
     let mut seq = Sequence::new();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
     });

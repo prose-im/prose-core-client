@@ -6,6 +6,7 @@
 use std::sync::atomic::AtomicBool;
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use jid::BareJid;
 use parking_lot::RwLock;
 
@@ -63,6 +64,16 @@ impl AppContext {
 
     pub fn connected_account(&self) -> Result<UserId> {
         Ok(self.connected_id()?.into_user_id())
+    }
+
+    pub fn connection_timestamp(&self) -> Result<DateTime<Utc>> {
+        self.connection_properties
+            .read()
+            .as_ref()
+            .map(|p| p.connection_timestamp.clone())
+            .ok_or(anyhow::anyhow!(
+                "Failed to read the connection timestamp since the client is not connected."
+            ))
     }
 
     pub fn muc_service(&self) -> Result<BareJid> {

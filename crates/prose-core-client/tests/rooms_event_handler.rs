@@ -717,6 +717,7 @@ async fn test_swallows_self_presence() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("us@prose.org/res"),
         server_features: Default::default(),
     });

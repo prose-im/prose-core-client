@@ -75,6 +75,7 @@ impl Default for AppContext {
     fn default() -> Self {
         AppContext {
             connection_properties: RwLock::new(Some(ConnectionProperties {
+                connection_timestamp: Default::default(),
                 connected_jid: mock_account_jid(),
                 server_features: ServerFeatures {
                     muc_service: Some(mock_muc_service()),

@@ -6,7 +6,7 @@
 use crate::domain::shared::models::MamVersion;
 use jid::BareJid;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct ServerFeatures {
     pub muc_service: Option<BareJid>,
     pub http_upload_service: Option<HttpUploadService>,

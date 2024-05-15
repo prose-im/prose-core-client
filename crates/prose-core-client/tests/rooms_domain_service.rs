@@ -48,6 +48,7 @@ async fn test_joins_room() -> Result<()> {
     )));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
     });
@@ -272,6 +273,7 @@ async fn test_creates_group() -> Result<()> {
     let mut seq = Sequence::new();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: Default::default(),
     });
@@ -592,6 +594,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
 
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: ServerFeatures {
             muc_service: Some(bare!("conference.prose.org")),
@@ -687,6 +690,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: Default::default(),
     });
@@ -994,6 +998,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
     let mut seq = Sequence::new();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
     });
@@ -1090,6 +1095,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
     let mut seq = Sequence::new();
 
     deps.ctx.set_connection_properties(ConnectionProperties {
+        connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
     });

@@ -244,6 +244,7 @@ impl TestClient {
         ));
 
         let connection_props = ConnectionProperties {
+            connection_timestamp: Default::default(),
             connected_jid: their_user_id.with_resource("their_device").unwrap(),
             server_features: Default::default(),
         };
