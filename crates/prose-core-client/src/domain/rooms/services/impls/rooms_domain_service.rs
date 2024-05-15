@@ -16,9 +16,9 @@ use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
-    DynConnectedRoomsRepository, DynIDProvider, DynMessageMigrationDomainService,
-    DynRoomAttributesService, DynRoomManagementService, DynRoomParticipationService,
-    DynUserInfoRepository, DynUserProfileRepository,
+    DynConnectedRoomsRepository, DynIDProvider, DynMessageArchiveDomainService,
+    DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
+    DynRoomParticipationService, DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
@@ -52,6 +52,7 @@ pub struct RoomsDomainService {
     room_participation_service: DynRoomParticipationService,
     user_info_repo: DynUserInfoRepository,
     user_profile_repo: DynUserProfileRepository,
+    message_archive_domain_service: DynMessageArchiveDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -62,7 +63,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         request: CreateOrEnterRoomRequest,
         sidebar_state: RoomSidebarState,
     ) -> Result<Room, RoomError> {
-        match request {
+        let room = match request {
             CreateOrEnterRoomRequest::Create {
                 service,
                 room_type,
@@ -82,7 +83,13 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             CreateOrEnterRoomRequest::JoinDirectMessage { participant } => {
                 self.join_direct_message(&participant, sidebar_state).await
             }
-        }
+        }?;
+
+        self.message_archive_domain_service
+            .catchup_room(&room)
+            .await?;
+
+        Ok(room)
     }
 
     /// Renames the room identified by `room_jid` to `name`.

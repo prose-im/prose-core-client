@@ -34,7 +34,8 @@ use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
 use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
 use crate::domain::messaging::services::mocks::{
-    MockMessageArchiveService, MockMessageMigrationDomainService, MockMessagingService,
+    MockMessageArchiveDomainService, MockMessageArchiveService, MockMessageMigrationDomainService,
+    MockMessagingService,
 };
 use crate::domain::rooms::repos::mocks::{
     MockConnectedRoomsReadOnlyRepository, MockConnectedRoomsReadWriteRepository,
@@ -264,6 +265,7 @@ pub struct MockRoomsDomainServiceDependencies {
     pub encryption_domain_service: MockEncryptionDomainService,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"short-id\"))"))]
     pub id_provider: DynIDProvider,
+    pub message_archive_domain_service: MockMessageArchiveDomainService,
     pub message_migration_domain_service: MockMessageMigrationDomainService,
     pub room_attributes_service: MockRoomAttributesService,
     pub room_management_service: MockRoomManagementService,
@@ -292,6 +294,7 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             room_participation_service: Arc::new(value.room_participation_service),
             user_info_repo: Arc::new(value.user_info_repo),
             user_profile_repo: Arc::new(value.user_profile_repo),
+            message_archive_domain_service: Arc::new(value.message_archive_domain_service),
         }
     }
 }

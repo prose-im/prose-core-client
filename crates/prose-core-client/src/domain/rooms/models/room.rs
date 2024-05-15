@@ -179,6 +179,10 @@ impl Room {
         self.inner.details.write().encryption_enabled = enabled
     }
 
+    pub fn set_unread_count(&self, count: u32) {
+        self.inner.details.write().unread_count = count;
+    }
+
     pub fn increment_unread_count(&self) {
         let mut guard = self.inner.details.write();
         guard.unread_count = guard.unread_count.saturating_add(1);

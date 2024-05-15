@@ -34,7 +34,7 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
         loop {
             let MessagePage { messages, is_last } = self
                 .message_archive_service
-                .load_messages(&source_room, first_message_id.as_ref(), None, 100)
+                .load_messages_before(&source_room, first_message_id.as_ref(), 100)
                 .await?;
 
             first_message_id = messages

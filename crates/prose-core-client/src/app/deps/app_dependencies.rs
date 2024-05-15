@@ -25,6 +25,7 @@ use crate::domain::encryption::services::{
 };
 use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
+use crate::domain::messaging::services::MessageArchiveDomainService;
 use crate::domain::messaging::services::{
     MessageArchiveService, MessageMigrationDomainService, MessagingService,
 };
@@ -62,6 +63,7 @@ pub type DynEncryptionKeysRepository = Arc<dyn EncryptionKeysRepository>;
 pub type DynEncryptionService = Arc<dyn EncryptionService>;
 pub type DynIDProvider = Arc<dyn IDProvider>;
 pub type DynLocalRoomSettingsRepository = Arc<dyn LocalRoomSettingsRepository>;
+pub type DynMessageArchiveDomainService = Arc<dyn MessageArchiveDomainService>;
 pub type DynMessageArchiveService = Arc<dyn MessageArchiveService>;
 pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 pub type DynMessagesRepository = Arc<dyn MessagesRepository>;

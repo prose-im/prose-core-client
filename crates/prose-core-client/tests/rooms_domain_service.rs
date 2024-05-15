@@ -41,6 +41,11 @@ async fn test_joins_room() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
+    deps.message_archive_domain_service
+        .expect_catchup_room()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(()) }));
+
     let room = Arc::new(Mutex::new(Room::connecting(
         &muc_id!("room@conf.prose.org").into(),
         "user1#3dea7f2",
@@ -268,6 +273,11 @@ async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
 async fn test_creates_group() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
+
+    deps.message_archive_domain_service
+        .expect_catchup_room()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(()) }));
 
     // Make sure that the method calls are in the exact order…
     let mut seq = Sequence::new();
@@ -515,6 +525,11 @@ async fn test_joins_direct_message() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
+    deps.message_archive_domain_service
+        .expect_catchup_room()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(()) }));
+
     deps.connected_rooms_repo
         .expect_get()
         .once()
@@ -591,6 +606,11 @@ async fn test_joins_direct_message() -> Result<()> {
 #[tokio::test]
 async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
+
+    deps.message_archive_domain_service
+        .expect_catchup_room()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(()) }));
 
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
     deps.ctx.set_connection_properties(ConnectionProperties {
@@ -997,6 +1017,11 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     let mut seq = Sequence::new();
 
+    deps.message_archive_domain_service
+        .expect_catchup_room()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(()) }));
+
     deps.ctx.set_connection_properties(ConnectionProperties {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
@@ -1093,6 +1118,11 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
 async fn test_updates_pending_public_channel() -> Result<()> {
     let mut deps = MockRoomsDomainServiceDependencies::default();
     let mut seq = Sequence::new();
+
+    deps.message_archive_domain_service
+        .expect_catchup_room()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(()) }));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
         connection_timestamp: Default::default(),

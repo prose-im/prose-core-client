@@ -224,6 +224,8 @@ impl TestClient {
         </iq>"#
         );
 
+        self.expect_muc_catchup(&room_id);
+
         self.expect_set_bookmark(
             &RoomId::Muc(room_id.clone()),
             room_name,
@@ -281,6 +283,8 @@ impl TestClient {
         </iq>
         "#
         );
+
+        self.expect_catchup(&user_id);
 
         self.expect_set_bookmark(
             &RoomId::User(user_id.clone()),
@@ -355,6 +359,85 @@ impl TestClient {
           </pubsub>
         </iq>
         "#
+        );
+
+        self.pop_ctx();
+    }
+
+    pub fn expect_muc_catchup(&self, room_id: &MucId) {
+        self.push_ctx([("ROOM_ID".into(), room_id.to_string())].into());
+
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID:2}}" to="{{ROOM_ID}}" type="set">
+              <query xmlns="urn:xmpp:mam:2" queryid="{{ID:1}}">
+                <x xmlns="jabber:x:data" type="submit">
+                  <field type="hidden" var="FORM_TYPE">
+                    <value>urn:xmpp:mam:2</value>
+                  </field>
+                  <field var="start">
+                    <value>2024-02-14T00:00:00+00:00</value>
+                  </field>
+                </x>
+                <set xmlns="http://jabber.org/protocol/rsm">
+                  <max>100</max>
+                </set>
+              </query>
+            </iq>
+            "#
+        );
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+                <fin xmlns="urn:xmpp:mam:2" complete="true">
+                    <set xmlns="http://jabber.org/protocol/rsm" />
+                </fin>
+            </iq>
+            "#
+        );
+
+        self.pop_ctx();
+    }
+
+    pub fn expect_catchup(&self, room_id: &UserId) {
+        self.push_ctx([("ROOM_ID".into(), room_id.to_string())].into());
+
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID:2}}" type="set">
+              <query xmlns="urn:xmpp:mam:2" queryid="{{ID:1}}">
+                <x xmlns="jabber:x:data" type="submit">
+                  <field type="hidden" var="FORM_TYPE">
+                    <value>urn:xmpp:mam:2</value>
+                  </field>
+                  <field var="start">
+                    <value>2024-02-14T00:00:00+00:00</value>
+                  </field>
+                  <field var="with">
+                    <value>{{ROOM_ID}}</value>
+                  </field>
+                </x>
+                <set xmlns="http://jabber.org/protocol/rsm">
+                  <max>100</max>
+                </set>
+              </query>
+            </iq>
+            "#
+        );
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+                <fin xmlns="urn:xmpp:mam:2" complete="true">
+                    <set xmlns="http://jabber.org/protocol/rsm" />
+                </fin>
+            </iq>
+            "#
         );
 
         self.pop_ctx();

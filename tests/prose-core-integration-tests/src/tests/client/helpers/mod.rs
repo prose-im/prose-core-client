@@ -19,6 +19,7 @@ pub(self) use test_message_queue::TestMessageQueue;
 mod connector;
 mod delegate;
 mod element_ext;
+mod id_provider;
 mod test_client;
 mod test_client_login;
 mod test_client_muc;

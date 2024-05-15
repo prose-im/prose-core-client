@@ -223,6 +223,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
     client.expect_send_vard_request(&user_id!("user3@prose.org"));
     client.receive_not_found_iq_response();
 
+    client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(
         &RoomId::Muc(room_id.clone()),
         room_name,
@@ -521,6 +522,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
     client.expect_send_vard_request(&user_id!("user2@prose.org"));
     client.receive_not_found_iq_response();
 
+    client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(
         &RoomId::Muc(room_id.clone()),
         room_name,

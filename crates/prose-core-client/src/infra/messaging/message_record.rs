@@ -91,11 +91,11 @@ impl Entity for MessageRecord {
                 .add_column(columns::ACCOUNT)
                 .add_column(columns::ROOM_ID)
                 .build(),
+            // Can't be unique, because stanzaId might be nil…
             IndexSpec::builder()
                 .add_column(columns::ACCOUNT)
                 .add_column(columns::ROOM_ID)
                 .add_column(columns::STANZA_ID)
-                .unique()
                 .build(),
             IndexSpec::builder()
                 .add_column(columns::ACCOUNT)

@@ -120,9 +120,9 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: vec![
@@ -335,9 +335,9 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
     deps.ctx.config.message_page_size = 5;
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, before, _, page_size| {
+        .return_once(|_, before, page_size| {
             assert_eq!(5, page_size);
             assert!(before.is_none());
 
@@ -392,9 +392,9 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
         });
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, before, _, page_size| {
+        .return_once(|_, before, page_size| {
             assert_eq!(5, page_size);
             assert_eq!(Some(&MessageBuilder::stanza_id_for_index(100)), before);
 
@@ -568,9 +568,9 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
     deps.ctx.config.max_message_pages_to_load = 2;
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, before, _, page_size| {
+        .return_once(|_, before, page_size| {
             assert_eq!(5, page_size);
             assert_eq!(None, before);
 
@@ -603,9 +603,9 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
         });
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, before, _, page_size| {
+        .return_once(|_, before, page_size| {
             assert_eq!(5, page_size);
             assert_eq!(Some(&MessageBuilder::stanza_id_for_index(96)), before);
 
@@ -670,9 +670,9 @@ async fn test_stops_at_last_page() -> Result<()> {
     deps.ctx.config.max_message_pages_to_load = 100;
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: (96..=100)
@@ -687,9 +687,9 @@ async fn test_stops_at_last_page() -> Result<()> {
         });
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _| {
             Box::pin(async {
                 Ok(MessagePage {
                     messages: (93..=95)
@@ -729,9 +729,9 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
     deps.ctx.config.max_message_pages_to_load = 1;
 
     deps.message_archive_service
-        .expect_load_messages()
+        .expect_load_messages_before()
         .once()
-        .return_once(|_, before, _, _| {
+        .return_once(|_, before, _| {
             assert!(before.is_some());
 
             Box::pin(async {

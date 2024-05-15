@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
@@ -22,11 +23,26 @@ pub struct MessagePage {
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait MessageArchiveService: SendUnlessWasm + SyncUnlessWasm {
     /// Returns requested messages in the order from oldest to newest.
-    async fn load_messages(
+    async fn load_messages_before(
         &self,
-        room_jid: &RoomId,
+        room_id: &RoomId,
         before: Option<&StanzaId>,
-        after: Option<&StanzaId>,
+        batch_size: u32,
+    ) -> Result<MessagePage>;
+
+    /// Returns requested messages in the order from oldest to newest.
+    async fn load_messages_after(
+        &self,
+        room_id: &RoomId,
+        after: &StanzaId,
+        batch_size: u32,
+    ) -> Result<MessagePage>;
+
+    /// Returns requested messages in the order from oldest to newest.
+    async fn load_messages_since(
+        &self,
+        room_id: &RoomId,
+        since: DateTime<Utc>,
         batch_size: u32,
     ) -> Result<MessagePage>;
 }

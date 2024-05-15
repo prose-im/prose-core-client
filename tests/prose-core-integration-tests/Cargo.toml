@@ -17,6 +17,7 @@ prose-core-client = { path = "../../crates/prose-core-client", features = ["test
 prose-proc-macros = { path = "../../crates/prose-proc-macros" }
 prose-store = { path = "../../crates/prose-store" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
+regex = "1.10"
 tempfile = { workspace = true }
 xml-rs = "0.8"
 xmpp-parsers = { workspace = true }

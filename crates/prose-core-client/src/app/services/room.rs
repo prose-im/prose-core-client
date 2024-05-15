@@ -425,10 +425,9 @@ impl<Kind> Room<Kind> {
         while num_text_messages < message_page_size && loaded_pages < max_message_pages_to_load {
             let page = self
                 .message_archive_service
-                .load_messages(
+                .load_messages_before(
                     &self.data.room_id,
                     last_message_id.as_ref(),
-                    None,
                     message_page_size,
                 )
                 .await?;

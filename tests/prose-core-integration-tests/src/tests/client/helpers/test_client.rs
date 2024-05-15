@@ -3,12 +3,14 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::cmp::max;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
+use regex::Regex;
 
 use prose_core_client::domain::encryption::services::IncrementingUserDeviceIdProvider;
 use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId, UserId};
@@ -19,9 +21,9 @@ use prose_core_client::{
     Client, ClientEvent, ClientRoomEventType, FsAvatarCache, SignalServiceHandle,
 };
 use prose_xmpp::test::IncrementingIDProvider;
-use prose_xmpp::IDProvider;
 
 use crate::tests::client::helpers::delegate::Delegate;
+use crate::tests::client::helpers::id_provider::IncrementingOffsettingIDProvider;
 use crate::tests::store;
 
 use super::{connector::Connector, test_message_queue::TestMessageQueue};
@@ -30,7 +32,7 @@ use super::{connector::Connector, test_message_queue::TestMessageQueue};
 pub struct TestClient {
     pub(super) client: Client,
     connector: Connector,
-    id_provider: IncrementingIDProvider,
+    id_provider: IncrementingOffsettingIDProvider,
     pub(super) short_id_provider: IncrementingIDProvider,
     messages: TestMessageQueue,
     context: Mutex<Vec<HashMap<String, String>>>,
@@ -82,7 +84,7 @@ impl TestClient {
             client,
             // We'll just mirror the used ID provider here…
             connector,
-            id_provider: IncrementingIDProvider::new("id"),
+            id_provider: IncrementingOffsettingIDProvider::new("id"),
             short_id_provider: IncrementingIDProvider::new("short-id"),
             messages,
             context: Default::default(),
@@ -132,26 +134,61 @@ macro_rules! any_event(
 #[allow(dead_code)]
 impl TestClient {
     pub fn send(&self, xml: impl Into<String>, file: &str, line: u32) {
+        self.id_provider.apply_offset();
+
         let mut xml = xml.into();
 
-        // Only increase the ID counter if the message contains an ID…
-        if xml.contains("{{ID}}") {
-            self.push_ctx([("ID".into(), self.id_provider.new_id())].into());
-            self.apply_ctx(&mut xml);
-            self.pop_ctx();
-        } else {
-            self.apply_ctx(&mut xml);
+        let regex = Regex::new(r"\{\{ID(?::([0-9]+))?}}").unwrap();
+        let mut highest_offset = 0i64;
+
+        let unmodified_xml = xml.clone();
+        let captures = regex.captures_iter(&unmodified_xml).collect::<Vec<_>>();
+
+        for c in captures.into_iter().rev() {
+            let full_capture = c.get(0).unwrap();
+
+            let offset = c
+                .get(1)
+                .map(|s| s.as_str().parse::<i64>().unwrap())
+                .unwrap_or(1);
+            assert!(offset >= 1, "ID offsets must start at 1");
+            highest_offset = max(highest_offset, offset);
+
+            xml.replace_range(
+                full_capture.start()..full_capture.end(),
+                &self.id_provider.id_with_offset(offset),
+            );
         }
+
+        self.id_provider.set_offset(highest_offset);
+        self.apply_ctx(&mut xml);
         self.messages.send(xml, file, line);
     }
 
     pub fn receive(&self, xml: impl Into<String>, file: &str, line: u32) {
         let mut xml = xml.into();
 
-        self.push_ctx([("ID".into(), self.id_provider.last_id())].into());
-        self.apply_ctx(&mut xml);
-        self.pop_ctx();
+        let regex = Regex::new(r"\{\{ID(?::([0-9]+))?}}").unwrap();
 
+        let unmodified_xml = xml.clone();
+        let captures = regex.captures_iter(&unmodified_xml).collect::<Vec<_>>();
+
+        for c in captures.into_iter().rev() {
+            let full_capture = c.get(0).unwrap();
+
+            let offset = c
+                .get(1)
+                .map(|s| s.as_str().parse::<i64>().unwrap())
+                .unwrap_or(1);
+            assert!(offset >= 1, "ID offsets must start at 1");
+
+            xml.replace_range(
+                full_capture.start()..full_capture.end(),
+                &self.id_provider.last_id_with_offset(offset),
+            );
+        }
+
+        self.apply_ctx(&mut xml);
         self.messages.receive(xml, file, line);
     }
 
@@ -218,7 +255,7 @@ impl TestClient {
     }
 
     pub fn get_last_id(&self) -> String {
-        self.id_provider.last_id()
+        self.id_provider.last_id_with_offset(1)
     }
 
     pub fn get_next_id(&self) -> String {

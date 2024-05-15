@@ -21,6 +21,7 @@ use crate::domain::encryption::services::impls::{
     EncryptionDomainService, EncryptionDomainServiceDependencies,
 };
 use crate::domain::messaging::services::impls::{
+    MessageArchiveDomainService, MessageArchiveDomainServiceDependencies,
     MessageMigrationDomainService, MessageMigrationDomainServiceDependencies,
 };
 use crate::domain::rooms::services::impls::{RoomsDomainService, RoomsDomainServiceDependencies};
@@ -42,6 +43,7 @@ use crate::infra::messaging::{
 use crate::infra::rooms::InMemoryConnectedRoomsRepository;
 use crate::infra::settings::{
     AccountSettingsRecord, AccountSettingsRepository, LocalRoomSettingsRecord,
+    LocalRoomSettingsRepository,
 };
 use crate::infra::user_info::caching_avatar_repository::CachingAvatarRepository;
 use crate::infra::user_info::{CachingUserInfoRepository, UserInfoRecord};
@@ -62,7 +64,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 23;
+const DB_VERSION: u32 = 24;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -137,6 +139,11 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
 
         if event.old_version < 23 {
             create_collection::<D, LocalRoomSettingsRecord>(&tx)?;
+        }
+
+        if event.old_version < 24 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
         }
 
         Ok(())
@@ -216,6 +223,19 @@ impl From<PlatformDependencies> for AppDependencies {
             encryption_domain_service_dependencies,
         ));
 
+        let message_archive_domain_service_dependencies = MessageArchiveDomainServiceDependencies {
+            ctx: ctx.clone(),
+            encryption_domain_service: encryption_domain_service.clone(),
+            local_room_settings: Arc::new(LocalRoomSettingsRepository::new(d.store.clone())),
+            message_archive_service: d.xmpp.clone(),
+            message_repo: messages_repo.clone(),
+            time_provider: time_provider.clone(),
+        };
+
+        let message_archive_domain_service = Arc::new(MessageArchiveDomainService::from(
+            message_archive_domain_service_dependencies,
+        ));
+
         let rooms_domain_service_dependencies = RoomsDomainServiceDependencies {
             account_settings_repo: account_settings_repo.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
@@ -228,6 +248,7 @@ impl From<PlatformDependencies> for AppDependencies {
             room_participation_service: d.xmpp.clone(),
             user_info_repo: user_info_repo.clone(),
             user_profile_repo: user_profile_repo.clone(),
+            message_archive_domain_service: message_archive_domain_service.clone(),
         };
 
         let rooms_domain_service =
