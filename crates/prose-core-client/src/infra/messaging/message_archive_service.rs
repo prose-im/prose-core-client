@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use xmpp_parsers::mam::Complete;
 
 use prose_xmpp::mods;
+use prose_xmpp::stanza::mam::query;
 use prose_xmpp::stanza::message::stanza_id;
 
 use crate::domain::messaging::models::StanzaId;
@@ -29,26 +30,34 @@ impl MessageArchiveService for XMPPClient {
         let before: Option<stanza_id::Id> = before.map(|id| id.as_ref().into());
         let after: Option<stanza_id::Id> = after.map(|id| id.as_ref().into());
 
-        let (messages, fin) = match room_id {
-            RoomId::User(id) => {
-                mam.load_messages_in_chat(
-                    id.as_ref(),
-                    before.as_ref(),
-                    after.as_ref(),
-                    Some(batch_size as usize),
-                )
-                .await?
-            }
-            RoomId::Muc(id) => {
-                mam.load_messages_in_muc_chat(
-                    id.as_ref(),
-                    before.as_ref(),
-                    after.as_ref(),
-                    Some(batch_size as usize),
-                )
-                .await?
-            }
+        let rsm_filter = query::RsmFilter {
+            range: match (before, after) {
+                (Some(before), _) => Some(query::RsmRange::Before(Some(before))),
+                (None, Some(after)) => Some(query::RsmRange::After(after)),
+                (None, None) => Some(query::RsmRange::Before(None)),
+            },
+            max: Some(batch_size as usize),
         };
+
+        let mut query = query::Query {
+            filter: None,
+            rsm_filter: Some(rsm_filter),
+            flip_page: false,
+        };
+
+        let to = match room_id {
+            RoomId::User(id) => {
+                query.filter = Some(query::Filter {
+                    range: None,
+                    with: Some(id.as_ref().clone().into()),
+                });
+                None
+            }
+            RoomId::Muc(id) => Some(id.as_ref()),
+        };
+
+        let (messages, fin) = mam.load_messages(to, query).await?;
+
         Ok(MessagePage {
             messages,
             is_last: fin.complete == Complete::True,

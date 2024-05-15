@@ -15,6 +15,7 @@ pub use vcard::VCard4;
 pub mod avatar;
 pub mod conference_bookmark;
 pub mod last_activity;
+pub mod mam;
 pub mod media_sharing;
 pub mod message;
 pub mod muc;

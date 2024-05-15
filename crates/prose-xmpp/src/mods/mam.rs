@@ -8,15 +8,15 @@ use std::future::Future;
 use anyhow::Result;
 use jid::BareJid;
 use tracing::error;
-use xmpp_parsers::data_forms::{DataForm, DataFormType, Field};
 use xmpp_parsers::iq::{Iq, IqType};
-use xmpp_parsers::rsm::SetQuery;
 
 use crate::client::ModuleContext;
 use crate::mods::Module;
-use crate::stanza::message::{mam, stanza_id};
-use crate::stanza::ns;
+use crate::stanza::mam::query;
+use crate::stanza::message::mam;
 use crate::util::{ElementReducerPoll, RequestError, RequestFuture, XMPPElement};
+
+// https://xmpp.org/extensions/xep-0313.html
 
 #[derive(Default, Clone)]
 pub struct MAM {
@@ -30,83 +30,28 @@ impl Module for MAM {
 }
 
 impl MAM {
-    pub fn load_messages_in_chat<'a>(
+    /// When you're loading message from a MUC chat, make sure to set `to` to the room's JID.
+    /// If you're loading messages in a regular conversation, make sure to set the `with` filter
+    /// on `query`. Leave `to` blank in this case.
+    pub fn load_messages(
         &self,
-        jid: &BareJid,
-        before: impl Into<Option<&'a stanza_id::Id>>,
-        after: impl Into<Option<&'a stanza_id::Id>>,
-        max_count: impl Into<Option<usize>>,
+        to: Option<&BareJid>,
+        query: query::Query,
     ) -> impl Future<Output = Result<(Vec<mam::ArchivedMessage>, mam::Fin), RequestError>> {
-        let query_id = mam::QueryId(self.ctx.generate_id());
+        let query_id = self.ctx.generate_id();
         let id = self.ctx.generate_id();
 
-        let mut before = before.into().map(ToString::to_string);
-        let after = after.into().map(ToString::to_string);
+        let iq = Iq {
+            from: None,
+            to: to.map(|jid| jid.clone().into()),
+            id: id.clone(),
+            payload: IqType::Set(query.into_mam_query(query_id.clone()).into()),
+        };
 
-        if before.is_none() && after.is_none() {
-            before = Some("".to_string())
-        }
-
-        let iq = Iq::from_set(
-            id.clone(),
-            mam::Query {
-                queryid: Some(query_id.clone()),
-                node: None,
-                form: Some(DataForm::new(
-                    DataFormType::Submit,
-                    ns::MAM,
-                    vec![Field::text_single("with", &jid.to_string())],
-                )),
-                set: Some(SetQuery {
-                    max: max_count.into(),
-                    after,
-                    before,
-                    index: None,
-                }),
-                flip_page: false,
-            },
-        );
-
-        self.ctx
-            .send_stanza_with_future(iq, RequestFuture::new_mam_request(id, query_id))
-    }
-
-    pub fn load_messages_in_muc_chat<'a>(
-        &self,
-        room_id: &BareJid,
-        before: impl Into<Option<&'a stanza_id::Id>>,
-        after: impl Into<Option<&'a stanza_id::Id>>,
-        max_count: impl Into<Option<usize>>,
-    ) -> impl Future<Output = Result<(Vec<mam::ArchivedMessage>, mam::Fin), RequestError>> {
-        let query_id = mam::QueryId(self.ctx.generate_id());
-        let id = self.ctx.generate_id();
-
-        let mut before = before.into().map(ToString::to_string);
-        let after = after.into().map(ToString::to_string);
-
-        if before.is_none() && after.is_none() {
-            before = Some("".to_string())
-        }
-
-        let iq = Iq::from_set(
-            id.clone(),
-            mam::Query {
-                queryid: Some(query_id.clone()),
-                node: None,
-                form: None,
-                set: Some(SetQuery {
-                    max: max_count.into(),
-                    after,
-                    before,
-                    index: None,
-                }),
-                flip_page: false,
-            },
+        self.ctx.send_stanza_with_future(
+            iq,
+            RequestFuture::new_mam_request(id, mam::QueryId(query_id)),
         )
-        .with_to(room_id.clone().into());
-
-        self.ctx
-            .send_stanza_with_future(iq, RequestFuture::new_mam_request(id, query_id))
     }
 }
 
