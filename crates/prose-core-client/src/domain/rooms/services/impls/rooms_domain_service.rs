@@ -18,7 +18,8 @@ use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
     DynConnectedRoomsRepository, DynIDProvider, DynMessageArchiveDomainService,
     DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
-    DynRoomParticipationService, DynUserInfoRepository, DynUserProfileRepository,
+    DynRoomParticipationService, DynSyncedRoomSettingsService, DynUserInfoRepository,
+    DynUserProfileRepository,
 };
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
@@ -29,6 +30,7 @@ use crate::domain::rooms::services::rooms_domain_service::{
     CreateRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
 };
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
+use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{MucId, RoomId, RoomType, UserId};
 use crate::dtos::{Availability, RoomState};
 use crate::util::StringExt;
@@ -46,13 +48,14 @@ pub struct RoomsDomainService {
     connected_rooms_repo: DynConnectedRoomsRepository,
     ctx: DynAppContext,
     id_provider: DynIDProvider,
+    message_archive_domain_service: DynMessageArchiveDomainService,
     message_migration_domain_service: DynMessageMigrationDomainService,
     room_attributes_service: DynRoomAttributesService,
     room_management_service: DynRoomManagementService,
     room_participation_service: DynRoomParticipationService,
+    synced_room_settings_service: DynSyncedRoomSettingsService,
     user_info_repo: DynUserInfoRepository,
     user_profile_repo: DynUserProfileRepository,
-    message_archive_domain_service: DynMessageArchiveDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -429,6 +432,14 @@ impl RoomsDomainService {
             .unwrap_or_else(|| participant.formatted_username());
         let user_info = user_info.unwrap_or_default().unwrap_or_default();
 
+        let room_id = RoomId::User(participant.clone());
+        let settings = self
+            .synced_room_settings_service
+            .load_settings(&room_id)
+            .await
+            .unwrap_or_default()
+            .unwrap_or_else(|| SyncedRoomSettings::new(room_id));
+
         let room = Room::for_direct_message(
             &participant,
             &contact_name,
@@ -437,6 +448,7 @@ impl RoomsDomainService {
             RoomFeatures {
                 mam_version: self.ctx.mam_version(),
             },
+            settings,
         );
 
         self.connected_rooms_repo.set_or_replace(room.clone());
@@ -751,12 +763,21 @@ impl RoomsDomainService {
             });
         }
 
+        let room_id = RoomId::Muc(info.room_id.clone());
+
         let room_info = RoomInfo {
-            room_id: RoomId::Muc(info.room_id.clone()),
+            room_id: room_id.clone(),
             user_nickname: info.user_nickname,
             r#type: info.config.room_type,
             features: info.config.features,
         };
+
+        let settings = self
+            .synced_room_settings_service
+            .load_settings(&room_id)
+            .await
+            .unwrap_or_default()
+            .unwrap_or_else(|| SyncedRoomSettings::new(room_id));
 
         let Some(room) = self.connected_rooms_repo.update(info.room_id.as_ref(), {
             let room_name = room_name;
@@ -769,6 +790,7 @@ impl RoomsDomainService {
                     room_info,
                     members,
                     info.participants,
+                    settings,
                 );
                 room
             })

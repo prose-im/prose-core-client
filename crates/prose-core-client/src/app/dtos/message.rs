@@ -20,6 +20,8 @@ pub struct Message {
     pub is_delivered: bool,
     pub is_transient: bool,
     pub is_encrypted: bool,
+    /// When contained in a list, this message is the last message that our user has read.
+    pub is_last_read: bool,
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,

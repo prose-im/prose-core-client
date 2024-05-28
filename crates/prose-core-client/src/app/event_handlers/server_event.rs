@@ -9,6 +9,7 @@ use prose_xmpp::ConnectionError;
 
 use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::encryption::models::DeviceList;
+use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::MucId;
 use crate::domain::sidebar::models::Bookmark;
 use crate::domain::{
@@ -20,6 +21,7 @@ use crate::domain::{
     user_info::models::{AvatarMetadata, UserStatus},
     user_profiles::models::UserProfile,
 };
+use crate::dtos::RoomId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerEvent {
@@ -45,6 +47,8 @@ pub enum ServerEvent {
     Message(MessageEvent),
     /// Events about changes to the sidebar.
     SidebarBookmark(SidebarBookmarkEvent),
+    /// Events about RoomSettings that are shared between our clients.
+    SyncedRoomSettings(SyncedRoomSettingsEvent),
     /// Events about OMEMO devices.
     UserDevice(UserDeviceEvent),
 }
@@ -193,6 +197,7 @@ pub enum PubSubEventType<Id, Item> {
 
 pub type SidebarBookmarkEvent = PubSubEvent<BareJid, Bookmark>;
 pub type UserDeviceEvent = PubSubEvent<String, DeviceList>;
+pub type SyncedRoomSettingsEvent = PubSubEvent<RoomId, SyncedRoomSettings>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContactListEventType {

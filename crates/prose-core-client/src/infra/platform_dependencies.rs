@@ -64,7 +64,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 24;
+const DB_VERSION: u32 = 26;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -146,6 +146,11 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, MessageRecord>(&tx)?;
         }
 
+        if event.old_version < 26 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
+        }
+
         Ok(())
     })
     .await?;
@@ -195,6 +200,7 @@ impl From<PlatformDependencies> for AppDependencies {
             d.store.clone(),
             d.xmpp.clone(),
         ));
+        let local_room_settings_repo = Arc::new(LocalRoomSettingsRepository::new(d.store.clone()));
 
         let message_migration_domain_service_dependencies =
             MessageMigrationDomainServiceDependencies {
@@ -226,7 +232,7 @@ impl From<PlatformDependencies> for AppDependencies {
         let message_archive_domain_service_dependencies = MessageArchiveDomainServiceDependencies {
             ctx: ctx.clone(),
             encryption_domain_service: encryption_domain_service.clone(),
-            local_room_settings: Arc::new(LocalRoomSettingsRepository::new(d.store.clone())),
+            local_room_settings_repo: local_room_settings_repo.clone(),
             message_archive_service: d.xmpp.clone(),
             message_repo: messages_repo.clone(),
             time_provider: time_provider.clone(),
@@ -246,6 +252,7 @@ impl From<PlatformDependencies> for AppDependencies {
             room_attributes_service: d.xmpp.clone(),
             room_management_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),
+            synced_room_settings_service: d.xmpp.clone(),
             user_info_repo: user_info_repo.clone(),
             user_profile_repo: user_profile_repo.clone(),
             message_archive_domain_service: message_archive_domain_service.clone(),
@@ -313,6 +320,7 @@ impl From<PlatformDependencies> for AppDependencies {
                     message_repo: message_repo.clone(),
                     messaging_service: xmpp.clone(),
                     participation_service: xmpp.clone(),
+                    synced_room_settings_service: xmpp.clone(),
                     sidebar_domain_service: sidebar_domain_service.clone(),
                     time_provider: time_provider.clone(),
                     user_profile_repo: user_profile_repo.clone(),
@@ -333,6 +341,7 @@ impl From<PlatformDependencies> for AppDependencies {
             drafts_repo,
             encryption_domain_service,
             id_provider,
+            local_room_settings_repo,
             message_archive_service: d.xmpp.clone(),
             messages_repo,
             messaging_service: d.xmpp.clone(),

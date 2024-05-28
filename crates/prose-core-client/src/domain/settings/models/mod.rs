@@ -5,6 +5,8 @@
 
 pub use account_settings::AccountSettings;
 pub use local_room_settings::LocalRoomSettings;
+pub use synced_room_settings::SyncedRoomSettings;
 
 mod account_settings;
 mod local_room_settings;
+mod synced_room_settings;

@@ -15,11 +15,14 @@ use crate::domain::general::models::{Capabilities, SoftwareVersion};
 use crate::domain::shared::models::MamVersion;
 use crate::dtos::{UserId, UserResourceId};
 
+#[derive(Debug, Clone)]
 pub struct AppConfig {
     /// The number of messages to return in a MessageResultSet.
     pub message_page_size: u32,
     /// The maximum number of pages to fetch when trying to fill a MessageResultSet.
     pub max_message_pages_to_load: u32,
+    /// The maximum duration to fetch messages into the past during catchup.
+    pub max_catchup_duration_secs: i64,
 }
 
 pub struct AppContext {
@@ -31,13 +34,17 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn new(capabilities: Capabilities, software_version: SoftwareVersion) -> Self {
+    pub fn new(
+        capabilities: Capabilities,
+        software_version: SoftwareVersion,
+        config: AppConfig,
+    ) -> Self {
         Self {
             connection_properties: Default::default(),
             capabilities,
             software_version,
             is_observing_rooms: Default::default(),
-            config: Default::default(),
+            config,
         }
     }
 }
@@ -47,6 +54,7 @@ impl Default for AppConfig {
         Self {
             message_page_size: 100,
             max_message_pages_to_load: 5,
+            max_catchup_duration_secs: 60 * 60 * 24 * 5,
         }
     }
 }

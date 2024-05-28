@@ -8,3 +8,4 @@ pub use local_room_settings_repository::{LocalRoomSettingsRecord, LocalRoomSetti
 
 mod account_settings_repository;
 mod local_room_settings_repository;
+mod synced_room_settings_service;

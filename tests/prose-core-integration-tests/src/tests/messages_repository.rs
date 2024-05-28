@@ -8,13 +8,13 @@ use chrono::{DateTime, TimeZone, Utc};
 use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::messaging::models::{
-    MessageLike, MessageLikePayload, MessageRef, MessageTargetId,
+    ArchivedMessageRef, MessageLike, MessageLikePayload, MessageTargetId,
 };
 use prose_core_client::domain::messaging::repos::MessagesRepository;
-use prose_core_client::domain::shared::models::{RoomId, UserId};
+use prose_core_client::domain::shared::models::{MucId, RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::MessageBuilder;
-use prose_core_client::user_id;
+use prose_core_client::{muc_id, user_id};
 
 use crate::tests::{async_test, store};
 
@@ -328,6 +328,87 @@ async fn test_resolves_message_id() -> Result<()> {
 }
 
 #[async_test]
+async fn test_get_messages_after() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    repo.append(
+        &user_id!("a@prose.org"),
+        &muc_id!("room2@prose.org").into(),
+        &[
+            MessageBuilder::new_with_index(1)
+                .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 10, 00, 00).unwrap())
+                .build_message_like(),
+            MessageBuilder::new_with_index(2)
+                .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 11, 00, 00).unwrap())
+                .build_message_like(),
+            MessageBuilder::new_with_index(3)
+                .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
+                .build_message_like(),
+        ],
+    )
+    .await?;
+
+    repo.append(
+        &user_id!("a@prose.org"),
+        &muc_id!("room1@prose.org").into(),
+        &[MessageBuilder::new_with_index(10)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
+            .build_message_like()],
+    )
+    .await?;
+
+    repo.append(
+        &user_id!("a@prose.org"),
+        &muc_id!("room3@prose.org").into(),
+        &[MessageBuilder::new_with_index(10)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
+            .build_message_like()],
+    )
+    .await?;
+
+    repo.append(
+        &user_id!("b@prose.org"),
+        &muc_id!("room2@prose.org").into(),
+        &[MessageBuilder::new_with_index(100)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
+            .build_message_like()],
+    )
+    .await?;
+
+    assert_eq!(
+        vec![
+            MessageBuilder::id_for_index(1),
+            MessageBuilder::id_for_index(2),
+            MessageBuilder::id_for_index(3)
+        ],
+        repo.get_messages_after(
+            &user_id!("a@prose.org"),
+            &muc_id!("room2@prose.org").into(),
+            DateTime::<Utc>::MIN_UTC
+        )
+        .await?
+        .into_iter()
+        .map(|m| m.id.into_original_id().unwrap())
+        .collect::<Vec<_>>()
+    );
+
+    assert_eq!(
+        vec![MessageBuilder::id_for_index(3)],
+        repo.get_messages_after(
+            &user_id!("a@prose.org"),
+            &muc_id!("room2@prose.org").into(),
+            Utc.with_ymd_and_hms(2024, 05, 24, 11, 00, 00).unwrap()
+        )
+        .await?
+        .into_iter()
+        .map(|m| m.id.into_original_id().unwrap())
+        .collect::<Vec<_>>()
+    );
+
+    Ok(())
+}
+
+#[async_test]
 async fn test_clears_cache() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
@@ -462,8 +543,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
     .await?;
 
     assert_eq!(
-        Some(MessageRef {
-            message_id: MessageBuilder::id_for_index(3),
+        Some(ArchivedMessageRef {
             stanza_id: MessageBuilder::stanza_id_for_index(3),
             timestamp: Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap(),
         }),
@@ -472,8 +552,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
     );
 
     assert_eq!(
-        Some(MessageRef {
-            message_id: MessageBuilder::id_for_index(4),
+        Some(ArchivedMessageRef {
             stanza_id: MessageBuilder::stanza_id_for_index(4),
             timestamp: Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap(),
         }),

@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
@@ -225,7 +226,10 @@ impl Message {
 }
 
 impl Message {
-    fn typed_payload<P: MessagePayload>(&self, name: &str, ns: &str) -> Option<P> {
+    fn typed_payload<P: MessagePayload>(&self, name: &str, ns: &str) -> Option<P>
+    where
+        P::Error: Display,
+    {
         self.typed_payload_with_predicate(|p| p.is(name, ns))
     }
 
@@ -250,16 +254,23 @@ impl Message {
     fn typed_payload_with_predicate<P: MessagePayload, F>(&self, predicate: F) -> Option<P>
     where
         F: FnMut(&Element) -> bool,
+        P::Error: Display,
     {
         let mut predicate = predicate;
         let Some(payload) = self.payloads.iter().find(|p| predicate(*p)) else {
             return None;
         };
-        let Ok(payload) = P::try_from(payload.clone()) else {
-            error!("Failed to parse message payload {}.", String::from(payload));
-            return None;
-        };
-        Some(payload)
+        match P::try_from(payload.clone()) {
+            Ok(payload) => Some(payload),
+            Err(err) => {
+                error!(
+                    "Failed to parse message payload {}. {}",
+                    String::from(payload),
+                    err.to_string()
+                );
+                None
+            }
+        }
     }
 }
 

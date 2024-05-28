@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::messaging::models::{
-    MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
+    ArchivedMessageRef, MessageId, MessageLike, MessageTargetId, StanzaId,
 };
 use crate::domain::shared::models::RoomId;
 use crate::dtos::UserId;
@@ -67,5 +67,13 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         account: &UserId,
         room_id: &RoomId,
         before: Option<DateTime<Utc>>,
-    ) -> Result<Option<MessageRef>>;
+    ) -> Result<Option<ArchivedMessageRef>>;
+
+    /// Returns all messages with a timestamp greater than `after`.
+    async fn get_messages_after(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        after: DateTime<Utc>,
+    ) -> Result<Vec<MessageLike>>;
 }

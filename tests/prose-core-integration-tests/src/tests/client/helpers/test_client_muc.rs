@@ -4,17 +4,42 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use minidom::IntoAttributeValue;
+use chrono::{DateTime, Duration, Utc};
+use minidom::{Element, IntoAttributeValue};
+use xmpp_parsers::mam::QueryId;
 
 use prose_core_client::domain::rooms::services::impls::build_nickname;
+use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
 use prose_core_client::dtos::{MucId, OccupantId, RoomEnvelope, RoomId, UserId};
 use prose_core_client::ClientEvent;
+use prose_xmpp::stanza::message::mam::ArchivedMessage;
+use prose_xmpp::stanza::Message;
+use prose_xmpp::TimeProvider;
 
 use crate::{event, recv, send};
 
 use super::TestClient;
+
+pub struct JoinRoomStrategy {
+    pub room_settings: Option<SyncedRoomSettings>,
+    pub expect_catchup: Box<dyn FnOnce(&TestClient, &MucId)>,
+}
+
+#[derive(Default)]
+pub struct StartDMStrategy {
+    pub room_settings: Option<SyncedRoomSettings>,
+}
+
+impl Default for JoinRoomStrategy {
+    fn default() -> Self {
+        JoinRoomStrategy {
+            room_settings: None,
+            expect_catchup: Box::new(|client, room_id| client.expect_muc_catchup(room_id)),
+        }
+    }
+}
 
 impl TestClient {
     pub fn build_occupant_id(&self, room_id: &MucId) -> OccupantId {
@@ -32,6 +57,16 @@ impl TestClient {
         &self,
         room_id: MucId,
         anon_occupant_id: impl Into<AnonOccupantId>,
+    ) -> Result<()> {
+        self.join_room_with_strategy(room_id, anon_occupant_id, Default::default())
+            .await
+    }
+
+    pub async fn join_room_with_strategy(
+        &self,
+        room_id: MucId,
+        anon_occupant_id: impl Into<AnonOccupantId>,
+        strategy: JoinRoomStrategy,
     ) -> Result<()> {
         let occupant_id = self.build_occupant_id(&room_id);
         let room_name = "general";
@@ -55,7 +90,7 @@ impl TestClient {
             <x xmlns='http://jabber.org/protocol/muc'>
               <history maxstanzas="0" />
             </x>
-            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc="/>
+            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}"/>
         </presence>
         "#
         );
@@ -65,11 +100,11 @@ impl TestClient {
             r#"
         <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
           <show>chat</show>
-          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
+          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}" />
           <occupant-id xmlns="urn:xmpp:occupant-id:0" id="{{ANON_OCCUPANT_ID}}" />
           <x xmlns="http://jabber.org/protocol/muc#user">
             <status code="100" />
-            <item affiliation="owner" jid="m@nsm.chat/tnFAvzAb" role="moderator" />
+            <item affiliation="owner" jid="{{USER_RESOURCE_ID}}" role="moderator" />
             <status code="110" />
           </x>
         </presence>
@@ -224,7 +259,8 @@ impl TestClient {
         </iq>"#
         );
 
-        self.expect_muc_catchup(&room_id);
+        self.expect_load_settings(room_id.clone(), strategy.room_settings);
+        (strategy.expect_catchup)(&self, &room_id);
 
         self.expect_set_bookmark(
             &RoomId::Muc(room_id.clone()),
@@ -242,10 +278,21 @@ impl TestClient {
     }
 
     pub async fn start_dm(&self, user_id: UserId) -> Result<RoomEnvelope> {
+        self.start_dm_with_strategy(user_id, Default::default())
+            .await
+    }
+
+    pub async fn start_dm_with_strategy(
+        &self,
+        user_id: UserId,
+        strategy: StartDMStrategy,
+    ) -> Result<RoomEnvelope> {
+        self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+
         send!(
             self,
             r#"
-        <iq xmlns="jabber:client" id="{{ID}}" to="them@prose.org" type="get">
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
             <vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0" />
         </iq>
         "#
@@ -265,7 +312,7 @@ impl TestClient {
         send!(
             self,
             r#"
-        <iq xmlns="jabber:client" id="{{ID}}" to="them@prose.org" type="get">
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
           <pubsub xmlns="http://jabber.org/protocol/pubsub">
             <items max_items="1" node="urn:xmpp:avatar:metadata" />
           </pubsub>
@@ -284,6 +331,7 @@ impl TestClient {
         "#
         );
 
+        self.expect_load_settings(user_id.clone(), strategy.room_settings);
         self.expect_catchup(&user_id);
 
         self.expect_set_bookmark(
@@ -364,8 +412,87 @@ impl TestClient {
         self.pop_ctx();
     }
 
+    pub fn expect_publish_settings(&self, settings: SyncedRoomSettings) {
+        self.push_ctx(
+            [
+                ("ROOM_ID".into(), settings.room_id.to_string()),
+                (
+                    "ROOM_SETTINGS".into(),
+                    String::from(&Element::from(settings)),
+                ),
+            ]
+            .into(),
+        );
+
+        send!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}">
+                {{ROOM_SETTINGS}}
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+        );
+
+        recv!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#
+        );
+    }
+
     pub fn expect_muc_catchup(&self, room_id: &MucId) {
-        self.push_ctx([("ROOM_ID".into(), room_id.to_string())].into());
+        self.expect_muc_catchup_with_config(
+            room_id,
+            self.time_provider.now() - Duration::seconds(self.app_config.max_catchup_duration_secs),
+            None,
+        )
+    }
+
+    pub fn expect_muc_catchup_with_config(
+        &self,
+        room_id: &MucId,
+        start: DateTime<Utc>,
+        messages: impl IntoIterator<Item = ArchivedMessage>,
+    ) {
+        self.push_ctx(
+            [
+                ("ROOM_ID".into(), room_id.to_string()),
+                ("CATCHUP_START".into(), start.to_rfc3339()),
+            ]
+            .into(),
+        );
 
         send!(
             self,
@@ -377,7 +504,7 @@ impl TestClient {
                     <value>urn:xmpp:mam:2</value>
                   </field>
                   <field var="start">
-                    <value>2024-02-14T00:00:00+00:00</value>
+                    <value>{{CATCHUP_START}}</value>
                   </field>
                 </x>
                 <set xmlns="http://jabber.org/protocol/rsm">
@@ -387,6 +514,15 @@ impl TestClient {
             </iq>
             "#
         );
+
+        let query_id = QueryId(self.id_provider.id_with_offset(1));
+
+        for mut archived_message in messages.into_iter() {
+            archived_message.query_id = Some(query_id.clone());
+
+            let message = Message::new().set_archived_message(archived_message);
+            self.receive_element(Element::from(message), file!(), line!());
+        }
 
         recv!(
             self,
@@ -402,8 +538,83 @@ impl TestClient {
         self.pop_ctx();
     }
 
+    pub fn expect_load_settings(
+        &self,
+        room_id: impl Into<RoomId>,
+        settings: Option<SyncedRoomSettings>,
+    ) {
+        self.push_ctx([("ROOM_ID".into(), room_id.into().to_string())].into());
+
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" type="get">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="https://prose.org/protocol/room_settings">
+                  <item id="{{ROOM_ID}}" />
+                </items>
+              </pubsub>
+             </iq>
+            "#
+        );
+
+        if let Some(settings) = settings {
+            self.push_ctx(
+                [(
+                    "ROOM_SETTINGS".into(),
+                    String::from(&Element::from(settings)),
+                )]
+                .into(),
+            );
+
+            recv!(
+                self,
+                r#"
+                <iq xmlns="jabber:client" id="{{ID}}" type="result">
+                  <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                    <items node="https://prose.org/protocol/room_settings">
+                      <item id="{{ROOM_ID}}">
+                        {{ROOM_SETTINGS}}
+                      </item>
+                    </items>
+                  </pubsub>
+                </iq>
+                "#
+            );
+
+            self.pop_ctx();
+        } else {
+            recv!(
+                self,
+                r#"
+                <iq xmlns="jabber:client" id="{{ID}}" type="error">
+                  <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                    <items node="https://prose.org/protocol/room_settings">
+                      <item id="{{ROOM_ID}}" />
+                    </items>
+                  </pubsub>
+                  <error type="cancel">
+                    <item-not-found xmlns="urn:ietf:params:xml:ns:xmpp-stanzas"/>
+                  </error>
+                </iq>
+                "#
+            );
+        }
+
+        self.pop_ctx();
+    }
+
     pub fn expect_catchup(&self, room_id: &UserId) {
-        self.push_ctx([("ROOM_ID".into(), room_id.to_string())].into());
+        let start =
+            self.time_provider.now() - Duration::seconds(self.app_config.max_catchup_duration_secs);
+
+        self.push_ctx(
+            [
+                ("ROOM_ID".into(), room_id.to_string()),
+                ("START".into(), start.to_rfc3339()),
+            ]
+            .into(),
+        );
 
         send!(
             self,
@@ -415,7 +626,7 @@ impl TestClient {
                     <value>urn:xmpp:mam:2</value>
                   </field>
                   <field var="start">
-                    <value>2024-02-14T00:00:00+00:00</value>
+                    <value>{{START}}</value>
                   </field>
                   <field var="with">
                     <value>{{ROOM_ID}}</value>

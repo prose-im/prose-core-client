@@ -17,8 +17,8 @@ use crate::app::deps::{
     AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
     DynDraftsRepository, DynEncryptionDomainService, DynIDProvider, DynMessageArchiveService,
     DynMessagesRepository, DynMessagingService, DynRngProvider, DynRoomAttributesService,
-    DynRoomParticipationService, DynSidebarDomainService, DynTimeProvider,
-    DynUserProfileRepository,
+    DynRoomParticipationService, DynSidebarDomainService, DynSyncedRoomSettingsService,
+    DynTimeProvider, DynUserProfileRepository,
 };
 use crate::app::event_handlers::MockClientEventDispatcherTrait;
 use crate::app::services::RoomInner;
@@ -46,7 +46,10 @@ use crate::domain::rooms::services::mocks::{
     MockRoomsDomainService,
 };
 use crate::domain::rooms::services::RoomFactory;
-use crate::domain::settings::repos::mocks::MockAccountSettingsRepository;
+use crate::domain::settings::repos::mocks::{
+    MockAccountSettingsRepository, MockLocalRoomSettingsRepository,
+};
+use crate::domain::settings::services::mocks::MockSyncedRoomSettingsService;
 use crate::domain::sidebar::services::impls::SidebarDomainServiceDependencies;
 use crate::domain::sidebar::services::mocks::{MockBookmarksService, MockSidebarDomainService};
 use crate::domain::uploads::services::mocks::MockUploadService;
@@ -108,9 +111,11 @@ pub struct MockAppDependencies {
     pub encryption_domain_service: MockEncryptionDomainService,
     #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(\"id\"))"))]
     pub id_provider: DynIDProvider,
+    pub local_room_settings_repo: MockLocalRoomSettingsRepository,
     pub message_archive_service: MockMessageArchiveService,
     pub messages_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
+    pub synced_room_settings_service: MockSyncedRoomSettingsService,
     pub request_handling_service: MockRequestHandlingService,
     #[derivative(Default(value = "Arc::new(StepRngProvider::default())"))]
     pub rng_provider: DynRngProvider,
@@ -153,6 +158,7 @@ impl From<MockAppDependencies> for AppDependencies {
         let room_attributes_service = Arc::new(mock.room_attributes_service);
         let sidebar_domain_service = Arc::new(mock.sidebar_domain_service);
         let user_profile_repo = Arc::new(mock.user_profile_repo);
+        let synced_room_settings_service = Arc::new(mock.synced_room_settings_service);
 
         let room_factory = {
             let client_event_dispatcher = client_event_dispatcher.clone();
@@ -168,6 +174,7 @@ impl From<MockAppDependencies> for AppDependencies {
             let time_provider = mock.time_provider.clone();
             let topic_service = room_attributes_service.clone();
             let user_profile_repo = user_profile_repo.clone();
+            let synced_room_settings_service = synced_room_settings_service.clone();
 
             RoomFactory::new(Arc::new(move |data| {
                 RoomInner {
@@ -182,6 +189,7 @@ impl From<MockAppDependencies> for AppDependencies {
                     message_repo: message_repo.clone(),
                     messaging_service: messaging_service.clone(),
                     participation_service: participation_service.clone(),
+                    synced_room_settings_service: synced_room_settings_service.clone(),
                     sidebar_domain_service: sidebar_domain_service.clone(),
                     time_provider: time_provider.clone(),
                     user_profile_repo: user_profile_repo.clone(),
@@ -201,6 +209,7 @@ impl From<MockAppDependencies> for AppDependencies {
             drafts_repo,
             encryption_domain_service,
             id_provider: mock.id_provider,
+            local_room_settings_repo: Arc::new(mock.local_room_settings_repo),
             message_archive_service,
             messages_repo,
             messaging_service,
@@ -270,6 +279,7 @@ pub struct MockRoomsDomainServiceDependencies {
     pub room_attributes_service: MockRoomAttributesService,
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
+    pub synced_room_settings_service: MockSyncedRoomSettingsService,
     pub user_info_repo: MockUserInfoRepository,
     pub user_profile_repo: MockUserProfileRepository,
 }
@@ -292,6 +302,7 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             room_attributes_service: Arc::new(value.room_attributes_service),
             room_management_service: Arc::new(value.room_management_service),
             room_participation_service: Arc::new(value.room_participation_service),
+            synced_room_settings_service: Arc::new(value.synced_room_settings_service),
             user_info_repo: Arc::new(value.user_info_repo),
             user_profile_repo: Arc::new(value.user_profile_repo),
             message_archive_domain_service: Arc::new(value.message_archive_domain_service),
@@ -314,6 +325,7 @@ pub struct MockRoomFactoryDependencies {
     pub message_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
     pub participation_service: MockRoomParticipationService,
+    pub synced_room_settings_service: MockSyncedRoomSettingsService,
     pub sidebar_domain_service: MockSidebarDomainService,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
@@ -331,6 +343,7 @@ pub struct MockSealedRoomFactoryDependencies {
     pub message_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
     pub participation_service: DynRoomParticipationService,
+    pub synced_room_settings_service: DynSyncedRoomSettingsService,
     pub sidebar_domain_service: DynSidebarDomainService,
     pub time_provider: DynTimeProvider,
     pub topic_service: DynRoomAttributesService,
@@ -350,6 +363,7 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
             message_repo: Arc::new(value.message_repo),
             messaging_service: Arc::new(value.messaging_service),
             participation_service: Arc::new(value.participation_service),
+            synced_room_settings_service: Arc::new(value.synced_room_settings_service),
             sidebar_domain_service: Arc::new(value.sidebar_domain_service),
             time_provider: Arc::new(value.time_provider),
             topic_service: Arc::new(value.attributes_service),
@@ -373,6 +387,7 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
                 message_repo: value.message_repo.clone(),
                 messaging_service: value.messaging_service.clone(),
                 participation_service: value.participation_service.clone(),
+                synced_room_settings_service: value.synced_room_settings_service.clone(),
                 sidebar_domain_service: value.sidebar_domain_service.clone(),
                 time_provider: value.time_provider.clone(),
                 user_profile_repo: value.user_profile_repo.clone(),

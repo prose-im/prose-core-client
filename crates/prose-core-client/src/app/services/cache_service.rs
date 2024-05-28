@@ -5,8 +5,8 @@ use prose_proc_macros::InjectDependencies;
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynAvatarRepository, DynBlockListDomainService,
     DynContactListDomainService, DynDraftsRepository, DynEncryptionDomainService,
-    DynMessagesRepository, DynSidebarDomainService, DynUserInfoRepository,
-    DynUserProfileRepository,
+    DynLocalRoomSettingsRepository, DynMessagesRepository, DynSidebarDomainService,
+    DynUserInfoRepository, DynUserProfileRepository,
 };
 
 #[derive(InjectDependencies)]
@@ -25,6 +25,8 @@ pub struct CacheService {
     drafts_repo: DynDraftsRepository,
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
+    #[inject]
+    local_room_settings_repo: DynLocalRoomSettingsRepository,
     #[inject]
     messages_repo: DynMessagesRepository,
     #[inject]
@@ -46,9 +48,11 @@ impl CacheService {
         self.drafts_repo.clear_cache().await?;
         self.encryption_domain_service.clear_cache().await?;
         self.messages_repo.clear_cache(&account).await?;
+        self.local_room_settings_repo.clear_cache(&account).await?;
         self.sidebar_domain_service.clear_cache().await?;
         self.user_info_repo.clear_cache().await?;
         self.user_profile_repo.clear_cache().await?;
+
         Ok(())
     }
 }

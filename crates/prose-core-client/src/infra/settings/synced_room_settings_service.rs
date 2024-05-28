@@ -1,11 +1,10 @@
 // prose-core-client/prose-core-client
 //
-// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
 use async_trait::async_trait;
-use jid::BareJid;
 use minidom::Element;
 use xmpp_parsers::data_forms::{Field, FieldType};
 use xmpp_parsers::pubsub::pubsub::PublishOptions;
@@ -13,32 +12,37 @@ use xmpp_parsers::pubsub::{Item, ItemId};
 
 use prose_xmpp::{mods, PublishOptionsExt};
 
-use crate::domain::sidebar::models::Bookmark;
-use crate::domain::sidebar::services::BookmarksService;
-use crate::infra::xmpp::type_conversions::bookmark::ns;
+use crate::domain::settings::models::SyncedRoomSettings;
+use crate::domain::settings::services::SyncedRoomSettingsService;
+use crate::domain::shared::models::RoomId;
+use crate::infra::xmpp::type_conversions::synced_room_settings::ns;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl BookmarksService for XMPPClient {
-    async fn load_bookmarks(&self) -> Result<Vec<Bookmark>> {
+impl SyncedRoomSettingsService for XMPPClient {
+    async fn load_settings(&self, room_id: &RoomId) -> Result<Option<SyncedRoomSettings>> {
         let pubsub = self.client.get_mod::<mods::PubSub>();
-        let bookmarks = pubsub.load_all_objects(ns::PROSE_BOOKMARK).await?;
-
-        Ok(bookmarks)
+        let mut settings = pubsub
+            .load_objects_with_ids::<SyncedRoomSettings, _>(
+                ns::PROSE_ROOM_SETTINGS,
+                [room_id.to_string()],
+            )
+            .await?;
+        Ok(settings.pop())
     }
 
-    async fn save_bookmark(&self, bookmark: &Bookmark) -> Result<()> {
+    async fn save_settings(&self, room_id: &RoomId, settings: &SyncedRoomSettings) -> Result<()> {
         let item = Item {
-            id: Some(ItemId(bookmark.jid.to_string())),
+            id: Some(ItemId(room_id.to_string())),
             publisher: None,
-            payload: Some(Element::from(bookmark.clone())),
+            payload: Some(Element::from(settings.clone())),
         };
 
         let pubsub = self.client.get_mod::<mods::PubSub>();
         pubsub
             .publish_items(
-                ns::PROSE_BOOKMARK,
+                ns::PROSE_ROOM_SETTINGS,
                 [item],
                 Some(PublishOptions::for_private_data([
                     Field::new("pubsub#max_items", FieldType::TextSingle).with_value("256"),
@@ -50,10 +54,10 @@ impl BookmarksService for XMPPClient {
         Ok(())
     }
 
-    async fn delete_bookmark(&self, jid: &BareJid) -> Result<()> {
+    async fn delete_settings(&self, room_id: &RoomId) -> Result<()> {
         let pubsub = self.client.get_mod::<mods::PubSub>();
         pubsub
-            .delete_items_with_ids(ns::PROSE_BOOKMARK, [jid.to_string()], true)
+            .delete_items_with_ids(ns::PROSE_ROOM_SETTINGS, [room_id.to_string()], true)
             .await?;
         Ok(())
     }

@@ -46,7 +46,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
           <x xmlns='http://jabber.org/protocol/muc'>
             <history maxstanzas="0" />
           </x>
-          <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc="/>
+          <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}"/>
         </presence>
         "#
     );
@@ -69,7 +69,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
         r#"
         <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
           <show>chat</show>
-          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
+          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}" />
           <occupant-id xmlns="urn:xmpp:occupant-id:0" id="occupant-id" />
           <x xmlns="http://jabber.org/protocol/muc#user">
             <status code="100" />
@@ -223,6 +223,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
     client.expect_send_vard_request(&user_id!("user3@prose.org"));
     client.receive_not_found_iq_response();
 
+    client.expect_load_settings(room_id.clone(), None);
     client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(
         &RoomId::Muc(room_id.clone()),
@@ -349,7 +350,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
           <x xmlns='http://jabber.org/protocol/muc'>
             <history maxstanzas="0" />
           </x>
-          <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc="/>
+          <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}"/>
         </presence>
         "#
     );
@@ -372,7 +373,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
         r#"
         <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
           <show>chat</show>
-          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
+          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}" />
           <occupant-id xmlns="urn:xmpp:occupant-id:0" id="{{ANON_OCCUPANT_ID}}" />
           <x xmlns="http://jabber.org/protocol/muc#user">
             <status code="100" />
@@ -522,6 +523,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
     client.expect_send_vard_request(&user_id!("user2@prose.org"));
     client.receive_not_found_iq_response();
 
+    client.expect_load_settings(room_id.clone(), None);
     client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(
         &RoomId::Muc(room_id.clone()),
@@ -537,7 +539,57 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
         .get_room(RoomId::Muc(room_id.clone()))
         .await
         .to_generic_room();
-    room.set_encryption_enabled(true);
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}">
+                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
+                  <encryption type="omemo" />
+                </room-settings>
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    room.set_encryption_enabled(true).await;
 
     client.expect_load_device_list(&user_id!("user1@prose.org"), [100.into(), 101.into()]);
     client.expect_load_device_bundle(

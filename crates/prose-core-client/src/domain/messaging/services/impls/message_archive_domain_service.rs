@@ -18,18 +18,15 @@ use crate::app::deps::{
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, MessageParser};
 use crate::domain::messaging::services::MessagePage;
 use crate::domain::rooms::models::Room;
-use crate::domain::settings::models::LocalRoomSettings;
 use crate::dtos::StanzaId;
 
 use super::super::MessageArchiveDomainService as MessageArchiveDomainServiceTrait;
-
-const MAX_CATCHUP_DURATION_SECS: i64 = 60 * 60 * 24 * 5;
 
 #[derive(DependenciesStruct)]
 pub struct MessageArchiveDomainService {
     ctx: DynAppContext,
     encryption_domain_service: DynEncryptionDomainService,
-    local_room_settings: DynLocalRoomSettingsRepository,
+    local_room_settings_repo: DynLocalRoomSettingsRepository,
     message_archive_service: DynMessageArchiveService,
     message_repo: DynMessagesRepository,
     time_provider: DynTimeProvider,
@@ -50,18 +47,11 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
         let account = self.ctx.connected_account()?;
         let connection_time = self.ctx.connection_timestamp()?;
 
-        let LocalRoomSettings {
-            last_catchup_time,
-            last_read_message,
-            ..
-        } = self
-            .local_room_settings
+        let last_catchup_time = self
+            .local_room_settings_repo
             .get(&account, &room.room_id)
-            .await?;
-
-        let last_read_message_timestamp = last_read_message
-            .map(|message_ref| message_ref.timestamp)
-            .unwrap_or(DateTime::<Utc>::MIN_UTC);
+            .await?
+            .last_catchup_time;
 
         // The idea here is that we want to catchup from either the last received message before
         // the current connection or from the last successful catchup.
@@ -76,12 +66,14 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
         let catchup_since = last_catchup_time
             .max(last_received_message_time)
             .unwrap_or(DateTime::<Utc>::MIN_UTC)
-            .max(self.time_provider.now() - Duration::seconds(MAX_CATCHUP_DURATION_SECS));
+            .max(
+                self.time_provider.now()
+                    - Duration::seconds(self.ctx.config.max_catchup_duration_secs),
+            );
 
         info!("Catching up {} since {}", room.room_id, catchup_since);
 
         let mut messages = vec![];
-        let mut unread_count = 0;
 
         let page = self
             .message_archive_service
@@ -91,14 +83,7 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
         let mut last_message_id = page.messages.last().map(|m| StanzaId::from(m.id.as_ref()));
         let mut is_last_page = page.is_last;
 
-        self.parse_message_page(
-            room,
-            page,
-            &mut messages,
-            &last_read_message_timestamp,
-            &mut unread_count,
-        )
-        .await;
+        self.parse_message_page(room, page, &mut messages).await;
 
         while !is_last_page {
             let Some(message_id) = last_message_id.take() else {
@@ -113,14 +98,7 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
             last_message_id = page.messages.last().map(|m| StanzaId::from(m.id.as_ref()));
             is_last_page = page.is_last;
 
-            self.parse_message_page(
-                room,
-                page,
-                &mut messages,
-                &last_read_message_timestamp,
-                &mut unread_count,
-            )
-            .await;
+            self.parse_message_page(room, page, &mut messages).await;
         }
 
         self.message_repo
@@ -128,7 +106,7 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
             .await?;
 
         let now = self.time_provider.now();
-        self.local_room_settings
+        self.local_room_settings_repo
             .update(
                 &account,
                 &room.room_id,
@@ -136,7 +114,7 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
             )
             .await?;
 
-        room.set_unread_count(unread_count);
+        room.set_needs_update_statistics();
 
         Ok(())
     }
@@ -148,8 +126,6 @@ impl MessageArchiveDomainService {
         room: &Room,
         page: MessagePage,
         messages: &mut Vec<MessageLike>,
-        last_read_message_timestamp: &DateTime<Utc>,
-        unread_count: &mut u32,
     ) {
         for archive_message in page.messages {
             let parsed_message = match MessageParser::new(
@@ -177,12 +153,6 @@ impl MessageArchiveDomainService {
             // message really?
             if parsed_message.payload.is_error() {
                 continue;
-            }
-
-            if parsed_message.payload.is_message()
-                && &parsed_message.timestamp > last_read_message_timestamp
-            {
-                *unread_count += 1;
             }
 
             messages.push(parsed_message)

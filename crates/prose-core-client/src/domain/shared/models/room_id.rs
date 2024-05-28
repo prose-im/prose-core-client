@@ -4,7 +4,9 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 
+use anyhow::anyhow;
 use jid::BareJid;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -53,6 +55,18 @@ impl From<UserId> for RoomId {
 impl From<MucId> for RoomId {
     fn from(value: MucId) -> Self {
         RoomId::Muc(value)
+    }
+}
+
+impl FromStr for RoomId {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            _ if s.starts_with("user:") => Ok(RoomId::User(s[5..].parse()?)),
+            _ if s.starts_with("muc:") => Ok(RoomId::Muc(s[4..].parse()?)),
+            _ => Err(anyhow!("Scheme should be 'user' or 'muc'")),
+        }
     }
 }
 
@@ -125,16 +139,7 @@ impl<'de> Deserialize<'de> for RoomId {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-
-        match s {
-            _ if s.starts_with("user:") => Ok(RoomId::User(
-                s[5..].parse().map_err(serde::de::Error::custom)?,
-            )),
-            _ if s.starts_with("muc:") => Ok(RoomId::Muc(
-                s[4..].parse().map_err(serde::de::Error::custom)?,
-            )),
-            _ => Err(serde::de::Error::custom("Scheme should be 'user' or 'muc'")),
-        }
+        Ok(s.parse().map_err(serde::de::Error::custom)?)
     }
 }
 

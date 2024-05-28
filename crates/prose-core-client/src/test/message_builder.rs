@@ -160,6 +160,7 @@ impl MessageBuilder {
             is_delivered: self.is_delivered,
             is_transient: false,
             is_encrypted: false,
+            is_last_read: false,
             reactions: self
                 .reactions
                 .into_iter()

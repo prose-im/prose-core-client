@@ -21,7 +21,7 @@ pub mod ns {
 }
 
 impl TryFrom<Element> for Bookmark {
-    type Error = anyhow::Error;
+    type Error = RequestError;
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("bookmark", ns::PROSE_BOOKMARK)?;

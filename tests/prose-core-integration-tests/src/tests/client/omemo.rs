@@ -6,6 +6,7 @@
 use anyhow::Result;
 use minidom::Element;
 
+use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::dtos::{
     DeviceBundle, DeviceId, DeviceInfo, DeviceTrust, SendMessageRequest, SendMessageRequestBody,
     UserId,
@@ -183,7 +184,11 @@ async fn test_sending_encrypted_message_fails_if_recipient_has_no_devices() -> R
         .await?
         .to_generic_room();
 
-    room.set_encryption_enabled(true);
+    let mut settings = SyncedRoomSettings::new(user_id!("them@prose.org").into());
+    settings.encryption_enabled = true;
+    client.expect_publish_settings(settings);
+
+    room.set_encryption_enabled(true).await;
 
     client.expect_load_device_list(&user_id!("them@prose.org"), []);
 
@@ -221,7 +226,11 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         .await?
         .to_generic_room();
 
-    room.set_encryption_enabled(true);
+    let mut settings = SyncedRoomSettings::new(user_id!("them@prose.org").into());
+    settings.encryption_enabled = true;
+    client.expect_publish_settings(settings);
+
+    room.set_encryption_enabled(true).await;
 
     // Device list is not loaded here, because it is already cached.
     client.expect_load_device_bundle(
@@ -338,7 +347,11 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
         .await?
         .to_generic_room();
 
-    room.set_encryption_enabled(true);
+    let mut settings = SyncedRoomSettings::new(user_id!("them@prose.org").into());
+    settings.encryption_enabled = true;
+    client.expect_publish_settings(settings);
+
+    room.set_encryption_enabled(true).await;
 
     client.expect_load_device_list(&user_id!("them@prose.org"), [111.into()]);
     client.expect_load_device_bundle(
@@ -464,7 +477,11 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
         .await?
         .to_generic_room();
 
-    room.set_encryption_enabled(true);
+    let mut settings = SyncedRoomSettings::new(user_id!("them@prose.org").into());
+    settings.encryption_enabled = true;
+    client.expect_publish_settings(settings);
+
+    room.set_encryption_enabled(true).await;
 
     client.expect_load_device_list(&user_id!("them@prose.org"), [111.into(), 222.into()]);
     client.expect_load_device_bundle(
@@ -693,7 +710,11 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
         .await?
         .to_generic_room();
 
-    room.set_encryption_enabled(true);
+    let mut settings = SyncedRoomSettings::new(user_id!("them@prose.org").into());
+    settings.encryption_enabled = true;
+    client.expect_publish_settings(settings);
+
+    room.set_encryption_enabled(true).await;
 
     client.expect_load_device_bundle(
         &user_id!("user@prose.org"),

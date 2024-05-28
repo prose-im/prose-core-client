@@ -22,7 +22,7 @@ use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomBehavior, CreateRoomType, JoinRoomBehavior,
     RoomsDomainService as RoomsDomainServiceTrait,
 };
-use prose_core_client::domain::settings::models::AccountSettings;
+use prose_core_client::domain::settings::models::{AccountSettings, SyncedRoomSettings};
 use prose_core_client::domain::shared::models::{
     MucId, OccupantId, RoomId, RoomType, UserResourceId,
 };
@@ -156,6 +156,12 @@ async fn test_joins_room() -> Result<()> {
             let username = user_id.formatted_username();
             Box::pin(async move { Ok(Some(username)) })
         });
+
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async move { Ok(None) }));
 
     {
         let room = room.clone();
@@ -354,6 +360,7 @@ async fn test_creates_group() -> Result<()> {
             RoomSidebarState::InSidebar,
         )))
         .return_once(|_| Ok(()));
+
     {
         let group_jid = group_id.clone();
         deps.room_management_service
@@ -416,6 +423,12 @@ async fn test_creates_group() -> Result<()> {
                 Ok(Some(first_name.to_string()))
             })
         });
+
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async move { Ok(None) }));
 
     {
         let group_jid = group_id.clone();
@@ -559,6 +572,12 @@ async fn test_joins_direct_message() -> Result<()> {
             })
         });
 
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async move { Ok(None) }));
+
     deps.connected_rooms_repo
         .expect_set_or_replace()
         .once()
@@ -569,6 +588,7 @@ async fn test_joins_direct_message() -> Result<()> {
             Availability::Available,
             RoomSidebarState::InSidebar,
             Default::default(),
+            SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
         )))
         .return_once(|_| None);
 
@@ -669,6 +689,11 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
                 ))
             })
         });
+
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .return_once(|_| Box::pin(async move { Ok(None) }));
 
     deps.connected_rooms_repo
         .expect_update()
@@ -812,6 +837,12 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                 })
             });
     }
+
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async move { Ok(None) }));
 
     {
         let channel_jid = channel_id.clone();
@@ -1070,6 +1101,12 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             })
         });
 
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async move { Ok(None) }));
+
     deps.connected_rooms_repo
         .expect_set_or_replace()
         .once()
@@ -1080,6 +1117,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             Availability::Available,
             RoomSidebarState::InSidebar,
             Default::default(),
+            SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
         )))
         .return_once(|_| Some(pending_room));
 
@@ -1205,6 +1243,12 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             let username = user_id.formatted_username();
             Box::pin(async move { Ok(Some(username)) })
         });
+
+    deps.synced_room_settings_service
+        .expect_load_settings()
+        .once()
+        .in_sequence(&mut seq)
+        .return_once(|_| Box::pin(async move { Ok(None) }));
 
     {
         let room = pending_room.clone();

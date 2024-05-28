@@ -379,7 +379,7 @@ to_raw_key!(&str);
 
 #[cfg(feature = "chrono")]
 mod chrono {
-    use chrono::{DateTime, NaiveDate, SecondsFormat, Utc};
+    use chrono::{DateTime, Datelike, NaiveDate, Timelike, Utc};
 
     use super::{KeyType, RawKey};
 
@@ -389,7 +389,22 @@ mod chrono {
     /// exact same timezone, otherwise your query wouldn't match.
     impl KeyType for DateTime<Utc> {
         fn to_raw_key(&self) -> RawKey {
-            RawKey::Text(self.to_rfc3339_opts(SecondsFormat::Secs, true))
+            // We're using a custom format here, which boils down to RFC 3339, however converting
+            // DateTime::<Utc>::MAX_UTC to a string with to_rfc3339 would result in '+262142-12-31T23:59:59Z'.
+            // In that example the leading + sign indicates that the year is outside the usual
+            // range (0000-9999), which is a feature of the extended format specified by ISO 8601,
+            // upon which RFC 3339 is based. SQLite however does not parse that string properly.
+
+            let formatted = format!(
+                "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+                self.year(),
+                self.month(),
+                self.day(),
+                self.hour(),
+                self.minute(),
+                self.second()
+            );
+            RawKey::Text(formatted)
         }
     }
 

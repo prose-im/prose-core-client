@@ -3,15 +3,16 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::Bound;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use tracing::warn;
 
 use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{
-    MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
+    ArchivedMessageRef, MessageId, MessageLike, MessageTargetId, StanzaId,
 };
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::RoomId;
@@ -48,8 +49,6 @@ impl MessagesRepository for CachingMessageRepository {
         room_id: &RoomId,
         ids: &[MessageId],
     ) -> Result<Vec<MessageLike>> {
-        warn!("Getting {} {} {:?}", account, room_id, ids);
-
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
@@ -225,7 +224,7 @@ impl MessagesRepository for CachingMessageRepository {
         account: &UserId,
         room_id: &RoomId,
         before: Option<DateTime<Utc>>,
-    ) -> Result<Option<MessageRef>> {
+    ) -> Result<Option<ArchivedMessageRef>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
@@ -234,11 +233,10 @@ impl MessagesRepository for CachingMessageRepository {
         let room_idx = collection.index(&MessageRecord::room_idx())?;
         let before = before.unwrap_or(DateTime::<Utc>::MAX_UTC);
         let (message_ref, is_placeholder) = room_idx
-            .fold::<MessageRecord, (MessageRef, bool)>(
+            .fold::<MessageRecord, (ArchivedMessageRef, bool)>(
                 Query::Only((account, room_id)),
                 (
-                    MessageRef {
-                        message_id: "".into(),
+                    ArchivedMessageRef {
                         stanza_id: "".into(),
                         timestamp: DateTime::<Utc>::MIN_UTC,
                     },
@@ -249,15 +247,12 @@ impl MessagesRepository for CachingMessageRepository {
                         return (result, is_placeholder);
                     }
 
-                    let (Some(message_id), Some(stanza_id)) =
-                        (message.message_id.into_original_id(), message.stanza_id)
-                    else {
+                    let Some(stanza_id) = message.stanza_id else {
                         return (result, is_placeholder);
                     };
 
                     (
-                        MessageRef {
-                            message_id,
+                        ArchivedMessageRef {
                             stanza_id,
                             timestamp: message.timestamp,
                         },
@@ -272,5 +267,33 @@ impl MessagesRepository for CachingMessageRepository {
         }
 
         Ok(Some(message_ref))
+    }
+
+    async fn get_messages_after(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+        after: DateTime<Utc>,
+    ) -> Result<Vec<MessageLike>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessageRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessageRecord::collection())?;
+        let room_idx = collection.index(&MessageRecord::timestamp_idx())?;
+
+        let messages = room_idx
+            .get_all_filtered::<MessageRecord, MessageLike>(
+                Query::Range {
+                    start: Bound::Included((account, room_id, &after)),
+                    end: Bound::Included((account, room_id, &DateTime::<Utc>::MAX_UTC)),
+                },
+                QueryDirection::default(),
+                None,
+                |_, message| (message.timestamp > after).then_some(MessageLike::from(message)),
+            )
+            .await?;
+
+        Ok(messages)
     }
 }

@@ -3,19 +3,22 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::sync::Arc;
+
 use chrono::{DateTime, TimeZone, Utc};
 use parking_lot::Mutex;
 
 use prose_xmpp::TimeProvider;
 
+#[derive(Clone)]
 pub struct ConstantTimeProvider {
-    pub time: Mutex<DateTime<Utc>>,
+    pub time: Arc<Mutex<DateTime<Utc>>>,
 }
 
 impl ConstantTimeProvider {
     pub fn new(time: DateTime<Utc>) -> Self {
         Self {
-            time: Mutex::new(time),
+            time: Arc::new(Mutex::new(time)),
         }
     }
 
@@ -25,10 +28,10 @@ impl ConstantTimeProvider {
 
     pub fn ymd_hms(year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32) -> Self {
         ConstantTimeProvider {
-            time: Mutex::new(
+            time: Arc::new(Mutex::new(
                 Utc.with_ymd_and_hms(year, month, day, hour, min, sec)
                     .unwrap(),
-            ),
+            )),
         }
     }
 

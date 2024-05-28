@@ -16,7 +16,7 @@ use crate::app::deps::{
     DynAppContext, DynBookmarksService, DynClientEventDispatcher, DynConnectedRoomsRepository,
     DynRoomManagementService, DynRoomsDomainService,
 };
-use crate::domain::messaging::models::{MessageLike, MessageLikePayload};
+use crate::domain::messaging::models::MessageLike;
 use crate::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec, RoomState};
 use crate::domain::rooms::services::impls::build_nickname;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
@@ -302,18 +302,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
             }
         };
 
-        if let MessageLikePayload::Message { ref mentions, .. } = message.payload {
-            let connected_user_id = self.ctx.connected_id()?.into_user_id();
-
-            for mention in mentions {
-                if mention.user == connected_user_id {
-                    room.increment_mentions_count();
-                    break;
-                }
-            }
-        }
-
-        room.increment_unread_count();
+        room.set_needs_update_statistics();
 
         match room.r#type {
             RoomType::DirectMessage => (),

@@ -20,6 +20,7 @@ use prose_core_client::domain::rooms::models::{
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, RoomFactory,
 };
+use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::{
     MucId, OccupantId, UserId, UserOrResourceId, UserResourceId,
 };
@@ -443,6 +444,7 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
         Default::default(),
+        SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
     );
 
     {
@@ -546,6 +548,7 @@ async fn test_handles_user_presence() -> Result<()> {
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
         Default::default(),
+        SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
     );
 
     let room = room.clone();
@@ -728,6 +731,7 @@ async fn test_swallows_self_presence() -> Result<()> {
         Availability::Unavailable,
         RoomSidebarState::InSidebar,
         Default::default(),
+        SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
     );
 
     let room = room.clone();

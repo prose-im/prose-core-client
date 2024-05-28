@@ -61,6 +61,9 @@ pub struct MessageMetadata {
     pub is_transient: bool,
     #[wasm_bindgen(js_name = "isEncrypted")]
     pub is_encrypted: bool,
+    #[wasm_bindgen(js_name = "isLastRead")]
+    /// When contained in a list, this message is the last message that our user has read.
+    pub is_last_read: bool,
 }
 
 impl From<dtos::Message> for Message {
@@ -90,6 +93,7 @@ impl From<dtos::Message> for Message {
                 is_edited: value.is_edited,
                 is_transient: value.is_transient,
                 is_encrypted: value.is_encrypted,
+                is_last_read: value.is_last_read,
             },
             reactions: value
                 .reactions

@@ -37,6 +37,7 @@ mod columns {
     pub const STANZA_ID_TARGET: &str = "stanza_id_target";
     pub const MESSAGE_ID: &str = "message_id";
     pub const MESSAGE_ID_TARGET: &str = "message_id_target";
+    pub const TIMESTAMP: &str = "timestamp";
 }
 
 impl MessageRecord {
@@ -70,6 +71,10 @@ impl MessageRecord {
             columns::ROOM_ID,
             columns::MESSAGE_ID_TARGET,
         ]
+    }
+
+    pub fn timestamp_idx() -> [&'static str; 3] {
+        [columns::ACCOUNT, columns::ROOM_ID, columns::TIMESTAMP]
     }
 }
 
@@ -112,6 +117,11 @@ impl Entity for MessageRecord {
                 .add_column(columns::ACCOUNT)
                 .add_column(columns::ROOM_ID)
                 .add_column(columns::MESSAGE_ID_TARGET)
+                .build(),
+            IndexSpec::builder()
+                .add_column(columns::ACCOUNT)
+                .add_column(columns::ROOM_ID)
+                .add_column(columns::TIMESTAMP)
                 .build(),
         ]
     }

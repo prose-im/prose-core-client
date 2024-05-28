@@ -61,6 +61,7 @@ export interface RoomBase {
     loadLatestMessages(): Promise<MessageResultSet>;
     loadMessagesBefore(before: ArchiveId): Promise<MessageResultSet>;
     loadMessagesWithIDs(messageIDs: string[]): Promise<Message[]>;
+    loadUnreadMessages(): Promise<MessageResultSet>;
     
     setUserIsComposing(isComposing: boolean): Promise<void>;
     loadComposingUsers(): Promise<UserBasicInfo[]>;
@@ -316,6 +317,16 @@ macro_rules! base_room_impl {
 
                 // debug!(room_id = self.id(), messages = ?messages, "loadMessagesBefore");
 
+                Ok(messages.into())
+            }
+
+            #[wasm_bindgen(js_name = "loadUnreadMessages")]
+            pub async fn load_unread_messages(&self) -> Result<MessageResultSet> {
+                let messages = self
+                    .room
+                    .load_unread_messages()
+                    .await
+                    .map_err(WasmError::from)?;
                 Ok(messages.into())
             }
 

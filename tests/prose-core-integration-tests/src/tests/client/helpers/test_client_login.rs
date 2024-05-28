@@ -51,6 +51,10 @@ impl TestClient {
                     "USER_RESOURCE_ID".into(),
                     format!("{}/{}", user.to_string(), self.short_id_provider.new_id()),
                 ),
+                (
+                    "CAPS_HASH".into(),
+                    "zQudvh/0QdfUMrrQBB1ZR3NMyTY=".to_string(),
+                ),
             ]
             .into(),
         );
@@ -63,7 +67,7 @@ impl TestClient {
             r#"
         <presence xmlns='jabber:client'>
             <show>chat</show>
-            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="6F3DapJergay3XYdZEtLkCjrPpc=" />
+            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}" />
         </presence>"#
         );
 

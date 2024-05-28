@@ -15,11 +15,12 @@ use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
 use prose_xmpp::ns;
 
 use crate::domain::encryption::models::DeviceList;
+use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::sidebar::models::Bookmark;
-use crate::dtos::UserId;
+use crate::dtos::{RoomId, UserId};
 use crate::infra::xmpp::event_parser::pubsub::generic_pub_sub_parser::GenericPubSubParser;
 use crate::infra::xmpp::event_parser::Context;
-use crate::infra::xmpp::type_conversions::bookmark;
+use crate::infra::xmpp::type_conversions::{bookmark, synced_room_settings};
 
 mod generic_pub_sub_parser;
 
@@ -55,6 +56,12 @@ fn get_parser(ns: &str) -> Option<&Box<dyn PubSubParser>> {
                 (
                     ns::LEGACY_OMEMO_DEVICELIST.to_string(),
                     Box::new(GenericPubSubParser::<String, DeviceList>::new(Into::into)),
+                ),
+                (
+                    synced_room_settings::ns::PROSE_ROOM_SETTINGS.to_string(),
+                    Box::new(GenericPubSubParser::<RoomId, SyncedRoomSettings>::new(
+                        Into::into,
+                    )) as Box<dyn PubSubParser>,
                 ),
             ]
             .into_iter()

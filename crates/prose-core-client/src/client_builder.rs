@@ -10,13 +10,13 @@ use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynEncryptionService, DynIDProvider, DynRngProvider,
+    AppConfig, AppContext, AppDependencies, DynEncryptionService, DynIDProvider, DynRngProvider,
     DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::event_handlers::{
     BlockListEventHandler, BookmarksEventHandler, ConnectionEventHandler, ContactListEventHandler,
     MessagesEventHandler, RequestsEventHandler, RoomsEventHandler, ServerEventHandlerQueue,
-    UserDevicesEventHandler, UserStateEventHandler,
+    SyncedRoomSettingsEventHandler, UserDevicesEventHandler, UserStateEventHandler,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactListService, RoomsService, UserDataService,
@@ -36,6 +36,7 @@ pub struct UndefinedAvatarCache;
 pub struct UndefinedEncryptionService;
 
 pub struct ClientBuilder<S, A, E> {
+    app_config: AppConfig,
     avatar_cache: A,
     builder: XMPPClientBuilder,
     delegate: Option<Box<dyn ClientDelegate>>,
@@ -52,6 +53,7 @@ pub struct ClientBuilder<S, A, E> {
 impl ClientBuilder<UndefinedStore, UndefinedAvatarCache, UndefinedEncryptionService> {
     pub(crate) fn new() -> Self {
         ClientBuilder {
+            app_config: Default::default(),
             avatar_cache: UndefinedAvatarCache {},
             builder: XMPPClient::builder(),
             delegate: None,
@@ -73,6 +75,7 @@ impl<A, E> ClientBuilder<UndefinedStore, A, E> {
         store: Store<PlatformDriver>,
     ) -> ClientBuilder<Store<PlatformDriver>, A, E> {
         ClientBuilder {
+            app_config: self.app_config,
             avatar_cache: self.avatar_cache,
             builder: self.builder,
             delegate: None,
@@ -91,6 +94,7 @@ impl<A, E> ClientBuilder<UndefinedStore, A, E> {
 impl<D, E> ClientBuilder<D, UndefinedAvatarCache, E> {
     pub fn set_avatar_cache<A2: AvatarCache>(self, avatar_cache: A2) -> ClientBuilder<D, A2, E> {
         ClientBuilder {
+            app_config: self.app_config,
             avatar_cache,
             builder: self.builder,
             delegate: None,
@@ -112,6 +116,7 @@ impl<S, A> ClientBuilder<S, A, UndefinedEncryptionService> {
         encryption_service: DynEncryptionService,
     ) -> ClientBuilder<S, A, DynEncryptionService> {
         ClientBuilder {
+            app_config: self.app_config,
             avatar_cache: self.avatar_cache,
             builder: self.builder,
             delegate: None,
@@ -168,6 +173,11 @@ impl<D, A, E> ClientBuilder<D, A, E> {
         self
     }
 
+    pub fn set_config(mut self, config: AppConfig) -> Self {
+        self.app_config = config;
+        self
+    }
+
     pub fn set_delegate(mut self, delegate: Option<Box<dyn ClientDelegate>>) -> Self {
         self.delegate = delegate;
         self
@@ -210,6 +220,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
                 Feature::Name(ns::VCARD4),
                 Feature::Name(ns::VERSION),
                 Feature::Notify(crate::infra::xmpp::type_conversions::bookmark::ns::PROSE_BOOKMARK),
+                Feature::Notify(crate::infra::xmpp::type_conversions::synced_room_settings::ns::PROSE_ROOM_SETTINGS),
                 Feature::Notify(ns::AVATAR_METADATA),
                 Feature::Notify(ns::BOOKMARKS),
                 Feature::Notify(ns::BOOKMARKS2),
@@ -243,7 +254,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
         );
 
         let dependencies: AppDependencies = PlatformDependencies {
-            ctx: AppContext::new(capabilities, self.software_version),
+            ctx: AppContext::new(capabilities, self.software_version, self.app_config),
             encryption_service: self.encryption_service,
             id_provider: self.id_provider,
             rng_provider: self.rng_provider,
@@ -267,6 +278,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             Box::new(ContactListEventHandler::from(&dependencies)),
             Box::new(BlockListEventHandler::from(&dependencies)),
             Box::new(UserDevicesEventHandler::from(&dependencies)),
+            Box::new(SyncedRoomSettingsEventHandler::from(&dependencies)),
         ]);
 
         let client_inner = Arc::new(ClientInner {

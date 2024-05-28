@@ -6,13 +6,18 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
+use anyhow::Result;
+use chrono::{DateTime, Utc};
 use parking_lot::{
     MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
 
+use crate::app::deps::DynMessagesRepository;
+use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::rooms::models::{
     ParticipantList, RegisteredMember, RoomFeatures, RoomSessionParticipant,
 };
+use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{Availability, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::OccupantId;
@@ -68,6 +73,26 @@ pub struct RoomInfo {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct RoomStatistics {
+    /// Are the statistics out of date?
+    needs_update: bool,
+    /// The number of unread messages in this room.
+    pub unread_count: u32,
+    /// The number of unread messages mentioning our user in this room.
+    pub mentions_count: u32,
+}
+
+impl Default for RoomStatistics {
+    fn default() -> Self {
+        Self {
+            needs_update: true,
+            unread_count: 0,
+            mentions_count: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct RoomDetails {
     /// The name of the room.
     pub name: Option<String>,
@@ -81,12 +106,10 @@ pub struct RoomDetails {
     pub sidebar_state: RoomSidebarState,
     /// The state the room is in.
     pub state: RoomState,
-    /// The number of unread messages in this room.
-    pub unread_count: u32,
-    /// The number of unread messages mentioning our user in this room.
-    pub mentions_count: u32,
-    /// Should messages be OMEMO encrypted?
-    pub encryption_enabled: bool,
+    /// Some tidbits about this room.
+    pub statistics: RoomStatistics,
+    /// The room's settings
+    pub settings: SyncedRoomSettings,
 }
 
 #[derive(Debug)]
@@ -163,40 +186,63 @@ impl Room {
         self.inner.details.write().state = state
     }
 
-    pub fn unread_count(&self) -> u32 {
-        self.inner.details.read().unread_count
+    pub fn statistics(&self) -> RoomStatistics {
+        self.inner.details.read().statistics.clone()
     }
 
-    pub fn mentions_count(&self) -> u32 {
-        self.inner.details.read().mentions_count
+    pub fn set_needs_update_statistics(&self) {
+        self.inner.details.write().statistics.needs_update = true;
     }
 
-    pub fn encryption_enabled(&self) -> bool {
-        self.inner.details.read().encryption_enabled
+    pub async fn update_statistics_if_needed(
+        &self,
+        account: &UserId,
+        messages_repo: &DynMessagesRepository,
+    ) -> Result<RoomStatistics> {
+        let last_read_message = {
+            let guard = self.inner.details.read();
+            if !guard.statistics.needs_update {
+                return Ok(guard.statistics.clone());
+            }
+            guard.settings.last_read_message.clone()
+        };
+
+        let mut stats = RoomStatistics::default();
+        stats.needs_update = false;
+
+        self.inner.details.write().statistics = stats.clone();
+
+        let last_read_message_timestamp = last_read_message
+            .map(|message_ref| message_ref.timestamp)
+            .unwrap_or(DateTime::<Utc>::MIN_UTC);
+
+        let messages = messages_repo
+            .get_messages_after(account, &self.room_id, last_read_message_timestamp)
+            .await?;
+
+        for message in messages {
+            if let MessageLikePayload::Message { ref mentions, .. } = message.payload {
+                for mention in mentions {
+                    if &mention.user == account {
+                        stats.mentions_count += 1;
+                        break;
+                    }
+                }
+
+                stats.unread_count += 1;
+            }
+        }
+
+        self.inner.details.write().statistics = stats.clone();
+        Ok(stats)
     }
 
-    pub fn set_encryption_enabled(&self, enabled: bool) {
-        self.inner.details.write().encryption_enabled = enabled
+    pub fn settings(&self) -> MappedRwLockReadGuard<SyncedRoomSettings> {
+        RwLockReadGuard::map(self.inner.details.read(), |s| &s.settings)
     }
 
-    pub fn set_unread_count(&self, count: u32) {
-        self.inner.details.write().unread_count = count;
-    }
-
-    pub fn increment_unread_count(&self) {
-        let mut guard = self.inner.details.write();
-        guard.unread_count = guard.unread_count.saturating_add(1);
-    }
-
-    pub fn increment_mentions_count(&self) {
-        let mut guard = self.inner.details.write();
-        guard.mentions_count = guard.mentions_count.saturating_add(1);
-    }
-
-    pub fn mark_as_read(&self) {
-        let mut guard = self.inner.details.write();
-        guard.unread_count = 0;
-        guard.mentions_count = 0;
+    pub fn settings_mut(&self) -> MappedRwLockWriteGuard<SyncedRoomSettings> {
+        RwLockWriteGuard::map(self.inner.details.write(), |s| &mut s.settings)
     }
 }
 
@@ -225,9 +271,8 @@ impl Room {
                 participants,
                 sidebar_state: bookmark.sidebar_state,
                 state: RoomState::Pending,
-                unread_count: 0,
-                mentions_count: 0,
-                encryption_enabled: false,
+                statistics: Default::default(),
+                settings: SyncedRoomSettings::new(bookmark.jid.clone()),
             },
         )
     }
@@ -247,9 +292,8 @@ impl Room {
                 participants: Default::default(),
                 sidebar_state,
                 state: RoomState::Connecting,
-                unread_count: 0,
-                mentions_count: 0,
-                encryption_enabled: false,
+                statistics: Default::default(),
+                settings: SyncedRoomSettings::new(room_id.clone()),
             },
         )
     }
@@ -270,6 +314,7 @@ impl Room {
         info: RoomInfo,
         members: Vec<RegisteredMember>,
         participants: Vec<RoomSessionParticipant>,
+        settings: SyncedRoomSettings,
     ) -> Self {
         assert!(self.is_connecting(), "Cannot promote a non-connecting room");
 
@@ -279,6 +324,7 @@ impl Room {
         details.topic = topic;
         details.participants = ParticipantList::new(members, participants);
         details.state = RoomState::Connected;
+        details.settings = settings;
 
         Self::new(info, details)
     }
@@ -303,6 +349,7 @@ impl Room {
         availability: Availability,
         sidebar_state: RoomSidebarState,
         features: RoomFeatures,
+        settings: SyncedRoomSettings,
     ) -> Self {
         Self::new(
             RoomInfo {
@@ -322,9 +369,8 @@ impl Room {
                 ),
                 sidebar_state,
                 state: RoomState::Connected,
-                unread_count: 0,
-                mentions_count: 0,
-                encryption_enabled: false,
+                statistics: Default::default(),
+                settings,
             },
         )
     }
@@ -333,6 +379,7 @@ impl Room {
 #[cfg(feature = "test")]
 impl Room {
     pub fn mock(info: RoomInfo) -> Self {
+        let room_id = info.room_id.clone();
         Self::new(
             info,
             RoomDetails {
@@ -342,9 +389,8 @@ impl Room {
                 participants: Default::default(),
                 sidebar_state: RoomSidebarState::InSidebar,
                 state: Default::default(),
-                unread_count: 0,
-                mentions_count: 0,
-                encryption_enabled: false,
+                statistics: Default::default(),
+                settings: SyncedRoomSettings::new(room_id),
             },
         )
     }
@@ -390,6 +436,7 @@ mod tests {
             Availability::Available,
             RoomSidebarState::Favorite,
             Default::default(),
+            SyncedRoomSettings::new(user_id!("contact@prose.org").into()),
         );
 
         assert_eq!(
@@ -412,9 +459,8 @@ mod tests {
                     ),
                     sidebar_state: RoomSidebarState::Favorite,
                     state: RoomState::Connected,
-                    unread_count: 0,
-                    mentions_count: 0,
-                    encryption_enabled: false,
+                    statistics: Default::default(),
+                    settings: SyncedRoomSettings::new(user_id!("contact@prose.org").into()),
                 }
             )
         )

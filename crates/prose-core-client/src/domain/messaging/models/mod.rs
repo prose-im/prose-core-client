@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+pub use archived_message_ref::ArchivedMessageRef;
 pub use attachment::{Attachment, AttachmentType, Thumbnail};
 pub use encrypted_message::{
     EncryptedMessage, EncryptedPayload, EncryptionKey, KeyTransportPayload,
@@ -17,9 +18,9 @@ pub use message_like::{
     Payload as MessageLikePayload,
 };
 pub use message_parser::{MessageLikeError, MessageParser};
-pub use message_ref::MessageRef;
 pub use send_message_request::SendMessageRequest;
 
+mod archived_message_ref;
 mod attachment;
 mod encrypted_message;
 mod error;
@@ -28,5 +29,4 @@ mod message;
 mod message_id;
 mod message_like;
 mod message_parser;
-mod message_ref;
 pub mod send_message_request;

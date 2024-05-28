@@ -22,8 +22,9 @@ use prose_xmpp::{
 use crate::app::event_handlers::{
     BlockListEvent, BlockListEventType, ConnectionEvent, ContactListEvent, ContactListEventType,
     MessageEvent, MessageEventType, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
-    RoomEventType, ServerEvent, UserDeviceEvent, UserInfoEvent, UserInfoEventType,
-    UserResourceEvent, UserResourceEventType, UserStatusEvent, UserStatusEventType,
+    RoomEventType, ServerEvent, SyncedRoomSettingsEvent, UserDeviceEvent, UserInfoEvent,
+    UserInfoEventType, UserResourceEvent, UserResourceEventType, UserStatusEvent,
+    UserStatusEventType,
 };
 use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
 use crate::domain::contacts::models::PresenceSubscription;
@@ -396,5 +397,10 @@ impl From<BlockListEvent> for ServerEvent {
 impl From<UserDeviceEvent> for ServerEvent {
     fn from(value: UserDeviceEvent) -> Self {
         Self::UserDevice(value)
+    }
+}
+impl From<SyncedRoomSettingsEvent> for ServerEvent {
+    fn from(value: SyncedRoomSettingsEvent) -> Self {
+        Self::SyncedRoomSettings(value)
     }
 }

@@ -13,6 +13,7 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use crate::domain::messaging::models::StanzaId;
 use crate::dtos::RoomId;
 
+#[derive(Debug)]
 pub struct MessagePage {
     pub messages: Vec<ArchivedMessage>,
     pub is_last: bool,

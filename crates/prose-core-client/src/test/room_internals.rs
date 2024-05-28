@@ -9,6 +9,7 @@ use crate::domain::rooms::models::{
     ComposeState, ParticipantList, RegisteredMember, Room, RoomAffiliation, RoomInfo,
     RoomSidebarState,
 };
+use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
 use crate::dtos::{Availability, Participant, RoomState, UserId};
 use crate::test::mock_data;
@@ -23,6 +24,7 @@ impl Room {
             availability,
             RoomSidebarState::InSidebar,
             Default::default(),
+            SyncedRoomSettings::new(RoomId::User(jid.clone())),
         )
     }
 

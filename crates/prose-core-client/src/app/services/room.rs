@@ -21,7 +21,7 @@ use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynEncryptionDomainService,
     DynIDProvider, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
     DynRoomAttributesService, DynRoomParticipationService, DynSidebarDomainService,
-    DynTimeProvider, DynUserProfileRepository,
+    DynSyncedRoomSettingsService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{
     send_message_request, Emoji, Message, MessageId, MessageLike, MessageLikeError, MessageParser,
@@ -29,6 +29,7 @@ use crate::domain::messaging::models::{
 };
 use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
+use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId, RoomType};
 use crate::dtos::{
     Message as MessageDTO, MessageResultSet, MessageSender, Reaction as ReactionDTO, RoomState,
@@ -86,6 +87,7 @@ pub struct RoomInner {
     pub(crate) message_repo: DynMessagesRepository,
     pub(crate) messaging_service: DynMessagingService,
     pub(crate) participation_service: DynRoomParticipationService,
+    pub(crate) synced_room_settings_service: DynSyncedRoomSettingsService,
     pub(crate) sidebar_domain_service: DynSidebarDomainService,
     pub(crate) time_provider: DynTimeProvider,
     pub(crate) user_profile_repo: DynUserProfileRepository,
@@ -182,12 +184,12 @@ impl<Kind> Room<Kind> {
 
         match request.body.as_ref().map(|body| body.text.as_str()) {
             Some("/omemo enable") => {
-                self.data.set_encryption_enabled(true);
+                self.set_encryption_enabled(true).await;
                 self.show_system_message("OMEMO is now enabled.").await?;
                 return Ok(());
             }
             Some("/omemo disable") => {
-                self.data.set_encryption_enabled(false);
+                self.set_encryption_enabled(false).await;
                 self.show_system_message("OMEMO is now disabled.").await?;
                 return Ok(());
             }
@@ -379,13 +381,6 @@ impl<Kind> Room<Kind> {
     pub async fn load_latest_messages(&self) -> Result<MessageResultSet> {
         debug!("Loading latest messages from server…");
         let messages = self.load_messages(None).await?;
-
-        // TODO: Remove this when we have server-synchronized settings.
-        if messages.messages.last().map(|m| m.is_encrypted) == Some(true) {
-            info!("Found encrypted message. Enabling encryption…");
-            self.set_encryption_enabled(true);
-        }
-
         Ok(messages)
     }
 
@@ -394,19 +389,54 @@ impl<Kind> Room<Kind> {
         self.load_messages(Some(stanza_id)).await
     }
 
+    pub async fn load_unread_messages(&self) -> Result<MessageResultSet> {
+        let Some(last_read_message) = self.data.settings().last_read_message.clone() else {
+            return self.load_latest_messages().await;
+        };
+
+        let messages = self
+            .message_repo
+            .get_messages_after(
+                &self.ctx.connected_account()?,
+                &self.data.room_id,
+                last_read_message.timestamp,
+            )
+            .await?;
+
+        Ok(MessageResultSet {
+            messages: self.reduce_messages_and_add_sender(messages).await,
+            last_message_id: None,
+        })
+    }
+
     pub async fn mark_as_read(&self) -> Result<()> {
-        self.inner.data.mark_as_read();
+        let Some(message_ref) = self
+            .message_repo
+            .get_last_received_message(&self.ctx.connected_account()?, &self.data.room_id, None)
+            .await?
+        else {
+            return Ok(());
+        };
+
+        self.update_synced_settings(|settings| {
+            settings.last_read_message = Some(message_ref);
+        })
+        .await;
+
+        self.inner.data.set_needs_update_statistics();
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::SidebarChanged);
+
         Ok(())
     }
 
     pub fn encryption_enabled(&self) -> bool {
-        self.data.encryption_enabled()
+        self.data.settings().encryption_enabled
     }
 
-    pub fn set_encryption_enabled(&self, enabled: bool) {
-        self.data.set_encryption_enabled(enabled)
+    pub async fn set_encryption_enabled(&self, enabled: bool) {
+        self.update_synced_settings(|settings| settings.encryption_enabled = enabled)
+            .await
     }
 }
 
@@ -542,6 +572,12 @@ impl<Kind> Room<Kind> {
         let messages = Message::reducing_messages(messages);
         let mut message_dtos = Vec::with_capacity(messages.len());
         let mut message_senders = HashMap::new();
+        let last_read_message_id = self
+            .data
+            .settings()
+            .last_read_message
+            .as_ref()
+            .map(|msg| msg.stanza_id.clone());
 
         async fn resolve_message_sender<'a, Kind>(
             room: &Room<Kind>,
@@ -578,6 +614,8 @@ impl<Kind> Room<Kind> {
                 })
             }
 
+            let is_last_read_message = message.stanza_id == last_read_message_id;
+
             message_dtos.push(MessageDTO {
                 id: message.id,
                 stanza_id: message.stanza_id,
@@ -589,6 +627,7 @@ impl<Kind> Room<Kind> {
                 is_delivered: message.is_delivered,
                 is_transient: message.is_transient,
                 is_encrypted: message.is_encrypted,
+                is_last_read: is_last_read_message,
                 reactions,
                 attachments: message.attachments,
                 mentions: message.mentions,
@@ -693,7 +732,7 @@ impl<Kind> Room<Kind> {
 
         let payload = match self.data.r#type {
             RoomType::DirectMessage | RoomType::Group | RoomType::PrivateChannel
-                if self.data.encryption_enabled() =>
+                if self.data.settings().encryption_enabled =>
             {
                 let user_ids = self
                     .data
@@ -725,6 +764,32 @@ impl<Kind> Room<Kind> {
             }),
             attachments: request.attachments,
         })
+    }
+
+    async fn update_synced_settings(&self, handler: impl FnOnce(&mut SyncedRoomSettings)) {
+        let updated_settings = {
+            let mut settings = self.data.settings_mut();
+            let mut updated_settings = settings.clone();
+            handler(&mut updated_settings);
+
+            if updated_settings == *settings {
+                return;
+            }
+
+            *settings = updated_settings.clone();
+            updated_settings
+        };
+
+        match self
+            .synced_room_settings_service
+            .save_settings(&self.data.room_id, &updated_settings)
+            .await
+        {
+            Ok(_) => (),
+            Err(err) => {
+                error!("Failed to save updated room settings. {}", err.to_string())
+            }
+        }
     }
 }
 

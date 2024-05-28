@@ -128,6 +128,26 @@ impl PubSub {
         Ok(items)
     }
 
+    pub async fn load_objects_with_ids<T: TryFrom<Element>, ID: Into<String>>(
+        &self,
+        node: impl AsRef<str>,
+        item_ids: impl IntoIterator<Item = ID>,
+    ) -> Result<Vec<T>, RequestError>
+    where
+        T::Error: Into<RequestError>,
+    {
+        self.load_items_with_ids(node, item_ids)
+            .await?
+            .into_iter()
+            .map(|item| {
+                let Some(payload) = item.payload else {
+                    return Err(RequestError::UnexpectedResponse);
+                };
+                return T::try_from(payload).map_err(Into::into);
+            })
+            .collect::<Result<Vec<_>, _>>()
+    }
+
     pub async fn load_all_items(
         &self,
         node: impl AsRef<str>,
@@ -139,6 +159,25 @@ impl PubSub {
             .unwrap_or_default();
 
         Ok(items)
+    }
+
+    pub async fn load_all_objects<T: TryFrom<Element>>(
+        &self,
+        node: impl AsRef<str>,
+    ) -> Result<Vec<T>, RequestError>
+    where
+        T::Error: Into<RequestError>,
+    {
+        self.load_all_items(node)
+            .await?
+            .into_iter()
+            .map(|item| {
+                let Some(payload) = item.payload else {
+                    return Err(RequestError::UnexpectedResponse);
+                };
+                return T::try_from(payload).map_err(Into::into);
+            })
+            .collect::<Result<Vec<_>, _>>()
     }
 
     pub async fn delete_items_with_ids<ID: AsRef<str>>(
