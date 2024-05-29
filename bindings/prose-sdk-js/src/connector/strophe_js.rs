@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -25,7 +24,6 @@ use prose_xmpp::connector::{
 
 use crate::client::ClientConfig;
 use crate::types::ConnectionErrorType;
-use crate::util::Interval;
 
 #[wasm_bindgen(typescript_custom_section)]
 const TS_APPEND_CONTENT: &'static str = r#"
@@ -104,26 +102,6 @@ impl ConnectorTrait for Connector {
         let client = Rc::new(self.provider.provide_connection(self.config.clone()));
         let event_handler = Rc::new(event_handler);
 
-        let ping_interval = {
-            let connection = Connection::new(client.clone());
-            let event_handler = event_handler.clone();
-
-            Interval::new(self.config.ping_interval * 1000, move || {
-                let fut = (event_handler)(&connection, ConnectionEvent::PingTimer);
-                spawn_local(async move { fut.await });
-            })
-        };
-
-        let timeout_interval = {
-            let connection = Connection::new(client.clone());
-            let event_handler = event_handler.clone();
-
-            Interval::new(5_000, move || {
-                let fut = (event_handler)(&connection, ConnectionEvent::TimeoutTimer);
-                spawn_local(async move { fut.await });
-            })
-        };
-
         let event_handler = EventHandler {
             connection: Connection::new(client.clone()),
             handler: event_handler,
@@ -149,27 +127,17 @@ impl ConnectorTrait for Connector {
             return Err(ConnectionError::from(error_type));
         }
 
-        Ok(Box::new(Connection {
-            client,
-            ping_interval: RefCell::new(Some(ping_interval)),
-            timeout_interval: RefCell::new(Some(timeout_interval)),
-        }))
+        Ok(Box::new(Connection { client }))
     }
 }
 
 pub struct Connection {
     client: Rc<JSConnection>,
-    ping_interval: RefCell<Option<Interval>>,
-    timeout_interval: RefCell<Option<Interval>>,
 }
 
 impl Connection {
     fn new(client: Rc<JSConnection>) -> Self {
-        Connection {
-            client,
-            ping_interval: Default::default(),
-            timeout_interval: Default::default(),
-        }
+        Connection { client }
     }
 }
 
@@ -182,8 +150,6 @@ impl ConnectionTrait for Connection {
     }
 
     fn disconnect(&self) {
-        self.ping_interval.replace(None);
-        self.timeout_interval.replace(None);
         self.client.disconnect()
     }
 }
@@ -209,6 +175,18 @@ impl EventHandler {
                 Element::from_str(&stanza).expect("Failed to parse received stanza"),
             ),
         );
+        spawn_local(async move { fut.await })
+    }
+
+    #[wasm_bindgen(js_name = "handlePingTimer")]
+    pub fn handle_ping_timer(&self) {
+        let fut = (self.handler)(&self.connection, ConnectionEvent::PingTimer);
+        spawn_local(async move { fut.await })
+    }
+
+    #[wasm_bindgen(js_name = "handleTimeoutTimer")]
+    pub fn handle_timeout_timer(&self) {
+        let fut = (self.handler)(&self.connection, ConnectionEvent::TimeoutTimer);
         spawn_local(async move { fut.await })
     }
 }

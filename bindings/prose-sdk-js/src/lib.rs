@@ -18,7 +18,6 @@ mod encryption;
 mod error;
 mod log;
 mod types;
-mod util;
 
 #[wasm_bindgen(start)]
 pub fn start() {

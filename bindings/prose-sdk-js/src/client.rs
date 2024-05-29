@@ -34,11 +34,6 @@ use crate::types::{
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "ProseClientConfig")]
 pub struct ClientConfig {
-    /// Defines the frequency in which Pings are sent (in seconds). Useful for debugging
-    /// disconnect/reconnect scenarios. Default is 60s.
-    #[wasm_bindgen(js_name = "pingInterval")]
-    pub ping_interval: u32,
-
     /// Defines if received stanzas should be logged to the console.
     #[wasm_bindgen(js_name = "logReceivedStanzas")]
     pub log_received_stanzas: bool,
@@ -114,7 +109,6 @@ impl ClientConfig {
 impl Default for ClientConfig {
     fn default() -> Self {
         ClientConfig {
-            ping_interval: 60,
             log_received_stanzas: false,
             log_sent_stanzas: false,
             logging_enabled: true,
