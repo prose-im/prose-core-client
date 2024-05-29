@@ -128,10 +128,12 @@ impl ClientInner {
 
     async fn handle_event(self: Arc<Self>, event: ConnectionEvent) {
         match event {
-            ConnectionEvent::Disconnected { error } => self
-                .context
-                .clone()
-                .schedule_event(ClientEvent::Client(Event::Disconnected { error })),
+            ConnectionEvent::Disconnected { error } => {
+                Self::cancel_pending_futures(&self.context);
+                self.context
+                    .clone()
+                    .schedule_event(ClientEvent::Client(Event::Disconnected { error }))
+            }
             ConnectionEvent::Stanza(stanza) => {
                 Self::handle_stanza(&self.context, &self.mods, stanza)
             }
