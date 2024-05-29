@@ -10,7 +10,7 @@ use prose_store::prelude::*;
 
 use crate::app::deps::{
     AppContext, AppDependencies, DynClientEventDispatcher, DynEncryptionService, DynIDProvider,
-    DynRngProvider, DynTimeProvider, DynUserDeviceIdProvider,
+    DynRngProvider, DynServerEventHandlerQueue, DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::services::RoomInner;
 use crate::domain::contacts::services::impls::{
@@ -39,6 +39,7 @@ use crate::infra::encryption::{
 };
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
+    OfflineMessagesRepository,
 };
 use crate::infra::rooms::InMemoryConnectedRoomsRepository;
 use crate::infra::settings::{
@@ -57,6 +58,7 @@ pub(crate) struct PlatformDependencies {
     pub encryption_service: DynEncryptionService,
     pub id_provider: DynIDProvider,
     pub rng_provider: DynRngProvider,
+    pub server_event_handler_queue: DynServerEventHandlerQueue,
     pub short_id_provider: DynIDProvider,
     pub store: Store<PlatformDriver>,
     pub time_provider: DynTimeProvider,
@@ -345,6 +347,7 @@ impl From<PlatformDependencies> for AppDependencies {
             message_archive_service: d.xmpp.clone(),
             messages_repo,
             messaging_service: d.xmpp.clone(),
+            offline_messages_repo: Arc::new(OfflineMessagesRepository::new()),
             request_handling_service: d.xmpp.clone(),
             rng_provider: d.rng_provider.clone(),
             room_attributes_service: d.xmpp.clone(),
@@ -352,6 +355,7 @@ impl From<PlatformDependencies> for AppDependencies {
             room_management_service: d.xmpp.clone(),
             room_participation_service: d.xmpp.clone(),
             rooms_domain_service,
+            server_event_handler_queue: d.server_event_handler_queue,
             short_id_provider: d.short_id_provider,
             sidebar_domain_service,
             time_provider,

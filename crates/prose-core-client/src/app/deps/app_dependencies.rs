@@ -8,7 +8,7 @@ use std::sync::Arc;
 use prose_xmpp::{IDProvider, TimeProvider};
 
 use crate::app::deps::app_context::AppContext;
-use crate::app::event_handlers::ClientEventDispatcherTrait;
+use crate::app::event_handlers::{ClientEventDispatcherTrait, ServerEventHandlerQueue};
 use crate::domain::account::services::UserAccountService;
 use crate::domain::connection::services::ConnectionService;
 use crate::domain::contacts::repos::{
@@ -24,7 +24,9 @@ use crate::domain::encryption::services::{
     EncryptionDomainService, EncryptionService, UserDeviceIdProvider, UserDeviceService,
 };
 use crate::domain::general::services::RequestHandlingService;
-use crate::domain::messaging::repos::{DraftsRepository, MessagesRepository};
+use crate::domain::messaging::repos::{
+    DraftsRepository, MessagesRepository, OfflineMessagesRepository,
+};
 use crate::domain::messaging::services::MessageArchiveDomainService;
 use crate::domain::messaging::services::{
     MessageArchiveService, MessageMigrationDomainService, MessagingService,
@@ -69,6 +71,7 @@ pub type DynMessageArchiveService = Arc<dyn MessageArchiveService>;
 pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 pub type DynMessagesRepository = Arc<dyn MessagesRepository>;
 pub type DynMessagingService = Arc<dyn MessagingService>;
+pub type DynOfflineMessagesRepository = Arc<dyn OfflineMessagesRepository>;
 pub type DynPresenceSubRequestsRepository = Arc<dyn PresenceSubRequestsRepository>;
 pub type DynRequestHandlingService = Arc<dyn RequestHandlingService>;
 pub type DynRngProvider = Arc<dyn RngProvider>;
@@ -77,6 +80,7 @@ pub type DynRoomFactory = RoomFactory;
 pub type DynRoomManagementService = Arc<dyn RoomManagementService>;
 pub type DynRoomParticipationService = Arc<dyn RoomParticipationService>;
 pub type DynRoomsDomainService = Arc<dyn RoomsDomainService>;
+pub type DynServerEventHandlerQueue = Arc<ServerEventHandlerQueue>;
 pub type DynSessionRepository = Arc<dyn SessionRepository>;
 pub type DynSidebarDomainService = Arc<dyn SidebarDomainService>;
 pub type DynSyncedRoomSettingsService = Arc<dyn SyncedRoomSettingsService>;
@@ -107,6 +111,7 @@ pub struct AppDependencies {
     pub message_archive_service: DynMessageArchiveService,
     pub messages_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
+    pub offline_messages_repo: DynOfflineMessagesRepository,
     pub request_handling_service: DynRequestHandlingService,
     pub rng_provider: DynRngProvider,
     pub room_attributes_service: DynRoomAttributesService,
@@ -114,6 +119,7 @@ pub struct AppDependencies {
     pub room_management_service: DynRoomManagementService,
     pub room_participation_service: DynRoomParticipationService,
     pub rooms_domain_service: DynRoomsDomainService,
+    pub server_event_handler_queue: DynServerEventHandlerQueue,
     pub short_id_provider: DynIDProvider,
     pub sidebar_domain_service: DynSidebarDomainService,
     pub time_provider: DynTimeProvider,

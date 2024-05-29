@@ -46,7 +46,7 @@ impl ServerEventHandlerQueue {
 }
 
 impl ServerEventHandlerQueue {
-    async fn handle_server_event(&self, event: ServerEvent) {
+    pub async fn handle_server_event(&self, event: ServerEvent) {
         let mut event = event;
         let handlers = self
             .handlers

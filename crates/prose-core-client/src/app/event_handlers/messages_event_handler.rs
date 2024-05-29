@@ -18,7 +18,8 @@ use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynEncryptionDomainService, DynMessagesRepository, DynSidebarDomainService, DynTimeProvider,
+    DynEncryptionDomainService, DynMessagesRepository, DynOfflineMessagesRepository,
+    DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
@@ -26,7 +27,7 @@ use crate::domain::messaging::models::{
     MessageTargetId,
 };
 use crate::domain::rooms::models::Room;
-use crate::domain::shared::models::{RoomId, UserEndpointId};
+use crate::domain::shared::models::{ConnectionState, RoomId, UserEndpointId};
 use crate::dtos::{MessageId, OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
@@ -47,6 +48,8 @@ pub struct MessagesEventHandler {
     time_provider: DynTimeProvider,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
+    #[inject]
+    offline_messages_repo: DynOfflineMessagesRepository,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -59,6 +62,13 @@ impl ServerEventHandler for MessagesEventHandler {
     async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
             ServerEvent::Message(event) => {
+                // We're collecting offline messages that we're receiving while we're
+                // still connecting. These will be applied by the ConnectionService after the
+                // connection was complete and successful.
+                if self.ctx.connection_state() != ConnectionState::Connected {
+                    self.offline_messages_repo.push(event);
+                    return Ok(None);
+                }
                 self.handle_message_event(event).await?;
             }
             _ => return Ok(Some(event)),

@@ -12,7 +12,7 @@ use parking_lot::RwLock;
 
 use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
-use crate::domain::shared::models::MamVersion;
+use crate::domain::shared::models::{ConnectionState, MamVersion};
 use crate::dtos::{UserId, UserResourceId};
 
 #[derive(Debug, Clone)]
@@ -27,6 +27,7 @@ pub struct AppConfig {
 
 pub struct AppContext {
     pub connection_properties: RwLock<Option<ConnectionProperties>>,
+    pub connection_state: RwLock<ConnectionState>,
     pub capabilities: Capabilities,
     pub software_version: SoftwareVersion,
     pub is_observing_rooms: AtomicBool,
@@ -41,6 +42,7 @@ impl AppContext {
     ) -> Self {
         Self {
             connection_properties: Default::default(),
+            connection_state: Default::default(),
             capabilities,
             software_version,
             is_observing_rooms: Default::default(),
@@ -60,6 +62,14 @@ impl Default for AppConfig {
 }
 
 impl AppContext {
+    pub fn connection_state(&self) -> ConnectionState {
+        *self.connection_state.read()
+    }
+
+    pub fn set_connection_state(&self, state: ConnectionState) {
+        *self.connection_state.write() = state;
+    }
+
     pub fn connected_id(&self) -> Result<UserResourceId> {
         self.connection_properties
             .read()

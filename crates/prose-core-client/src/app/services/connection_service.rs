@@ -13,11 +13,13 @@ use prose_xmpp::{ConnectionError, IDProvider, TimeProvider};
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynBlockListDomainService,
     DynClientEventDispatcher, DynConnectionService, DynContactListDomainService,
-    DynEncryptionDomainService, DynIDProvider, DynTimeProvider, DynUserAccountService,
-    DynUserProfileRepository,
+    DynEncryptionDomainService, DynIDProvider, DynOfflineMessagesRepository,
+    DynServerEventHandlerQueue, DynTimeProvider, DynUserAccountService, DynUserProfileRepository,
 };
+use crate::app::event_handlers::ServerEvent;
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
+use crate::domain::shared::models::ConnectionState;
 use crate::dtos::UserId;
 use crate::ClientEvent;
 
@@ -45,6 +47,10 @@ pub struct ConnectionService {
     user_profile_repo: DynUserProfileRepository,
     #[inject]
     time_provider: DynTimeProvider,
+    #[inject]
+    offline_messages_repo: DynOfflineMessagesRepository,
+    #[inject]
+    server_event_handler_queue: DynServerEventHandlerQueue,
 }
 
 impl ConnectionService {
@@ -53,6 +59,9 @@ impl ConnectionService {
         jid: &UserId,
         password: Secret<String>,
     ) -> Result<(), ConnectionError> {
+        self.ctx.set_connection_state(ConnectionState::Connecting);
+        self.offline_messages_repo.drain();
+
         let settings =
             self.account_settings_repo
                 .get(jid)
@@ -151,6 +160,14 @@ impl ConnectionService {
             })?;
 
         self.user_profile_repo.reset_after_reconnect().await;
+
+        self.ctx.set_connection_state(ConnectionState::Connected);
+
+        for event in self.offline_messages_repo.drain() {
+            self.server_event_handler_queue
+                .handle_server_event(ServerEvent::Message(event))
+                .await;
+        }
 
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::ConnectionStatusChanged {

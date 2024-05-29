@@ -20,7 +20,7 @@ use crate::app::deps::{
     DynRoomParticipationService, DynSidebarDomainService, DynSyncedRoomSettingsService,
     DynTimeProvider, DynUserProfileRepository,
 };
-use crate::app::event_handlers::MockClientEventDispatcherTrait;
+use crate::app::event_handlers::{MockClientEventDispatcherTrait, ServerEventHandlerQueue};
 use crate::app::services::RoomInner;
 use crate::domain::account::services::mocks::MockUserAccountService;
 use crate::domain::connection::models::{ConnectionProperties, ServerFeatures};
@@ -32,7 +32,9 @@ use crate::domain::encryption::repos::mocks::MockUserDeviceRepository;
 use crate::domain::encryption::services::mocks::MockEncryptionDomainService;
 use crate::domain::general::models::Capabilities;
 use crate::domain::general::services::mocks::MockRequestHandlingService;
-use crate::domain::messaging::repos::mocks::{MockDraftsRepository, MockMessagesRepository};
+use crate::domain::messaging::repos::mocks::{
+    MockDraftsRepository, MockMessagesRepository, MockOfflineMessagesRepository,
+};
 use crate::domain::messaging::services::mocks::{
     MockMessageArchiveDomainService, MockMessageArchiveService, MockMessageMigrationDomainService,
     MockMessagingService,
@@ -50,6 +52,7 @@ use crate::domain::settings::repos::mocks::{
     MockAccountSettingsRepository, MockLocalRoomSettingsRepository,
 };
 use crate::domain::settings::services::mocks::MockSyncedRoomSettingsService;
+use crate::domain::shared::models::ConnectionState;
 use crate::domain::sidebar::services::impls::SidebarDomainServiceDependencies;
 use crate::domain::sidebar::services::mocks::{MockBookmarksService, MockSidebarDomainService};
 use crate::domain::uploads::services::mocks::MockUploadService;
@@ -87,6 +90,7 @@ impl Default for AppContext {
                     mam_version: None,
                 },
             })),
+            connection_state: RwLock::new(ConnectionState::Connected),
             capabilities: Capabilities::new("Prose", "https://prose.org", vec![]),
             software_version: Default::default(),
             is_observing_rooms: Default::default(),
@@ -115,6 +119,7 @@ pub struct MockAppDependencies {
     pub message_archive_service: MockMessageArchiveService,
     pub messages_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
+    pub offline_message_repo: MockOfflineMessagesRepository,
     pub synced_room_settings_service: MockSyncedRoomSettingsService,
     pub request_handling_service: MockRequestHandlingService,
     #[derivative(Default(value = "Arc::new(StepRngProvider::default())"))]
@@ -213,12 +218,14 @@ impl From<MockAppDependencies> for AppDependencies {
             message_archive_service,
             messages_repo,
             messaging_service,
+            offline_messages_repo: Arc::new(mock.offline_message_repo),
             request_handling_service: Arc::new(mock.request_handling_service),
             room_factory,
             room_management_service,
             room_participation_service,
             room_attributes_service,
             rooms_domain_service: Arc::new(mock.rooms_domain_service),
+            server_event_handler_queue: Arc::new(ServerEventHandlerQueue::new()),
             short_id_provider: mock.short_id_provider,
             sidebar_domain_service,
             time_provider: mock.time_provider,

@@ -231,11 +231,11 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             ],
         );
 
-        let handler_queue = Arc::new(ServerEventHandlerQueue::new());
+        let server_event_handler_queue = Arc::new(ServerEventHandlerQueue::new());
 
         let xmpp_client = Arc::new(
             {
-                let handler_queue = handler_queue.clone();
+                let handler_queue = server_event_handler_queue.clone();
                 self.builder.set_event_handler(move |_, event| {
                     let handler_queue = handler_queue.clone();
                     async move { handler_queue.handle_event(event).await }
@@ -258,6 +258,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             encryption_service: self.encryption_service,
             id_provider: self.id_provider,
             rng_provider: self.rng_provider,
+            server_event_handler_queue: server_event_handler_queue.clone(),
             short_id_provider: self.short_id_provider,
             store: self.store,
             time_provider: self.time_provider,
@@ -268,7 +269,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
         }
         .into();
 
-        handler_queue.set_handlers(vec![
+        server_event_handler_queue.set_handlers(vec![
             Box::new(ConnectionEventHandler::from(&dependencies)),
             Box::new(RequestsEventHandler::from(&dependencies)),
             Box::new(UserStateEventHandler::from(&dependencies)),

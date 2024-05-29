@@ -23,6 +23,11 @@ use prose_xmpp::{bare, ConnectionError};
 async fn test_starts_available_and_generates_resource() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
+    deps.offline_message_repo
+        .expect_drain()
+        .times(2)
+        .returning(|| vec![]);
+
     deps.encryption_domain_service
         .expect_initialize()
         .once()
@@ -136,6 +141,11 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
 async fn test_restores_availability_and_resource() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
+    deps.offline_message_repo
+        .expect_drain()
+        .times(2)
+        .returning(|| vec![]);
+
     deps.encryption_domain_service
         .expect_initialize()
         .once()
@@ -245,6 +255,11 @@ async fn test_connection_failure() -> Result<()> {
     let ctx = Arc::new(OnceLock::<DynAppContext>::new());
 
     deps.short_id_provider = Arc::new(ConstantIDProvider::new("resource-id"));
+
+    deps.offline_message_repo
+        .expect_drain()
+        .once()
+        .return_once(|| vec![]);
 
     deps.account_settings_repo
         .expect_get()

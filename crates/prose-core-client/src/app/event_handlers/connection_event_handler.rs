@@ -12,6 +12,7 @@ use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{DynAppContext, DynClientEventDispatcher};
 use crate::app::event_handlers::{ConnectionEvent, ServerEvent, ServerEventHandler};
+use crate::domain::shared::models::ConnectionState;
 use crate::{ClientEvent, ConnectionEvent as ClientConnectionEvent};
 
 #[derive(InjectDependencies)]
@@ -47,6 +48,7 @@ impl ConnectionEventHandler {
                 // can be sure that we have everything we need.
             }
             ConnectionEvent::Disconnected { error } => {
+                self.ctx.set_connection_state(ConnectionState::Disconnected);
                 self.ctx.is_observing_rooms.store(false, Ordering::Relaxed);
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ConnectionStatusChanged {
