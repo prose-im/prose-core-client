@@ -447,6 +447,7 @@ impl RoomsDomainService {
             sidebar_state,
             RoomFeatures {
                 mam_version: self.ctx.mam_version(),
+                server_time_offset: self.ctx.server_time_offset().unwrap_or_default(),
             },
             settings,
         );
@@ -765,11 +766,21 @@ impl RoomsDomainService {
 
         let room_id = RoomId::Muc(info.room_id.clone());
 
+        // TODO: If the MUC room is not on our server, determine the time offset of that server.
+        let server_time_offset = self
+            .ctx
+            .is_muc_room_on_connected_server(&info.room_id)
+            .then(|| self.ctx.server_time_offset().unwrap_or_default())
+            .unwrap_or_default();
+
         let room_info = RoomInfo {
             room_id: room_id.clone(),
             user_nickname: info.user_nickname,
             r#type: info.config.room_type,
-            features: info.config.features,
+            features: RoomFeatures {
+                mam_version: info.config.mam_version,
+                server_time_offset,
+            },
         };
 
         let settings = self

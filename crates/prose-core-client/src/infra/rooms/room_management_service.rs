@@ -100,7 +100,7 @@ impl RoomManagementService for XMPPClient {
                 room_name: room_info.name,
                 room_description: room_info.description,
                 room_type: spec.room_type(),
-                features: room_info.features.into(),
+                mam_version: room_info.features.mam_version,
             },
             topic: occupancy.subject,
             user_nickname,
@@ -211,7 +211,7 @@ impl RoomManagementService for XMPPClient {
             room_name: room_info.name,
             room_description: room_info.description,
             room_type,
-            features: room_info.features.into(),
+            mam_version: room_info.features.mam_version,
         })
     }
 

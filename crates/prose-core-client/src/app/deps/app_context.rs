@@ -6,14 +6,14 @@
 use std::sync::atomic::AtomicBool;
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use jid::BareJid;
 use parking_lot::RwLock;
 
 use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 use crate::domain::shared::models::{ConnectionState, MamVersion};
-use crate::dtos::{UserId, UserResourceId};
+use crate::dtos::{MucId, UserId, UserResourceId};
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -117,6 +117,24 @@ impl AppContext {
             .read()
             .as_ref()
             .and_then(|p| p.server_features.mam_version.clone())
+    }
+
+    pub fn server_time_offset(&self) -> Option<TimeDelta> {
+        self.connection_properties
+            .read()
+            .as_ref()
+            .map(|p| p.server_features.server_time_offset.clone())
+    }
+}
+
+impl AppContext {
+    pub fn is_muc_room_on_connected_server(&self, room_id: &MucId) -> bool {
+        let props = self.connection_properties.read();
+        let muc_service_id = BareJid::from_parts(None, &room_id.as_ref().domain());
+        Some(&muc_service_id)
+            == props
+                .as_ref()
+                .and_then(|p| p.server_features.muc_service.as_ref())
     }
 }
 

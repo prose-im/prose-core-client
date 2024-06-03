@@ -396,6 +396,24 @@ impl Profile {
         Ok(TimeResult::try_from(response)?.0 .0)
     }
 
+    /// XEP-0202: Entity Time
+    /// https://xmpp.org/extensions/xep-0202.html
+    pub async fn load_server_time(&self) -> Result<DateTime<FixedOffset>> {
+        let response = self
+            .ctx
+            .send_iq(
+                Iq::from_get(self.ctx.generate_id(), TimeQuery)
+                    .with_to(self.ctx.server_jid().into()),
+            )
+            .await?;
+
+        let Some(response) = response else {
+            return Err(RequestError::UnexpectedResponse.into());
+        };
+
+        Ok(TimeResult::try_from(response)?.0 .0)
+    }
+
     /// XEP-0012: Last Activity
     /// https://xmpp.org/extensions/xep-0012.html
     pub async fn load_last_activity(&self, from: impl Into<Jid>) -> Result<LastActivityResponse> {

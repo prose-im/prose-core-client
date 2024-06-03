@@ -4,10 +4,11 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use jid::BareJid;
 
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
 use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
-use prose_xmpp::{ConnectionError, IDProvider};
+use prose_xmpp::{ConnectionError, IDProvider, TimeProvider};
 
 use crate::{event, recv, send};
 
@@ -52,6 +53,10 @@ impl TestClient {
                     format!("{}/{}", user.to_string(), self.short_id_provider.new_id()),
                 ),
                 (
+                    "SERVER_ID".into(),
+                    BareJid::from_parts(None, &user.as_ref().domain()).to_string(),
+                ),
+                (
                     "CAPS_HASH".into(),
                     "zQudvh/0QdfUMrrQBB1ZR3NMyTY=".to_string(),
                 ),
@@ -85,6 +90,41 @@ impl TestClient {
         );
 
         self.expect_request_server_capabilities();
+
+        self.push_ctx(
+            [(
+                "SERVER_TIME".to_string(),
+                self.time_provider
+                    .now()
+                    .format("%Y-%m-%dT%H:%M:%SZ")
+                    .to_string(),
+            )]
+            .into(),
+        );
+
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{SERVER_ID}}" type="get">
+              <time xmlns="urn:xmpp:time" />
+            </iq>
+            "#
+        );
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" from="{{SERVER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+              <time xmlns="urn:xmpp:time">
+                <tzo>+00:00</tzo>
+                <utc>{{SERVER_TIME}}</utc>
+              </time>
+            </iq>
+            "#
+        );
+
+        self.pop_ctx();
+
         self.expect_load_block_list();
 
         self.expect_load_device_list(

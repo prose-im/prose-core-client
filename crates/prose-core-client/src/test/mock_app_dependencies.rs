@@ -88,6 +88,7 @@ impl Default for AppContext {
                     muc_service: Some(mock_muc_service()),
                     http_upload_service: None,
                     mam_version: None,
+                    server_time_offset: Default::default(),
                 },
             })),
             connection_state: RwLock::new(ConnectionState::Connected),

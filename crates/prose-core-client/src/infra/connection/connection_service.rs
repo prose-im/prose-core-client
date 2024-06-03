@@ -5,9 +5,10 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use chrono::Utc;
 use minidom::Element;
 use secrecy::Secret;
-use tracing::warn;
+use tracing::{info, warn};
 
 use prose_xmpp::{mods, ns, ConnectionError};
 
@@ -44,6 +45,7 @@ impl ConnectionService for XMPPClient {
         let mut server_features = ServerFeatures::default();
 
         for item in disco_items.items {
+            info!("Loading features for {}…", item.jid);
             let info = match caps.query_disco_info(item.jid.clone(), None).await {
                 Ok(info) => info,
                 Err(error) => {
@@ -92,6 +94,7 @@ impl ConnectionService for XMPPClient {
             }
         }
 
+        info!("Loading server features…");
         let disco_info = caps
             .query_disco_info(
                 self.connected_jid()
@@ -129,6 +132,27 @@ impl ConnectionService for XMPPClient {
                 _ => (),
             }
         }
+
+        info!("Loading server time…");
+        let profile = self.client.get_mod::<mods::Profile>();
+        let t1 = Utc::now();
+        let server_time = profile
+            .load_server_time()
+            .await
+            .inspect_err(|err| warn!("Failed to load server time. {}", err.to_string()))
+            .map(Some)
+            .unwrap_or_default();
+        let t2 = Utc::now();
+
+        server_features.server_time_offset = server_time
+            .map(|server_time| {
+                let round_trip = t2.signed_duration_since(t1);
+                let half_round_trip = round_trip / 2;
+                let midpoint_time = t1 + half_round_trip;
+
+                server_time.signed_duration_since(midpoint_time)
+            })
+            .unwrap_or_default();
 
         Ok(server_features)
     }

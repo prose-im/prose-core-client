@@ -6,10 +6,10 @@
 use xmpp_parsers::disco;
 use xmpp_parsers::disco::DiscoInfoResult;
 
-use crate::domain::rooms::models::RoomFeatures;
-use crate::domain::shared::models::MamVersion;
 use prose_xmpp::stanza::muc;
 use prose_xmpp::{ns, parse_bool, ParseError};
+
+use crate::domain::shared::models::MamVersion;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct RoomInfo {
@@ -180,13 +180,5 @@ impl From<&[disco::Feature]> for Features {
         }
 
         result
-    }
-}
-
-impl From<Features> for RoomFeatures {
-    fn from(value: Features) -> Self {
-        Self {
-            mam_version: value.mam_version,
-        }
     }
 }

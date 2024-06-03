@@ -3,10 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::domain::rooms::models::room_features::RoomFeatures;
 use crate::domain::rooms::models::RoomAffiliation;
 use crate::domain::shared::models::{
-    AnonOccupantId, Availability, MucId, OccupantId, RoomType, UserId,
+    AnonOccupantId, Availability, MamVersion, MucId, OccupantId, RoomType, UserId,
 };
 
 /// Contains information about a room after creating or joining it.
@@ -26,7 +25,7 @@ pub struct RoomConfig {
     pub room_name: Option<String>,
     pub room_description: Option<String>,
     pub room_type: RoomType,
-    pub features: RoomFeatures,
+    pub mam_version: Option<MamVersion>,
 }
 
 #[derive(Debug, PartialEq, Clone)]

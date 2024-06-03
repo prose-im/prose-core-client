@@ -197,10 +197,13 @@ impl MessagesEventHandler {
 
         let room_id = from.to_room_id();
         let room = self.connected_rooms_repo.get(room_id.as_ref());
+        let now = self.time_provider.now();
 
         let parser = MessageParser::new(
             room.clone(),
-            self.time_provider.now(),
+            room.as_ref()
+                .map(|room| room.features.local_time_to_server_time(now))
+                .unwrap_or(now),
             self.encryption_domain_service.clone(),
         );
 
@@ -258,7 +261,8 @@ impl MessagesEventHandler {
 
         let parser = MessageParser::new(
             Some(room.clone()),
-            self.time_provider.now(),
+            room.features
+                .local_time_to_server_time(self.time_provider.now()),
             self.encryption_domain_service.clone(),
         );
 
