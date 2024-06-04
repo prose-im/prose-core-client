@@ -5,14 +5,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::messaging::models::ArchivedMessageRef;
+use crate::domain::messaging::models::MessageRef;
 use crate::dtos::RoomId;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SyncedRoomSettings {
     pub room_id: RoomId,
     pub encryption_enabled: bool,
-    pub last_read_message: Option<ArchivedMessageRef>,
+    pub last_read_message: Option<MessageRef>,
 }
 
 impl SyncedRoomSettings {

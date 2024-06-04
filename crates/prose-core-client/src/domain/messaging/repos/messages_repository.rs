@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageId, MessageLike, MessageTargetId, StanzaId,
+    ArchivedMessageRef, MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
 };
 use crate::domain::shared::models::RoomId;
 use crate::dtos::UserId;
@@ -68,6 +68,14 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         room_id: &RoomId,
         before: Option<DateTime<Utc>>,
     ) -> Result<Option<ArchivedMessageRef>>;
+
+    /// Returns the latest message, if available, that has an `id` set and was received
+    /// before `before` (if set).
+    async fn get_last_message(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+    ) -> Result<Option<MessageRef>>;
 
     /// Returns all messages with a timestamp greater than `after`.
     async fn get_messages_after(

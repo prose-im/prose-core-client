@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageId, MessageLike, MessageTargetId, StanzaId,
+    ArchivedMessageRef, MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
 };
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::RoomId;
@@ -267,6 +267,39 @@ impl MessagesRepository for CachingMessageRepository {
         }
 
         Ok(Some(message_ref))
+    }
+
+    async fn get_last_message(
+        &self,
+        account: &UserId,
+        room_id: &RoomId,
+    ) -> Result<Option<MessageRef>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessageRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessageRecord::collection())?;
+        let room_idx = collection.index(&MessageRecord::timestamp_idx())?;
+
+        let mut message_refs = room_idx
+            .get_all_filtered::<MessageRecord, MessageRef>(
+                Query::Range {
+                    start: Bound::Included((account, room_id, &DateTime::<Utc>::MIN_UTC)),
+                    end: Bound::Included((account, room_id, &DateTime::<Utc>::MAX_UTC)),
+                },
+                QueryDirection::Backward,
+                Some(1),
+                |_, record| {
+                    let message = MessageLike::from(record);
+                    message.id.into_original_id().map(|id| MessageRef {
+                        id,
+                        timestamp: message.timestamp,
+                    })
+                },
+            )
+            .await?;
+
+        Ok(message_refs.pop())
     }
 
     async fn get_messages_after(

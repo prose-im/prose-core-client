@@ -9,7 +9,7 @@ use minidom::Element;
 use pretty_assertions::assert_eq;
 use xmpp_parsers::mam::QueryId;
 
-use prose_core_client::domain::messaging::models::{ArchivedMessageRef, MessageLikePayload};
+use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageRef};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::dtos::{Mention, MucId, OccupantId, RoomId, UnicodeScalarIndex, UserId};
@@ -67,8 +67,8 @@ async fn test_maintains_message_count_from_prior_runs() -> Result<()> {
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(ArchivedMessageRef {
-            stanza_id: MessageBuilder::stanza_id_for_index(1),
+        last_read_message: Some(MessageRef {
+            id: MessageBuilder::id_for_index(1),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
         }),
     });
@@ -148,8 +148,8 @@ async fn test_loads_unread_messages() -> Result<()> {
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(ArchivedMessageRef {
-            stanza_id: MessageBuilder::stanza_id_for_index(1),
+        last_read_message: Some(MessageRef {
+            id: MessageBuilder::id_for_index(1),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
         }),
     });
@@ -242,10 +242,7 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
     client.push_ctx(
         [
             ("OTHER_USER_ID".into(), user_id.to_string()),
-            (
-                "MSG_STANZA_ID".into(),
-                MessageBuilder::stanza_id_for_index(2).to_string(),
-            ),
+            ("MSG_ID".into(), MessageBuilder::id_for_index(2).to_string()),
             (
                 "MSG_TIMESTAMP".into(),
                 Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00)
@@ -263,7 +260,7 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
           <items node="https://prose.org/protocol/room_settings">
             <item id="{{OTHER_USER_ID}}" publisher="{{USER_ID}}">
               <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="user:{{OTHER_USER_ID}}">
-                <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="{{MSG_TIMESTAMP}}" />
+                <message-ref xmlns="https://prose.org/protocol/message_ref" id="{{MSG_ID}}" ts="{{MSG_TIMESTAMP}}" />
               </room-settings>
             </item>
           </items>
@@ -304,8 +301,8 @@ async fn test_marks_first_unread_message() -> Result<()> {
     strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(ArchivedMessageRef {
-            stanza_id: MessageBuilder::stanza_id_for_index(2),
+        last_read_message: Some(MessageRef {
+            id: MessageBuilder::id_for_index(2),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap(),
         }),
     });
@@ -383,6 +380,141 @@ async fn test_marks_first_unread_message() -> Result<()> {
     assert_eq!(true, messages.messages[1].is_last_read);
     assert_eq!(false, messages.messages[2].is_last_read);
     assert_eq!(false, messages.messages[3].is_last_read);
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_mark_as_unread_saves_settings() -> Result<()> {
+    let store = store().await.expect("Failed to set up store.");
+
+    let account = user_id!("user@prose.org");
+    let muc_id = muc_id!("room@conf.prose.org");
+    let room_id = RoomId::Muc(muc_id.clone());
+
+    let message_repo = CachingMessageRepository::new(store.clone());
+    message_repo
+        .append(
+            &account,
+            &room_id,
+            &[
+                MessageBuilder::new_with_index(1)
+                    .set_from(occupant_id!("room@conf.prose.org/friend"))
+                    .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap())
+                    .build_message_like(),
+                MessageBuilder::new_with_index(2)
+                    .set_from(occupant_id!("room@conf.prose.org/friend"))
+                    .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00).unwrap())
+                    .build_message_like(),
+                MessageBuilder::new_with_index(3)
+                    .set_from(occupant_id!("room@conf.prose.org/friend"))
+                    .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap())
+                    .build_message_like(),
+            ],
+        )
+        .await?;
+
+    let now = Utc::now();
+
+    let client = TestClient::builder()
+        .set_store(store)
+        .set_time_provider(ConstantTimeProvider::new(now.clone()))
+        .build()
+        .await;
+    client.expect_login(account, "secret").await?;
+
+    let mut join_room_strategy = JoinRoomStrategy::default();
+    join_room_strategy.room_settings = Some(SyncedRoomSettings {
+        room_id: room_id.clone(),
+        encryption_enabled: false,
+        last_read_message: Some(MessageRef {
+            id: MessageBuilder::id_for_index(1),
+            timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
+        }),
+    });
+
+    client
+        .join_room_with_strategy(muc_id.clone(), "anon-id", join_room_strategy)
+        .await?;
+
+    let sidebar_items = client.sidebar.sidebar_items().await;
+    assert_eq!(1, sidebar_items.len());
+
+    let sidebar_item = sidebar_items
+        .get(0)
+        .expect("Expected at least one SidebarItem");
+    assert_eq!(2, sidebar_item.unread_count);
+
+    client.push_ctx(
+        [
+            ("ROOM_ID".into(), room_id.to_string()),
+            (
+                "MESSAGE_ID".into(),
+                MessageBuilder::id_for_index(3).to_string(),
+            ),
+        ]
+        .into(),
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}">
+                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
+                  <message-ref xmlns="https://prose.org/protocol/message_ref" id="{{MESSAGE_ID}}" ts="2024-04-26T11:00:00+00:00" />
+                  <encryption type="none" />
+                </room-settings>
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    client.pop_ctx();
+
+    event!(client, ClientEvent::SidebarChanged);
+
+    let room = client.get_room(room_id).await.to_generic_room();
+    room.mark_as_read().await?;
+
+    // This shouldn't do anything, since the last read message did not change.
+    room.mark_as_read().await?;
 
     Ok(())
 }

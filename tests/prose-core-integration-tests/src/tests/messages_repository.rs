@@ -8,7 +8,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::messaging::models::{
-    ArchivedMessageRef, MessageLike, MessageLikePayload, MessageTargetId,
+    ArchivedMessageRef, MessageLike, MessageLikeId, MessageLikePayload, MessageRef, MessageTargetId,
 };
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::shared::models::{MucId, RoomId, UserId};
@@ -562,6 +562,60 @@ async fn test_loads_latest_received_message() -> Result<()> {
             Some(Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap())
         )
         .await?,
+    );
+
+    assert_eq!(
+        None,
+        repo.get_last_received_message(
+            &user_id!("b@prose.org"),
+            &RoomId::from(user_id!("void@prose.org")),
+            None
+        )
+        .await?,
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_loads_latest_message() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = RoomId::from(user_id!("room@prose.org"));
+
+    repo.append(
+        &user_id!("a@prose.org"),
+        &room_id,
+        &[MessageBuilder::new_with_index(1)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap())
+            .build_message_like()],
+    )
+    .await?;
+
+    let mut messages = [
+        MessageBuilder::new_with_index(2)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 5, 1, 0, 0, 0).unwrap())
+            .build_message_like(),
+        MessageBuilder::new_with_index(3)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap())
+            .build_message_like(),
+        MessageBuilder::new_with_index(4)
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap())
+            .build_message_like(),
+    ];
+
+    messages[0].id = MessageLikeId::new(None);
+
+    repo.append(&user_id!("b@prose.org"), &room_id, &messages)
+        .await?;
+
+    assert_eq!(
+        Some(MessageRef {
+            id: MessageBuilder::id_for_index(3),
+            timestamp: Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap(),
+        }),
+        repo.get_last_message(&user_id!("b@prose.org"), &room_id)
+            .await?,
     );
 
     assert_eq!(

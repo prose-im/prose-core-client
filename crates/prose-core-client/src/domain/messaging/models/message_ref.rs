@@ -6,10 +6,16 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use super::StanzaId;
+use super::{MessageId, StanzaId};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArchivedMessageRef {
     pub stanza_id: StanzaId,
+    pub timestamp: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MessageRef {
+    pub id: MessageId,
     pub timestamp: DateTime<Utc>,
 }

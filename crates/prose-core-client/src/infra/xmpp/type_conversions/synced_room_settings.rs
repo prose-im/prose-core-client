@@ -12,7 +12,7 @@ use prose_xmpp::{ElementExt, ParseError};
 
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::dtos::RoomId;
-use crate::infra::xmpp::type_conversions::archived_message_ref;
+use crate::infra::xmpp::type_conversions::message_ref;
 
 pub mod ns {
     pub const PROSE_ROOM_SETTINGS: &str = "https://prose.org/protocol/room_settings";
@@ -29,10 +29,7 @@ impl TryFrom<Element> for SyncedRoomSettings {
                 },
             )?,
             last_read_message: value
-                .get_child(
-                    "archived-message-ref",
-                    archived_message_ref::ns::PROSE_ARCHIVED_MESSAGE_REF,
-                )
+                .get_child("message-ref", message_ref::ns::PROSE_MESSAGE_REF)
                 .cloned()
                 .map(TryFrom::try_from)
                 .transpose()?,

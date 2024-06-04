@@ -3,7 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-mod archived_message_ref;
 pub(crate) mod attachment;
 pub(crate) mod availability;
 pub(crate) mod bookmark;
@@ -13,6 +12,7 @@ pub(crate) mod contact;
 pub(crate) mod device_bundle;
 pub(crate) mod encrypted_payload;
 pub(crate) mod mention;
+pub(crate) mod message_ref;
 pub(crate) mod presence;
 pub(crate) mod room_affiliation;
 pub(crate) mod room_info;

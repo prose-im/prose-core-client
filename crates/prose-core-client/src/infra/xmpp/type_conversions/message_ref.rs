@@ -7,10 +7,11 @@ use minidom::Element;
 
 use prose_xmpp::{ElementExt, ParseError};
 
-use crate::domain::messaging::models::ArchivedMessageRef;
+use crate::domain::messaging::models::{ArchivedMessageRef, MessageRef};
 
 pub mod ns {
     pub const PROSE_ARCHIVED_MESSAGE_REF: &str = "https://prose.org/protocol/archived_message_ref";
+    pub const PROSE_MESSAGE_REF: &str = "https://prose.org/protocol/message_ref";
 }
 
 impl From<ArchivedMessageRef> for Element {
@@ -28,6 +29,31 @@ impl TryFrom<Element> for ArchivedMessageRef {
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         Ok(Self {
             stanza_id: value.attr_req("stanza-id")?.into(),
+            timestamp: value
+                .attr_req("ts")?
+                .parse()
+                .map_err(|err: chrono::ParseError| ParseError::Generic {
+                    msg: err.to_string(),
+                })?,
+        })
+    }
+}
+
+impl From<MessageRef> for Element {
+    fn from(value: MessageRef) -> Self {
+        Element::builder("message-ref", ns::PROSE_MESSAGE_REF)
+            .attr("id", value.id)
+            .attr("ts", value.timestamp.to_rfc3339())
+            .build()
+    }
+}
+
+impl TryFrom<Element> for MessageRef {
+    type Error = ParseError;
+
+    fn try_from(value: Element) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: value.attr_req("id")?.into(),
             timestamp: value
                 .attr_req("ts")?
                 .parse()
