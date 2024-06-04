@@ -199,6 +199,11 @@ impl Room {
         account: &UserId,
         messages_repo: &DynMessagesRepository,
     ) -> Result<RoomStatistics> {
+        match self.state() {
+            RoomState::Pending | RoomState::Connecting => return Ok(Default::default()),
+            RoomState::Connected | RoomState::Disconnected { .. } => (),
+        }
+
         let last_read_message = {
             let guard = self.inner.details.read();
             if !guard.statistics.needs_update {
