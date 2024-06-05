@@ -15,16 +15,25 @@ use crate::{event, recv, send};
 use super::TestClient;
 
 #[derive(Default)]
-pub struct LoginConfig {
+pub struct LoginStrategy {
     pub device_bundles: Vec<(DeviceId, DeviceBundle)>,
+    pub offline_messages: Vec<prose_xmpp::stanza::Message>,
 }
 
-impl LoginConfig {
+impl LoginStrategy {
     pub fn with_device_bundles(
         mut self,
         device_bundles: impl IntoIterator<Item = (DeviceId, DeviceBundle)>,
     ) -> Self {
         self.device_bundles = device_bundles.into_iter().collect::<Vec<_>>();
+        self
+    }
+
+    pub fn with_offline_messages(
+        mut self,
+        offline_messages: impl IntoIterator<Item = prose_xmpp::stanza::Message>,
+    ) -> Self {
+        self.offline_messages = offline_messages.into_iter().collect::<Vec<_>>();
         self
     }
 }
@@ -35,15 +44,15 @@ impl TestClient {
         user: UserId,
         password: impl AsRef<str>,
     ) -> Result<(), ConnectionError> {
-        self.expect_login_with_config(user, password, LoginConfig::default())
+        self.expect_login_with_strategy(user, password, LoginStrategy::default())
             .await
     }
 
-    pub async fn expect_login_with_config(
+    pub async fn expect_login_with_strategy(
         &self,
         user: UserId,
         password: impl AsRef<str>,
-        config: LoginConfig,
+        config: LoginStrategy,
     ) -> Result<(), ConnectionError> {
         self.push_ctx(
             [
@@ -88,6 +97,13 @@ impl TestClient {
             self,
             r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#
         );
+
+        if !config.offline_messages.is_empty() {
+            for message in config.offline_messages {
+                self.receive_element(message, file!(), line!());
+            }
+            self.receive_next().await;
+        }
 
         self.expect_request_server_capabilities();
 

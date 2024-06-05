@@ -221,6 +221,34 @@ impl MessageBuilder {
         query_id: impl Into<String>,
         muc_user: Option<MucUser>,
     ) -> ArchivedMessage {
+        let stanza_id = self
+            .stanza_id
+            .clone()
+            .expect("Missing stanzaId")
+            .to_string()
+            .into();
+        let timestamp = date::DateTime(self.timestamp.clone().into());
+        let mut message = self.build_message_stanza();
+
+        if let Some(muc_user) = muc_user {
+            message = message.set_muc_user(muc_user);
+        }
+
+        ArchivedMessage {
+            id: stanza_id,
+            query_id: Some(mam::QueryId(query_id.into())),
+            forwarded: Forwarded {
+                delay: Some(Delay {
+                    from: None,
+                    stamp: timestamp,
+                    data: None,
+                }),
+                stanza: Some(Box::new(message)),
+            },
+        }
+    }
+
+    pub fn build_message_stanza(self) -> prose_xmpp::stanza::Message {
         let mut message = prose_xmpp::stanza::Message::new()
             .set_id(self.id.as_ref().into())
             .set_type(match self.from {
@@ -253,21 +281,6 @@ impl MessageBuilder {
             }
         }
 
-        if let Some(muc_user) = muc_user {
-            message = message.set_muc_user(muc_user);
-        }
-
-        ArchivedMessage {
-            id: self.stanza_id.expect("Missing stanzaId").to_string().into(),
-            query_id: Some(mam::QueryId(query_id.into())),
-            forwarded: Forwarded {
-                delay: Some(Delay {
-                    from: None,
-                    stamp: date::DateTime(self.timestamp.into()),
-                    data: None,
-                }),
-                stanza: Some(Box::new(message)),
-            },
-        }
+        message
     }
 }

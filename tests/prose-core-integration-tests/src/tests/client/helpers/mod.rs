@@ -13,7 +13,7 @@ use prose_core_client::dtos::{DeviceBundle, DeviceId};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::{EncryptionService, SignalServiceHandle};
 pub use test_client::TestClient;
-pub use test_client_login::LoginConfig;
+pub use test_client_login::LoginStrategy;
 pub use test_client_muc::{JoinRoomStrategy, StartDMStrategy};
 pub(self) use test_message_queue::TestMessageQueue;
 

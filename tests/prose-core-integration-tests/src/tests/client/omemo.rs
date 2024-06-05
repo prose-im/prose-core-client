@@ -16,7 +16,7 @@ use prose_proc_macros::mt_test;
 
 use crate::{event, recv, room_event, send};
 
-use super::helpers::{LoginConfig, TestClient, TestDeviceBundle};
+use super::helpers::{LoginStrategy, TestClient, TestDeviceBundle};
 
 #[mt_test]
 async fn test_receives_device_list_with_current_device_missing() -> Result<()> {
@@ -213,10 +213,10 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
     let client = TestClient::new().await;
 
     client
-        .expect_login_with_config(
+        .expect_login_with_strategy(
             user_id!("user@prose.org"),
             "secret",
-            LoginConfig::default()
+            LoginStrategy::default()
                 .with_device_bundles([(500.into(), DeviceBundle::test(500).await)]),
         )
         .await?;
@@ -695,10 +695,10 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
     let client = TestClient::new().await;
 
     client
-        .expect_login_with_config(
+        .expect_login_with_strategy(
             user_id!("user@prose.org"),
             "secret",
-            LoginConfig::default().with_device_bundles([
+            LoginStrategy::default().with_device_bundles([
                 (10.into(), DeviceBundle::test(10).await),
                 (20.into(), DeviceBundle::test(20).await),
             ]),
