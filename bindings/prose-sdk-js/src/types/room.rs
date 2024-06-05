@@ -459,8 +459,8 @@ macro_rules! direct_message_impl {
             }
 
             #[wasm_bindgen(setter, js_name = "isEncryptionEnabled")]
-            pub fn set_is_encryption_enabled(&self, enabled: bool) {
-                self.room.set_encryption_enabled(enabled);
+            pub async fn set_is_encryption_enabled(&self, enabled: bool) {
+                self.room.set_encryption_enabled(enabled).await;
             }
         }
     };
