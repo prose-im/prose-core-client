@@ -16,14 +16,12 @@ use prose_core_client::{ClientEvent, ClientRoomEventType};
 
 use super::element_ext::ElementExt;
 
-#[derive(Debug)]
 struct Message {
     file: String,
     line: u32,
     r#type: MessageType,
 }
 
-#[derive(Debug)]
 pub enum MessageType {
     In(Element),
     Out(Element),
@@ -32,6 +30,37 @@ pub enum MessageType {
 
 pub struct ClientEventMatcher {
     matcher: Box<dyn FnOnce(ClientEvent, String, u32) + Send>,
+}
+
+impl Debug for Message {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}\n\n{}:{}\n", self.r#type, self.file, self.line)
+    }
+}
+
+impl Debug for MessageType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MessageType::In(element) => write!(
+                f,
+                "[Receive]\n{}",
+                element
+                    .to_pretty_printed_xml()
+                    .expect("Failed to format element")
+            ),
+            MessageType::Out(element) => write!(
+                f,
+                "[Send]\n{}",
+                element
+                    .to_pretty_printed_xml()
+                    .expect("Failed to format element")
+            ),
+            MessageType::Event(matcher) => {
+                write!(f, "[Event]\n")?;
+                matcher.fmt(f)
+            }
+        }
+    }
 }
 
 impl Debug for ClientEventMatcher {
@@ -92,9 +121,18 @@ impl ClientEventMatcher {
     }
 }
 
-#[derive(Default, Clone, Debug)]
+#[derive(Default, Clone)]
 pub struct TestMessageQueue {
     messages: Arc<Mutex<VecDeque<Message>>>,
+}
+
+impl Debug for TestMessageQueue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for message in self.messages.lock().iter() {
+            write!(f, "\n{:?}", message)?;
+        }
+        Ok(())
+    }
 }
 
 impl TestMessageQueue {

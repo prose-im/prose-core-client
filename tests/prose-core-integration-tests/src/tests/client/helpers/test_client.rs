@@ -53,7 +53,8 @@ impl Drop for TestClient {
         let num_remaining_messages = self.messages.len();
         assert_eq!(
             num_remaining_messages, 0,
-            "TestClient dropped while still containing {num_remaining_messages} messages."
+            "TestClient dropped while still containing {num_remaining_messages} messages.\n\n{:?}",
+            self.messages
         );
     }
 }
