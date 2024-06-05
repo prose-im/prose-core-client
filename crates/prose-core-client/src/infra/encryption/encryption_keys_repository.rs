@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tracing::info;
 use uuid::Uuid;
 
 use prose_store::prelude::*;
@@ -235,27 +234,6 @@ impl EncryptionKeysRepositoryTrait for EncryptionKeysRepository {
         }
 
         tx.commit().await?;
-        Ok(())
-    }
-
-    async fn get_all_pre_keys(&self) -> Result<Vec<PreKeyRecord>> {
-        let tx = self
-            .store
-            .transaction_for_reading(&[encryption_keys_collections::PRE_KEY])
-            .await?;
-        let collection = tx.readable_collection(encryption_keys_collections::PRE_KEY)?;
-
-        let pre_keys = collection
-            .get_all_values::<PreKeyRecord>(Query::<u32>::All, QueryDirection::Forward, None)
-            .await?;
-        Ok(pre_keys)
-    }
-
-    async fn delete_pre_key(&self, prekey_id: PreKeyId) -> Result<()> {
-        info!("Deleting PreKey with id {:?}…", prekey_id);
-        self.store
-            .delete(encryption_keys_collections::PRE_KEY, prekey_id.as_ref())
-            .await?;
         Ok(())
     }
 

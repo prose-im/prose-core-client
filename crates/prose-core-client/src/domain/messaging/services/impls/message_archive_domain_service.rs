@@ -15,6 +15,7 @@ use crate::app::deps::{
     DynAppContext, DynEncryptionDomainService, DynLocalRoomSettingsRepository,
     DynMessageArchiveService, DynMessagesRepository, DynTimeProvider,
 };
+use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, MessageParser};
 use crate::domain::messaging::services::MessagePage;
 use crate::domain::rooms::models::Room;
@@ -35,7 +36,7 @@ pub struct MessageArchiveDomainService {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
-    async fn catchup_room(&self, room: &Room) -> Result<()> {
+    async fn catchup_room(&self, room: &Room, context: DecryptionContext) -> Result<()> {
         if !room.features.is_mam_supported() {
             info!(
                 "Skipping catchup on {} since it does not support MAM.",
@@ -83,7 +84,8 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
         let mut last_message_id = page.messages.last().map(|m| StanzaId::from(m.id.as_ref()));
         let mut is_last_page = page.is_last;
 
-        self.parse_message_page(room, page, &mut messages).await;
+        self.parse_message_page(room, page, &mut messages, &context)
+            .await;
 
         while !is_last_page {
             let Some(message_id) = last_message_id.take() else {
@@ -98,7 +100,8 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
             last_message_id = page.messages.last().map(|m| StanzaId::from(m.id.as_ref()));
             is_last_page = page.is_last;
 
-            self.parse_message_page(room, page, &mut messages).await;
+            self.parse_message_page(room, page, &mut messages, &context)
+                .await;
         }
 
         self.message_repo
@@ -126,12 +129,14 @@ impl MessageArchiveDomainService {
         room: &Room,
         page: MessagePage,
         messages: &mut Vec<MessageLike>,
+        context: &DecryptionContext,
     ) {
         for archive_message in page.messages {
             let parsed_message = match MessageParser::new(
                 Some(room.clone()),
                 Default::default(),
                 self.encryption_domain_service.clone(),
+                Some(context.clone()),
             )
             .parse_mam_message(archive_message)
             .await

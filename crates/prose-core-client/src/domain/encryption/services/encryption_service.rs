@@ -9,7 +9,9 @@ use std::time::SystemTime;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::encryption::models::{DeviceId, LocalEncryptionBundle, PreKeyBundle};
+use crate::domain::encryption::models::{
+    DecryptionContext, DeviceId, LocalEncryptionBundle, PreKeyBundle,
+};
 use crate::domain::messaging::models::EncryptionKey;
 use crate::domain::shared::models::UserId;
 use crate::dtos::{PreKeyId, PreKeyRecord};
@@ -41,5 +43,6 @@ pub trait EncryptionService: SendUnlessWasm + SyncUnlessWasm {
         device_id: &DeviceId,
         message: &[u8],
         is_pre_key: bool,
+        decryption_context: DecryptionContext,
     ) -> Result<Box<[u8]>>;
 }

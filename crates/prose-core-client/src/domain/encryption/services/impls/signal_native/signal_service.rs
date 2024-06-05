@@ -13,8 +13,8 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::app::deps::{DynEncryptionKeysRepository, DynRngProvider, DynSessionRepository};
 use crate::domain::encryption::models::{
-    DeviceId, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey, PublicKey,
-    SignedPreKeyId, SignedPreKeyRecord,
+    DecryptionContext, DeviceId, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord,
+    PrivateKey, PublicKey, SignedPreKeyId, SignedPreKeyRecord,
 };
 use crate::domain::encryption::services::EncryptionService;
 use crate::domain::messaging::models::EncryptionKey;
@@ -50,6 +50,7 @@ enum SignalServiceMessage {
         device_id: DeviceId,
         encrypted_message: Box<[u8]>,
         is_pre_key: bool,
+        decryption_context: DecryptionContext,
         callback: oneshot::Sender<Result<Box<[u8]>>>,
     },
 }
@@ -86,11 +87,18 @@ impl SignalService {
                 device_id,
                 encrypted_message,
                 is_pre_key,
+                decryption_context,
                 callback,
             } => {
                 _ = callback.send(
-                    self.decrypt_key(sender_id, device_id, encrypted_message, is_pre_key)
-                        .await,
+                    self.decrypt_key(
+                        sender_id,
+                        device_id,
+                        encrypted_message,
+                        is_pre_key,
+                        decryption_context,
+                    )
+                    .await,
                 )
             }
         }
@@ -103,8 +111,11 @@ impl SignalService {
         bundle: libsignal_protocol::PreKeyBundle,
         now: SystemTime,
     ) -> Result<()> {
-        let signal_store =
-            SignalRepoWrapper::new(self.encryption_keys_repo.clone(), self.session_repo.clone());
+        let signal_store = SignalRepoWrapper::new(
+            self.encryption_keys_repo.clone(),
+            self.session_repo.clone(),
+            None,
+        );
 
         libsignal_protocol::process_prekey_bundle(
             &ProtocolAddress::new(user_id.to_string(), device_id.clone().into()),
@@ -125,6 +136,7 @@ impl SignalService {
         device_id: DeviceId,
         encrypted_message: Box<[u8]>,
         is_pre_key: bool,
+        decryption_context: DecryptionContext,
     ) -> Result<Box<[u8]>> {
         let address = ProtocolAddress::new(sender_id.to_string(), device_id.clone().into());
 
@@ -136,8 +148,11 @@ impl SignalService {
             CiphertextMessage::SignalMessage(SignalMessage::try_from(encrypted_message.as_ref())?)
         };
 
-        let signal_store =
-            SignalRepoWrapper::new(self.encryption_keys_repo.clone(), self.session_repo.clone());
+        let signal_store = SignalRepoWrapper::new(
+            self.encryption_keys_repo.clone(),
+            self.session_repo.clone(),
+            Some(decryption_context),
+        );
 
         let dek_and_mac = libsignal_protocol::message_decrypt(
             &ciphertext_message,
@@ -161,8 +176,11 @@ impl SignalService {
         message: &[u8],
         now: &SystemTime,
     ) -> Result<EncryptionKey> {
-        let signal_store =
-            SignalRepoWrapper::new(self.encryption_keys_repo.clone(), self.session_repo.clone());
+        let signal_store = SignalRepoWrapper::new(
+            self.encryption_keys_repo.clone(),
+            self.session_repo.clone(),
+            None,
+        );
 
         let address = ProtocolAddress::new(user_id.to_string(), device_id.clone().into());
 
@@ -375,6 +393,7 @@ impl EncryptionService for SignalServiceHandle {
         device_id: &DeviceId,
         message: &[u8],
         is_pre_key: bool,
+        decryption_context: DecryptionContext,
     ) -> Result<Box<[u8]>> {
         let (send, recv) = oneshot::channel();
         let message = SignalServiceMessage::DecryptKey {
@@ -382,6 +401,7 @@ impl EncryptionService for SignalServiceHandle {
             device_id: device_id.clone(),
             encrypted_message: message.into(),
             is_pre_key,
+            decryption_context,
             callback: send,
         };
 

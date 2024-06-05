@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::atomic::Ordering;
-
 use anyhow::Result;
 use async_trait::async_trait;
 
@@ -49,7 +47,6 @@ impl ConnectionEventHandler {
             }
             ConnectionEvent::Disconnected { error } => {
                 self.ctx.set_connection_state(ConnectionState::Disconnected);
-                self.ctx.is_observing_rooms.store(false, Ordering::Relaxed);
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ConnectionStatusChanged {
                         event: ClientConnectionEvent::Disconnect { error },

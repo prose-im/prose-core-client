@@ -44,7 +44,12 @@ async fn test_joins_room() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+
+    deps.encryption_domain_service
+        .expect_finalize_decryption()
+        .once()
+        .return_once(|_| Box::pin(async move { () }));
 
     let room = Arc::new(Mutex::new(Room::connecting(
         &muc_id!("room@conf.prose.org").into(),
@@ -56,6 +61,8 @@ async fn test_joins_room() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     deps.account_settings_repo
@@ -188,6 +195,7 @@ async fn test_joins_room() -> Result<()> {
                 room_id: muc_id!("room@conf.prose.org"),
                 password: None,
                 behavior: JoinRoomBehavior::user_initiated(),
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -263,6 +271,7 @@ async fn test_throws_conflict_error_if_room_exists() -> Result<()> {
                     name: "New Channel".to_string(),
                 },
                 behavior: CreateRoomBehavior::FailIfGone,
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -283,7 +292,12 @@ async fn test_creates_group() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+
+    deps.encryption_domain_service
+        .expect_finalize_decryption()
+        .once()
+        .return_once(|_| Box::pin(async move { () }));
 
     // Make sure that the method calls are in the exact order…
     let mut seq = Sequence::new();
@@ -292,6 +306,8 @@ async fn test_creates_group() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     // jane.doe@prose.org + a@prose.org + b@prose.org + c@prose.org
@@ -523,6 +539,7 @@ async fn test_creates_group() -> Result<()> {
                     ],
                 },
                 behavior: CreateRoomBehavior::FailIfGone,
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -541,7 +558,12 @@ async fn test_joins_direct_message() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+
+    deps.encryption_domain_service
+        .expect_finalize_decryption()
+        .once()
+        .return_once(|_| Box::pin(async move { () }));
 
     deps.connected_rooms_repo
         .expect_get()
@@ -597,6 +619,7 @@ async fn test_joins_direct_message() -> Result<()> {
         .create_or_join_room(
             CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant: user_id!("user2@prose.org"),
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -630,7 +653,12 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+
+    deps.encryption_domain_service
+        .expect_finalize_decryption()
+        .once()
+        .return_once(|_| Box::pin(async move { () }));
 
     deps.id_provider = Arc::new(IncrementingIDProvider::new("hash"));
     deps.ctx.set_connection_properties(ConnectionProperties {
@@ -642,6 +670,8 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
             mam_version: None,
             server_time_offset: Default::default(),
         },
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     deps.account_settings_repo
@@ -721,6 +751,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
                     name: "New Channel".to_string(),
                 },
                 behavior: CreateRoomBehavior::FailIfGone,
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -739,6 +770,8 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("jane.doe@prose.org/macOS"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let channel_id = muc_id!("org.prose.channel.hash-1@conf.prose.org");
@@ -1052,12 +1085,19 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+
+    deps.encryption_domain_service
+        .expect_finalize_decryption()
+        .once()
+        .return_once(|_| Box::pin(async move { () }));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let pending_room = Room::pending(
@@ -1127,6 +1167,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         .create_or_join_room(
             CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant: user_id!("user2@prose.org"),
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -1161,12 +1202,19 @@ async fn test_updates_pending_public_channel() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+
+    deps.encryption_domain_service
+        .expect_finalize_decryption()
+        .once()
+        .return_once(|_| Box::pin(async move { () }));
 
     deps.ctx.set_connection_properties(ConnectionProperties {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let pending_room = Arc::new(Mutex::new(Room::pending(
@@ -1275,6 +1323,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
                 room_id: muc_id!("room@conf.prose.org"),
                 password: None,
                 behavior: JoinRoomBehavior::user_initiated(),
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -1334,6 +1383,7 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
                 room_id: muc_id!("room@conf.prose.org"),
                 password: None,
                 behavior: JoinRoomBehavior::system_initiated(),
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )
@@ -1396,6 +1446,7 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
                 room_id: muc_id!("room@conf.prose.org"),
                 password: None,
                 behavior: JoinRoomBehavior::user_initiated(),
+                decryption_context: None,
             },
             RoomSidebarState::InSidebar,
         )

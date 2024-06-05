@@ -14,7 +14,7 @@ use prose_core_client::domain::shared::models::{MucId, OccupantId, UserId, UserR
 use prose_core_client::domain::sidebar::models::{Bookmark, BookmarkType};
 use prose_core_client::domain::sidebar::services::impls::SidebarDomainService;
 use prose_core_client::domain::sidebar::services::SidebarDomainService as SidebarDomainServiceTrait;
-use prose_core_client::dtos::{Availability, RoomId, RoomState};
+use prose_core_client::dtos::{Availability, DecryptionContext, RoomId, RoomState};
 use prose_core_client::test::{
     DisconnectedState, MessageBuilder, MockSidebarDomainServiceDependencies,
 };
@@ -43,6 +43,8 @@ async fn test_extend_items_inserts_items() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     {
@@ -78,6 +80,7 @@ async fn test_extend_items_inserts_items() -> Result<()> {
                     room_id: muc_id!("channel1@prose.org"),
                     password: None,
                     behavior: JoinRoomBehavior::system_initiated(),
+                    decryption_context: Some(DecryptionContext::default()),
                 }),
                 predicate::eq(RoomSidebarState::InSidebar),
             )
@@ -93,11 +96,14 @@ async fn test_extend_items_inserts_items() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![
-            Bookmark::try_from(&room1).unwrap(),
-            Bookmark::try_from(&room2).unwrap(),
-            Bookmark::try_from(&room3).unwrap(),
-        ])
+        .extend_items_from_bookmarks(
+            vec![
+                Bookmark::try_from(&room1).unwrap(),
+                Bookmark::try_from(&room2).unwrap(),
+                Bookmark::try_from(&room3).unwrap(),
+            ],
+            Default::default(),
+        )
         .await?;
 
     Ok(())
@@ -130,8 +136,11 @@ async fn test_extend_items_updates_room() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![Bookmark::group(muc_id!("group@prose.org"), "Group")
-            .set_sidebar_state(RoomSidebarState::Favorite)])
+        .extend_items_from_bookmarks(
+            vec![Bookmark::group(muc_id!("group@prose.org"), "Group")
+                .set_sidebar_state(RoomSidebarState::Favorite)],
+            Default::default(),
+        )
         .await?;
 
     assert_eq!(room.sidebar_state(), RoomSidebarState::Favorite);
@@ -182,6 +191,7 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
                     room_id: muc_id!("group@muc.prose.org"),
                     password: None,
                     behavior: JoinRoomBehavior::system_initiated(),
+                    decryption_context: Some(DecryptionContext::default()),
                 }),
                 predicate::eq(RoomSidebarState::InSidebar),
             )
@@ -196,6 +206,7 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
                     room_id: muc_id!("visible-gone-group@muc.prose.org"),
                     password: None,
                     behavior: JoinRoomBehavior::system_initiated(),
+                    decryption_context: Some(DecryptionContext::default()),
                 }),
                 predicate::eq(RoomSidebarState::InSidebar),
             )
@@ -221,6 +232,7 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
                     room_id: muc_id!("hidden-gone-group@muc.prose.org"),
                     password: None,
                     behavior: JoinRoomBehavior::system_initiated(),
+                    decryption_context: Some(DecryptionContext::default()),
                 }),
                 predicate::eq(RoomSidebarState::NotInSidebar),
             )
@@ -247,6 +259,7 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
                     room_id: muc_id!("hidden-group@muc.prose.org"),
                     password: None,
                     behavior: JoinRoomBehavior::system_initiated(),
+                    decryption_context: Some(DecryptionContext::default()),
                 }),
                 predicate::eq(RoomSidebarState::NotInSidebar),
             )
@@ -277,12 +290,15 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
 
     let service = SidebarDomainService::from(deps.into_deps());
     service
-        .extend_items_from_bookmarks(vec![
-            Bookmark::try_from(&room1).unwrap(),
-            Bookmark::try_from(&room2).unwrap(),
-            Bookmark::try_from(&room3).unwrap(),
-            Bookmark::try_from(&room4).unwrap(),
-        ])
+        .extend_items_from_bookmarks(
+            vec![
+                Bookmark::try_from(&room1).unwrap(),
+                Bookmark::try_from(&room2).unwrap(),
+                Bookmark::try_from(&room3).unwrap(),
+                Bookmark::try_from(&room4).unwrap(),
+            ],
+            Default::default(),
+        )
         .await?;
 
     Ok(())
@@ -593,6 +609,7 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
         .with(
             predicate::eq(CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant: user_id!("contact@prose.org"),
+                decryption_context: None,
             }),
             predicate::eq(RoomSidebarState::NotInSidebar),
         )
@@ -961,6 +978,8 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user1@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     deps.connected_rooms_repo
@@ -1019,6 +1038,7 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
                 room_id: muc_id!("channel@muc.prose.org").into(),
                 password: None,
                 behavior: JoinRoomBehavior::system_initiated(),
+                decryption_context: None,
             }),
             predicate::eq(RoomSidebarState::Favorite),
         )
@@ -1314,6 +1334,7 @@ async fn test_joins_room() -> Result<()> {
             room_id: muc_id!("room@conf.prose.org"),
             password: None,
             behavior: JoinRoomBehavior::user_initiated(),
+            decryption_context: None,
         })
         .await?;
 
@@ -1369,6 +1390,7 @@ async fn test_updates_sidebar_state_of_already_joined_room_if_needed() -> Result
             room_id: muc_id!("room@conf.prose.org").into(),
             password: None,
             behavior: JoinRoomBehavior::user_initiated(),
+            decryption_context: None,
         })
         .await?;
 
@@ -1414,6 +1436,7 @@ async fn test_updates_sidebar_state_of_already_joined_group_if_needed() -> Resul
             room_id: muc_id!("group@conf.prose.org").into(),
             password: None,
             behavior: JoinRoomBehavior::user_initiated(),
+            decryption_context: None,
         })
         .await?;
 
@@ -1451,6 +1474,7 @@ async fn test_does_not_update_sidebar_state_of_already_joined_room_if_not_needed
             room_id: muc_id!("room@conf.prose.org").into(),
             password: None,
             behavior: JoinRoomBehavior::user_initiated(),
+            decryption_context: None,
         })
         .await?;
 

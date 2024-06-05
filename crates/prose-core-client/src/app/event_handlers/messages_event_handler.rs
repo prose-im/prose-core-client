@@ -8,7 +8,7 @@ use std::ops::Deref;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::Jid;
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 use xmpp_parsers::message::MessageType;
 
 use prose_proc_macros::InjectDependencies;
@@ -63,9 +63,13 @@ impl ServerEventHandler for MessagesEventHandler {
         match event {
             ServerEvent::Message(event) => {
                 // We're collecting offline messages that we're receiving while we're
-                // still connecting. These will be applied by the ConnectionService after the
-                // connection was complete and successful.
+                // still connecting. This is important since received messages can trigger the
+                // creation of rooms, but some of these rooms rely on data that is still being
+                // determined during the connection process, like server features. The collected
+                // messages will be applied by the ConnectionService after the connection was
+                // complete and successful.
                 if self.ctx.connection_state() != ConnectionState::Connected {
+                    info!("Caching offline message…");
                     self.offline_messages_repo.push(event);
                     return Ok(None);
                 }
@@ -205,6 +209,7 @@ impl MessagesEventHandler {
                 .map(|room| room.features.local_time_to_server_time(now))
                 .unwrap_or(now),
             self.encryption_domain_service.clone(),
+            self.ctx.decryption_context(),
         );
 
         let parsed_message: Result<MessageLike> = match message {
@@ -264,6 +269,7 @@ impl MessagesEventHandler {
             room.features
                 .local_time_to_server_time(self.time_provider.now()),
             self.encryption_domain_service.clone(),
+            self.ctx.decryption_context(),
         );
 
         let mut parsed_message = match message {

@@ -3,13 +3,14 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::atomic::Ordering;
-
 use anyhow::{bail, Result};
+use tracing::info;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::{DynAppContext, DynRoomManagementService, DynSidebarDomainService};
+use crate::app::deps::{
+    DynAppContext, DynEncryptionDomainService, DynRoomManagementService, DynSidebarDomainService,
+};
 use crate::domain::rooms::models::constants::MAX_PARTICIPANTS_PER_GROUP;
 use crate::domain::rooms::models::PublicRoomInfo;
 use crate::domain::rooms::services::{
@@ -22,6 +23,8 @@ pub struct RoomsService {
     #[inject]
     ctx: DynAppContext,
     #[inject]
+    encryption_domain_service: DynEncryptionDomainService,
+    #[inject]
     room_management_service: DynRoomManagementService,
     #[inject]
     sidebar_domain_service: DynSidebarDomainService,
@@ -30,10 +33,27 @@ pub struct RoomsService {
 impl RoomsService {
     #[tracing::instrument(skip(self))]
     pub async fn start_observing_rooms(&self) -> Result<()> {
-        if self.ctx.is_observing_rooms.swap(true, Ordering::Acquire) {
+        let Some(context) = self.ctx.decryption_context() else {
             return Ok(());
+        };
+
+        self.sidebar_domain_service
+            .populate_sidebar(context)
+            .await?;
+
+        self.ctx.set_rooms_caught_up();
+
+        if let Some(context) = self.ctx.take_decryption_context() {
+            info!("Finalizing catch-up…");
+            self.encryption_domain_service
+                .finalize_decryption(
+                    context
+                        .into_inner()
+                        .expect("DecryptionContext still has references to it."),
+                )
+                .await;
         }
-        self.sidebar_domain_service.populate_sidebar().await?;
+
         Ok(())
     }
 
@@ -76,6 +96,7 @@ impl RoomsService {
                 room_id: room_id.clone(),
                 password: password.map(ToString::to_string),
                 behavior: JoinRoomBehavior::user_initiated(),
+                decryption_context: None,
             })
             .await
     }
@@ -84,6 +105,7 @@ impl RoomsService {
         self.sidebar_domain_service
             .insert_item_by_creating_or_joining_room(CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant: participant_jid.clone(),
+                decryption_context: None,
             })
             .await
     }
@@ -96,6 +118,7 @@ impl RoomsService {
                     participants: participants.to_vec(),
                 },
                 behavior: CreateRoomBehavior::FollowThenCreateUnique,
+                decryption_context: None,
             })
             .await
     }
@@ -111,6 +134,7 @@ impl RoomsService {
                     name: channel_name.as_ref().to_string(),
                 },
                 behavior: CreateRoomBehavior::FailIfGone,
+                decryption_context: None,
             })
             .await
     }
@@ -126,6 +150,7 @@ impl RoomsService {
                     name: channel_name.as_ref().to_string(),
                 },
                 behavior: CreateRoomBehavior::FollowThenCreateUnique,
+                decryption_context: None,
             })
             .await
     }

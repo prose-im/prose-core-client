@@ -15,6 +15,7 @@ use prose_xmpp::stanza::message::Forwarded;
 use prose_xmpp::stanza::Message;
 
 use crate::app::deps::DynEncryptionDomainService;
+use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
     EncryptedMessage, MessageLike, MessageLikeEncryptionInfo, MessageLikeId, MessageTargetId,
@@ -30,6 +31,7 @@ pub struct MessageParser {
     room: Option<Room>,
     timestamp: DateTime<Utc>,
     encryption_domain_service: DynEncryptionDomainService,
+    decryption_context: Option<DecryptionContext>,
 }
 
 impl MessageParser {
@@ -37,11 +39,13 @@ impl MessageParser {
         room: Option<Room>,
         now: DateTime<Utc>,
         encryption_domain_service: DynEncryptionDomainService,
+        decryption_context: Option<DecryptionContext>,
     ) -> Self {
         Self {
             room,
             timestamp: now,
             encryption_domain_service,
+            decryption_context,
         }
     }
 }
@@ -311,13 +315,23 @@ impl MessageParser {
             let decryption_result = match encrypted_message {
                 EncryptedMessage::Message(message) => {
                     self.encryption_domain_service
-                        .decrypt_message(sender_id, room_id, message_id.as_ref(), message)
+                        .decrypt_message(
+                            sender_id,
+                            room_id,
+                            message_id.as_ref(),
+                            message,
+                            self.decryption_context.clone(),
+                        )
                         .await
                 }
                 EncryptedMessage::KeyTransport(payload) => {
                     let res = self
                         .encryption_domain_service
-                        .handle_received_key_transport_message(sender_id, payload)
+                        .handle_received_key_transport_message(
+                            sender_id,
+                            payload,
+                            self.decryption_context.clone(),
+                        )
                         .await;
                     if let Err(error) = res {
                         error!(

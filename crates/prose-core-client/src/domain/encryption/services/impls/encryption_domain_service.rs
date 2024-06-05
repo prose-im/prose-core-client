@@ -23,7 +23,10 @@ use crate::app::deps::{
     DynMessagingService, DynRngProvider, DynSessionRepository, DynTimeProvider,
     DynUserDeviceIdProvider, DynUserDeviceRepository, DynUserDeviceService,
 };
-use crate::domain::encryption::models::{Device, DeviceId, DeviceInfo, DeviceList, PreKeyBundle};
+use crate::domain::encryption::models::{
+    DecryptionContext, DecryptionContextInner, Device, DeviceId, DeviceInfo, DeviceList,
+    PreKeyBundle,
+};
 use crate::domain::encryption::services::encryption_domain_service::{
     DecryptionError, EncryptionError,
 };
@@ -267,10 +270,27 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         room_id: &RoomId,
         message_id: Option<&MessageId>,
         payload: EncryptedPayload,
+        context: Option<DecryptionContext>,
     ) -> Result<String, DecryptionError> {
+        let needs_finalize_context = context.is_none();
+        let context = context.unwrap_or_default();
+
         // First try to decrypt the message. If that succeeds, great!
-        let error = match self.decrypt_payload(sender_id, payload).await {
-            Ok(message) => return Ok(message),
+        let error = match self
+            .decrypt_payload(sender_id, payload, context.clone())
+            .await
+        {
+            Ok(message) => {
+                if needs_finalize_context {
+                    self.finalize_decryption(
+                        context
+                            .into_inner()
+                            .expect("DecryptionContext still has references to it."),
+                    )
+                    .await;
+                }
+                return Ok(message);
+            }
             Err(error) => error,
         };
 
@@ -297,6 +317,60 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         };
 
         Ok(body.to_string())
+    }
+
+    async fn finalize_decryption(&self, context: DecryptionContextInner) {
+        let Some(local_device_id) = self
+            .encryption_keys_repo
+            .get_local_device()
+            .await
+            .ok()
+            .unwrap_or_default()
+            .map(|device| device.device_id)
+        else {
+            warn!("Could not finalize decryption session. Failed to determine local device id.");
+            return;
+        };
+
+        let DecryptionContextInner {
+            message_senders,
+            broken_sessions,
+            used_pre_keys,
+        } = context;
+
+        if let Err(err) = self
+            .refresh_and_publish_prekeys(used_pre_keys.into_iter().collect())
+            .await
+        {
+            error!(
+                "Failed to refresh and publish used prekeys. {}",
+                err.to_string()
+            )
+        }
+
+        for (sender_id, sender_device_id) in message_senders {
+            if let Err(err) = self
+                .complete_session(&local_device_id, &sender_id, &sender_device_id)
+                .await
+            {
+                error!(
+                    "Failed to complete session with {sender_id}. {}",
+                    err.to_string()
+                )
+            }
+        }
+
+        for (sender_id, sender_device_id) in broken_sessions {
+            if self
+                .repair_session_attempts
+                .lock()
+                .insert((sender_id.clone(), sender_device_id.clone()))
+            {
+                _ = self
+                    .start_session_with_device(&sender_id, sender_device_id)
+                    .await;
+            }
+        }
     }
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
@@ -383,7 +457,11 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         &self,
         sender_id: &UserId,
         payload: KeyTransportPayload,
+        context: Option<DecryptionContext>,
     ) -> Result<()> {
+        let needs_finalize_context = context.is_none();
+        let context = context.unwrap_or_default();
+
         let local_device = self
             .encryption_keys_repo
             .get_local_device()
@@ -394,12 +472,20 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             "KeyTransportMessage was not encrypted for current device."
         ))?;
 
-        self.decrypt_key(&key, sender_id, &payload.device_id)
+        if key.is_pre_key {
+            context.insert_message_sender(sender_id.clone(), payload.device_id.clone());
+        }
+
+        self.decrypt_key(&key, sender_id, &payload.device_id, context.clone())
             .await?;
 
-        if key.is_pre_key {
-            self.did_receive_pre_key_message(&local_device.device_id, sender_id, &payload.device_id)
-                .await
+        if needs_finalize_context {
+            self.finalize_decryption(
+                context
+                    .into_inner()
+                    .expect("DecryptionContext still has references to it."),
+            )
+            .await;
         }
 
         Ok(())
@@ -466,43 +552,22 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 }
 
 impl EncryptionDomainService {
-    async fn generate_and_publish_missing_pre_keys(&self) -> Result<()> {
-        let pre_keys = self
-            .encryption_keys_repo
-            .get_all_pre_keys()
-            .await
-            .context("Failed to load local PreKeys")?;
-
-        // Collect existing PreKey ids…
-        let pre_key_ids = pre_keys
-            .iter()
-            .map(|pre_key| pre_key.id.as_ref())
-            .collect::<HashSet<_>>();
-        // Check if any IDs between 1 and 100 are missing…
-        let missing_pre_key_ids = (1..=100)
-            .filter_map(|idx| {
-                if pre_key_ids.contains(&idx) {
-                    return None;
-                }
-                return Some(PreKeyId::from(idx));
-            })
-            .collect::<Vec<_>>();
-
+    async fn refresh_and_publish_prekeys(&self, used_pre_key_ids: Vec<PreKeyId>) -> Result<()> {
         // No missing IDs, nothing to do…
-        if missing_pre_key_ids.is_empty() {
+        if used_pre_key_ids.is_empty() {
             return Ok(());
         }
 
-        info!("Generating {} new PreKeys…", missing_pre_key_ids.len());
-        let missing_pre_keys = self
+        info!("Generating {} new PreKeys…", used_pre_key_ids.len());
+        let refreshed_pre_keys = self
             .encryption_service
-            .generate_pre_keys_with_ids(missing_pre_key_ids)
+            .generate_pre_keys_with_ids(used_pre_key_ids)
             .await
             .context("Failed to re-generate deleted PreKeys")?;
 
         info!("Saving new PreKeys…");
         self.encryption_keys_repo
-            .put_pre_keys(missing_pre_keys.as_slice())
+            .put_pre_keys(refreshed_pre_keys.as_slice())
             .await
             .context("Failed to save re-generated PreKeys…")?;
 
@@ -527,6 +592,7 @@ impl EncryptionDomainService {
         key: &EncryptionKey,
         sender_id: &UserId,
         sender_device_id: &DeviceId,
+        context: DecryptionContext,
     ) -> Result<Box<[u8]>> {
         let dek_and_mac = self
             .encryption_service
@@ -535,6 +601,7 @@ impl EncryptionDomainService {
                 &sender_device_id,
                 &key.data.as_ref(),
                 key.is_pre_key,
+                context,
             )
             .await?;
 
@@ -549,6 +616,7 @@ impl EncryptionDomainService {
         &self,
         sender_id: &UserId,
         payload: EncryptedPayload,
+        context: DecryptionContext,
     ) -> Result<String, DecryptionError> {
         let local_device = self
             .encryption_keys_repo
@@ -560,7 +628,14 @@ impl EncryptionDomainService {
             .get_key(&local_device.device_id)
             .ok_or(DecryptionError::NotEncryptedForThisDevice)?;
 
-        let dek_and_mac = match self.decrypt_key(&key, sender_id, &payload.device_id).await {
+        if key.is_pre_key {
+            context.insert_message_sender(sender_id.clone(), payload.device_id.clone());
+        }
+
+        let dek_and_mac = match self
+            .decrypt_key(&key, sender_id, &payload.device_id, context.clone())
+            .await
+        {
             Ok(data) => data,
             Err(err) => {
                 // While we would usually only try to repair a session for certain error types,
@@ -568,15 +643,8 @@ impl EncryptionDomainService {
                 // a typed error out of the outdated libsignal-protocol-javascript. This is
                 // something to improve after we switch to WASI and can share the native libsignal
                 // library between web and native.
-                if self
-                    .repair_session_attempts
-                    .lock()
-                    .insert((sender_id.clone(), payload.device_id.clone()))
-                {
-                    _ = self
-                        .start_session_with_device(sender_id, payload.device_id)
-                        .await;
-                }
+
+                context.insert_broken_session(sender_id.clone(), payload.device_id);
                 return Err(err.into());
             }
         };
@@ -597,33 +665,7 @@ impl EncryptionDomainService {
         )
         .map_err(|err| anyhow!(err))?;
 
-        if key.is_pre_key {
-            self.did_receive_pre_key_message(&local_device.device_id, sender_id, &payload.device_id)
-                .await
-        }
-
         Ok(message)
-    }
-
-    async fn did_receive_pre_key_message(
-        &self,
-        local_device_id: &DeviceId,
-        sender_id: &UserId,
-        sender_device_id: &DeviceId,
-    ) {
-        if let Err(err) = self.generate_and_publish_missing_pre_keys().await {
-            error!("Failed to generate missing prekeys. {}", err.to_string())
-        }
-
-        if let Err(err) = self
-            .complete_session(&local_device_id, sender_id, sender_device_id)
-            .await
-        {
-            error!(
-                "Failed to complete session with {sender_id}. {}",
-                err.to_string()
-            )
-        }
     }
 
     async fn complete_session(
@@ -632,6 +674,8 @@ impl EncryptionDomainService {
         sender_id: &UserId,
         sender_device_id: &DeviceId,
     ) -> Result<()> {
+        info!("Completing OMEMO session with {sender_id} ({sender_device_id})…");
+
         let nonce = Aes128Gcm::generate_nonce(self.rng_provider.rng());
         let dek = Aes128Gcm::generate_key(self.rng_provider.rng());
 
@@ -717,7 +761,7 @@ impl EncryptionDomainService {
         else {
             info!("No device bundle found for {user_id} ({device_id}).");
 
-            if user_id == &self.ctx.connected_id()?.into_user_id()
+            if user_id == &self.ctx.connected_account()?
                 && self
                     .unpublish_device_attempts
                     .lock()
@@ -748,7 +792,7 @@ impl EncryptionDomainService {
         {
             Ok(_) => (),
             Err(err) => {
-                if user_id == &self.ctx.connected_id()?.into_user_id()
+                if user_id == &self.ctx.connected_account()?
                     && self
                         .unpublish_device_attempts
                         .lock()

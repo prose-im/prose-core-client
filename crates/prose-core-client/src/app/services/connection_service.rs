@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use secrecy::Secret;
-use tracing::error;
+use tracing::{error, info};
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{ConnectionError, IDProvider, TimeProvider};
@@ -20,7 +20,7 @@ use crate::app::event_handlers::ServerEvent;
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
 use crate::domain::shared::models::ConnectionState;
-use crate::dtos::UserId;
+use crate::dtos::{DecryptionContext, UserId};
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
@@ -81,7 +81,9 @@ impl ConnectionService {
         let mut connection_properties = ConnectionProperties {
             connected_jid: full_jid.clone(),
             server_features: Default::default(),
+            rooms_caught_up: false,
             connection_timestamp: DateTime::<Utc>::MIN_UTC,
+            decryption_context: Some(DecryptionContext::default()),
         };
 
         self.ctx
@@ -163,7 +165,12 @@ impl ConnectionService {
 
         self.ctx.set_connection_state(ConnectionState::Connected);
 
-        for event in self.offline_messages_repo.drain() {
+        let offline_message_events = self.offline_messages_repo.drain();
+        info!(
+            "Applying {} cached offline messages…",
+            offline_message_events.len()
+        );
+        for event in offline_message_events {
             self.server_event_handler_queue
                 .handle_server_event(ServerEvent::Message(event))
                 .await;

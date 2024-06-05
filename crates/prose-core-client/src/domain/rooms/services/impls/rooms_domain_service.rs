@@ -16,10 +16,10 @@ use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
-    DynConnectedRoomsRepository, DynIDProvider, DynMessageArchiveDomainService,
-    DynMessageMigrationDomainService, DynRoomAttributesService, DynRoomManagementService,
-    DynRoomParticipationService, DynSyncedRoomSettingsService, DynUserInfoRepository,
-    DynUserProfileRepository,
+    DynConnectedRoomsRepository, DynEncryptionDomainService, DynIDProvider,
+    DynMessageArchiveDomainService, DynMessageMigrationDomainService, DynRoomAttributesService,
+    DynRoomManagementService, DynRoomParticipationService, DynSyncedRoomSettingsService,
+    DynUserInfoRepository, DynUserProfileRepository,
 };
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
@@ -47,6 +47,7 @@ pub struct RoomsDomainService {
     client_event_dispatcher: DynClientEventDispatcher,
     connected_rooms_repo: DynConnectedRoomsRepository,
     ctx: DynAppContext,
+    encryption_domain_service: DynEncryptionDomainService,
     id_provider: DynIDProvider,
     message_archive_domain_service: DynMessageArchiveDomainService,
     message_migration_domain_service: DynMessageMigrationDomainService,
@@ -66,31 +67,57 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         request: CreateOrEnterRoomRequest,
         sidebar_state: RoomSidebarState,
     ) -> Result<Room, RoomError> {
-        let room = match request {
+        let (room, context) = match request {
             CreateOrEnterRoomRequest::Create {
                 service,
                 room_type,
                 behavior,
-            } => {
+                decryption_context,
+            } => (
                 self.create_room(&service, room_type, sidebar_state, behavior)
-                    .await
-            }
+                    .await?,
+                decryption_context,
+            ),
             CreateOrEnterRoomRequest::JoinRoom {
                 room_id: room_jid,
                 password,
                 behavior,
-            } => {
+                decryption_context,
+            } => (
                 self.join_room(&room_jid, password.as_deref(), sidebar_state, behavior)
-                    .await
-            }
-            CreateOrEnterRoomRequest::JoinDirectMessage { participant } => {
-                self.join_direct_message(&participant, sidebar_state).await
-            }
-        }?;
+                    .await?,
+                decryption_context,
+            ),
+            CreateOrEnterRoomRequest::JoinDirectMessage {
+                participant,
+                decryption_context,
+            } => (
+                self.join_direct_message(&participant, sidebar_state)
+                    .await?,
+                decryption_context,
+            ),
+        };
 
-        self.message_archive_domain_service
-            .catchup_room(&room)
-            .await?;
+        let needs_finalize_context = context.is_none();
+        let context = context.unwrap_or_default();
+
+        if let Err(err) = self
+            .message_archive_domain_service
+            .catchup_room(&room, context.clone())
+            .await
+        {
+            error!("Failed to catch up room. {}", err.to_string())
+        }
+
+        if needs_finalize_context {
+            self.encryption_domain_service
+                .finalize_decryption(
+                    context
+                        .into_inner()
+                        .expect("DecryptionContext still has references to it."),
+                )
+                .await;
+        }
 
         Ok(room)
     }

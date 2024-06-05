@@ -44,8 +44,6 @@ pub trait EncryptionKeysRepository: SendUnlessWasm + SyncUnlessWasm {
 
     async fn get_pre_key(&self, prekey_id: PreKeyId) -> Result<Option<PreKeyRecord>>;
     async fn put_pre_keys(&self, records: &[PreKeyRecord]) -> Result<()>;
-    async fn get_all_pre_keys(&self) -> Result<Vec<PreKeyRecord>>;
-    async fn delete_pre_key(&self, prekey_id: PreKeyId) -> Result<()>;
 
     async fn put_sender_key(
         &self,

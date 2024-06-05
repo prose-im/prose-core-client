@@ -60,7 +60,7 @@ use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoR
 use crate::domain::user_info::services::mocks::MockUserInfoService;
 use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
 use crate::domain::user_profiles::services::mocks::MockUserProfileService;
-use crate::dtos::UserResourceId;
+use crate::dtos::{DecryptionContext, UserResourceId};
 use crate::infra::general::mocks::StepRngProvider;
 use crate::infra::general::OsRngProvider;
 use crate::test::ConstantTimeProvider;
@@ -90,11 +90,12 @@ impl Default for AppContext {
                     mam_version: None,
                     server_time_offset: Default::default(),
                 },
+                rooms_caught_up: false,
+                decryption_context: Some(DecryptionContext::default()),
             })),
             connection_state: RwLock::new(ConnectionState::Connected),
             capabilities: Capabilities::new("Prose", "https://prose.org", vec![]),
             software_version: Default::default(),
-            is_observing_rooms: Default::default(),
             config: Default::default(),
         }
     }
@@ -305,6 +306,7 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             connected_rooms_repo: Arc::new(value.connected_rooms_repo),
             ctx: Arc::new(value.ctx),
+            encryption_domain_service: Arc::new(value.encryption_domain_service),
             id_provider: Arc::new(value.id_provider),
             message_migration_domain_service: Arc::new(value.message_migration_domain_service),
             room_attributes_service: Arc::new(value.room_attributes_service),

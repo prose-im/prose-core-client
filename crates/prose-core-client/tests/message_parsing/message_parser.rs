@@ -52,6 +52,7 @@ async fn test_parse_chat_message() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_message(message)
     .await?;
@@ -98,6 +99,7 @@ async fn test_parse_groupchat_message() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_message(message)
     .await?;
@@ -147,6 +149,7 @@ async fn test_parse_sent_carbon_message() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_carbon(message)
     .await?;
@@ -199,6 +202,7 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_mam_message(message)
     .await?;
@@ -256,6 +260,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_mam_message(message)
     .await?;
@@ -308,6 +313,7 @@ async fn test_parse_mam_chat_message() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_mam_message(message)
     .await?;
@@ -356,6 +362,7 @@ async fn test_parse_delayed_message() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_message(message)
     .await?;
@@ -401,6 +408,7 @@ async fn test_message_with_attachment_and_empty_body() -> Result<()> {
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
+        None,
     )
     .parse_message(message)
     .await?;

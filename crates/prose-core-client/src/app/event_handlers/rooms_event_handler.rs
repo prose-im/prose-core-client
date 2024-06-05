@@ -199,6 +199,7 @@ impl RoomsEventHandler {
                             on_redirect: JoinRoomRedirectBehavior::FollowIfGone,
                             on_failure: JoinRoomFailureBehavior::RetainOnError,
                         },
+                        decryption_context: None,
                     })
                     .await?;
             }

@@ -247,6 +247,8 @@ impl TestClient {
             connection_timestamp: Default::default(),
             connected_jid: their_user_id.with_resource("their_device").unwrap(),
             server_features: Default::default(),
+            rooms_caught_up: false,
+            decryption_context: None,
         };
 
         let mut user_device_repo = MockUserDeviceRepository::new();

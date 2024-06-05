@@ -14,6 +14,7 @@ use crate::domain::rooms::models::RoomSpec;
 use crate::domain::rooms::services::CreateOrEnterRoomRequest;
 use crate::domain::shared::models::{MucId, RoomId};
 use crate::domain::sidebar::models::Bookmark;
+use crate::dtos::DecryptionContext;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -23,7 +24,7 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///
     /// Loads the remote bookmarks then proceeds with the logic details
     /// in `extend_items_from_bookmarks`.
-    async fn populate_sidebar(&self) -> Result<()>;
+    async fn populate_sidebar(&self, context: DecryptionContext) -> Result<()>;
 
     /// Extends the sidebar with items from a collection of bookmarks.
     ///
@@ -38,7 +39,11 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   - On failure, a new sidebar item is created with an error state.
     ///
     /// After processing all bookmarks, dispatches a `ClientEvent::SidebarChanged`.
-    async fn extend_items_from_bookmarks(&self, bookmarks: Vec<Bookmark>) -> Result<()>;
+    async fn extend_items_from_bookmarks(
+        &self,
+        bookmarks: Vec<Bookmark>,
+        context: DecryptionContext,
+    ) -> Result<()>;
 
     /// Inserts a sidebar item by creating or joining a room based on the specified request.
     ///

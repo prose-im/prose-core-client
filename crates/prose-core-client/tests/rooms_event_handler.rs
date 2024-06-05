@@ -520,6 +520,7 @@ async fn test_handles_invite() -> Result<()> {
             room_id: muc_id!("group@conference.prose.org").into(),
             password: None,
             behavior: JoinRoomBehavior::system_initiated(),
+            decryption_context: None,
         }))
         .return_once(|_| Box::pin(async move { Ok(muc_id!("group@conference.prose.org").into()) }));
 
@@ -723,6 +724,8 @@ async fn test_swallows_self_presence() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("us@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let room = Room::for_direct_message(

@@ -488,6 +488,7 @@ impl<Kind> Room<Kind> {
                     Some(self.data.clone()),
                     Default::default(),
                     self.encryption_domain_service.clone(),
+                    None,
                 )
                 .parse_mam_message(archive_message)
                 .await

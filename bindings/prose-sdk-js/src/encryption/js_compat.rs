@@ -9,7 +9,7 @@ use prose_core_client::dtos::{
 };
 
 use crate::encryption::signal_repo::{
-    Direction, PreKeyBundle as JsPreKeyBundle, PreKeyPairType, PreKeyType, SignedPreKeyPairType,
+    PreKeyBundle as JsPreKeyBundle, PreKeyPairType, PreKeyType, SignedPreKeyPairType,
     SignedPublicPreKeyType,
 };
 

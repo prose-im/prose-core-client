@@ -195,6 +195,8 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("from@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let room = Room::group(muc_id!("room@conference.prose.org"));
@@ -288,6 +290,8 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("user@prose.org/res"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let room = Room::group(muc_id!("room@conference.prose.org"));
@@ -433,6 +437,8 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
         connection_timestamp: Default::default(),
         connected_jid: user_resource_id!("me@prose.org/res2"),
         server_features: Default::default(),
+        rooms_caught_up: false,
+        decryption_context: None,
     });
 
     let room = Room::direct_message(user_id!("user@prose.org"), Availability::Available);

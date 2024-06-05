@@ -8,7 +8,7 @@ use jid::BareJid;
 
 use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
 use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
-use prose_xmpp::{ConnectionError, IDProvider, TimeProvider};
+use prose_xmpp::{IDProvider, TimeProvider};
 
 use crate::{event, recv, send};
 
@@ -39,11 +39,7 @@ impl LoginStrategy {
 }
 
 impl TestClient {
-    pub async fn expect_login(
-        &self,
-        user: UserId,
-        password: impl AsRef<str>,
-    ) -> Result<(), ConnectionError> {
+    pub async fn expect_login(&self, user: UserId, password: impl AsRef<str>) -> Result<()> {
         self.expect_login_with_strategy(user, password, LoginStrategy::default())
             .await
     }
@@ -53,7 +49,7 @@ impl TestClient {
         user: UserId,
         password: impl AsRef<str>,
         config: LoginStrategy,
-    ) -> Result<(), ConnectionError> {
+    ) -> Result<()> {
         self.push_ctx(
             [
                 ("USER_ID".into(), user.to_string()),
@@ -160,7 +156,33 @@ impl TestClient {
         event!(self, ClientEvent::AccountInfoChanged);
 
         self.connect(&user, Secret::new(password.as_ref().to_string()))
-            .await
+            .await?;
+
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" type="get">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="https://prose.org/protocol/bookmark" />
+              </pubsub>
+            </iq>
+            "#
+        );
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" type="result">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="https://prose.org/protocol/bookmark"/>
+              </pubsub>
+            </iq>
+            "#
+        );
+
+        self.rooms.start_observing_rooms().await?;
+
+        Ok(())
     }
 }
 

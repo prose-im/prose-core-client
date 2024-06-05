@@ -9,8 +9,8 @@ use wasm_bindgen::JsValue;
 use wasm_bindgen_derive::TryFromJsValue;
 
 use prose_core_client::dtos::{
-    IdentityKey, PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SessionData, SignedPreKeyId,
-    SignedPreKeyRecord,
+    DecryptionContext, IdentityKey, PreKeyId, PreKeyRecord, PrivateKey, PublicKey, SessionData,
+    SignedPreKeyId, SignedPreKeyRecord,
 };
 use prose_core_client::{DynEncryptionKeysRepository, DynSessionRepository};
 
@@ -114,16 +114,19 @@ pub type SessionRecordType = String;
 pub struct SignalRepo {
     encryption_keys_repo: DynEncryptionKeysRepository,
     session_repo: DynSessionRepository,
+    decryption_context: Option<DecryptionContext>,
 }
 
 impl SignalRepo {
     pub fn new(
         encryption_keys_repo: DynEncryptionKeysRepository,
         session_repo: DynSessionRepository,
+        decryption_context: Option<DecryptionContext>,
     ) -> Self {
         Self {
             encryption_keys_repo,
             session_repo,
+            decryption_context,
         }
     }
 }
@@ -228,10 +231,10 @@ impl SignalRepo {
             .map(|value| PreKeyId::from(value as u32))
             .map_err(WasmError::from)?;
 
-        self.encryption_keys_repo
-            .delete_pre_key(pre_key_id)
-            .await
-            .map_err(WasmError::from)?;
+        self.decryption_context
+            .as_ref()
+            .expect("Tried to save a used PreKey, but we don't have a DecryptionContext. Did you forget to set it?")
+            .insert_used_pre_key(pre_key_id);
 
         Ok(())
     }

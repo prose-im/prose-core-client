@@ -14,8 +14,8 @@ use wasm_bindgen::JsValue;
 
 use crate::encryption::signal_repo::PreKeyPairType;
 use prose_core_client::dtos::{
-    DeviceId, EncryptionKey, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord,
-    SignedPreKeyRecord, UserId,
+    DecryptionContext, DeviceId, EncryptionKey, LocalEncryptionBundle, PreKeyBundle, PreKeyId,
+    PreKeyRecord, SignedPreKeyRecord, UserId,
 };
 use prose_core_client::{
     DynEncryptionKeysRepository, DynSessionRepository, EncryptionService as EncryptionServiceTrait,
@@ -161,7 +161,11 @@ impl EncryptionServiceTrait for EncryptionService {
 
     async fn process_pre_key_bundle(&self, user_id: &UserId, bundle: PreKeyBundle) -> Result<()> {
         await_promise(self.inner.process_pre_key_bundle(
-            SignalRepo::new(self.encryption_keys_repo.clone(), self.session_repo.clone()),
+            SignalRepo::new(
+                self.encryption_keys_repo.clone(),
+                self.session_repo.clone(),
+                None,
+            ),
             user_id.to_string(),
             *bundle.device_id.as_ref(),
             JsPreKeyBundle::from(bundle),
@@ -179,7 +183,11 @@ impl EncryptionServiceTrait for EncryptionService {
     ) -> Result<EncryptionKey> {
         let value = JsEncryptedMessage::try_from(
             &await_promise(self.inner.encrypt_key(
-                SignalRepo::new(self.encryption_keys_repo.clone(), self.session_repo.clone()),
+                SignalRepo::new(
+                    self.encryption_keys_repo.clone(),
+                    self.session_repo.clone(),
+                    None,
+                ),
                 recipient_id.to_string(),
                 *device_id.as_ref(),
                 message.into(),
@@ -201,10 +209,15 @@ impl EncryptionServiceTrait for EncryptionService {
         device_id: &DeviceId,
         message: &[u8],
         is_pre_key: bool,
+        decryption_context: DecryptionContext,
     ) -> Result<Box<[u8]>> {
         let value = Uint8Array::from(
             await_promise(self.inner.decrypt_key(
-                SignalRepo::new(self.encryption_keys_repo.clone(), self.session_repo.clone()),
+                SignalRepo::new(
+                    self.encryption_keys_repo.clone(),
+                    self.session_repo.clone(),
+                    Some(decryption_context),
+                ),
                 sender_id.to_string(),
                 *device_id.as_ref(),
                 message.into(),

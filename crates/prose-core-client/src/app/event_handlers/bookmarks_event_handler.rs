@@ -8,13 +8,16 @@ use async_trait::async_trait;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::DynSidebarDomainService;
+use crate::app::deps::{DynEncryptionDomainService, DynSidebarDomainService};
 use crate::app::event_handlers::{
     PubSubEventType, ServerEvent, ServerEventHandler, SidebarBookmarkEvent,
 };
+use crate::dtos::DecryptionContext;
 
 #[derive(InjectDependencies)]
 pub struct BookmarksEventHandler {
+    #[inject]
+    encryption_domain_service: DynEncryptionDomainService,
     #[inject]
     sidebar_domain_service: DynSidebarDomainService,
 }
@@ -39,9 +42,17 @@ impl BookmarksEventHandler {
     async fn handle_bookmark_event(&self, event: SidebarBookmarkEvent) -> Result<()> {
         match event.r#type {
             PubSubEventType::AddedOrUpdated { items: bookmarks } => {
+                let context = DecryptionContext::default();
                 self.sidebar_domain_service
-                    .extend_items_from_bookmarks(bookmarks)
+                    .extend_items_from_bookmarks(bookmarks, context.clone())
                     .await?;
+                self.encryption_domain_service
+                    .finalize_decryption(
+                        context
+                            .into_inner()
+                            .expect("DecryptionContext still has references to it."),
+                    )
+                    .await;
             }
             PubSubEventType::Deleted { ids } => {
                 self.sidebar_domain_service

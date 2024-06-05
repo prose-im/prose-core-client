@@ -14,6 +14,7 @@ use libsignal_protocol::{
 use uuid::Uuid;
 
 use crate::app::deps::{DynEncryptionKeysRepository, DynSessionRepository};
+use crate::domain::encryption::models::DecryptionContext;
 
 use super::signal_compat::{map_repo_error, ProtocolAddressExt, UnwindSafeError};
 
@@ -21,16 +22,19 @@ use super::signal_compat::{map_repo_error, ProtocolAddressExt, UnwindSafeError};
 pub struct SignalRepoWrapper {
     encryption_keys_repo: DynEncryptionKeysRepository,
     session_repo: DynSessionRepository,
+    decryption_context: Option<DecryptionContext>,
 }
 
 impl SignalRepoWrapper {
     pub fn new(
         encryption_keys_repo: DynEncryptionKeysRepository,
         session_repo: DynSessionRepository,
+        decryption_context: Option<DecryptionContext>,
     ) -> Self {
         Self {
             encryption_keys_repo,
             session_repo,
+            decryption_context,
         }
     }
 }
@@ -84,10 +88,10 @@ impl PreKeyStore for SignalRepoWrapper {
     }
 
     async fn remove_pre_key(&mut self, prekey_id: PreKeyId) -> Result<()> {
-        self.encryption_keys_repo
-            .delete_pre_key(prekey_id.into())
-            .await
-            .map_err(map_repo_error)?;
+        self.decryption_context
+            .as_ref()
+            .expect("Tried to save a used PreKey, but we don't have a DecryptionContext. Did you forget to set it?")
+            .insert_used_pre_key(prekey_id.into());
         Ok(())
     }
 }

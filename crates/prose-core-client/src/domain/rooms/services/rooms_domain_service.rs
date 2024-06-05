@@ -9,6 +9,7 @@ use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
+use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::rooms::models::{Room, RoomError, RoomSidebarState, RoomSpec};
 use crate::domain::shared::models::{MucId, UserId};
 
@@ -25,14 +26,17 @@ pub enum CreateOrEnterRoomRequest {
         service: BareJid,
         room_type: CreateRoomType,
         behavior: CreateRoomBehavior,
+        decryption_context: Option<DecryptionContext>,
     },
     JoinRoom {
         room_id: MucId,
         password: Option<String>,
         behavior: JoinRoomBehavior,
+        decryption_context: Option<DecryptionContext>,
     },
     JoinDirectMessage {
         participant: UserId,
+        decryption_context: Option<DecryptionContext>,
     },
 }
 

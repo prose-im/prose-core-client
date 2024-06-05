@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::sync::atomic::AtomicBool;
-
 use anyhow::Result;
 use chrono::{DateTime, TimeDelta, Utc};
 use jid::BareJid;
@@ -13,7 +11,7 @@ use parking_lot::RwLock;
 use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
 use crate::domain::shared::models::{ConnectionState, MamVersion};
-use crate::dtos::{MucId, UserId, UserResourceId};
+use crate::dtos::{DecryptionContext, MucId, UserId, UserResourceId};
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -30,7 +28,6 @@ pub struct AppContext {
     pub connection_state: RwLock<ConnectionState>,
     pub capabilities: Capabilities,
     pub software_version: SoftwareVersion,
-    pub is_observing_rooms: AtomicBool,
     pub config: AppConfig,
 }
 
@@ -45,7 +42,6 @@ impl AppContext {
             connection_state: Default::default(),
             capabilities,
             software_version,
-            is_observing_rooms: Default::default(),
             config,
         }
     }
@@ -64,10 +60,6 @@ impl Default for AppConfig {
 impl AppContext {
     pub fn connection_state(&self) -> ConnectionState {
         *self.connection_state.read()
-    }
-
-    pub fn set_connection_state(&self, state: ConnectionState) {
-        *self.connection_state.write() = state;
     }
 
     pub fn connected_id(&self) -> Result<UserResourceId> {
@@ -125,6 +117,22 @@ impl AppContext {
             .as_ref()
             .map(|p| p.server_features.server_time_offset.clone())
     }
+
+    /// Have we loaded the unread messages for the rooms in our sidebar?
+    pub fn rooms_caught_up(&self) -> bool {
+        self.connection_properties
+            .read()
+            .as_ref()
+            .map(|p| p.rooms_caught_up)
+            .unwrap_or_default()
+    }
+
+    pub fn decryption_context(&self) -> Option<DecryptionContext> {
+        self.connection_properties
+            .read()
+            .as_ref()
+            .and_then(|p| p.decryption_context.clone())
+    }
 }
 
 impl AppContext {
@@ -145,5 +153,23 @@ impl AppContext {
 
     pub fn reset_connection_properties(&self) {
         self.connection_properties.write().take();
+    }
+
+    pub fn set_connection_state(&self, state: ConnectionState) {
+        *self.connection_state.write() = state;
+    }
+
+    pub fn set_rooms_caught_up(&self) {
+        self.connection_properties
+            .write()
+            .as_mut()
+            .map(|p| p.rooms_caught_up = true);
+    }
+
+    pub fn take_decryption_context(&self) -> Option<DecryptionContext> {
+        self.connection_properties
+            .write()
+            .as_mut()
+            .and_then(|p| p.decryption_context.take())
     }
 }
