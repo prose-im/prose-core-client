@@ -47,11 +47,7 @@ impl BookmarksEventHandler {
                     .extend_items_from_bookmarks(bookmarks, context.clone())
                     .await?;
                 self.encryption_domain_service
-                    .finalize_decryption(
-                        context
-                            .into_inner()
-                            .expect("DecryptionContext still has references to it."),
-                    )
+                    .finalize_decryption(context)
                     .await;
             }
             PubSubEventType::Deleted { ids } => {

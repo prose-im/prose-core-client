@@ -8,9 +8,7 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::encryption::models::{
-    DecryptionContext, DecryptionContextInner, DeviceId, DeviceInfo, DeviceList,
-};
+use crate::domain::encryption::models::{DecryptionContext, DeviceId, DeviceInfo, DeviceList};
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload, MessageId};
 use crate::domain::shared::models::UserId;
 use crate::dtos::RoomId;
@@ -59,7 +57,7 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         context: Option<DecryptionContext>,
     ) -> Result<String, DecryptionError>;
 
-    async fn finalize_decryption(&self, context: DecryptionContextInner);
+    async fn finalize_decryption(&self, context: DecryptionContext);
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>>;
     async fn delete_device(&self, device_id: &DeviceId) -> Result<()>;

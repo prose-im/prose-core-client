@@ -282,12 +282,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         {
             Ok(message) => {
                 if needs_finalize_context {
-                    self.finalize_decryption(
-                        context
-                            .into_inner()
-                            .expect("DecryptionContext still has references to it."),
-                    )
-                    .await;
+                    self.finalize_decryption(context).await;
                 }
                 return Ok(message);
             }
@@ -319,7 +314,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         Ok(body.to_string())
     }
 
-    async fn finalize_decryption(&self, context: DecryptionContextInner) {
+    async fn finalize_decryption(&self, context: DecryptionContext) {
         let Some(local_device_id) = self
             .encryption_keys_repo
             .get_local_device()
@@ -336,7 +331,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             message_senders,
             broken_sessions,
             used_pre_keys,
-        } = context;
+        } = context.into_inner();
 
         if let Err(err) = self
             .refresh_and_publish_prekeys(used_pre_keys.into_iter().collect())
@@ -480,12 +475,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await?;
 
         if needs_finalize_context {
-            self.finalize_decryption(
-                context
-                    .into_inner()
-                    .expect("DecryptionContext still has references to it."),
-            )
-            .await;
+            self.finalize_decryption(context).await;
         }
 
         Ok(())

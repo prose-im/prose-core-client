@@ -46,11 +46,7 @@ impl RoomsService {
         if let Some(context) = self.ctx.take_decryption_context() {
             info!("Finalizing catch-up…");
             self.encryption_domain_service
-                .finalize_decryption(
-                    context
-                        .into_inner()
-                        .expect("DecryptionContext still has references to it."),
-                )
+                .finalize_decryption(context)
                 .await;
         }
 

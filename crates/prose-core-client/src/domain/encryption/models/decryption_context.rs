@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::collections::HashSet;
+use std::mem;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -54,8 +55,8 @@ impl DecryptionContext {
 }
 
 impl DecryptionContext {
-    pub fn into_inner(self) -> Option<DecryptionContextInner> {
-        Arc::into_inner(self.inner).map(|mutex| mutex.into_inner())
+    pub fn into_inner(self) -> DecryptionContextInner {
+        mem::replace(&mut *self.inner.lock(), Default::default())
     }
 }
 

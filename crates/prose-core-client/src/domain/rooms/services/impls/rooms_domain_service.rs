@@ -111,11 +111,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
         if needs_finalize_context {
             self.encryption_domain_service
-                .finalize_decryption(
-                    context
-                        .into_inner()
-                        .expect("DecryptionContext still has references to it."),
-                )
+                .finalize_decryption(context)
                 .await;
         }
 
