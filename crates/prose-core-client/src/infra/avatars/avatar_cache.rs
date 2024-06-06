@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::{AccountId, UserId};
 use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
 
 pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (400, 400);
@@ -19,22 +19,25 @@ pub const MAX_IMAGE_DIMENSIONS: (u32, u32) = (400, 400);
 pub trait AvatarCache: SendUnlessWasm + SyncUnlessWasm {
     async fn cache_avatar_image(
         &self,
-        jid: &UserId,
+        account: &AccountId,
+        user_id: &UserId,
         image: &AvatarData,
         metadata: &AvatarInfo,
     ) -> Result<(), Error>;
 
     async fn has_cached_avatar_image(
         &self,
-        jid: &UserId,
+        account: &AccountId,
+        user_id: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<bool, Error>;
 
     async fn cached_avatar_image(
         &self,
-        jid: &UserId,
+        account: &AccountId,
+        user_id: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<Option<PlatformImage>, Error>;
 
-    async fn delete_all_cached_images(&self) -> Result<(), Error>;
+    async fn delete_all_cached_images(&self, account: &AccountId) -> Result<(), Error>;
 }

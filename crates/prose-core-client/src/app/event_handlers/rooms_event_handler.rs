@@ -70,10 +70,13 @@ impl ServerEventHandler for RoomsEventHandler {
 }
 
 impl RoomsEventHandler {
-    fn get_room(&self, jid: &RoomId) -> Result<Room> {
+    fn get_room(&self, room_id: &RoomId) -> Result<Room> {
         self.connected_rooms_repo
-            .get(jid.as_ref())
-            .ok_or(anyhow::format_err!("Could not find room with jid {}", jid))
+            .get(&self.ctx.connected_account()?, room_id.as_ref())
+            .ok_or(anyhow::format_err!(
+                "Could not find room with id {}",
+                room_id
+            ))
     }
 
     async fn handle_occupant_event(&self, event: OccupantEvent) -> Result<()> {
@@ -108,7 +111,10 @@ impl RoomsEventHandler {
                     break 'outer participants_changed;
                 }
 
-                let name = self.user_profile_repo.get_display_name(&real_id).await?;
+                let name = self
+                    .user_profile_repo
+                    .get_display_name(&self.ctx.connected_account()?, &real_id)
+                    .await?;
                 room.participants_mut().set_ids_and_name(
                     &participant_id,
                     Some(&real_id),
@@ -216,7 +222,10 @@ impl RoomsEventHandler {
 
                 let room = self.get_room(&RoomId::Muc(event.room_id))?;
 
-                let name = self.user_profile_repo.get_display_name(&user_id).await?;
+                let name = self
+                    .user_profile_repo
+                    .get_display_name(&self.ctx.connected_account()?, &user_id)
+                    .await?;
                 room.participants_mut()
                     .add_user(&user_id, false, &affiliation, name.as_deref());
 
@@ -229,6 +238,7 @@ impl RoomsEventHandler {
     }
 
     async fn handle_user_status_event(&self, event: UserStatusEvent) -> Result<()> {
+        let account = self.ctx.connected_account()?;
         let room = self.get_room(&event.user_id.to_room_id()).ok();
 
         let is_self_event = room
@@ -238,7 +248,7 @@ impl RoomsEventHandler {
                     .map(|participant| Ok(participant.is_self))
             })
             .unwrap_or_else(|| -> Result<bool> {
-                Ok(event.user_id.to_user_id() == Some(self.ctx.connected_id()?.into_user_id()))
+                Ok(event.user_id.to_user_id().as_ref() == Some(account.as_ref()))
             })?;
 
         match event.r#type {
@@ -281,6 +291,7 @@ impl RoomsEventHandler {
 
                 self.user_info_repo
                     .set_user_presence(
+                        &account,
                         &id,
                         &Presence {
                             priority,

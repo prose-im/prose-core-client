@@ -21,8 +21,8 @@ pub use crate::domain::{
     contacts::models::PresenceSubscription,
     encryption::models::{
         DecryptionContext, DeviceBundle, DeviceId, DeviceInfo, IdentityKey, IdentityKeyPair,
-        LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord, PrivateKey, PublicKey,
-        SessionData, SignedPreKeyId, SignedPreKeyRecord, Trust as DeviceTrust,
+        LocalEncryptionBundle, PreKey, PreKeyBundle, PreKeyId, PrivateKey, PublicKey, SessionData,
+        SignedPreKey, SignedPreKeyId, Trust as DeviceTrust,
     },
     general::models::SoftwareVersion,
     messaging::models::{
@@ -31,9 +31,9 @@ pub use crate::domain::{
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        Availability, MucId, OccupantId, ParticipantId, ParticipantInfo, RoomId, ScalarRangeExt,
-        StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId, UserPresenceInfo,
-        UserResourceId, Utf16Index, Utf8Index,
+        AccountId, Availability, MucId, OccupantId, ParticipantId, ParticipantInfo, RoomId,
+        ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId,
+        UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index,
     },
     uploads::models::UploadHeader,
     user_info::models::{LastActivity, UserInfo, UserMetadata, UserStatus},

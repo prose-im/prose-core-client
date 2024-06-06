@@ -94,7 +94,7 @@ impl<D: Driver> Store<D> {
         collection.put(key, value)
     }
 
-    pub async fn delete<K: KeyType + ?Sized>(
+    pub async fn delete<K: KeyTuple + ?Sized>(
         &self,
         collection_name: &str,
         key: &K,
@@ -104,7 +104,7 @@ impl<D: Driver> Store<D> {
             .transaction_for_reading_and_writing(&[collection_name])
             .await?;
         let collection = tx.writeable_collection(collection_name)?;
-        collection.delete(key)
+        collection.delete(key).await
     }
 
     pub async fn get<K: KeyTuple + ?Sized, V: DeserializeOwned>(

@@ -235,7 +235,7 @@ impl<'tx, Mode> IndexedCollection<'tx> for IndexedDBCollection<'tx, IdbObjectSto
 where
     Mode: ReadMode,
 {
-    type Index<'coll> = IndexedDBCollection<'coll, IdbIndex<'coll>, ReadOnly> where Self: 'coll;
+    type Index<'coll> = IndexedDBCollection<'coll, IdbIndex<'coll>, Mode> where Self: 'coll;
 
     fn index(&self, columns: &[&str]) -> Result<Self::Index<'_>, Self::Error> {
         let index_name = columns.join("_");
@@ -442,8 +442,8 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
         Ok(())
     }
 
-    fn delete<K: KeyType + ?Sized>(&self, key: &K) -> Result<(), Self::Error> {
-        self.store.delete(&key.to_js_value()?)?;
+    async fn delete<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<(), Self::Error> {
+        self.store.delete(&key.to_idb_key()?)?;
         Ok(())
     }
 
@@ -478,6 +478,30 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
 
     fn truncate(&self) -> Result<(), Self::Error> {
         self.store.clear()?;
+        Ok(())
+    }
+}
+
+impl<'tx> IndexedDBCollection<'tx, IdbIndex<'tx>, ReadWrite> {
+    pub async fn delete<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<(), Error> {
+        let key = key.to_idb_key()?;
+        let range = IdbKeyRange::only(&key).map_err(|_| {
+            Error::IndexedDB(format!("Failed to build IdbKeyRange::only from {:?}", key))
+        })?;
+
+        let Some(cursor) = self.store.open_cursor_with_range(&range)?.await? else {
+            return Ok(());
+        };
+
+        loop {
+            let key = cursor.primary_key().ok_or(Error::InvalidDBKey)?;
+            self.store.object_store().delete(&key)?;
+
+            if !cursor.continue_cursor()?.await? {
+                break;
+            }
+        }
+
         Ok(())
     }
 }

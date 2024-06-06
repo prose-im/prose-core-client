@@ -23,8 +23,11 @@ async fn test_load_user_metadata_resolves_full_jid() -> Result<()> {
     deps.user_info_repo
         .expect_resolve_user_id_to_user_resource_id()
         .once()
-        .with(predicate::eq(user_id!("request@prose.org")))
-        .return_once(|_| Some(user_resource_id!("request@prose.org/resource")));
+        .with(
+            predicate::always(),
+            predicate::eq(user_id!("request@prose.org")),
+        )
+        .return_once(|_, _| Some(user_resource_id!("request@prose.org/resource")));
 
     deps.user_profile_service
         .expect_load_user_metadata()

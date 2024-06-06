@@ -11,6 +11,7 @@ use parking_lot::RwLock;
 
 use crate::app::deps::DynBlockListService;
 use crate::domain::contacts::repos::BlockListRepository;
+use crate::domain::shared::models::AccountId;
 use crate::dtos::UserId;
 
 pub struct CachingBlockListRepository {
@@ -30,7 +31,7 @@ impl CachingBlockListRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl BlockListRepository for CachingBlockListRepository {
-    async fn get_all(&self) -> Result<Vec<UserId>> {
+    async fn get_all(&self, _account: &AccountId) -> Result<Vec<UserId>> {
         self.load_block_list_if_needed().await?;
         Ok(self
             .blocked_users
@@ -40,7 +41,7 @@ impl BlockListRepository for CachingBlockListRepository {
             .unwrap_or_else(|| vec![]))
     }
 
-    async fn insert(&self, user_id: &UserId) -> Result<bool> {
+    async fn insert(&self, _account: &AccountId, user_id: &UserId) -> Result<bool> {
         self.load_block_list_if_needed().await?;
 
         Ok(self
@@ -50,7 +51,7 @@ impl BlockListRepository for CachingBlockListRepository {
             .insert(user_id.clone()))
     }
 
-    async fn delete(&self, user_id: &UserId) -> Result<bool> {
+    async fn delete(&self, _account: &AccountId, user_id: &UserId) -> Result<bool> {
         Ok(self
             .blocked_users
             .write()
@@ -58,7 +59,7 @@ impl BlockListRepository for CachingBlockListRepository {
             .remove(user_id))
     }
 
-    async fn delete_all(&self) -> Result<bool> {
+    async fn delete_all(&self, _account: &AccountId) -> Result<bool> {
         let Some(blocked_users) = &mut *self.blocked_users.write() else {
             return Ok(false);
         };
@@ -67,7 +68,7 @@ impl BlockListRepository for CachingBlockListRepository {
         Ok(has_entries)
     }
 
-    async fn clear_cache(&self) -> Result<()> {
+    async fn clear_cache(&self, _account: &AccountId) -> Result<()> {
         self.blocked_users.write().take();
         Ok(())
     }

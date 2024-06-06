@@ -12,14 +12,15 @@ use js_sys::{Array, Uint8Array};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
-use crate::encryption::signal_repo::PreKeyPairType;
 use prose_core_client::dtos::{
-    DecryptionContext, DeviceId, EncryptionKey, LocalEncryptionBundle, PreKeyBundle, PreKeyId,
-    PreKeyRecord, SignedPreKeyRecord, UserId,
+    AccountId, DecryptionContext, DeviceId, EncryptionKey, LocalEncryptionBundle, PreKey,
+    PreKeyBundle, PreKeyId, SignedPreKey, UserId,
 };
 use prose_core_client::{
     DynEncryptionKeysRepository, DynSessionRepository, EncryptionService as EncryptionServiceTrait,
 };
+
+use crate::encryption::signal_repo::PreKeyPairType;
 
 use super::{
     EncryptedMessage as JsEncryptedMessage, LocalEncryptionBundle as JsLocalEncryptionBundle,
@@ -122,6 +123,7 @@ impl EncryptionService {
 impl EncryptionServiceTrait for EncryptionService {
     async fn generate_local_encryption_bundle(
         &self,
+        _account: &AccountId,
         device_id: DeviceId,
     ) -> Result<LocalEncryptionBundle> {
         let bundle = JsLocalEncryptionBundle::try_from(
@@ -129,22 +131,22 @@ impl EncryptionServiceTrait for EncryptionService {
         )
         .map_err(|err| anyhow!("{err}"))?;
 
-        let mut signed_pre_key = SignedPreKeyRecord::from(bundle.signed_pre_key);
+        let mut signed_pre_key = SignedPreKey::from(bundle.signed_pre_key);
         signed_pre_key.timestamp = Utc::now().timestamp() as u64;
 
         Ok(LocalEncryptionBundle {
             device_id,
             identity_key_pair: bundle.identity_key.into(),
             signed_pre_key,
-            pre_keys: bundle
-                .pre_keys
-                .into_iter()
-                .map(PreKeyRecord::from)
-                .collect(),
+            pre_keys: bundle.pre_keys.into_iter().map(PreKey::from).collect(),
         })
     }
 
-    async fn generate_pre_keys_with_ids(&self, ids: Vec<PreKeyId>) -> Result<Vec<PreKeyRecord>> {
+    async fn generate_pre_keys_with_ids(
+        &self,
+        _account: &AccountId,
+        ids: Vec<PreKeyId>,
+    ) -> Result<Vec<PreKey>> {
         let pre_keys =
             Array::from(
                 &await_promise(self.inner.generate_pre_keys_with_ids(
@@ -153,15 +155,21 @@ impl EncryptionServiceTrait for EncryptionService {
                 .await?,
             )
             .into_iter()
-            .map(|value| PreKeyPairType::try_from(&value).map(PreKeyRecord::from))
+            .map(|value| PreKeyPairType::try_from(&value).map(PreKey::from))
             .collect::<Result<Vec<_>, _>>()
             .map_err(|err| anyhow!("{err}"))?;
         Ok(pre_keys)
     }
 
-    async fn process_pre_key_bundle(&self, user_id: &UserId, bundle: PreKeyBundle) -> Result<()> {
+    async fn process_pre_key_bundle(
+        &self,
+        account: &AccountId,
+        user_id: &UserId,
+        bundle: PreKeyBundle,
+    ) -> Result<()> {
         await_promise(self.inner.process_pre_key_bundle(
             SignalRepo::new(
+                account.clone(),
                 self.encryption_keys_repo.clone(),
                 self.session_repo.clone(),
                 None,
@@ -176,6 +184,7 @@ impl EncryptionServiceTrait for EncryptionService {
 
     async fn encrypt_key(
         &self,
+        account: &AccountId,
         recipient_id: &UserId,
         device_id: &DeviceId,
         message: &[u8],
@@ -184,6 +193,7 @@ impl EncryptionServiceTrait for EncryptionService {
         let value = JsEncryptedMessage::try_from(
             &await_promise(self.inner.encrypt_key(
                 SignalRepo::new(
+                    account.clone(),
                     self.encryption_keys_repo.clone(),
                     self.session_repo.clone(),
                     None,
@@ -205,6 +215,7 @@ impl EncryptionServiceTrait for EncryptionService {
 
     async fn decrypt_key(
         &self,
+        account: &AccountId,
         sender_id: &UserId,
         device_id: &DeviceId,
         message: &[u8],
@@ -214,6 +225,7 @@ impl EncryptionServiceTrait for EncryptionService {
         let value = Uint8Array::from(
             await_promise(self.inner.decrypt_key(
                 SignalRepo::new(
+                    account.clone(),
                     self.encryption_keys_repo.clone(),
                     self.session_repo.clone(),
                     Some(decryption_context),

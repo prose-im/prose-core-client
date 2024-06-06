@@ -40,12 +40,17 @@ pub struct AccountService {
 
 impl AccountService {
     pub async fn account_info(&self) -> Result<AccountInfo> {
-        let user_id = self.ctx.connected_id()?.into_user_id();
-        let user_info = self.user_info_repo.get_user_info(&user_id).await?;
-        let account_settings = self.account_settings_repo.get(&user_id).await?;
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
+
+        let user_info = self
+            .user_info_repo
+            .get_user_info(&account, &user_id)
+            .await?;
+        let account_settings = self.account_settings_repo.get(&account).await?;
         let name = self
             .user_profile_repo
-            .get_display_name(&user_id)
+            .get_display_name(&account, &user_id)
             .await?
             .unwrap_or_else(|| user_id.formatted_username());
 
@@ -58,27 +63,35 @@ impl AccountService {
     }
 
     pub async fn set_profile(&self, user_profile: &UserProfile) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
+
         self.user_account_service.set_profile(&user_profile).await?;
         self.user_profile_repo
-            .set(&self.ctx.connected_id()?.to_user_id(), user_profile)
+            .set(&account, &user_id, user_profile)
             .await?;
+
         Ok(())
     }
 
     pub async fn delete_profile(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
+
         self.user_account_service.delete_profile().await?;
-        self.user_profile_repo
-            .delete(&self.ctx.connected_id()?.to_user_id())
-            .await?;
+        self.user_profile_repo.delete(&account, &user_id).await?;
+
         Ok(())
     }
 
     pub async fn set_availability(&self, availability: Availability) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         self.user_account_service
             .set_availability(None, &self.ctx.capabilities, availability)
             .await?;
 
-        for room in self.connected_rooms_repo.get_all() {
+        for room in self.connected_rooms_repo.get_all(&account) {
             let Some(occupant_id) = room.occupant_id() else {
                 continue;
             };
@@ -89,7 +102,7 @@ impl AccountService {
 
         self.account_settings_repo
             .update(
-                &self.ctx.connected_id()?.to_user_id(),
+                &account,
                 Box::new(move |settings| settings.availability = availability),
             )
             .await?;
@@ -101,14 +114,14 @@ impl AccountService {
     }
 
     pub async fn set_user_activity(&self, user_activity: Option<UserStatus>) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
+
         self.user_account_service
             .set_user_activity(user_activity.as_ref())
             .await?;
         self.user_info_repo
-            .set_user_activity(
-                &self.ctx.connected_id()?.to_user_id(),
-                user_activity.as_ref(),
-            )
+            .set_user_activity(&account, &user_id, user_activity.as_ref())
             .await?;
         Ok(())
     }
@@ -120,7 +133,8 @@ impl AccountService {
         height: Option<u32>,
         mime_type: impl AsRef<str>,
     ) -> Result<()> {
-        let jid = self.ctx.connected_id()?.to_user_id();
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
         let image_data_len = image_data.as_ref().len();
         let image_data = AvatarData::Data(image_data.as_ref().to_vec());
 
@@ -145,12 +159,12 @@ impl AccountService {
 
         debug!("Caching avatar metadata");
         self.user_info_repo
-            .set_avatar_metadata(&jid, &metadata)
+            .set_avatar_metadata(&account, &user_id, &metadata)
             .await?;
 
         debug!("Caching image locally…");
         self.avatar_repo
-            .set(&jid, &metadata.into_info(), &image_data)
+            .set(&account, &user_id, &metadata.into_info(), &image_data)
             .await?;
 
         Ok(())

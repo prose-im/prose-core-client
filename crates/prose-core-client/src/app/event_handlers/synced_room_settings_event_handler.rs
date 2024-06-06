@@ -9,7 +9,9 @@ use tracing::info;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::{DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository};
+use crate::app::deps::{
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
+};
 use crate::app::event_handlers::{
     PubSubEventType, ServerEvent, ServerEventHandler, SyncedRoomSettingsEvent,
 };
@@ -17,6 +19,8 @@ use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct SyncedRoomSettingsEventHandler {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
@@ -50,10 +54,10 @@ impl SyncedRoomSettingsEventHandler {
         match event.r#type {
             PubSubEventType::AddedOrUpdated { items: settings } => {
                 for setting in settings {
-                    let Some(room) = self
-                        .connected_rooms_repo
-                        .get(&setting.room_id.clone().into_bare())
-                    else {
+                    let Some(room) = self.connected_rooms_repo.get(
+                        &self.ctx.connected_account()?,
+                        &setting.room_id.clone().into_bare(),
+                    ) else {
                         continue;
                     };
 

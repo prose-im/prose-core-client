@@ -8,9 +8,8 @@ use libsignal_protocol::GenericSignedPreKey;
 use tracing::error;
 
 use crate::domain::encryption::models::{
-    DeviceId, IdentityKey, IdentityKeyPair, KyberPreKeyId, KyberPreKeyRecord, PreKeyId,
-    PreKeyRecord, PrivateKey, PublicKey, SenderKeyRecord, SessionData, SignedPreKeyId,
-    SignedPreKeyRecord,
+    DeviceId, IdentityKey, IdentityKeyPair, KyberPreKey, KyberPreKeyId, PreKey, PreKeyId,
+    PrivateKey, PublicKey, SenderKey, SessionData, SignedPreKey, SignedPreKeyId,
 };
 use crate::dtos::UserId;
 
@@ -177,7 +176,7 @@ impl From<DeviceId> for libsignal_protocol::DeviceId {
     }
 }
 
-impl TryFrom<&libsignal_protocol::PreKeyRecord> for PreKeyRecord {
+impl TryFrom<&libsignal_protocol::PreKeyRecord> for PreKey {
     type Error = SignalError;
 
     fn try_from(value: &libsignal_protocol::PreKeyRecord) -> SignalResult<Self> {
@@ -189,10 +188,10 @@ impl TryFrom<&libsignal_protocol::PreKeyRecord> for PreKeyRecord {
     }
 }
 
-impl TryFrom<&PreKeyRecord> for libsignal_protocol::PreKeyRecord {
+impl TryFrom<&PreKey> for libsignal_protocol::PreKeyRecord {
     type Error = SignalError;
 
-    fn try_from(value: &PreKeyRecord) -> SignalResult<Self> {
+    fn try_from(value: &PreKey) -> SignalResult<Self> {
         Ok(Self::new(
             value.id.into(),
             &libsignal_protocol::KeyPair::new(
@@ -203,7 +202,7 @@ impl TryFrom<&PreKeyRecord> for libsignal_protocol::PreKeyRecord {
     }
 }
 
-impl TryFrom<&libsignal_protocol::SignedPreKeyRecord> for SignedPreKeyRecord {
+impl TryFrom<&libsignal_protocol::SignedPreKeyRecord> for SignedPreKey {
     type Error = SignalError;
 
     fn try_from(value: &libsignal_protocol::SignedPreKeyRecord) -> SignalResult<Self> {
@@ -217,10 +216,10 @@ impl TryFrom<&libsignal_protocol::SignedPreKeyRecord> for SignedPreKeyRecord {
     }
 }
 
-impl TryFrom<&SignedPreKeyRecord> for libsignal_protocol::SignedPreKeyRecord {
+impl TryFrom<&SignedPreKey> for libsignal_protocol::SignedPreKeyRecord {
     type Error = SignalError;
 
-    fn try_from(value: &SignedPreKeyRecord) -> SignalResult<Self> {
+    fn try_from(value: &SignedPreKey) -> SignalResult<Self> {
         Ok(Self::new(
             value.id.into(),
             value.timestamp,
@@ -233,7 +232,7 @@ impl TryFrom<&SignedPreKeyRecord> for libsignal_protocol::SignedPreKeyRecord {
     }
 }
 
-impl TryFrom<&libsignal_protocol::KyberPreKeyRecord> for KyberPreKeyRecord {
+impl TryFrom<&libsignal_protocol::KyberPreKeyRecord> for KyberPreKey {
     type Error = SignalError;
 
     fn try_from(value: &libsignal_protocol::KyberPreKeyRecord) -> SignalResult<Self> {
@@ -241,15 +240,15 @@ impl TryFrom<&libsignal_protocol::KyberPreKeyRecord> for KyberPreKeyRecord {
     }
 }
 
-impl TryFrom<&KyberPreKeyRecord> for libsignal_protocol::KyberPreKeyRecord {
+impl TryFrom<&KyberPreKey> for libsignal_protocol::KyberPreKeyRecord {
     type Error = SignalError;
 
-    fn try_from(value: &KyberPreKeyRecord) -> SignalResult<Self> {
+    fn try_from(value: &KyberPreKey) -> SignalResult<Self> {
         Self::deserialize(value.as_ref())
     }
 }
 
-impl TryFrom<&libsignal_protocol::SenderKeyRecord> for SenderKeyRecord {
+impl TryFrom<&libsignal_protocol::SenderKeyRecord> for SenderKey {
     type Error = SignalError;
 
     fn try_from(value: &libsignal_protocol::SenderKeyRecord) -> SignalResult<Self> {
@@ -257,10 +256,10 @@ impl TryFrom<&libsignal_protocol::SenderKeyRecord> for SenderKeyRecord {
     }
 }
 
-impl TryFrom<&SenderKeyRecord> for libsignal_protocol::SenderKeyRecord {
+impl TryFrom<&SenderKey> for libsignal_protocol::SenderKeyRecord {
     type Error = SignalError;
 
-    fn try_from(value: &SenderKeyRecord) -> SignalResult<Self> {
+    fn try_from(value: &SenderKey) -> SignalResult<Self> {
         Self::deserialize(value.as_ref())
     }
 }

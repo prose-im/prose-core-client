@@ -11,10 +11,10 @@ use prose_core_client::domain::messaging::models::{
     ArchivedMessageRef, MessageLike, MessageLikeId, MessageLikePayload, MessageRef, MessageTargetId,
 };
 use prose_core_client::domain::messaging::repos::MessagesRepository;
-use prose_core_client::domain::shared::models::{MucId, RoomId, UserId};
+use prose_core_client::domain::shared::models::{AccountId, MucId, RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::MessageBuilder;
-use prose_core_client::{muc_id, user_id};
+use prose_core_client::{account_id, muc_id, user_id};
 
 use crate::tests::{async_test, store};
 
@@ -25,15 +25,23 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
     let room_id = RoomId::from(user_id!("a@prose.org"));
     let message = MessageBuilder::new_with_index(123).build_message_like();
 
-    repo.append(&user_id!("account@prose.org"), &room_id, &[message.clone()])
-        .await?;
-    repo.append(&user_id!("account@prose.org"), &room_id, &[message.clone()])
-        .await?;
+    repo.append(
+        &account_id!("account@prose.org"),
+        &room_id,
+        &[message.clone()],
+    )
+    .await?;
+    repo.append(
+        &account_id!("account@prose.org"),
+        &room_id,
+        &[message.clone()],
+    )
+    .await?;
 
     assert_eq!(
         vec![message.clone()],
         repo.get_all(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &[message.id.clone().into_original_id().unwrap()]
         )
@@ -57,7 +65,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     let messages = vec![message1, message2];
 
     repo.append(
-        &user_id!("account@prose.org"),
+        &account_id!("account@prose.org"),
         &room_id,
         messages.as_slice(),
     )
@@ -66,7 +74,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     assert_eq!(
         messages,
         repo.get_all(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &[MessageBuilder::id_for_index(1)]
         )
@@ -75,7 +83,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
     assert_eq!(
         Vec::<MessageLike>::new(),
         repo.get_all(
-            &user_id!("other_account@prose.org"),
+            &account_id!("other_account@prose.org"),
             &room_id,
             &[MessageBuilder::id_for_index(1)]
         )
@@ -106,7 +114,7 @@ async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
 
     let messages = vec![message1, message2];
     repo.append(
-        &user_id!("account@prose.org"),
+        &account_id!("account@prose.org"),
         &room_id,
         messages.as_slice(),
     )
@@ -115,7 +123,7 @@ async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
     assert_eq!(
         messages,
         repo.get_all(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &[MessageBuilder::id_for_index(1)]
         )
@@ -154,7 +162,7 @@ async fn test_load_messages_targeting() -> Result<()> {
     ];
 
     repo.append(
-        &user_id!("account@prose.org"),
+        &account_id!("account@prose.org"),
         &room_id,
         messages.as_slice(),
     )
@@ -163,7 +171,7 @@ async fn test_load_messages_targeting() -> Result<()> {
     assert_eq!(
         messages,
         repo.get_all(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &[
                 MessageBuilder::id_for_index(1),
@@ -216,7 +224,7 @@ async fn test_load_only_messages_targeting() -> Result<()> {
         .build_message_like();
 
     repo.append(
-        &user_id!("account@prose.org"),
+        &account_id!("account@prose.org"),
         &room_id,
         &[
             message1.clone(),
@@ -233,7 +241,7 @@ async fn test_load_only_messages_targeting() -> Result<()> {
     assert_eq!(
         vec![message4, message6],
         repo.get_messages_targeting(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &[
                 MessageTargetId::MessageId(MessageBuilder::id_for_index(1)),
@@ -272,7 +280,7 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
         .build_message_like();
 
     repo.append(
-        &user_id!("account@prose.org"),
+        &account_id!("account@prose.org"),
         &room_id,
         &[message1.clone(), message2.clone(), message3.clone()],
     )
@@ -281,7 +289,7 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
     assert_eq!(
         vec![message3, message1, message2],
         repo.get_messages_targeting(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &[MessageTargetId::MessageId(MessageBuilder::id_for_index(
                 100
@@ -301,13 +309,13 @@ async fn test_resolves_message_id() -> Result<()> {
     let room_id = RoomId::from(user_id!("a@prose.org"));
     let message = MessageBuilder::new_with_index(101).build_message_like();
 
-    repo.append(&user_id!("account@prose.org"), &room_id, &[message])
+    repo.append(&account_id!("account@prose.org"), &room_id, &[message])
         .await?;
 
     assert_eq!(
         Some(MessageBuilder::id_for_index(101)),
         repo.resolve_message_id(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::stanza_id_for_index(101)
         )
@@ -317,7 +325,7 @@ async fn test_resolves_message_id() -> Result<()> {
     assert_eq!(
         None,
         repo.resolve_message_id(
-            &user_id!("account@prose.org"),
+            &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::stanza_id_for_index(1)
         )
@@ -332,7 +340,7 @@ async fn test_get_messages_after() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &muc_id!("room2@prose.org").into(),
         &[
             MessageBuilder::new_with_index(1)
@@ -349,7 +357,7 @@ async fn test_get_messages_after() -> Result<()> {
     .await?;
 
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &muc_id!("room1@prose.org").into(),
         &[MessageBuilder::new_with_index(10)
             .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
@@ -358,7 +366,7 @@ async fn test_get_messages_after() -> Result<()> {
     .await?;
 
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &muc_id!("room3@prose.org").into(),
         &[MessageBuilder::new_with_index(10)
             .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
@@ -367,7 +375,7 @@ async fn test_get_messages_after() -> Result<()> {
     .await?;
 
     repo.append(
-        &user_id!("b@prose.org"),
+        &account_id!("b@prose.org"),
         &muc_id!("room2@prose.org").into(),
         &[MessageBuilder::new_with_index(100)
             .set_timestamp(Utc.with_ymd_and_hms(2024, 05, 24, 12, 00, 00).unwrap())
@@ -382,7 +390,7 @@ async fn test_get_messages_after() -> Result<()> {
             MessageBuilder::id_for_index(3)
         ],
         repo.get_messages_after(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &muc_id!("room2@prose.org").into(),
             DateTime::<Utc>::MIN_UTC
         )
@@ -395,7 +403,7 @@ async fn test_get_messages_after() -> Result<()> {
     assert_eq!(
         vec![MessageBuilder::id_for_index(3)],
         repo.get_messages_after(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &muc_id!("room2@prose.org").into(),
             Utc.with_ymd_and_hms(2024, 05, 24, 11, 00, 00).unwrap()
         )
@@ -413,25 +421,25 @@ async fn test_clears_cache() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &user_id!("room1@prose.org").into(),
         &[MessageBuilder::new_with_index(1).build_message_like()],
     )
     .await?;
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &user_id!("room2@prose.org").into(),
         &[MessageBuilder::new_with_index(2).build_message_like()],
     )
     .await?;
     repo.append(
-        &user_id!("b@prose.org"),
+        &account_id!("b@prose.org"),
         &user_id!("room1@prose.org").into(),
         &[MessageBuilder::new_with_index(1).build_message_like()],
     )
     .await?;
     repo.append(
-        &user_id!("b@prose.org"),
+        &account_id!("b@prose.org"),
         &user_id!("room2@prose.org").into(),
         &[MessageBuilder::new_with_index(2).build_message_like()],
     )
@@ -440,7 +448,7 @@ async fn test_clears_cache() -> Result<()> {
     assert_eq!(
         vec![MessageBuilder::new_with_index(1).build_message_like()],
         repo.get_all(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into(),
             &[
                 MessageBuilder::id_for_index(1),
@@ -452,7 +460,7 @@ async fn test_clears_cache() -> Result<()> {
     assert_eq!(
         vec![MessageBuilder::new_with_index(2).build_message_like()],
         repo.get_all(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room2@prose.org").into(),
             &[
                 MessageBuilder::id_for_index(1),
@@ -462,11 +470,11 @@ async fn test_clears_cache() -> Result<()> {
         .await?
     );
 
-    repo.clear_cache(&user_id!("a@prose.org")).await?;
+    repo.clear_cache(&account_id!("a@prose.org")).await?;
 
     assert!(repo
         .get_all(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into(),
             &[
                 MessageBuilder::id_for_index(1),
@@ -477,7 +485,7 @@ async fn test_clears_cache() -> Result<()> {
         .is_empty());
     assert!(repo
         .get_all(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room2@prose.org").into(),
             &[
                 MessageBuilder::id_for_index(1),
@@ -490,7 +498,7 @@ async fn test_clears_cache() -> Result<()> {
     assert_eq!(
         vec![MessageBuilder::new_with_index(1).build_message_like()],
         repo.get_all(
-            &user_id!("b@prose.org"),
+            &account_id!("b@prose.org"),
             &user_id!("room1@prose.org").into(),
             &[MessageBuilder::id_for_index(1)]
         )
@@ -499,7 +507,7 @@ async fn test_clears_cache() -> Result<()> {
     assert_eq!(
         vec![MessageBuilder::new_with_index(2).build_message_like()],
         repo.get_all(
-            &user_id!("b@prose.org"),
+            &account_id!("b@prose.org"),
             &user_id!("room2@prose.org").into(),
             &[MessageBuilder::id_for_index(2)]
         )
@@ -516,7 +524,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
     let room_id = RoomId::from(user_id!("room@prose.org"));
 
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &room_id,
         &[MessageBuilder::new_with_index(1)
             .set_timestamp(Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap())
@@ -525,7 +533,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
     .await?;
 
     repo.append(
-        &user_id!("b@prose.org"),
+        &account_id!("b@prose.org"),
         &room_id,
         &[
             MessageBuilder::new_with_index(2)
@@ -547,7 +555,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
             stanza_id: MessageBuilder::stanza_id_for_index(3),
             timestamp: Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap(),
         }),
-        repo.get_last_received_message(&user_id!("b@prose.org"), &room_id, None)
+        repo.get_last_received_message(&account_id!("b@prose.org"), &room_id, None)
             .await?,
     );
 
@@ -557,7 +565,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
             timestamp: Utc.with_ymd_and_hms(2024, 3, 1, 0, 0, 0).unwrap(),
         }),
         repo.get_last_received_message(
-            &user_id!("b@prose.org"),
+            &account_id!("b@prose.org"),
             &room_id,
             Some(Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap())
         )
@@ -567,7 +575,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
     assert_eq!(
         None,
         repo.get_last_received_message(
-            &user_id!("b@prose.org"),
+            &account_id!("b@prose.org"),
             &RoomId::from(user_id!("void@prose.org")),
             None
         )
@@ -584,7 +592,7 @@ async fn test_loads_latest_message() -> Result<()> {
     let room_id = RoomId::from(user_id!("room@prose.org"));
 
     repo.append(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &room_id,
         &[MessageBuilder::new_with_index(1)
             .set_timestamp(Utc.with_ymd_and_hms(2024, 6, 1, 0, 0, 0).unwrap())
@@ -606,7 +614,7 @@ async fn test_loads_latest_message() -> Result<()> {
 
     messages[0].id = MessageLikeId::new(None);
 
-    repo.append(&user_id!("b@prose.org"), &room_id, &messages)
+    repo.append(&account_id!("b@prose.org"), &room_id, &messages)
         .await?;
 
     assert_eq!(
@@ -614,14 +622,14 @@ async fn test_loads_latest_message() -> Result<()> {
             id: MessageBuilder::id_for_index(3),
             timestamp: Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap(),
         }),
-        repo.get_last_message(&user_id!("b@prose.org"), &room_id)
+        repo.get_last_message(&account_id!("b@prose.org"), &room_id)
             .await?,
     );
 
     assert_eq!(
         None,
         repo.get_last_received_message(
-            &user_id!("b@prose.org"),
+            &account_id!("b@prose.org"),
             &RoomId::from(user_id!("void@prose.org")),
             None
         )

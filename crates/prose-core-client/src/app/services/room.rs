@@ -30,7 +30,9 @@ use crate::domain::messaging::models::{
 use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::settings::models::SyncedRoomSettings;
-use crate::domain::shared::models::{MucId, ParticipantId, ParticipantInfo, RoomId, RoomType};
+use crate::domain::shared::models::{
+    AccountId, MucId, ParticipantId, ParticipantInfo, RoomId, RoomType,
+};
 use crate::dtos::{
     Message as MessageDTO, MessageResultSet, MessageSender, Reaction as ReactionDTO, RoomState,
     SendMessageRequest as SendMessageRequestDTO, StanzaId, UserBasicInfo, UserId,
@@ -311,7 +313,7 @@ impl<Kind> Room<Kind> {
             .message_repo
             .get(&account, &self.data.room_id, &id)
             .await?;
-        let user_jid = ParticipantId::from(account);
+        let user_jid = ParticipantId::from(account.into_user_id());
 
         let mut message = Message::reducing_messages(messages)
             .pop()
@@ -347,11 +349,14 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<MessageDTO>> {
+        let account = self.ctx.connected_account()?;
         let messages = self
             .message_repo
-            .get_all(&self.ctx.connected_account()?, &self.data.room_id, ids)
+            .get_all(&account, &self.data.room_id, ids)
             .await?;
-        Ok(self.reduce_messages_and_add_sender(messages).await)
+        Ok(self
+            .reduce_messages_and_add_sender(&account, messages)
+            .await)
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
@@ -368,14 +373,18 @@ impl<Kind> Room<Kind> {
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
-        self.drafts_repo.set(&self.data.room_id, text).await?;
+        self.drafts_repo
+            .set(&self.ctx.connected_account()?, &self.data.room_id, text)
+            .await?;
         self.client_event_dispatcher
             .dispatch_event(ClientEvent::SidebarChanged);
         Ok(())
     }
 
     pub async fn load_draft(&self) -> Result<Option<String>> {
-        self.drafts_repo.get(&self.data.room_id).await
+        self.drafts_repo
+            .get(&self.ctx.connected_account()?, &self.data.room_id)
+            .await
     }
 
     pub async fn load_latest_messages(&self) -> Result<MessageResultSet> {
@@ -394,17 +403,17 @@ impl<Kind> Room<Kind> {
             return self.load_latest_messages().await;
         };
 
+        let account = self.ctx.connected_account()?;
+
         let messages = self
             .message_repo
-            .get_messages_after(
-                &self.ctx.connected_account()?,
-                &self.data.room_id,
-                last_read_message.timestamp,
-            )
+            .get_messages_after(&account, &self.data.room_id, last_read_message.timestamp)
             .await?;
 
         Ok(MessageResultSet {
-            messages: self.reduce_messages_and_add_sender(messages).await,
+            messages: self
+                .reduce_messages_and_add_sender(&account, messages)
+                .await,
             last_message_id: None,
         })
     }
@@ -568,6 +577,7 @@ impl<Kind> Room<Kind> {
         let result_set = MessageResultSet {
             messages: self
                 .reduce_messages_and_add_sender(
+                    &account,
                     messages
                         .into_iter()
                         .rev()
@@ -582,6 +592,7 @@ impl<Kind> Room<Kind> {
 
     async fn reduce_messages_and_add_sender(
         &self,
+        account: &AccountId,
         messages: impl IntoIterator<Item = MessageLike>,
     ) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
@@ -595,6 +606,7 @@ impl<Kind> Room<Kind> {
             .map(|msg| msg.id.clone());
 
         async fn resolve_message_sender<'a, Kind>(
+            account: &AccountId,
             room: &Room<Kind>,
             id: Cow<'a, ParticipantId>,
             map: &mut HashMap<ParticipantId, MessageSender>,
@@ -602,15 +614,19 @@ impl<Kind> Room<Kind> {
             if let Some(sender) = map.get(id.as_ref()) {
                 return sender.clone();
             };
-            let sender = room.resolve_message_sender(id.as_ref()).await;
+            let sender = room.resolve_message_sender(account, id.as_ref()).await;
             map.insert(id.into_owned(), sender.clone());
             sender
         }
 
         for message in messages {
-            let from =
-                resolve_message_sender(self, Cow::Borrowed(&message.from), &mut message_senders)
-                    .await;
+            let from = resolve_message_sender(
+                account,
+                self,
+                Cow::Borrowed(&message.from),
+                &mut message_senders,
+            )
+            .await;
 
             let mut reactions = vec![];
             for reaction in message.reactions {
@@ -618,8 +634,13 @@ impl<Kind> Room<Kind> {
 
                 for sender in reaction.from {
                     from.push(
-                        resolve_message_sender(self, Cow::Owned(sender), &mut message_senders)
-                            .await,
+                        resolve_message_sender(
+                            account,
+                            self,
+                            Cow::Owned(sender),
+                            &mut message_senders,
+                        )
+                        .await,
                     );
                 }
 
@@ -652,7 +673,11 @@ impl<Kind> Room<Kind> {
         message_dtos
     }
 
-    async fn resolve_message_sender(&self, id: &ParticipantId) -> MessageSender {
+    async fn resolve_message_sender(
+        &self,
+        account: &AccountId,
+        id: &ParticipantId,
+    ) -> MessageSender {
         let (name, mut real_id) = self
             .data
             .participants()
@@ -677,7 +702,7 @@ impl<Kind> Room<Kind> {
         if let Some(real_id) = real_id {
             if let Some(name) = self
                 .user_profile_repo
-                .get_display_name(&real_id)
+                .get_display_name(account, &real_id)
                 .await
                 .unwrap_or_default()
             {

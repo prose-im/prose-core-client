@@ -43,7 +43,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
     deps.user_info_repo
         .expect_get_user_info()
         .times(3)
-        .returning(|jid| {
+        .returning(|_, jid| {
             let info = match &jid {
                 _ if jid == &user_id!("a@prose.org") => Some(UserInfo {
                     avatar: None,
@@ -65,7 +65,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
     deps.user_profile_repo
         .expect_get()
         .times(3)
-        .returning(|jid| {
+        .returning(|_, jid| {
             let mut profile = UserProfile::default();
 
             match &jid {

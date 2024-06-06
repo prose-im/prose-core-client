@@ -6,9 +6,9 @@
 use anyhow::Result;
 
 use prose_core_client::domain::messaging::repos::DraftsRepository as DomainDraftsRepository;
-use prose_core_client::dtos::{RoomId, UserId};
+use prose_core_client::domain::shared::models::{AccountId, RoomId, UserId};
 use prose_core_client::infra::messaging::DraftsRepository;
-use prose_core_client::user_id;
+use prose_core_client::{account_id, user_id};
 
 use crate::tests::{async_test, store};
 
@@ -18,20 +18,21 @@ async fn test_saves_and_loads_draft() -> Result<()> {
 
     let jid_a = RoomId::from(user_id!("a@prose.org"));
     let jid_b = RoomId::from(user_id!("b@prose.org"));
+    let account = account_id!("user@prose.org");
 
-    assert_eq!(repo.get(&jid_a).await?, None);
-    assert_eq!(repo.get(&jid_b).await?, None);
+    assert_eq!(repo.get(&account, &jid_a).await?, None);
+    assert_eq!(repo.get(&account, &jid_b).await?, None);
 
-    repo.set(&jid_a, Some("Hello")).await?;
-    repo.set(&jid_b, Some("World")).await?;
+    repo.set(&account, &jid_a, Some("Hello")).await?;
+    repo.set(&account, &jid_b, Some("World")).await?;
 
-    assert_eq!(repo.get(&jid_a).await?, Some("Hello".to_string()));
-    assert_eq!(repo.get(&jid_b).await?, Some("World".to_string()));
+    assert_eq!(repo.get(&account, &jid_a).await?, Some("Hello".to_string()));
+    assert_eq!(repo.get(&account, &jid_b).await?, Some("World".to_string()));
 
-    repo.set(&jid_b, None).await?;
+    repo.set(&account, &jid_b, None).await?;
 
-    assert_eq!(repo.get(&jid_a).await?, Some("Hello".to_string()));
-    assert_eq!(repo.get(&jid_b).await?, None);
+    assert_eq!(repo.get(&account, &jid_a).await?, Some("Hello".to_string()));
+    assert_eq!(repo.get(&account, &jid_b).await?, None);
 
     Ok(())
 }

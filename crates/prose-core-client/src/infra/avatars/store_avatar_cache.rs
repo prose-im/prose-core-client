@@ -5,11 +5,13 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use prose_store::prelude::*;
-use prose_store::RawKey;
+use prose_store::{define_entity, RawKey};
 use prose_xmpp::mods::AvatarData;
 
+use crate::domain::shared::models::AccountId;
 use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
 use crate::dtos::UserId;
 use crate::infra::avatars::AvatarCache;
@@ -24,12 +26,46 @@ impl StoreAvatarCache {
     }
 }
 
-#[entity]
+#[derive(Serialize, Deserialize)]
 pub struct AvatarRecord {
-    id: AvatarImageId,
+    id: String,
+    account: AccountId,
+    user_id: UserId,
+    avatar_id: AvatarImageId,
     mime_type: String,
     base64_data: String,
 }
+
+impl AvatarRecord {
+    fn new(
+        account: &AccountId,
+        user_id: &UserId,
+        image: &AvatarData,
+        metadata: &AvatarInfo,
+    ) -> Self {
+        Self {
+            id: format!("{}.{}", account, user_id),
+            account: account.clone(),
+            user_id: user_id.clone(),
+            avatar_id: metadata.checksum.clone(),
+            mime_type: metadata.mime_type.clone(),
+            base64_data: image.base64().to_string(),
+        }
+    }
+}
+
+mod columns {
+    pub const ACCOUNT: &str = "account";
+    pub const USER_ID: &str = "user_id";
+    pub const AVATAR_ID: &str = "avatar_id";
+}
+
+define_entity!(AvatarRecord, "avatar",
+    account_idx => { columns: [columns::ACCOUNT], unique: false },
+    // We're only saving one avatar per user
+    user_idx => { columns: [columns::ACCOUNT, columns::USER_ID], unique: true },
+    avatar_idx => { columns: [columns::ACCOUNT, columns::USER_ID, columns::AVATAR_ID], unique: true }
+);
 
 impl KeyType for AvatarImageId {
     fn to_raw_key(&self) -> RawKey {
@@ -42,7 +78,8 @@ impl KeyType for AvatarImageId {
 impl AvatarCache for StoreAvatarCache {
     async fn cache_avatar_image(
         &self,
-        _jid: &UserId,
+        account: &AccountId,
+        user_id: &UserId,
         image: &AvatarData,
         metadata: &AvatarInfo,
     ) -> Result<()> {
@@ -51,18 +88,15 @@ impl AvatarCache for StoreAvatarCache {
             .transaction_for_reading_and_writing(&[AvatarRecord::collection()])
             .await?;
         let collection = tx.writeable_collection(AvatarRecord::collection())?;
-        collection.put_entity(&AvatarRecord {
-            id: metadata.checksum.clone(),
-            mime_type: metadata.mime_type.clone(),
-            base64_data: image.base64().to_string(),
-        })?;
+        collection.put_entity(&AvatarRecord::new(account, user_id, image, metadata))?;
         tx.commit().await?;
         Ok(())
     }
 
     async fn has_cached_avatar_image(
         &self,
-        _jid: &UserId,
+        account: &AccountId,
+        user_id: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<bool> {
         let tx = self
@@ -70,13 +104,17 @@ impl AvatarCache for StoreAvatarCache {
             .transaction_for_reading(&[AvatarRecord::collection()])
             .await?;
         let collection = tx.readable_collection(AvatarRecord::collection())?;
-        let contains_image = collection.contains_key(image_checksum).await?;
+        let idx = collection.index(&AvatarRecord::avatar_idx())?;
+        let contains_image = idx
+            .contains_key(&(account, user_id, image_checksum))
+            .await?;
         Ok(contains_image)
     }
 
     async fn cached_avatar_image(
         &self,
-        _jid: &UserId,
+        account: &AccountId,
+        user_id: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<Option<PlatformImage>> {
         let tx = self
@@ -84,21 +122,23 @@ impl AvatarCache for StoreAvatarCache {
             .transaction_for_reading(&[AvatarRecord::collection()])
             .await?;
         let collection = tx.readable_collection(AvatarRecord::collection())?;
-        let Some(record) = collection.get::<_, AvatarRecord>(image_checksum).await? else {
-            return Ok(None);
-        };
-        Ok(Some(format!(
-            "data:{};base64,{}",
-            record.mime_type, record.base64_data
-        )))
+        let idx = collection.index(&AvatarRecord::avatar_idx())?;
+
+        return Ok(idx
+            .get::<_, AvatarRecord>(&(account, user_id, image_checksum))
+            .await?
+            .map(|record| format!("data:{};base64,{}", record.mime_type, record.base64_data)));
     }
 
-    async fn delete_all_cached_images(&self) -> Result<()> {
+    async fn delete_all_cached_images(&self, account: &AccountId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[AvatarRecord::collection()])
             .await?;
-        tx.truncate_collections(&[AvatarRecord::collection()])?;
+        let collection = tx.writeable_collection(AvatarRecord::collection())?;
+        collection
+            .delete_all_in_index(&AvatarRecord::account_idx(), Query::Only(account))
+            .await?;
         tx.commit().await?;
         Ok(())
     }

@@ -9,9 +9,9 @@ use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::settings::models::LocalRoomSettings;
 use prose_core_client::domain::settings::repos::LocalRoomSettingsRepository as LocalRoomSettingsRepositoryTrait;
-use prose_core_client::domain::shared::models::UserId;
+use prose_core_client::domain::shared::models::{AccountId, UserId};
 use prose_core_client::infra::settings::LocalRoomSettingsRepository;
-use prose_core_client::user_id;
+use prose_core_client::{account_id, user_id};
 
 use crate::tests::{async_test, store};
 
@@ -21,7 +21,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
 
     assert_eq!(
         repo.get(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into()
         )
         .await?,
@@ -29,7 +29,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
     );
 
     repo.update(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &user_id!("room1@prose.org").into(),
         Box::new(|settings: &mut LocalRoomSettings| {
             settings.last_catchup_time =
@@ -39,7 +39,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
     .await?;
 
     repo.update(
-        &user_id!("a@prose.org"),
+        &account_id!("a@prose.org"),
         &user_id!("room2@prose.org").into(),
         Box::new(|settings: &mut LocalRoomSettings| {
             settings.last_catchup_time =
@@ -49,7 +49,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
     .await?;
 
     repo.update(
-        &user_id!("b@prose.org"),
+        &account_id!("b@prose.org"),
         &user_id!("room1@prose.org").into(),
         Box::new(|settings: &mut LocalRoomSettings| {
             settings.last_catchup_time =
@@ -60,7 +60,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
 
     assert_eq!(
         repo.get(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into()
         )
         .await?
@@ -69,7 +69,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
     );
     assert_eq!(
         repo.get(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room2@prose.org").into()
         )
         .await?
@@ -77,11 +77,11 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
         Some(Utc.with_ymd_and_hms(2024, 05, 14, 11, 00, 00).unwrap())
     );
 
-    repo.clear_cache(&user_id!("a@prose.org")).await?;
+    repo.clear_cache(&account_id!("a@prose.org")).await?;
 
     assert_eq!(
         repo.get(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into()
         )
         .await?
@@ -90,7 +90,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
     );
     assert_eq!(
         repo.get(
-            &user_id!("a@prose.org"),
+            &account_id!("a@prose.org"),
             &user_id!("room2@prose.org").into()
         )
         .await?
@@ -99,7 +99,7 @@ async fn test_save_and_load_local_room_settings() -> Result<()> {
     );
     assert_eq!(
         repo.get(
-            &user_id!("b@prose.org"),
+            &account_id!("b@prose.org"),
             &user_id!("room1@prose.org").into()
         )
         .await?

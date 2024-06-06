@@ -18,7 +18,7 @@ use crate::domain::rooms::models::{
     ParticipantList, RegisteredMember, RoomFeatures, RoomSessionParticipant,
 };
 use crate::domain::settings::models::SyncedRoomSettings;
-use crate::domain::shared::models::{Availability, RoomId, RoomType, UserId};
+use crate::domain::shared::models::{AccountId, Availability, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
 use crate::dtos::OccupantId;
 
@@ -196,7 +196,7 @@ impl Room {
 
     pub async fn update_statistics_if_needed(
         &self,
-        account: &UserId,
+        account: &AccountId,
         messages_repo: &DynMessagesRepository,
     ) -> Result<RoomStatistics> {
         match self.state() {
@@ -228,7 +228,7 @@ impl Room {
         for message in messages {
             if let MessageLikePayload::Message { ref mentions, .. } = message.payload {
                 for mention in mentions {
-                    if &mention.user == account {
+                    if account == &mention.user {
                         stats.mentions_count += 1;
                         break;
                     }

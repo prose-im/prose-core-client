@@ -12,10 +12,11 @@ use xmpp_parsers::mam::QueryId;
 use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageRef};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
+use prose_core_client::domain::shared::models::AccountId;
 use prose_core_client::dtos::{Mention, MucId, OccupantId, RoomId, UnicodeScalarIndex, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::{ConstantTimeProvider, MessageBuilder};
-use prose_core_client::{muc_id, occupant_id, user_id, ClientEvent};
+use prose_core_client::{account_id, muc_id, occupant_id, user_id, ClientEvent};
 use prose_proc_macros::mt_test;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::TimeProvider;
@@ -28,7 +29,7 @@ use crate::{event, recv, send};
 async fn test_maintains_message_count_from_prior_runs() -> Result<()> {
     let store = store().await.expect("Failed to set up store.");
 
-    let account = user_id!("user@prose.org");
+    let account = account_id!("user@prose.org");
     let muc_id = muc_id!("room@conf.prose.org");
     let room_id = RoomId::Muc(muc_id.clone());
 
@@ -61,7 +62,7 @@ async fn test_maintains_message_count_from_prior_runs() -> Result<()> {
         .set_time_provider(ConstantTimeProvider::new(now.clone()))
         .build()
         .await;
-    client.expect_login(account, "secret").await?;
+    client.expect_login(account.to_user_id(), "secret").await?;
 
     let mut join_room_strategy = JoinRoomStrategy::default();
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
@@ -109,7 +110,7 @@ async fn test_maintains_message_count_from_prior_runs() -> Result<()> {
 async fn test_loads_unread_messages() -> Result<()> {
     let store = store().await.expect("Failed to set up store.");
 
-    let account = user_id!("user@prose.org");
+    let account = account_id!("user@prose.org");
     let muc_id = muc_id!("room@conf.prose.org");
     let room_id = RoomId::Muc(muc_id.clone());
 
@@ -142,7 +143,7 @@ async fn test_loads_unread_messages() -> Result<()> {
         .set_time_provider(ConstantTimeProvider::new(now.clone()))
         .build()
         .await;
-    client.expect_login(account, "secret").await?;
+    client.expect_login(account.to_user_id(), "secret").await?;
 
     let mut join_room_strategy = JoinRoomStrategy::default();
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
@@ -179,7 +180,7 @@ async fn test_loads_unread_messages() -> Result<()> {
 async fn test_updates_unread_count_after_sync() -> Result<()> {
     let store = store().await.expect("Failed to set up store.");
 
-    let account = user_id!("user@prose.org");
+    let account = account_id!("user@prose.org");
     let user_id = user_id!("friend@prose.org");
     let room_id = RoomId::User(user_id.clone());
 
@@ -226,7 +227,7 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
         .await?;
 
     let client = TestClient::builder().set_store(store).build().await;
-    client.expect_login(account, "secret").await?;
+    client.expect_login(account.to_user_id(), "secret").await?;
 
     client.start_dm(user_id.clone()).await?;
 
@@ -388,7 +389,7 @@ async fn test_marks_first_unread_message() -> Result<()> {
 async fn test_mark_as_unread_saves_settings() -> Result<()> {
     let store = store().await.expect("Failed to set up store.");
 
-    let account = user_id!("user@prose.org");
+    let account = account_id!("user@prose.org");
     let muc_id = muc_id!("room@conf.prose.org");
     let room_id = RoomId::Muc(muc_id.clone());
 
@@ -421,7 +422,7 @@ async fn test_mark_as_unread_saves_settings() -> Result<()> {
         .set_time_provider(ConstantTimeProvider::new(now.clone()))
         .build()
         .await;
-    client.expect_login(account, "secret").await?;
+    client.expect_login(account.to_user_id(), "secret").await?;
 
     let mut join_room_strategy = JoinRoomStrategy::default();
     join_room_strategy.room_settings = Some(SyncedRoomSettings {

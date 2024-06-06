@@ -34,13 +34,13 @@ pub struct SidebarService {
 
 impl SidebarService {
     pub async fn sidebar_items(&self) -> Vec<SidebarItemDTO> {
-        let rooms: Vec<Room> = self.connected_rooms_repo.get_all();
-        let mut item_dtos = vec![];
-
         let Ok(account) = self.ctx.connected_account() else {
             error!("Could not read sidebar items since Client is not connected");
             return vec![];
         };
+
+        let rooms: Vec<Room> = self.connected_rooms_repo.get_all(&account);
+        let mut item_dtos = vec![];
 
         for room in rooms {
             if room.r#type == RoomType::Unknown || !room.sidebar_state().is_in_sidebar() {
@@ -68,7 +68,7 @@ impl SidebarService {
                 is_favorite,
                 has_draft: self
                     .drafts_repo
-                    .get(&id)
+                    .get(&account, &id)
                     .await
                     .unwrap_or_default()
                     .is_some(),

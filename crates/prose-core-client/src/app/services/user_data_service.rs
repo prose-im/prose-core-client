@@ -8,8 +8,8 @@ use anyhow::Result;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAvatarRepository, DynEncryptionDomainService, DynTimeProvider, DynUserInfoRepository,
-    DynUserProfileRepository, DynUserProfileService,
+    DynAppContext, DynAvatarRepository, DynEncryptionDomainService, DynTimeProvider,
+    DynUserInfoRepository, DynUserProfileRepository, DynUserProfileService,
 };
 use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{PlatformImage, UserMetadata};
@@ -18,6 +18,8 @@ use crate::dtos::DeviceInfo;
 
 #[derive(InjectDependencies)]
 pub struct UserDataService {
+    #[inject]
+    ctx: DynAppContext,
     #[inject]
     time_provider: DynTimeProvider,
     #[inject]
@@ -34,26 +36,32 @@ pub struct UserDataService {
 
 impl UserDataService {
     pub async fn load_avatar(&self, user_id: &UserId) -> Result<Option<PlatformImage>> {
+        let account = self.ctx.connected_account()?;
         let Some(avatar_metadata) = self
             .user_info_repo
-            .get_user_info(user_id)
+            .get_user_info(&account, user_id)
             .await?
             .and_then(|info| info.avatar)
         else {
             return Ok(None);
         };
-        let image = self.avatar_repo.get(user_id, &avatar_metadata).await?;
+        let image = self
+            .avatar_repo
+            .get(&account, user_id, &avatar_metadata)
+            .await?;
         Ok(image)
     }
 
     pub async fn load_user_profile(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
-        self.user_profile_repo.get(user_id).await
+        self.user_profile_repo
+            .get(&self.ctx.connected_account()?, user_id)
+            .await
     }
 
     pub async fn load_user_metadata(&self, user_id: &UserId) -> Result<Option<UserMetadata>> {
         let Some(resource_id) = self
             .user_info_repo
-            .resolve_user_id_to_user_resource_id(user_id)
+            .resolve_user_id_to_user_resource_id(&self.ctx.connected_account()?, user_id)
         else {
             return Ok(None);
         };

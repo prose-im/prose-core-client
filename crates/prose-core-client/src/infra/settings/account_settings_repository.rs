@@ -5,18 +5,21 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 
 use prose_store::prelude::*;
 
 use crate::domain::settings::models::AccountSettings;
 use crate::domain::settings::repos::AccountSettingsRepository as DomainAccountSettingsRepository;
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::AccountId;
 
-#[entity]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct AccountSettingsRecord {
-    id: UserId,
+    id: AccountId,
     payload: AccountSettings,
 }
+
+define_entity!(AccountSettingsRecord, "account_settings", AccountId);
 
 pub struct AccountSettingsRepository {
     store: Store<PlatformDriver>,
@@ -31,27 +34,27 @@ impl AccountSettingsRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl DomainAccountSettingsRepository for AccountSettingsRepository {
-    async fn get(&self, id: &UserId) -> Result<AccountSettings> {
+    async fn get(&self, account: &AccountId) -> Result<AccountSettings> {
         let tx = self
             .store
             .transaction_for_reading(&[AccountSettingsRecord::collection()])
             .await?;
         let collection = tx.readable_collection(AccountSettingsRecord::collection())?;
-        let settings = collection.get::<_, AccountSettingsRecord>(id).await?;
+        let settings = collection.get::<_, AccountSettingsRecord>(account).await?;
         Ok(settings.map(|s| s.payload).unwrap_or_default())
     }
 
     async fn update(
         &self,
-        id: &UserId,
+        account: &AccountId,
         block: Box<dyn for<'a> FnOnce(&'a mut AccountSettings) + Send>,
     ) -> Result<()> {
         upsert!(
             AccountSettingsRecord,
             store: self.store,
-            id: id,
+            id: account,
             insert_if_needed: || AccountSettingsRecord {
-                id: id.clone(),
+                id: account.clone(),
                 payload: Default::default()
             },
             update: |settings: &mut AccountSettingsRecord| block(&mut settings.payload)
@@ -59,12 +62,13 @@ impl DomainAccountSettingsRepository for AccountSettingsRepository {
         Ok(())
     }
 
-    async fn clear_cache(&self) -> Result<()> {
+    async fn clear_cache(&self, account: &AccountId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[AccountSettingsRecord::collection()])
             .await?;
-        tx.truncate_collections(&[AccountSettingsRecord::collection()])?;
+        let collection = tx.writeable_collection(AccountSettingsRecord::collection())?;
+        collection.delete(account).await?;
         tx.commit().await?;
         Ok(())
     }

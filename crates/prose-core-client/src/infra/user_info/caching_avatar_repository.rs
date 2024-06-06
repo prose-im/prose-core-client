@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::DynUserInfoService;
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::{AccountId, UserId};
 use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 use crate::domain::user_info::repos::AvatarRepository as DomainAvatarRepository;
 use crate::infra::avatars::AvatarCache;
@@ -33,12 +33,13 @@ impl CachingAvatarRepository {
 impl DomainAvatarRepository for CachingAvatarRepository {
     async fn precache_avatar_image(
         &self,
+        account: &AccountId,
         user_jid: &UserId,
         info: &AvatarInfo,
     ) -> anyhow::Result<()> {
         if self
             .avatar_cache
-            .has_cached_avatar_image(user_jid, &info.checksum)
+            .has_cached_avatar_image(account, user_jid, &info.checksum)
             .await?
         {
             return Ok(());
@@ -53,38 +54,40 @@ impl DomainAvatarRepository for CachingAvatarRepository {
         };
 
         self.avatar_cache
-            .cache_avatar_image(user_jid, &avatar_data, info)
+            .cache_avatar_image(account, user_jid, &avatar_data, info)
             .await?;
         Ok(())
     }
 
     async fn get(
         &self,
+        account: &AccountId,
         user_id: &UserId,
         info: &AvatarInfo,
-    ) -> anyhow::Result<Option<PlatformImage>> {
-        self.precache_avatar_image(user_id, info).await?;
+    ) -> Result<Option<PlatformImage>> {
+        self.precache_avatar_image(account, user_id, info).await?;
         let image = self
             .avatar_cache
-            .cached_avatar_image(user_id, &info.checksum)
+            .cached_avatar_image(account, user_id, &info.checksum)
             .await?;
         Ok(image)
     }
 
     async fn set(
         &self,
+        account: &AccountId,
         user_jid: &UserId,
         info: &AvatarInfo,
         image: &AvatarData,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         self.avatar_cache
-            .cache_avatar_image(user_jid, image, info)
+            .cache_avatar_image(account, user_jid, image, info)
             .await?;
         Ok(())
     }
 
-    async fn clear_cache(&self) -> Result<()> {
-        self.avatar_cache.delete_all_cached_images().await?;
+    async fn clear_cache(&self, account: &AccountId) -> Result<()> {
+        self.avatar_cache.delete_all_cached_images(account).await?;
         Ok(())
     }
 }

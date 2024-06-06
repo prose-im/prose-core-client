@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use pretty_assertions::assert_eq;
 use serde::{Deserialize, Serialize};
 #[cfg(not(target_arch = "wasm32"))]
 pub use tokio::test as async_test;
@@ -80,6 +81,58 @@ impl Camera {
             model: "5D".to_string(),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+struct IndexedRecord {
+    id: String,
+    account_id: String,
+    user_id: u32,
+    record_id: u32,
+    value: String,
+}
+
+impl IndexedRecord {
+    fn new(
+        account_id: impl Into<String>,
+        user_id: u32,
+        record_id: u32,
+        value: impl Into<String>,
+    ) -> Self {
+        let account_id = account_id.into();
+        let value = value.into();
+
+        Self {
+            id: format!("{}.{}.{}", account_id, user_id, record_id),
+            account_id,
+            user_id,
+            record_id,
+            value,
+        }
+    }
+}
+
+define_entity!(IndexedRecord, "indexed_record",
+    account_idx => { columns: ["account_id"], unique: false },
+    user_idx => { columns: ["account_id", "user_id"], unique: false },
+    record_idx => { columns: ["account_id", "user_id", "record_idx"], unique: true }
+);
+
+async fn multi_column_index_store(name: impl AsRef<str>) -> Result<Store<PlatformDriver>> {
+    let driver = platform_driver(name);
+    let store = Store::open(driver, 1, |event| {
+        let tx = &event.tx;
+
+        let collection = tx.create_collection(IndexedRecord::collection())?;
+        for idx_spec in IndexedRecord::indexes() {
+            collection.add_index(idx_spec)?;
+        }
+
+        Ok(())
+    })
+    .await?;
+    store.truncate_all_collections().await?;
+    Ok(store)
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -524,7 +577,7 @@ async fn test_delete() -> Result<()> {
     assert!(people.contains_key("id-1").await?);
     assert!(people.contains_key("id-2").await?);
 
-    people.delete("id-2")?;
+    people.delete("id-2").await?;
 
     assert!(people.contains_key("id-1").await?);
     assert!(!people.contains_key("id-2").await?);
@@ -1034,153 +1087,102 @@ async fn test_index() -> Result<()> {
 }
 
 #[async_test]
-async fn test_multicolumn_index() -> Result<()> {
-    #[derive(Debug, PartialEq, Serialize, Deserialize)]
-    struct DeviceRecord {
-        account: String,
-        user_id: u32,
-        id: u32,
-        name: String,
-    }
-
-    let driver = platform_driver("multi-column-index");
-    let store = Store::open(driver, 1, |event| {
-        let tx = &event.tx;
-
-        let collection = tx.create_collection("device_record")?;
-        collection.add_index(
-            IndexSpec::builder()
-                .add_column("account")
-                .add_column("user_id")
-                .add_column("id")
-                .unique()
-                .build(),
-        )?;
-        collection.add_index(
-            IndexSpec::builder()
-                .add_column("account")
-                .add_column("user_id")
-                .build(),
-        )?;
-
-        Ok(())
-    })
-    .await?;
-    store.truncate_all_collections().await?;
+async fn test_get_in_multicolumn_index() -> Result<()> {
+    let store = multi_column_index_store("test_get_in_multicolumn_index").await?;
 
     let tx = store
-        .transaction_for_reading_and_writing(&["device_record"])
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
         .await?;
     {
-        let records = tx.writeable_collection("device_record")?;
+        let records = tx.writeable_collection(IndexedRecord::collection())?;
         records
-            .set(
-                &0,
-                &DeviceRecord {
-                    account: "a@prose.org".to_string(),
-                    user_id: 1,
-                    id: 1,
-                    name: "Device 1 (A)".to_string(),
-                },
-            )
+            .set_entity(&IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"))
             .await?;
         records
-            .set(
-                &1,
-                &DeviceRecord {
-                    account: "a@prose.org".to_string(),
-                    user_id: 2,
-                    id: 2,
-                    name: "Device 2 (A)".to_string(),
-                },
-            )
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"))
             .await?;
         records
-            .set(
-                &2,
-                &DeviceRecord {
-                    account: "a@prose.org".to_string(),
-                    user_id: 2,
-                    id: 3,
-                    name: "Device 3 (A)".to_string(),
-                },
-            )
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"))
             .await?;
         records
-            .set(
-                &3,
-                &DeviceRecord {
-                    account: "a@prose.org".to_string(),
-                    user_id: 3,
-                    id: 4,
-                    name: "Device 4 (A)".to_string(),
-                },
-            )
-            .await?;
-        records
-            .set(
-                &4,
-                &DeviceRecord {
-                    account: "b@prose.org".to_string(),
-                    user_id: 1,
-                    id: 1,
-                    name: "Device 1 (B)".to_string(),
-                },
-            )
-            .await?;
-        records
-            .set(
-                &5,
-                &DeviceRecord {
-                    account: "b@prose.org".to_string(),
-                    user_id: 1,
-                    id: 2,
-                    name: "Device 2 (B)".to_string(),
-                },
-            )
-            .await?;
-        records
-            .set(
-                &6,
-                &DeviceRecord {
-                    account: "b@prose.org".to_string(),
-                    user_id: 2,
-                    id: 3,
-                    name: "Device 3 (B)".to_string(),
-                },
-            )
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)"))
             .await?;
     }
     tx.commit().await?;
 
-    let tx = store.transaction_for_reading(&["device_record"]).await?;
-    let records = tx.readable_collection("device_record")?;
-    let idx = records.index(&["account", "user_id"])?;
+    let tx = store
+        .transaction_for_reading(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.readable_collection(IndexedRecord::collection())?;
+    let idx = records.index(&IndexedRecord::user_idx())?;
+
+    assert_eq!(
+        Some(IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)")),
+        idx.get::<_, IndexedRecord>(&("b@prose.org", 1)).await?
+    );
+
+    assert_eq!(
+        Some(IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)")),
+        idx.get::<_, IndexedRecord>(&("a@prose.org", 2)).await?
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_get_all_in_multicolumn_index() -> Result<()> {
+    let store = multi_column_index_store("test_get_all_in_multicolumn_index").await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
+        .await?;
+    {
+        let records = tx.writeable_collection(IndexedRecord::collection())?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 3, "Device 3 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 3, 4, "Device 4 (A)"))
+            .await?;
+
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 2, 3, "Device 3 (B)"))
+            .await?;
+    }
+    tx.commit().await?;
+
+    let tx = store
+        .transaction_for_reading(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.readable_collection(IndexedRecord::collection())?;
+    let idx = records.index(&IndexedRecord::user_idx())?;
 
     let records = idx
-        .get_all_values::<DeviceRecord>(Query::Only(("b@prose.org", 1)), Default::default(), None)
+        .get_all_values::<IndexedRecord>(Query::Only(("b@prose.org", 1)), Default::default(), None)
         .await?;
 
     assert_eq!(
         vec![
-            DeviceRecord {
-                account: "b@prose.org".to_string(),
-                user_id: 1,
-                id: 1,
-                name: "Device 1 (B)".to_string(),
-            },
-            DeviceRecord {
-                account: "b@prose.org".to_string(),
-                user_id: 1,
-                id: 2,
-                name: "Device 2 (B)".to_string(),
-            }
+            IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"),
+            IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)")
         ],
         records
     );
 
     let records = idx
-        .get_all_values::<DeviceRecord>(
+        .get_all_values::<IndexedRecord>(
             Query::from_range(("a@prose.org", 2)..("a@prose.org", 3)),
             Default::default(),
             None,
@@ -1189,18 +1191,159 @@ async fn test_multicolumn_index() -> Result<()> {
 
     assert_eq!(
         vec![
-            DeviceRecord {
-                account: "a@prose.org".to_string(),
-                user_id: 2,
-                id: 2,
-                name: "Device 2 (A)".to_string(),
-            },
-            DeviceRecord {
-                account: "a@prose.org".to_string(),
-                user_id: 2,
-                id: 3,
-                name: "Device 3 (A)".to_string(),
-            }
+            IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"),
+            IndexedRecord::new("a@prose.org", 2, 3, "Device 3 (A)")
+        ],
+        records
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_delete_in_multicolumn_index() -> Result<()> {
+    let store = multi_column_index_store("test_delete_in_multicolumn_index").await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
+        .await?;
+    {
+        let records = tx.writeable_collection(IndexedRecord::collection())?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 3, "Device 3 (A)"))
+            .await?;
+
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 2, 3, "Device 3 (B)"))
+            .await?;
+    }
+    tx.commit().await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.writeable_collection(IndexedRecord::collection())?;
+    let idx = records.index(&IndexedRecord::user_idx())?;
+
+    idx.delete(&("b@prose.org", 2)).await?;
+    tx.commit().await?;
+
+    let tx = store
+        .transaction_for_reading(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.readable_collection(IndexedRecord::collection())?;
+
+    let records = records
+        .get_all_values::<IndexedRecord>(Query::<String>::All, Default::default(), None)
+        .await?;
+
+    assert_eq!(
+        vec![
+            IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"),
+            IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"),
+            IndexedRecord::new("a@prose.org", 2, 3, "Device 3 (A)"),
+            IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"),
+            IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)")
+        ],
+        records
+    );
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.writeable_collection(IndexedRecord::collection())?;
+    let idx = records.index(&IndexedRecord::user_idx())?;
+
+    idx.delete(&("a@prose.org", 2)).await?;
+    tx.commit().await?;
+
+    let tx = store
+        .transaction_for_reading(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.readable_collection(IndexedRecord::collection())?;
+
+    let records = records
+        .get_all_values::<IndexedRecord>(Query::<String>::All, Default::default(), None)
+        .await?;
+
+    assert_eq!(
+        vec![
+            IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"),
+            IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"),
+            IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)")
+        ],
+        records
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_delete_all_index_in_multicolumn_index() -> Result<()> {
+    let store = multi_column_index_store("test_delete_all_index_in_multicolumn_index").await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
+        .await?;
+    {
+        let records = tx.writeable_collection(IndexedRecord::collection())?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("a@prose.org", 2, 3, "Device 3 (A)"))
+            .await?;
+
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 1, "Device 1 (B)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 1, 2, "Device 2 (B)"))
+            .await?;
+        records
+            .set_entity(&IndexedRecord::new("b@prose.org", 2, 3, "Device 3 (B)"))
+            .await?;
+    }
+    tx.commit().await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.writeable_collection(IndexedRecord::collection())?;
+    records
+        .delete_all_in_index(&IndexedRecord::account_idx(), Query::Only("b@prose.org"))
+        .await?;
+    tx.commit().await?;
+
+    let tx = store
+        .transaction_for_reading(&[IndexedRecord::collection()])
+        .await?;
+    let records = tx.readable_collection(IndexedRecord::collection())?;
+
+    let records = records
+        .get_all_values::<IndexedRecord>(Query::<String>::All, Default::default(), None)
+        .await?;
+
+    assert_eq!(
+        vec![
+            IndexedRecord::new("a@prose.org", 1, 1, "Device 1 (A)"),
+            IndexedRecord::new("a@prose.org", 2, 2, "Device 2 (A)"),
+            IndexedRecord::new("a@prose.org", 2, 3, "Device 3 (A)"),
         ],
         records
     );

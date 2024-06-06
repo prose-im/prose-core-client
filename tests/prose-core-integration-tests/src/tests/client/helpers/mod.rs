@@ -9,6 +9,7 @@ pub(self) use element_ext::ElementExt;
 use prose_core_client::domain::encryption::repos::mocks::{
     MockEncryptionKeysRepository, MockSessionRepository,
 };
+use prose_core_client::domain::shared::models::AccountId;
 use prose_core_client::dtos::{DeviceBundle, DeviceId};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::{EncryptionService, SignalServiceHandle};
@@ -28,18 +29,22 @@ mod test_client_omemo;
 mod test_message_queue;
 
 pub trait TestDeviceBundle {
-    async fn test(device_id: impl Into<DeviceId>) -> DeviceBundle;
+    async fn test(account_id: impl Into<AccountId>, device_id: impl Into<DeviceId>)
+        -> DeviceBundle;
 }
 
 impl TestDeviceBundle for DeviceBundle {
-    async fn test(device_id: impl Into<DeviceId>) -> DeviceBundle {
+    async fn test(
+        account_id: impl Into<AccountId>,
+        device_id: impl Into<DeviceId>,
+    ) -> DeviceBundle {
         let service = SignalServiceHandle::new(
             Arc::new(MockEncryptionKeysRepository::new()),
             Arc::new(MockSessionRepository::new()),
             Arc::new(StepRngProvider::default()),
         );
         service
-            .generate_local_encryption_bundle(device_id.into())
+            .generate_local_encryption_bundle(&account_id.into(), device_id.into())
             .await
             .unwrap()
             .into_device_bundle()

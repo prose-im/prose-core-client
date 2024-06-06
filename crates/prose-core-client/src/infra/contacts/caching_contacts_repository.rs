@@ -10,7 +10,7 @@ use parking_lot::RwLock;
 use crate::app::deps::DynContactListService;
 use crate::domain::contacts::models::{Contact, PresenceSubscription};
 use crate::domain::contacts::repos::ContactListRepository;
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::{AccountId, UserId};
 
 pub struct CachingContactsRepository {
     service: DynContactListService,
@@ -29,12 +29,12 @@ impl CachingContactsRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl ContactListRepository for CachingContactsRepository {
-    async fn get_all(&self) -> Result<Vec<Contact>> {
+    async fn get_all(&self, _account: &AccountId) -> Result<Vec<Contact>> {
         self.load_contacts_if_needed().await?;
         Ok(self.contacts.read().clone().unwrap_or_else(|| vec![]))
     }
 
-    async fn get(&self, contact_id: &UserId) -> Result<Option<Contact>> {
+    async fn get(&self, _account: &AccountId, contact_id: &UserId) -> Result<Option<Contact>> {
         self.load_contacts_if_needed().await?;
 
         let Some(contacts) = &*self.contacts.read() else {
@@ -45,7 +45,12 @@ impl ContactListRepository for CachingContactsRepository {
         Ok(contact)
     }
 
-    async fn set(&self, contact_id: &UserId, subscription: PresenceSubscription) -> Result<bool> {
+    async fn set(
+        &self,
+        _account: &AccountId,
+        contact_id: &UserId,
+        subscription: PresenceSubscription,
+    ) -> Result<bool> {
         self.load_contacts_if_needed().await?;
 
         let mut guard = self.contacts.write();
@@ -67,7 +72,7 @@ impl ContactListRepository for CachingContactsRepository {
         Ok(true)
     }
 
-    async fn delete(&self, contact_id: &UserId) -> Result<bool> {
+    async fn delete(&self, _account: &AccountId, contact_id: &UserId) -> Result<bool> {
         self.load_contacts_if_needed().await?;
 
         let mut guard = self.contacts.write();
@@ -82,7 +87,7 @@ impl ContactListRepository for CachingContactsRepository {
         Ok(true)
     }
 
-    async fn clear_cache(&self) -> Result<()> {
+    async fn clear_cache(&self, _account: &AccountId) -> Result<()> {
         self.contacts.write().take();
         Ok(())
     }

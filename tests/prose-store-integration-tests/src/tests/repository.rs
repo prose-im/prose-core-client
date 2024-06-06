@@ -6,12 +6,14 @@ use prose_store::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
-#[entity]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 struct User {
     id: BareJid,
     name: String,
     company: Option<Company>,
 }
+
+define_entity!(User, "user", BareJid);
 
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 struct Company {

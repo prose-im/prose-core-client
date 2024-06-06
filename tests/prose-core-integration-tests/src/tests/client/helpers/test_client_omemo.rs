@@ -254,20 +254,22 @@ impl TestClient {
         let mut user_device_repo = MockUserDeviceRepository::new();
         {
             let their_user_id = their_user_id.clone();
-            user_device_repo.expect_get_all().returning(move |user_id| {
-                let device = if user_id == &their_user_id {
-                    Device {
-                        id: TestClient::their_device_id().into(),
-                        label: None,
-                    }
-                } else {
-                    Device {
-                        id: TestClient::device_id().into(),
-                        label: None,
-                    }
-                };
-                Box::pin(async move { Ok(vec![device]) })
-            });
+            user_device_repo
+                .expect_get_all()
+                .returning(move |_, user_id| {
+                    let device = if user_id == &their_user_id {
+                        Device {
+                            id: TestClient::their_device_id().into(),
+                            label: None,
+                        }
+                    } else {
+                        Device {
+                            id: TestClient::device_id().into(),
+                            label: None,
+                        }
+                    };
+                    Box::pin(async move { Ok(vec![device]) })
+                });
         }
 
         let mut user_device_service = MockUserDeviceService::new();

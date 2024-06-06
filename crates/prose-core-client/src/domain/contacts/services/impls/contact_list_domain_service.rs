@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_proc_macros::DependenciesStruct;
 
 use crate::app::deps::{
-    DynClientEventDispatcher, DynContactListRepository, DynContactListService,
+    DynAppContext, DynClientEventDispatcher, DynContactListRepository, DynContactListService,
     DynPresenceSubRequestsRepository,
 };
 use crate::domain::contacts::models::{Contact, PresenceSubscription};
@@ -20,6 +20,7 @@ use super::super::ContactListDomainService as ContactListDomainServiceTrait;
 
 #[derive(DependenciesStruct)]
 pub struct ContactListDomainService {
+    ctx: DynAppContext,
     client_event_dispatcher: DynClientEventDispatcher,
     contact_list_repo: DynContactListRepository,
     contact_list_service: DynContactListService,
@@ -30,7 +31,9 @@ pub struct ContactListDomainService {
 #[async_trait]
 impl ContactListDomainServiceTrait for ContactListDomainService {
     async fn load_contacts(&self) -> Result<Vec<Contact>> {
-        self.contact_list_repo.get_all().await
+        self.contact_list_repo
+            .get_all(&self.ctx.connected_account()?)
+            .await
     }
 
     async fn add_contact(&self, user_id: &UserId) -> Result<()> {
@@ -44,7 +47,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
 
         if self
             .contact_list_repo
-            .set(user_id, PresenceSubscription::Requested)
+            .set(
+                &self.ctx.connected_account()?,
+                user_id,
+                PresenceSubscription::Requested,
+            )
             .await?
         {
             self.client_event_dispatcher
@@ -60,7 +67,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
             .revoke_presence_subscription(user_id)
             .await?;
 
-        if self.contact_list_repo.delete(user_id).await? {
+        if self
+            .contact_list_repo
+            .delete(&self.ctx.connected_account()?, user_id)
+            .await?
+        {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::ContactListChanged);
         }
@@ -76,7 +87,9 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
     }
 
     async fn load_presence_sub_requests(&self) -> Result<Vec<UserId>> {
-        self.presence_sub_requests_repo.get_all().await
+        self.presence_sub_requests_repo
+            .get_all(&self.ctx.connected_account()?)
+            .await
     }
 
     async fn approve_presence_sub_request(&self, from: &UserId) -> Result<()> {
@@ -84,7 +97,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
             .approve_presence_sub_request(from)
             .await?;
 
-        if self.presence_sub_requests_repo.delete(from).await? {
+        if self
+            .presence_sub_requests_repo
+            .delete(&self.ctx.connected_account()?, from)
+            .await?
+        {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::PresenceSubRequestsChanged);
         }
@@ -99,7 +116,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
             .deny_presence_sub_request(from)
             .await?;
 
-        if self.presence_sub_requests_repo.delete(from).await? {
+        if self
+            .presence_sub_requests_repo
+            .delete(&self.ctx.connected_account()?, from)
+            .await?
+        {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::PresenceSubRequestsChanged);
         }
@@ -112,7 +133,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
         user_id: &UserId,
         subscription: PresenceSubscription,
     ) -> Result<()> {
-        if self.contact_list_repo.set(user_id, subscription).await? {
+        if self
+            .contact_list_repo
+            .set(&self.ctx.connected_account()?, user_id, subscription)
+            .await?
+        {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::ContactListChanged);
         }
@@ -120,7 +145,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
     }
 
     async fn handle_removed_contact(&self, user_id: &UserId) -> Result<()> {
-        if self.contact_list_repo.delete(user_id).await? {
+        if self
+            .contact_list_repo
+            .delete(&self.ctx.connected_account()?, user_id)
+            .await?
+        {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::ContactListChanged);
         }
@@ -128,7 +157,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
     }
 
     async fn handle_presence_sub_request(&self, from: &UserId) -> Result<()> {
-        if self.presence_sub_requests_repo.set(from).await? {
+        if self
+            .presence_sub_requests_repo
+            .set(&self.ctx.connected_account()?, from)
+            .await?
+        {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::PresenceSubRequestsChanged);
         }
@@ -136,8 +169,11 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
     }
 
     async fn clear_cache(&self) -> Result<()> {
-        self.contact_list_repo.clear_cache().await?;
-        self.presence_sub_requests_repo.clear_cache().await?;
+        let account = self.ctx.connected_account()?;
+        self.contact_list_repo.clear_cache(&account).await?;
+        self.presence_sub_requests_repo
+            .clear_cache(&account)
+            .await?;
         Ok(())
     }
 }

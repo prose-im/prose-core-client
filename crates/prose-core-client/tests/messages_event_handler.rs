@@ -42,8 +42,11 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("group@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("group@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     {
@@ -52,8 +55,11 @@ async fn test_receiving_message_adds_item_to_sidebar_if_needed() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("group@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("group@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.sidebar_domain_service
@@ -126,8 +132,11 @@ async fn test_receiving_message_from_new_contact_creates_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("jane.doe@prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("jane.doe@prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.sidebar_domain_service
@@ -234,8 +243,11 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("room@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.messages_repo
@@ -328,8 +340,11 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("room@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.sidebar_domain_service
@@ -391,7 +406,7 @@ async fn test_dispatches_messages_appended_for_new_received_message() -> Result<
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .return_once(|_| Some(room));
+            .return_once(|_, _| Some(room));
     }
 
     deps.messages_repo
@@ -448,7 +463,7 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .return_once(|_| Some(room));
+            .return_once(|_, _| Some(room));
     }
 
     // sidebar_domain_service.handle_received_message should not be called
@@ -521,8 +536,11 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .times(2)
-            .with(predicate::eq(bare!("room@groups.prose.org")))
-            .returning(move |_| Some(room.clone()));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@groups.prose.org")),
+            )
+            .returning(move |_, _| Some(room.clone()));
     }
 
     // sidebar_domain_service.handle_received_message should not be called
@@ -588,7 +606,7 @@ async fn test_dispatches_messages_updated_for_existing_received_message() -> Res
         let room = room.clone();
         deps.connected_rooms_repo
             .expect_get()
-            .return_once(|_| Some(room));
+            .return_once(|_, _| Some(room));
     }
 
     deps.messages_repo
@@ -637,7 +655,7 @@ async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()>
         deps.connected_rooms_repo
             .expect_get()
             .times(2)
-            .returning(move |_| Some(room.clone()));
+            .returning(move |_, _| Some(room.clone()));
     }
 
     deps.messages_repo
@@ -701,7 +719,7 @@ async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_m
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .returning(move |_| Some(room.clone()));
+            .returning(move |_, _| Some(room.clone()));
     }
 
     deps.messages_repo

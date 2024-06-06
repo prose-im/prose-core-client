@@ -15,8 +15,7 @@ use crate::domain::messaging::models::{
     ArchivedMessageRef, MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
 };
 use crate::domain::messaging::repos::MessagesRepository;
-use crate::domain::shared::models::RoomId;
-use crate::dtos::UserId;
+use crate::domain::shared::models::{AccountId, RoomId};
 use crate::infra::messaging::MessageRecord;
 
 // TODO: Incorporate MessageArchiveService, cache complete pages loaded from the server
@@ -36,7 +35,7 @@ impl CachingMessageRepository {
 impl MessagesRepository for CachingMessageRepository {
     async fn get(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         id: &MessageId,
     ) -> Result<Vec<MessageLike>> {
@@ -45,7 +44,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn get_all(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         ids: &[MessageId],
     ) -> Result<Vec<MessageLike>> {
@@ -103,7 +102,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn get_messages_targeting(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         targeted_ids: &[MessageTargetId],
         newer_than: &DateTime<Utc>,
@@ -152,7 +151,12 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(messages)
     }
 
-    async fn contains(&self, account: &UserId, room_id: &RoomId, id: &MessageId) -> Result<bool> {
+    async fn contains(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        id: &MessageId,
+    ) -> Result<bool> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
@@ -167,7 +171,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn append(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         messages: &[MessageLike],
     ) -> Result<()> {
@@ -187,7 +191,7 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(())
     }
 
-    async fn clear_cache(&self, account: &UserId) -> Result<()> {
+    async fn clear_cache(&self, account: &AccountId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[MessageRecord::collection()])
@@ -203,7 +207,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn resolve_message_id(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         stanza_id: &StanzaId,
     ) -> Result<Option<MessageId>> {
@@ -221,7 +225,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn get_last_received_message(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         before: Option<DateTime<Utc>>,
     ) -> Result<Option<ArchivedMessageRef>> {
@@ -271,7 +275,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn get_last_message(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
     ) -> Result<Option<MessageRef>> {
         let tx = self
@@ -304,7 +308,7 @@ impl MessagesRepository for CachingMessageRepository {
 
     async fn get_messages_after(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         after: DateTime<Utc>,
     ) -> Result<Vec<MessageLike>> {

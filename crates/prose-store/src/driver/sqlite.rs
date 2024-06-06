@@ -780,11 +780,29 @@ impl<'tx> WritableCollection<'tx> for SqliteCollection<'tx, ReadWrite> {
         Ok(())
     }
 
-    fn delete<K: KeyType + ?Sized>(&self, key: &K) -> Result<(), Self::Error> {
+    async fn delete<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<(), Self::Error> {
+        let values = key.to_raw_keys();
+        let columns = self.qualified_key_columns();
+
+        assert_eq!(
+            values.len(),
+            columns.len(),
+            "The number of tuple fields should match the number of columns in the index"
+        );
+
+        let sql = format!(
+            r#"DELETE FROM "{}" WHERE {}"#,
+            self.name,
+            columns
+                .iter()
+                .map(|column| format!("{column} = ?"))
+                .collect::<Vec<_>>()
+                .join(" AND ")
+        );
+
         let conn = self.obj.lock()?;
-        let mut statement =
-            conn.prepare(&format!(r#"DELETE FROM '{}' WHERE "key" = ?"#, self.name))?;
-        statement.execute(params![key.to_raw_key()])?;
+        let mut statement = conn.prepare(&sql)?;
+        statement.execute(params_from_iter(values))?;
         Ok(())
     }
 

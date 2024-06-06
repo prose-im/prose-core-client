@@ -52,17 +52,20 @@ async fn test_extend_items_inserts_items() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get_all()
             .once()
-            .return_once(|| rooms);
+            .return_once(|_| rooms);
     }
 
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Room::pending(
-            &Bookmark::try_from(&room1).unwrap(),
-            "user1#3dea7f2",
-        )))
-        .return_once(|_| Ok(()));
+        .with(
+            predicate::always(),
+            predicate::eq(Room::pending(
+                &Bookmark::try_from(&room1).unwrap(),
+                "user1#3dea7f2",
+            )),
+        )
+        .return_once(|_, _| Ok(()));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -124,7 +127,7 @@ async fn test_extend_items_updates_room() -> Result<()> {
             .expect_get_all()
             .once()
             .in_sequence(&mut seq)
-            .return_once(|| vec![room]);
+            .return_once(|_| vec![room]);
     }
 
     deps.client_event_dispatcher
@@ -168,12 +171,12 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get_all()
         .once()
-        .return_once(|| vec![]);
+        .return_once(|_| vec![]);
 
     deps.connected_rooms_repo
         .expect_set()
         .times(4)
-        .returning(|_| Ok(()));
+        .returning(|_, _| Ok(()));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -278,8 +281,11 @@ async fn test_extend_items_deletes_hidden_gone_rooms() -> Result<()> {
         deps.connected_rooms_repo
             .expect_delete()
             .once()
-            .with(predicate::eq(bare!("hidden-gone-group@muc.prose.org")))
-            .return_once(|_| Some(room3));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("hidden-gone-group@muc.prose.org")),
+            )
+            .return_once(|_, _| Some(room3));
     }
 
     deps.bookmarks_service
@@ -311,8 +317,11 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
-        .return_once(move |_| {
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("channel@conference.prose.org")),
+        )
+        .return_once(move |_, _| {
             Some(
                 Room::public_channel(muc_id!("channel@conference.prose.org"))
                     .with_name("Channel Name"),
@@ -322,8 +331,11 @@ async fn test_removes_public_channel_from_sidebar() -> Result<()> {
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("channel@conference.prose.org")))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("channel@conference.prose.org")),
+        )
+        .return_once(|_, _| None);
 
     deps.room_management_service
         .expect_exit_room()
@@ -366,8 +378,11 @@ async fn test_removes_direct_message_from_sidebar() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("contact@prose.org")))
-            .return_once(move |_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("contact@prose.org")),
+            )
+            .return_once(move |_, _| Some(room));
     }
 
     deps.bookmarks_service
@@ -379,8 +394,11 @@ async fn test_removes_direct_message_from_sidebar() -> Result<()> {
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("contact@prose.org")))
-        .return_once(|_| Some(room));
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("contact@prose.org")),
+        )
+        .return_once(|_, _| Some(room));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -407,15 +425,21 @@ async fn test_handles_removed_direct_message() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("contact@prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("contact@prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("contact@prose.org")))
-        .return_once(|_| Some(room));
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("contact@prose.org")),
+        )
+        .return_once(|_, _| Some(room));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -444,8 +468,11 @@ async fn test_removes_group_from_sidebar() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("group@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("group@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.bookmarks_service
@@ -491,8 +518,11 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("channel@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("channel@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.bookmarks_service
@@ -519,8 +549,11 @@ async fn test_removes_private_channel_from_sidebar() -> Result<()> {
         deps.connected_rooms_repo
             .expect_delete()
             .once()
-            .with(predicate::eq(bare!("channel@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("channel@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     // Unlike public channels, private channels should never be deleted. Otherwise we cannot
@@ -555,8 +588,11 @@ async fn test_insert_item_for_received_group_message_if_needed() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("group@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("group@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.bookmarks_service
@@ -600,8 +636,11 @@ async fn test_insert_item_for_received_direct_message_if_needed() -> Result<()> 
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("contact@prose.org")))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("contact@prose.org")),
+        )
+        .return_once(|_, _| None);
 
     deps.rooms_domain_service
         .expect_create_or_join_room()
@@ -666,8 +705,11 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("room@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.rooms_domain_service
@@ -719,8 +761,11 @@ async fn test_toggle_favorite() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("channel@conference.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("channel@conference.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.bookmarks_service
@@ -830,9 +875,12 @@ async fn test_destroys_room_and_deletes_bookmark() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
+        .return_once(|_, _| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
 
     deps.room_management_service
         .expect_destroy_room()
@@ -847,9 +895,12 @@ async fn test_destroys_room_and_deletes_bookmark() -> Result<()> {
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
+        .return_once(|_, _| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
 
     deps.bookmarks_service
         .expect_delete_bookmark()
@@ -881,9 +932,12 @@ async fn test_does_not_delete_bookmark_when_destroy_room_fails() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
+        .return_once(|_, _| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
 
     deps.room_management_service
         .expect_destroy_room()
@@ -913,9 +967,12 @@ async fn test_deletes_bookmark_when_trying_to_destroy_gone_room() -> Result<()> 
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
+        .return_once(|_, _| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
 
     deps.room_management_service
         .expect_destroy_room()
@@ -941,9 +998,12 @@ async fn test_deletes_bookmark_when_trying_to_destroy_gone_room() -> Result<()> 
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
+        .return_once(|_, _| Some(Room::private_channel(muc_id!("room@conf.prose.org"))));
 
     deps.bookmarks_service
         .expect_delete_bookmark()
@@ -985,9 +1045,12 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("group@muc.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("group@muc.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| {
+        .return_once(|_, _| {
             Some(
                 Room::group(muc_id!("group@muc.prose.org"))
                     .with_name("Destroyed Group")
@@ -998,23 +1061,29 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("channel@muc.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("channel@muc.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| None);
+        .return_once(|_, _| None);
 
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Room::pending(
-            &Bookmark {
-                name: "Destroyed Group".to_string(),
-                jid: muc_id!("channel@muc.prose.org").into(),
-                r#type: BookmarkType::Group,
-                sidebar_state: RoomSidebarState::Favorite,
-            },
-            "user1#3dea7f2",
-        )))
-        .return_once(|_| Ok(()));
+        .with(
+            predicate::always(),
+            predicate::eq(Room::pending(
+                &Bookmark {
+                    name: "Destroyed Group".to_string(),
+                    jid: muc_id!("channel@muc.prose.org").into(),
+                    r#type: BookmarkType::Group,
+                    sidebar_state: RoomSidebarState::Favorite,
+                },
+                "user1#3dea7f2",
+            )),
+        )
+        .return_once(|_, _| Ok(()));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -1102,8 +1171,11 @@ async fn test_handles_destroyed_room_without_alternate_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("room@conf.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conf.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.client_event_dispatcher
@@ -1150,8 +1222,11 @@ async fn test_handles_temporary_removal_from_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("room@conf.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conf.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.client_event_dispatcher
@@ -1198,8 +1273,11 @@ async fn test_handles_permanent_removal_from_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("room@conf.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conf.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.client_event_dispatcher
@@ -1236,8 +1314,11 @@ async fn test_handles_changed_room_config() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(bare!("room@conf.prose.org")))
-        .return_once(move |_| {
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
+        .return_once(move |_, _| {
             Some(
                 Room::private_channel(muc_id!("room@conf.prose.org"))
                     .with_name("Old Room Name")
@@ -1289,8 +1370,11 @@ async fn test_ignores_changed_config_for_connecting_room() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
-        .return_once(move |_| {
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
+        .return_once(move |_, _| {
             Some(Room::connecting(
                 &muc_id!("room@conf.prose.org").into(),
                 "nick",
@@ -1359,7 +1443,7 @@ async fn test_updates_sidebar_state_of_already_joined_room_if_needed() -> Result
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .return_once(|_| {
+        .return_once(|_, _| {
             Some(
                 Room::private_channel(muc_id!("room@conf.prose.org"))
                     .with_sidebar_state(RoomSidebarState::NotInSidebar),
@@ -1461,7 +1545,7 @@ async fn test_does_not_update_sidebar_state_of_already_joined_room_if_not_needed
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .return_once(|_| {
+        .return_once(|_, _| {
             Some(
                 Room::private_channel(muc_id!("room@conf.prose.org"))
                     .with_sidebar_state(RoomSidebarState::Favorite),

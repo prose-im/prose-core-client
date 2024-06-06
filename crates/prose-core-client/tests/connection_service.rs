@@ -13,9 +13,9 @@ use prose_core_client::app::deps::DynAppContext;
 use prose_core_client::app::services::ConnectionService;
 use prose_core_client::domain::connection::models::ServerFeatures;
 use prose_core_client::domain::settings::models::AccountSettings;
-use prose_core_client::domain::shared::models::{Availability, UserId, UserResourceId};
+use prose_core_client::domain::shared::models::{AccountId, Availability, UserId, UserResourceId};
 use prose_core_client::test::MockAppDependencies;
-use prose_core_client::{user_id, user_resource_id, ClientEvent, ConnectionEvent};
+use prose_core_client::{account_id, user_id, user_resource_id, ClientEvent, ConnectionEvent};
 use prose_xmpp::test::ConstantIDProvider;
 use prose_xmpp::{bare, ConnectionError};
 
@@ -36,7 +36,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
     deps.user_profile_repo
         .expect_reset_after_reconnect()
         .once()
-        .return_once(|| Box::pin(async {}));
+        .return_once(|_| Box::pin(async {}));
 
     deps.short_id_provider = Arc::new(ConstantIDProvider::new("resource-id"));
 
@@ -83,7 +83,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(user_id!("jane.doe@prose.org")),
+            predicate::eq(account_id!("jane.doe@prose.org")),
             predicate::always(),
         )
         .return_once(|_, f| {
@@ -154,7 +154,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
     deps.user_profile_repo
         .expect_reset_after_reconnect()
         .once()
-        .return_once(|| Box::pin(async {}));
+        .return_once(|_| Box::pin(async {}));
 
     deps.account_settings_repo
         .expect_get()
@@ -200,7 +200,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .expect_update()
         .once()
         .with(
-            predicate::eq(user_id!("jane.doe@prose.org")),
+            predicate::eq(account_id!("jane.doe@prose.org")),
             predicate::always(),
         )
         .return_once(|_, f| {

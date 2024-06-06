@@ -35,8 +35,8 @@ pub struct PreKeyId(u32);
 #[serde(transparent)]
 pub struct SignedPreKeyId(u32);
 
-#[derive(Clone, Serialize, Deserialize)]
-pub struct SignedPreKeyRecord {
+#[derive(Clone)]
+pub struct SignedPreKey {
     pub id: SignedPreKeyId,
     pub public_key: PublicKey,
     pub private_key: PrivateKey,
@@ -51,8 +51,8 @@ pub struct PublicSignedPreKey {
     pub signature: Box<[u8]>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct PreKeyRecord {
+#[derive(Clone, Debug)]
+pub struct PreKey {
     pub id: PreKeyId,
     pub public_key: PublicKey,
     pub private_key: PrivateKey,
@@ -64,16 +64,17 @@ pub struct PublicPreKey {
     pub key: PublicKey,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct KyberPreKeyId(u32);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct KyberPreKeyRecord(Box<[u8]>);
+pub struct KyberPreKey(Box<[u8]>);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(transparent)]
-pub struct SenderKeyRecord(Box<[u8]>);
+pub struct SenderKey(Box<[u8]>);
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -118,6 +119,18 @@ impl IdentityKey {
     }
 }
 
+impl KyberPreKey {
+    pub fn into_inner(self) -> Box<[u8]> {
+        self.0
+    }
+}
+
+impl SenderKey {
+    pub fn into_inner(self) -> Box<[u8]> {
+        self.0
+    }
+}
+
 impl From<&[u8]> for PublicKey {
     fn from(value: &[u8]) -> Self {
         Self(value.into())
@@ -136,13 +149,13 @@ impl From<&[u8]> for IdentityKey {
     }
 }
 
-impl From<Box<[u8]>> for KyberPreKeyRecord {
+impl From<Box<[u8]>> for KyberPreKey {
     fn from(value: Box<[u8]>) -> Self {
         Self(value)
     }
 }
 
-impl From<Box<[u8]>> for SenderKeyRecord {
+impl From<Box<[u8]>> for SenderKey {
     fn from(value: Box<[u8]>) -> Self {
         Self(value)
     }
@@ -166,13 +179,13 @@ impl AsRef<[u8]> for PrivateKey {
     }
 }
 
-impl AsRef<[u8]> for KyberPreKeyRecord {
+impl AsRef<[u8]> for KyberPreKey {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
 }
 
-impl AsRef<[u8]> for SenderKeyRecord {
+impl AsRef<[u8]> for SenderKey {
     fn as_ref(&self) -> &[u8] {
         self.0.as_ref()
     }
@@ -250,7 +263,7 @@ impl KyberPreKeyId {
     }
 }
 
-impl PreKeyRecord {
+impl PreKey {
     pub fn into_public_pre_key(self) -> PublicPreKey {
         PublicPreKey {
             id: self.id,
@@ -259,7 +272,7 @@ impl PreKeyRecord {
     }
 }
 
-impl SignedPreKeyRecord {
+impl SignedPreKey {
     pub fn into_public_signed_pre_key(self) -> PublicSignedPreKey {
         PublicSignedPreKey {
             id: self.id,
@@ -285,7 +298,7 @@ impl Debug for PrivateKey {
     }
 }
 
-impl Debug for SignedPreKeyRecord {
+impl Debug for SignedPreKey {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SignedPreKeyRecord")
             .field("id", &self.id)

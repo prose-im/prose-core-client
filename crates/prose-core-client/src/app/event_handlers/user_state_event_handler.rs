@@ -51,15 +51,16 @@ impl ServerEventHandler for UserStateEventHandler {
 
 impl UserStateEventHandler {
     async fn handle_user_info_event(&self, event: UserInfoEvent) -> Result<()> {
-        let is_self_event = event.user_id == self.ctx.connected_id()?.into_user_id();
+        let account = self.ctx.connected_account()?;
+        let is_self_event = account == event.user_id;
 
         match event.r#type {
             UserInfoEventType::AvatarChanged { metadata } => {
                 self.user_info_repo
-                    .set_avatar_metadata(&event.user_id, &metadata)
+                    .set_avatar_metadata(&account, &event.user_id, &metadata)
                     .await?;
                 self.avatar_repo
-                    .precache_avatar_image(&event.user_id, &metadata.to_info())
+                    .precache_avatar_image(&account, &event.user_id, &metadata.to_info())
                     .await?;
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::AvatarChanged {
@@ -67,7 +68,9 @@ impl UserStateEventHandler {
                     });
             }
             UserInfoEventType::ProfileChanged { profile } => {
-                self.user_profile_repo.set(&event.user_id, &profile).await?;
+                self.user_profile_repo
+                    .set(&account, &event.user_id, &profile)
+                    .await?;
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ContactChanged {
                         ids: vec![event.user_id],
@@ -75,7 +78,7 @@ impl UserStateEventHandler {
             }
             UserInfoEventType::StatusChanged { status } => {
                 self.user_info_repo
-                    .set_user_activity(&event.user_id, status.as_ref())
+                    .set_user_activity(&account, &event.user_id, status.as_ref())
                     .await?;
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ContactChanged {

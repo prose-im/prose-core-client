@@ -7,18 +7,18 @@ use chrono::{DateTime, Utc};
 use jid::BareJid;
 use serde::{Deserialize, Serialize};
 
-use prose_store::prelude::Entity;
-use prose_store::{IndexSpec, KeyType, RawKey};
+use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{
     MessageLike, MessageLikeId, MessageLikePayload, MessageTargetId,
 };
-use crate::dtos::{MessageId, ParticipantId, RoomId, StanzaId, UserId};
+use crate::domain::shared::models::AccountId;
+use crate::dtos::{MessageId, ParticipantId, RoomId, StanzaId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MessageRecord {
     pub id: String,
-    pub account: UserId,
+    pub account: AccountId,
     pub room_id: RoomId,
     pub message_id: MessageLikeId,
     pub message_id_target: Option<MessageId>,
@@ -40,92 +40,16 @@ mod columns {
     pub const TIMESTAMP: &str = "timestamp";
 }
 
-impl MessageRecord {
-    pub fn account_idx() -> [&'static str; 1] {
-        [columns::ACCOUNT]
-    }
-
-    pub fn room_idx() -> [&'static str; 2] {
-        [columns::ACCOUNT, columns::ROOM_ID]
-    }
-
-    pub fn stanza_id_idx() -> [&'static str; 3] {
-        [columns::ACCOUNT, columns::ROOM_ID, columns::STANZA_ID]
-    }
-
-    pub fn stanza_id_target_idx() -> [&'static str; 3] {
-        [
-            columns::ACCOUNT,
-            columns::ROOM_ID,
-            columns::STANZA_ID_TARGET,
-        ]
-    }
-
-    pub fn message_id_idx() -> [&'static str; 3] {
-        [columns::ACCOUNT, columns::ROOM_ID, columns::MESSAGE_ID]
-    }
-
-    pub fn message_id_target_idx() -> [&'static str; 3] {
-        [
-            columns::ACCOUNT,
-            columns::ROOM_ID,
-            columns::MESSAGE_ID_TARGET,
-        ]
-    }
-
-    pub fn timestamp_idx() -> [&'static str; 3] {
-        [columns::ACCOUNT, columns::ROOM_ID, columns::TIMESTAMP]
-    }
-}
-
-impl Entity for MessageRecord {
-    type ID = String;
-
-    fn id(&self) -> &Self::ID {
-        &self.id
-    }
-
-    fn collection() -> &'static str {
-        "messages"
-    }
-
-    fn indexes() -> Vec<IndexSpec> {
-        vec![
-            IndexSpec::builder().add_column(columns::ACCOUNT).build(),
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .build(),
-            // Can't be unique, because stanzaId might be nil…
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .add_column(columns::STANZA_ID)
-                .build(),
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .add_column(columns::STANZA_ID_TARGET)
-                .build(),
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .add_column(columns::MESSAGE_ID)
-                .unique()
-                .build(),
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .add_column(columns::MESSAGE_ID_TARGET)
-                .build(),
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .add_column(columns::TIMESTAMP)
-                .build(),
-        ]
-    }
-}
+define_entity!(MessageRecord, "messages",
+    account_idx => { columns: [columns::ACCOUNT], unique: false },
+    room_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID], unique: false },
+    // Can't be unique, because stanzaId might be nil…
+    stanza_id_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID, columns::STANZA_ID], unique: false },
+    stanza_id_target_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID, columns::STANZA_ID_TARGET], unique: false },
+    message_id_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID, columns::MESSAGE_ID], unique: true },
+    message_id_target_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID, columns::MESSAGE_ID_TARGET], unique: false },
+    timestamp_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID, columns::TIMESTAMP], unique: false }
+);
 
 impl KeyType for MessageLikeId {
     fn to_raw_key(&self) -> RawKey {
@@ -146,7 +70,7 @@ impl KeyType for StanzaId {
 }
 
 impl MessageRecord {
-    pub fn from_message(account: UserId, room_id: RoomId, value: MessageLike) -> Self {
+    pub fn from_message(account: AccountId, room_id: RoomId, value: MessageLike) -> Self {
         let (stanza_id_target, message_id_target) = match value.target {
             Some(MessageTargetId::MessageId(id)) => (None, Some(id)),
             Some(MessageTargetId::StanzaId(id)) => (Some(id), None),

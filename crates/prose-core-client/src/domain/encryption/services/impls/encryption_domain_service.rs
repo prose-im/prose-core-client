@@ -32,7 +32,7 @@ use crate::domain::encryption::services::encryption_domain_service::{
 };
 use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload};
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::{AccountId, UserId};
 use crate::dtos::{EncryptionKey, MessageId, PreKeyId, RoomId};
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
@@ -63,13 +63,15 @@ const MAC_SIZE: usize = 16;
 impl EncryptionDomainServiceTrait for EncryptionDomainService {
     /// Generates the local device bundle and publishes it if needed.
     async fn initialize(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         self.unpublish_device_attempts.lock().clear();
         self.repair_session_attempts.lock().clear();
 
         // Initialize local bundle if needed…
         let bundle = match self
             .encryption_keys_repo
-            .get_local_device_bundle()
+            .get_local_device_bundle(&account)
             .await
             .context("Failed to load local device bundle.")?
         {
@@ -77,12 +79,15 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             None => {
                 let local_encryption_bundle = self
                     .encryption_service
-                    .generate_local_encryption_bundle(self.user_device_id_provider.new_id())
+                    .generate_local_encryption_bundle(
+                        &account,
+                        self.user_device_id_provider.new_id(),
+                    )
                     .await
                     .context("Failed to generate local encryption bundle.")?;
 
                 self.encryption_keys_repo
-                    .put_local_encryption_bundle(&local_encryption_bundle)
+                    .put_local_encryption_bundle(&account, &local_encryption_bundle)
                     .await
                     .context("Failed to save local encryption bundle")?;
 
@@ -90,9 +95,9 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             }
         };
 
-        let user_id = self.ctx.connected_id()?.into_user_id();
+        let user_id = account.to_user_id();
 
-        let mut devices = self.user_device_repo.get_all(&user_id).await?;
+        let mut devices = self.user_device_repo.get_all(&account, &user_id).await?;
         // Add our device to our device list if needed…
         if !devices
             .iter()
@@ -136,19 +141,21 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         recipient_ids: Vec<UserId>,
         message: String,
     ) -> Result<EncryptedPayload, EncryptionError> {
-        let current_user_id = self.ctx.connected_id()?.into_user_id();
+        let account = self.ctx.connected_account()?;
+        let current_user_id = account.to_user_id();
 
         let local_device = self
             .encryption_keys_repo
-            .get_local_device()
+            .get_local_device(&account)
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
         match self
             .start_sessions_if_needed(
+                &account,
                 &current_user_id,
                 self.user_device_repo
-                    .get_all(&current_user_id)
+                    .get_all(&account, &current_user_id)
                     .await?
                     .into_iter()
                     .filter(|device| device.id != local_device.device_id),
@@ -167,8 +174,11 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         for recipient_id in &recipient_ids {
             match self
                 .start_sessions_if_needed(
+                    &account,
                     recipient_id,
-                    self.user_device_repo.get_all(recipient_id).await?,
+                    self.user_device_repo
+                        .get_all(&account, recipient_id)
+                        .await?,
                 )
                 .await
             {
@@ -188,7 +198,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             for recipient_id in &recipient_ids {
                 let sessions = self
                     .session_repo
-                    .get_all_sessions(&recipient_id)
+                    .get_all_sessions(&account, &recipient_id)
                     .await?
                     .into_iter()
                     .filter(|session| session.is_active)
@@ -235,7 +245,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         // for devices which we have an active session with, i.e. devices that are actually trusted.
         // Otherwise, libsignal will choke later on.
         let our_active_device_ids = self
-            .get_active_and_trusted_device_ids(&current_user_id)
+            .get_active_and_trusted_device_ids(&account, &current_user_id)
             .await?;
 
         let encrypt_message_futures = our_active_device_ids
@@ -243,10 +253,13 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .filter(|device_id| device_id != &local_device.device_id)
             .map(|device_id| (&current_user_id, device_id))
             .chain(their_active_device_ids)
-            .map(|(user_id, device_id)| async move {
-                self.encryption_service
-                    .encrypt_key(user_id, &device_id, &dek_and_mac, &now)
-                    .await
+            .map(|(user_id, device_id)| {
+                let account = account.clone();
+                async move {
+                    self.encryption_service
+                        .encrypt_key(&account, user_id, &device_id, &dek_and_mac, &now)
+                        .await
+                }
             });
 
         let messages = join_all(encrypt_message_futures)
@@ -315,9 +328,14 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     }
 
     async fn finalize_decryption(&self, context: DecryptionContext) {
+        let Some(account) = self.ctx.connected_account().ok() else {
+            warn!("Could not finalize decryption session. Failed to determine connected account.");
+            return;
+        };
+
         let Some(local_device_id) = self
             .encryption_keys_repo
-            .get_local_device()
+            .get_local_device(&account)
             .await
             .ok()
             .unwrap_or_default()
@@ -334,7 +352,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         } = context.into_inner();
 
         if let Err(err) = self
-            .refresh_and_publish_prekeys(used_pre_keys.into_iter().collect())
+            .refresh_and_publish_prekeys(&account, used_pre_keys.into_iter().collect())
             .await
         {
             error!(
@@ -345,7 +363,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 
         for (sender_id, sender_device_id) in message_senders {
             if let Err(err) = self
-                .complete_session(&local_device_id, &sender_id, &sender_device_id)
+                .complete_session(&account, &local_device_id, &sender_id, &sender_device_id)
                 .await
             {
                 error!(
@@ -362,16 +380,18 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
                 .insert((sender_id.clone(), sender_device_id.clone()))
             {
                 _ = self
-                    .start_session_with_device(&sender_id, sender_device_id)
+                    .start_session_with_device(&account, &sender_id, sender_device_id)
                     .await;
             }
         }
     }
 
     async fn load_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
+        let account = self.ctx.connected_account()?;
+
         let this_device_id = if &self.ctx.connected_id()?.into_user_id() == user_id {
             self.encryption_keys_repo
-                .get_local_device()
+                .get_local_device(&account)
                 .await?
                 .map(|device| device.device_id)
         } else {
@@ -380,7 +400,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
 
         let device_infos = self
             .session_repo
-            .get_all_sessions(user_id)
+            .get_all_sessions(&account, user_id)
             .await?
             .into_iter()
             .filter_map(|session| {
@@ -405,9 +425,10 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     }
 
     async fn delete_device(&self, device_id: &DeviceId) -> Result<()> {
-        let user_id = self.ctx.connected_id()?.into_user_id();
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
 
-        let mut devices = self.user_device_repo.get_all(&user_id).await?;
+        let mut devices = self.user_device_repo.get_all(&account, &user_id).await?;
         let num_devices = devices.len();
         devices.retain(|device| &device.id != device_id);
 
@@ -416,7 +437,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         }
 
         self.user_device_repo
-            .set_all(&user_id, devices.clone())
+            .set_all(&account, &user_id, devices.clone())
             .await?;
 
         self.user_device_service
@@ -431,10 +452,10 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     }
 
     async fn disable_omemo(&self) -> Result<()> {
-        let devices = self
-            .user_device_repo
-            .get_all(&self.ctx.connected_id()?.into_user_id())
-            .await?;
+        let account = self.ctx.connected_account()?;
+        let user_id = account.to_user_id();
+
+        let devices = self.user_device_repo.get_all(&account, &user_id).await?;
 
         self.user_device_service.delete_device_list().await?;
 
@@ -454,12 +475,13 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         payload: KeyTransportPayload,
         context: Option<DecryptionContext>,
     ) -> Result<()> {
+        let account = self.ctx.connected_account()?;
         let needs_finalize_context = context.is_none();
         let context = context.unwrap_or_default();
 
         let local_device = self
             .encryption_keys_repo
-            .get_local_device()
+            .get_local_device(&account)
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
@@ -471,8 +493,14 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             context.insert_message_sender(sender_id.clone(), payload.device_id.clone());
         }
 
-        self.decrypt_key(&key, sender_id, &payload.device_id, context.clone())
-            .await?;
+        self.decrypt_key(
+            &account,
+            &key,
+            sender_id,
+            &payload.device_id,
+            context.clone(),
+        )
+        .await?;
 
         if needs_finalize_context {
             self.finalize_decryption(context).await;
@@ -486,19 +514,22 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         user_id: &UserId,
         device_list: DeviceList,
     ) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         // Did we just receive our own PubSub node?
-        if user_id != &self.ctx.connected_id()?.into_user_id() {
+        if &account != user_id {
             self.user_device_repo
-                .set_all(user_id, device_list.devices)
+                .set_all(&account, user_id, device_list.devices)
                 .await?;
             return Ok(());
         }
 
         self.user_device_repo
-            .set_all(user_id, device_list.devices.clone())
+            .set_all(&account, user_id, device_list.devices.clone())
             .await?;
 
-        let Some(current_device) = self.encryption_keys_repo.get_local_device().await? else {
+        let Some(current_device) = self.encryption_keys_repo.get_local_device(&account).await?
+        else {
             return Ok(());
         };
 
@@ -534,15 +565,20 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
     }
 
     async fn clear_cache(&self) -> Result<()> {
-        self.user_device_repo.clear_cache().await?;
-        self.encryption_keys_repo.clear_cache().await?;
-        self.session_repo.clear_cache().await?;
+        let account = self.ctx.connected_account()?;
+        self.user_device_repo.clear_cache(&account).await?;
+        self.encryption_keys_repo.clear_cache(&account).await?;
+        self.session_repo.clear_cache(&account).await?;
         Ok(())
     }
 }
 
 impl EncryptionDomainService {
-    async fn refresh_and_publish_prekeys(&self, used_pre_key_ids: Vec<PreKeyId>) -> Result<()> {
+    async fn refresh_and_publish_prekeys(
+        &self,
+        account: &AccountId,
+        used_pre_key_ids: Vec<PreKeyId>,
+    ) -> Result<()> {
         // No missing IDs, nothing to do…
         if used_pre_key_ids.is_empty() {
             return Ok(());
@@ -551,20 +587,20 @@ impl EncryptionDomainService {
         info!("Generating {} new PreKeys…", used_pre_key_ids.len());
         let refreshed_pre_keys = self
             .encryption_service
-            .generate_pre_keys_with_ids(used_pre_key_ids)
+            .generate_pre_keys_with_ids(account, used_pre_key_ids)
             .await
             .context("Failed to re-generate deleted PreKeys")?;
 
         info!("Saving new PreKeys…");
         self.encryption_keys_repo
-            .put_pre_keys(refreshed_pre_keys.as_slice())
+            .put_pre_keys(&account, refreshed_pre_keys.as_slice())
             .await
             .context("Failed to save re-generated PreKeys…")?;
 
         info!("Publishing bundle with new PreKeys…");
         let mut bundle = self
             .encryption_keys_repo
-            .get_local_device_bundle()
+            .get_local_device_bundle(&account)
             .await?
             .ok_or(anyhow!("Missing own device bundle"))?;
         bundle.pre_keys.sort_by_key(|key| key.id);
@@ -579,6 +615,7 @@ impl EncryptionDomainService {
 
     async fn decrypt_key(
         &self,
+        account: &AccountId,
         key: &EncryptionKey,
         sender_id: &UserId,
         sender_device_id: &DeviceId,
@@ -587,6 +624,7 @@ impl EncryptionDomainService {
         let dek_and_mac = self
             .encryption_service
             .decrypt_key(
+                account,
                 sender_id,
                 &sender_device_id,
                 &key.data.as_ref(),
@@ -608,9 +646,11 @@ impl EncryptionDomainService {
         payload: EncryptedPayload,
         context: DecryptionContext,
     ) -> Result<String, DecryptionError> {
+        let account = self.ctx.connected_account()?;
+
         let local_device = self
             .encryption_keys_repo
-            .get_local_device()
+            .get_local_device(&account)
             .await?
             .ok_or(anyhow!("Missing local encryption bundle"))?;
 
@@ -623,7 +663,13 @@ impl EncryptionDomainService {
         }
 
         let dek_and_mac = match self
-            .decrypt_key(&key, sender_id, &payload.device_id, context.clone())
+            .decrypt_key(
+                &account,
+                &key,
+                sender_id,
+                &payload.device_id,
+                context.clone(),
+            )
             .await
         {
             Ok(data) => data,
@@ -660,6 +706,7 @@ impl EncryptionDomainService {
 
     async fn complete_session(
         &self,
+        account: &AccountId,
         local_device_id: &DeviceId,
         sender_id: &UserId,
         sender_device_id: &DeviceId,
@@ -675,6 +722,7 @@ impl EncryptionDomainService {
         let encrypted_key = self
             .encryption_service
             .encrypt_key(
+                account,
                 sender_id,
                 sender_device_id,
                 &dek_and_mac,
@@ -707,6 +755,7 @@ impl EncryptionDomainService {
 
     async fn start_sessions_if_needed(
         &self,
+        account: &AccountId,
         user_id: &UserId,
         devices: impl IntoIterator<Item = Device>,
     ) -> Result<()> {
@@ -716,20 +765,20 @@ impl EncryptionDomainService {
             .collect::<Vec<_>>();
 
         self.session_repo
-            .put_active_devices(user_id, device_ids.as_slice())
+            .put_active_devices(account, user_id, device_ids.as_slice())
             .await?;
 
         join_all(device_ids.into_iter().map(|device_id| async move {
             if self
                 .session_repo
-                .get_session(user_id, &device_id)
+                .get_session(account, user_id, &device_id)
                 .await?
                 .is_some()
             {
                 return Ok(());
             }
 
-            self.start_session_with_device(user_id, device_id.clone())
+            self.start_session_with_device(account, user_id, device_id.clone())
                 .await
                 .with_context(|| format!("Failed to start session with {user_id} ({})", device_id))
         }))
@@ -740,7 +789,12 @@ impl EncryptionDomainService {
         Ok(())
     }
 
-    async fn start_session_with_device(&self, user_id: &UserId, device_id: DeviceId) -> Result<()> {
+    async fn start_session_with_device(
+        &self,
+        account: &AccountId,
+        user_id: &UserId,
+        device_id: DeviceId,
+    ) -> Result<()> {
         info!("Starting OMEMO session with {user_id} ({device_id})…");
 
         let Some(bundle) = self
@@ -751,13 +805,13 @@ impl EncryptionDomainService {
         else {
             info!("No device bundle found for {user_id} ({device_id}).");
 
-            if user_id == &self.ctx.connected_account()?
+            if account == user_id
                 && self
                     .unpublish_device_attempts
                     .lock()
                     .insert(device_id.clone())
             {
-                _ = self.unpublish_device(&device_id).await
+                _ = self.unpublish_device(account, &device_id).await
             }
 
             return Ok(());
@@ -776,19 +830,19 @@ impl EncryptionDomainService {
 
         match self
             .encryption_service
-            .process_pre_key_bundle(&user_id, pre_key_bundle)
+            .process_pre_key_bundle(account, &user_id, pre_key_bundle)
             .await
             .with_context(|| format!("Failed to process PreKey bundle for {user_id} ({device_id})"))
         {
             Ok(_) => (),
             Err(err) => {
-                if user_id == &self.ctx.connected_account()?
+                if account == user_id
                     && self
                         .unpublish_device_attempts
                         .lock()
                         .insert(device_id.clone())
                 {
-                    _ = self.unpublish_device(&device_id).await
+                    _ = self.unpublish_device(account, &device_id).await
                 }
                 return Err(err);
             }
@@ -797,10 +851,14 @@ impl EncryptionDomainService {
         Ok(())
     }
 
-    async fn get_active_and_trusted_device_ids(&self, user_id: &UserId) -> Result<Vec<DeviceId>> {
+    async fn get_active_and_trusted_device_ids(
+        &self,
+        account: &AccountId,
+        user_id: &UserId,
+    ) -> Result<Vec<DeviceId>> {
         Ok(self
             .session_repo
-            .get_all_sessions(user_id)
+            .get_all_sessions(account, user_id)
             .await?
             .into_iter()
             .filter_map(|session| {
@@ -810,10 +868,10 @@ impl EncryptionDomainService {
             .collect())
     }
 
-    async fn unpublish_device(&self, device_id: &DeviceId) -> Result<()> {
+    async fn unpublish_device(&self, account: &AccountId, device_id: &DeviceId) -> Result<()> {
         let mut devices = self
             .user_device_repo
-            .get_all(&self.ctx.connected_id()?.into_user_id())
+            .get_all(account, &account.to_user_id())
             .await?;
         let num_devices = devices.len();
 

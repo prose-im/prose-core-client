@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::settings::models::LocalRoomSettings;
-use crate::domain::shared::models::{RoomId, UserId};
+use crate::domain::shared::models::{AccountId, RoomId};
 
 type UpdateHandler = Box<dyn for<'a> FnOnce(&'a mut LocalRoomSettings) + Send>;
 
@@ -17,7 +17,12 @@ type UpdateHandler = Box<dyn for<'a> FnOnce(&'a mut LocalRoomSettings) + Send>;
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait LocalRoomSettingsRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get(&self, account: &UserId, room_id: &RoomId) -> Result<LocalRoomSettings>;
-    async fn update(&self, account: &UserId, room_id: &RoomId, block: UpdateHandler) -> Result<()>;
-    async fn clear_cache(&self, account: &UserId) -> Result<()>;
+    async fn get(&self, account: &AccountId, room_id: &RoomId) -> Result<LocalRoomSettings>;
+    async fn update(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        block: UpdateHandler,
+    ) -> Result<()>;
+    async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

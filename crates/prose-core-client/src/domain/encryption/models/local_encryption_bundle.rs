@@ -4,15 +4,15 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::domain::encryption::models::{
-    DeviceBundle, DeviceId, IdentityKeyPair, PreKeyRecord, SignedPreKeyRecord,
+    DeviceBundle, DeviceId, IdentityKeyPair, PreKey, SignedPreKey,
 };
 
 #[derive(Clone, Debug)]
 pub struct LocalEncryptionBundle {
     pub device_id: DeviceId,
     pub identity_key_pair: IdentityKeyPair,
-    pub signed_pre_key: SignedPreKeyRecord,
-    pub pre_keys: Vec<PreKeyRecord>,
+    pub signed_pre_key: SignedPreKey,
+    pub pre_keys: Vec<PreKey>,
 }
 
 impl LocalEncryptionBundle {

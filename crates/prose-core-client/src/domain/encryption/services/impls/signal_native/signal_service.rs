@@ -13,11 +13,12 @@ use tokio::sync::{mpsc, oneshot};
 
 use crate::app::deps::{DynEncryptionKeysRepository, DynRngProvider, DynSessionRepository};
 use crate::domain::encryption::models::{
-    DecryptionContext, DeviceId, LocalEncryptionBundle, PreKeyBundle, PreKeyId, PreKeyRecord,
-    PrivateKey, PublicKey, SignedPreKeyId, SignedPreKeyRecord,
+    DecryptionContext, DeviceId, LocalEncryptionBundle, PreKey, PreKeyBundle, PreKeyId, PrivateKey,
+    PublicKey, SignedPreKey, SignedPreKeyId,
 };
 use crate::domain::encryption::services::EncryptionService;
 use crate::domain::messaging::models::EncryptionKey;
+use crate::domain::shared::models::AccountId;
 use crate::dtos::UserId;
 
 use super::SignalRepoWrapper;
@@ -30,6 +31,7 @@ struct SignalService {
 }
 enum SignalServiceMessage {
     ProcessPreKeyBundle {
+        account: AccountId,
         user_id: UserId,
         device_id: DeviceId,
         bundle: libsignal_protocol::PreKeyBundle,
@@ -38,6 +40,7 @@ enum SignalServiceMessage {
     },
 
     EncryptKey {
+        account: AccountId,
         recipient_id: UserId,
         device_id: DeviceId,
         message: Box<[u8]>,
@@ -46,6 +49,7 @@ enum SignalServiceMessage {
     },
 
     DecryptKey {
+        account: AccountId,
         sender_id: UserId,
         device_id: DeviceId,
         encrypted_message: Box<[u8]>,
@@ -59,6 +63,7 @@ impl SignalService {
     async fn handle_message(&mut self, msg: SignalServiceMessage) {
         match msg {
             SignalServiceMessage::ProcessPreKeyBundle {
+                account,
                 user_id,
                 device_id,
                 bundle,
@@ -66,11 +71,12 @@ impl SignalService {
                 callback,
             } => {
                 _ = callback.send(
-                    self.process_prekey_bundle(user_id, device_id, bundle, now)
+                    self.process_prekey_bundle(account, user_id, device_id, bundle, now)
                         .await,
                 );
             }
             SignalServiceMessage::EncryptKey {
+                account,
                 recipient_id,
                 device_id,
                 message,
@@ -78,11 +84,12 @@ impl SignalService {
                 callback,
             } => {
                 _ = callback.send(
-                    self.encrypt_key(&recipient_id, device_id, message.as_ref(), &now)
+                    self.encrypt_key(account, &recipient_id, device_id, message.as_ref(), &now)
                         .await,
                 )
             }
             SignalServiceMessage::DecryptKey {
+                account,
                 sender_id,
                 device_id,
                 encrypted_message,
@@ -92,6 +99,7 @@ impl SignalService {
             } => {
                 _ = callback.send(
                     self.decrypt_key(
+                        account,
                         sender_id,
                         device_id,
                         encrypted_message,
@@ -106,12 +114,14 @@ impl SignalService {
 
     async fn process_prekey_bundle(
         &self,
+        account: AccountId,
         user_id: UserId,
         device_id: DeviceId,
         bundle: libsignal_protocol::PreKeyBundle,
         now: SystemTime,
     ) -> Result<()> {
         let signal_store = SignalRepoWrapper::new(
+            account,
             self.encryption_keys_repo.clone(),
             self.session_repo.clone(),
             None,
@@ -132,6 +142,7 @@ impl SignalService {
 
     async fn decrypt_key(
         &self,
+        account: AccountId,
         sender_id: UserId,
         device_id: DeviceId,
         encrypted_message: Box<[u8]>,
@@ -149,6 +160,7 @@ impl SignalService {
         };
 
         let signal_store = SignalRepoWrapper::new(
+            account,
             self.encryption_keys_repo.clone(),
             self.session_repo.clone(),
             Some(decryption_context),
@@ -171,12 +183,14 @@ impl SignalService {
 
     async fn encrypt_key(
         &self,
+        account: AccountId,
         user_id: &UserId,
         device_id: DeviceId,
         message: &[u8],
         now: &SystemTime,
     ) -> Result<EncryptionKey> {
         let signal_store = SignalRepoWrapper::new(
+            account,
             self.encryption_keys_repo.clone(),
             self.session_repo.clone(),
             None,
@@ -270,6 +284,7 @@ impl SignalServiceHandle {
 impl EncryptionService for SignalServiceHandle {
     async fn generate_local_encryption_bundle(
         &self,
+        _account: &AccountId,
         device_id: DeviceId,
     ) -> Result<LocalEncryptionBundle> {
         let now = Utc::now();
@@ -283,7 +298,7 @@ impl EncryptionService for SignalServiceHandle {
         let bundle = LocalEncryptionBundle {
             device_id,
             identity_key_pair: (&identity_key_pair).try_into()?,
-            signed_pre_key: SignedPreKeyRecord {
+            signed_pre_key: SignedPreKey {
                 id: SignedPreKeyId::from(0),
                 public_key: (&signed_pre_key.public_key).try_into()?,
                 private_key: (&signed_pre_key.private_key).try_into()?,
@@ -303,7 +318,7 @@ impl EncryptionService for SignalServiceHandle {
                         Err(err) => return Err(err),
                     };
 
-                    Ok(PreKeyRecord {
+                    Ok(PreKey {
                         id: PreKeyId::from(i),
                         public_key,
                         private_key,
@@ -315,7 +330,11 @@ impl EncryptionService for SignalServiceHandle {
         Ok(bundle)
     }
 
-    async fn generate_pre_keys_with_ids(&self, ids: Vec<PreKeyId>) -> Result<Vec<PreKeyRecord>> {
+    async fn generate_pre_keys_with_ids(
+        &self,
+        _account: &AccountId,
+        ids: Vec<PreKeyId>,
+    ) -> Result<Vec<PreKey>> {
         let mut rng = self.rng_provider.rng();
         let pre_keys = ids
             .into_iter()
@@ -331,7 +350,7 @@ impl EncryptionService for SignalServiceHandle {
                     Err(err) => return Err(err),
                 };
 
-                Ok(PreKeyRecord {
+                Ok(PreKey {
                     id: PreKeyId::from(id),
                     public_key,
                     private_key,
@@ -341,7 +360,12 @@ impl EncryptionService for SignalServiceHandle {
         Ok(pre_keys)
     }
 
-    async fn process_pre_key_bundle(&self, user_id: &UserId, bundle: PreKeyBundle) -> Result<()> {
+    async fn process_pre_key_bundle(
+        &self,
+        account: &AccountId,
+        user_id: &UserId,
+        bundle: PreKeyBundle,
+    ) -> Result<()> {
         let device_id = bundle.device_id.clone();
 
         let bundle = libsignal_protocol::PreKeyBundle::new(
@@ -356,6 +380,7 @@ impl EncryptionService for SignalServiceHandle {
 
         let (send, recv) = oneshot::channel();
         let message = SignalServiceMessage::ProcessPreKeyBundle {
+            account: account.clone(),
             user_id: user_id.clone(),
             device_id,
             bundle,
@@ -369,6 +394,7 @@ impl EncryptionService for SignalServiceHandle {
 
     async fn encrypt_key(
         &self,
+        account: &AccountId,
         recipient_id: &UserId,
         device_id: &DeviceId,
         message: &[u8],
@@ -376,6 +402,7 @@ impl EncryptionService for SignalServiceHandle {
     ) -> Result<EncryptionKey> {
         let (send, recv) = oneshot::channel();
         let message = SignalServiceMessage::EncryptKey {
+            account: account.clone(),
             recipient_id: recipient_id.clone(),
             device_id: device_id.clone(),
             message: message.into(),
@@ -389,6 +416,7 @@ impl EncryptionService for SignalServiceHandle {
 
     async fn decrypt_key(
         &self,
+        account: &AccountId,
         sender_id: &UserId,
         device_id: &DeviceId,
         message: &[u8],
@@ -397,6 +425,7 @@ impl EncryptionService for SignalServiceHandle {
     ) -> Result<Box<[u8]>> {
         let (send, recv) = oneshot::channel();
         let message = SignalServiceMessage::DecryptKey {
+            account: account.clone(),
             sender_id: sender_id.clone(),
             device_id: device_id.clone(),
             encrypted_message: message.into(),

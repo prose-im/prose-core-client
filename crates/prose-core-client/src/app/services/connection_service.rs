@@ -19,7 +19,7 @@ use crate::app::deps::{
 use crate::app::event_handlers::ServerEvent;
 use crate::client_event::ConnectionEvent;
 use crate::domain::connection::models::ConnectionProperties;
-use crate::domain::shared::models::ConnectionState;
+use crate::domain::shared::models::{AccountId, ConnectionState};
 use crate::dtos::{DecryptionContext, UserId};
 use crate::ClientEvent;
 
@@ -56,25 +56,27 @@ pub struct ConnectionService {
 impl ConnectionService {
     pub async fn connect(
         &self,
-        jid: &UserId,
+        user_id: &UserId,
         password: Secret<String>,
     ) -> Result<(), ConnectionError> {
         self.ctx.set_connection_state(ConnectionState::Connecting);
         self.offline_messages_repo.drain();
 
-        let settings =
-            self.account_settings_repo
-                .get(jid)
-                .await
-                .map_err(|err| ConnectionError::Generic {
-                    msg: err.to_string(),
-                })?;
+        let account = AccountId::from(user_id.clone().into_inner());
+
+        let settings = self
+            .account_settings_repo
+            .get(&account)
+            .await
+            .map_err(|err| ConnectionError::Generic {
+                msg: err.to_string(),
+            })?;
         let resource = settings
             .resource
             .unwrap_or_else(|| self.short_id_provider.new_id());
         let availability = settings.availability;
 
-        let full_jid = jid
+        let full_jid = user_id
             .with_resource(&resource)
             .expect("Failed to build FullJid with generated ID as resource.");
 
@@ -139,7 +141,7 @@ impl ConnectionService {
 
         self.account_settings_repo
             .update(
-                jid,
+                &account,
                 Box::new(move |settings| {
                     settings.resource = Some(resource);
                     settings.availability = availability;
@@ -161,7 +163,7 @@ impl ConnectionService {
                 msg: err.to_string(),
             })?;
 
-        self.user_profile_repo.reset_after_reconnect().await;
+        self.user_profile_repo.reset_after_reconnect(&account).await;
 
         self.ctx.set_connection_state(ConnectionState::Connected);
 

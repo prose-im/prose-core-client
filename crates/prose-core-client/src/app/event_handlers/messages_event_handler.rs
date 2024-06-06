@@ -27,8 +27,8 @@ use crate::domain::messaging::models::{
     MessageTargetId,
 };
 use crate::domain::rooms::models::Room;
-use crate::domain::shared::models::{ConnectionState, RoomId, UserEndpointId};
-use crate::dtos::{MessageId, OccupantId, ParticipantId, UserId};
+use crate::domain::shared::models::{AccountId, ConnectionState, RoomId, UserEndpointId};
+use crate::dtos::{MessageId, OccupantId, ParticipantId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
 
@@ -143,6 +143,8 @@ impl SentMessage {
 
 impl MessagesEventHandler {
     async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         match event.r#type {
             MessageEventType::Received(mut message) => {
                 // When we send a message to a MUC room we'll receive the same message from
@@ -158,7 +160,7 @@ impl MessagesEventHandler {
                     let from = OccupantId::from(from.clone());
                     let room_id = from.room_id();
 
-                    if let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) {
+                    if let Some(room) = self.connected_rooms_repo.get(&account, room_id.as_ref()) {
                         // Was the message sent by us?
                         if Some(from) == room.occupant_id() {
                             // Now we'll modify the message so that it looks like other "sent"
@@ -169,38 +171,42 @@ impl MessagesEventHandler {
                             message.from = message.to.take();
                             message.to = Some(room_id.into_bare().into());
                             return self
-                                .handle_sent_message(SentMessage::Message(message))
+                                .handle_sent_message(account, SentMessage::Message(message))
                                 .await;
                         }
                     }
                 }
-                self.handle_received_message(ReceivedMessage::Message(message))
+                self.handle_received_message(account, ReceivedMessage::Message(message))
                     .await?
             }
             MessageEventType::Sync(Carbon::Received(message)) => {
-                self.handle_received_message(ReceivedMessage::Carbon(message))
+                self.handle_received_message(account, ReceivedMessage::Carbon(message))
                     .await?
             }
             MessageEventType::Sync(Carbon::Sent(message)) => {
-                self.handle_sent_message(SentMessage::Carbon(message))
+                self.handle_sent_message(account, SentMessage::Carbon(message))
                     .await?
             }
             MessageEventType::Sent(message) => {
-                self.handle_sent_message(SentMessage::Message(message))
+                self.handle_sent_message(account, SentMessage::Message(message))
                     .await?
             }
         }
         Ok(())
     }
 
-    async fn handle_received_message(&self, message: ReceivedMessage) -> Result<()> {
+    async fn handle_received_message(
+        &self,
+        account: AccountId,
+        message: ReceivedMessage,
+    ) -> Result<()> {
         let Some(from) = message.from() else {
             error!("Received message from unknown sender.");
             return Ok(());
         };
 
         let room_id = from.to_room_id();
-        let room = self.connected_rooms_repo.get(room_id.as_ref());
+        let room = self.connected_rooms_repo.get(&account, room_id.as_ref());
         let now = self.time_provider.now();
 
         let parser = MessageParser::new(
@@ -249,17 +255,18 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
-        self.save_message_and_dispatch_event(room, message).await?;
+        self.save_message_and_dispatch_event(&account, room, message)
+            .await?;
         Ok(())
     }
 
-    async fn handle_sent_message(&self, message: SentMessage) -> Result<()> {
+    async fn handle_sent_message(&self, account: AccountId, message: SentMessage) -> Result<()> {
         let Some(room_id) = &message.room_id() else {
             error!("Sent message to unknown recipient.");
             return Ok(());
         };
 
-        let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
+        let Some(room) = self.connected_rooms_repo.get(&account, room_id.as_ref()) else {
             error!("Sent message to recipient ('{room_id}') for which we do not have a room.");
             return Ok(());
         };
@@ -287,23 +294,22 @@ impl MessagesEventHandler {
         // What we'll receive as the `from` in a parsed message would then be a
         // ParticipantId::Occupant('me@prose.org/res') which is clearly wrong. Which is why we just
         // take our connected jid and plug it into the `from`.
-        parsed_message.from = ParticipantId::User(self.ctx.connected_id()?.into_user_id());
+        parsed_message.from = ParticipantId::User(account.to_user_id());
 
-        self.save_message_and_dispatch_event(room, parsed_message)
+        self.save_message_and_dispatch_event(&account, room, parsed_message)
             .await?;
         Ok(())
     }
 
     async fn save_message_and_dispatch_event(
         &self,
+        account: &AccountId,
         room: Room,
         message: MessageLike,
     ) -> Result<()> {
-        let account = self.ctx.connected_account()?;
-
         let is_message_update = if let Some(message_id) = message.id.original_id() {
             self.messages_repo
-                .contains(&account, &room.room_id, message_id)
+                .contains(account, &room.room_id, message_id)
                 .await
                 .unwrap_or(false)
         } else {
@@ -318,7 +324,7 @@ impl MessagesEventHandler {
 
         if is_message_update {
             let message_id = if let Some(target_id) = message.target {
-                self.resolve_message_target_id(&account, &room.room_id, &message.id, target_id)
+                self.resolve_message_target_id(account, &room.room_id, &message.id, target_id)
                     .await
             } else {
                 None
@@ -336,7 +342,7 @@ impl MessagesEventHandler {
 
         let event_type = if let Some(target) = message.target {
             let Some(message_id) = self
-                .resolve_message_target_id(&account, &room.room_id, &message.id, target)
+                .resolve_message_target_id(account, &room.room_id, &message.id, target)
                 .await
             else {
                 return Ok(());
@@ -365,7 +371,7 @@ impl MessagesEventHandler {
 
     async fn resolve_message_target_id(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         message_id: &MessageLikeId,
         target_id: MessageTargetId,

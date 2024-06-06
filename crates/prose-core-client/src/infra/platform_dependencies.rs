@@ -34,8 +34,9 @@ use crate::infra::contacts::{
     CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
 };
 use crate::infra::encryption::{
-    encryption_keys_collections, CachingUserDeviceRepository, EncryptionKeysRepository,
-    SessionRepository, UserDeviceRecord,
+    CachingUserDeviceRepository, EncryptionKeysRepository, KyberPreKeyRecord, LocalDeviceRecord,
+    PreKeyRecord, SenderKeyRecord, SessionRecord, SessionRepository, SignedPreKeyRecord,
+    UserDeviceRecord,
 };
 use crate::infra::messaging::{
     CachingMessageRepository, DraftsRecord, DraftsRepository, MessageRecord,
@@ -66,7 +67,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 26;
+const DB_VERSION: u32 = 27;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -103,21 +104,22 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         if event.old_version < 16 {
             create_collection::<D, UserDeviceRecord>(&tx)?;
             tx.create_collection("omemo_identity")?;
-            tx.create_collection(encryption_keys_collections::LOCAL_DEVICE)?;
-            tx.create_collection(encryption_keys_collections::PRE_KEY)?;
-            tx.create_collection(encryption_keys_collections::SENDER_KEY)?;
-            tx.create_collection(encryption_keys_collections::SESSION_RECORD)?;
-            tx.create_collection(encryption_keys_collections::SIGNED_PRE_KEY)?;
+
+            create_collection::<D, LocalDeviceRecord>(&tx)?;
+            create_collection::<D, PreKeyRecord>(&tx)?;
+            create_collection::<D, SenderKeyRecord>(&tx)?;
+            create_collection::<D, SessionRecord>(&tx)?;
+            create_collection::<D, SignedPreKeyRecord>(&tx)?;
         }
 
         if event.old_version < 17 {
-            tx.create_collection(encryption_keys_collections::KYBER_PRE_KEY)?;
+            create_collection::<D, KyberPreKeyRecord>(&tx)?;
         }
 
         if event.old_version < 19 {
             tx.delete_collection("omemo_identity")?;
-            tx.delete_collection(encryption_keys_collections::SESSION_RECORD)?;
-            tx.create_collection(encryption_keys_collections::SESSION_RECORD)?;
+            tx.delete_collection(SessionRecord::collection())?;
+            create_collection::<D, SessionRecord>(&tx)?;
         }
 
         if event.old_version < 20 {
@@ -151,6 +153,32 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         if event.old_version < 26 {
             tx.delete_collection(MessageRecord::collection())?;
             create_collection::<D, MessageRecord>(&tx)?;
+        }
+
+        if event.old_version < 27 {
+            tx.delete_collection(LocalDeviceRecord::collection())?;
+            tx.delete_collection(PreKeyRecord::collection())?;
+            tx.delete_collection(SenderKeyRecord::collection())?;
+            tx.delete_collection(SessionRecord::collection())?;
+            tx.delete_collection(SignedPreKeyRecord::collection())?;
+            tx.delete_collection(KyberPreKeyRecord::collection())?;
+
+            create_collection::<D, LocalDeviceRecord>(&tx)?;
+            create_collection::<D, PreKeyRecord>(&tx)?;
+            create_collection::<D, SenderKeyRecord>(&tx)?;
+            create_collection::<D, SessionRecord>(&tx)?;
+            create_collection::<D, SignedPreKeyRecord>(&tx)?;
+            create_collection::<D, KyberPreKeyRecord>(&tx)?;
+
+            tx.delete_collection(UserInfoRecord::collection())?;
+            tx.delete_collection(UserProfileRecord::collection())?;
+            tx.delete_collection(DraftsRecord::collection())?;
+            tx.delete_collection(UserDeviceRecord::collection())?;
+
+            create_collection::<D, UserInfoRecord>(&tx)?;
+            create_collection::<D, UserProfileRecord>(&tx)?;
+            create_collection::<D, DraftsRecord>(&tx)?;
+            create_collection::<D, UserDeviceRecord>(&tx)?;
         }
 
         Ok(())
@@ -278,6 +306,7 @@ impl From<PlatformDependencies> for AppDependencies {
         ));
 
         let contact_list_domain_service_dependencies = ContactListDomainServiceDependencies {
+            ctx: ctx.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
             contact_list_repo: Arc::new(CachingContactsRepository::new(d.xmpp.clone())),
             contact_list_service: d.xmpp.clone(),
@@ -289,6 +318,7 @@ impl From<PlatformDependencies> for AppDependencies {
         ));
 
         let block_list_domain_service_dependencies = BlockListDomainServiceDependencies {
+            ctx: ctx.clone(),
             block_list_repo: Arc::new(CachingBlockListRepository::new(d.xmpp.clone())),
             block_list_service: d.xmpp.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),

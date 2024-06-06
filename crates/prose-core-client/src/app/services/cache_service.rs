@@ -41,17 +41,18 @@ impl CacheService {
     pub async fn clear_cache(&self) -> Result<()> {
         let account = self.ctx.connected_account()?;
 
-        self.account_settings_repo.clear_cache().await?;
-        self.avatar_repo.clear_cache().await?;
+        self.account_settings_repo.clear_cache(&account).await?;
+        self.avatar_repo.clear_cache(&account).await?;
+        self.drafts_repo.clear_cache(&account).await?;
+        self.local_room_settings_repo.clear_cache(&account).await?;
+        self.messages_repo.clear_cache(&account).await?;
+        self.user_info_repo.clear_cache(&account).await?;
+        self.user_profile_repo.clear_cache(&account).await?;
+
         self.block_list_domain_service.clear_cache().await?;
         self.contact_list_domain_service.clear_cache().await?;
-        self.drafts_repo.clear_cache().await?;
         self.encryption_domain_service.clear_cache().await?;
-        self.messages_repo.clear_cache(&account).await?;
-        self.local_room_settings_repo.clear_cache(&account).await?;
         self.sidebar_domain_service.clear_cache().await?;
-        self.user_info_repo.clear_cache().await?;
-        self.user_profile_repo.clear_cache().await?;
 
         Ok(())
     }

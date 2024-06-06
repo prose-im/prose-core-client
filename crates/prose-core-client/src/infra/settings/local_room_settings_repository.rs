@@ -9,18 +9,19 @@ use serde::{Deserialize, Serialize};
 
 use prose_store::prelude::{Entity, PlatformDriver, Store};
 use prose_store::{
-    Database, IndexSpec, IndexedCollection, Query, ReadTransaction, ReadableCollection,
-    WritableCollection, WriteTransaction,
+    define_entity, Database, IndexSpec, IndexedCollection, Query, ReadTransaction,
+    ReadableCollection, WritableCollection, WriteTransaction,
 };
 
 use crate::domain::settings::models::LocalRoomSettings;
 use crate::domain::settings::repos::LocalRoomSettingsRepository as LocalRoomSettingsRepositoryTrait;
-use crate::dtos::{RoomId, UserId};
+use crate::domain::shared::models::AccountId;
+use crate::dtos::RoomId;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LocalRoomSettingsRecord {
     id: String,
-    account: UserId,
+    account: AccountId,
     room_id: RoomId,
     payload: LocalRoomSettings,
 }
@@ -30,38 +31,10 @@ mod columns {
     pub const ROOM_ID: &str = "room_id";
 }
 
-impl LocalRoomSettingsRecord {
-    fn account_idx() -> [&'static str; 1] {
-        [columns::ACCOUNT]
-    }
-
-    fn room_idx() -> [&'static str; 2] {
-        [columns::ACCOUNT, columns::ROOM_ID]
-    }
-}
-
-impl Entity for LocalRoomSettingsRecord {
-    type ID = String;
-
-    fn id(&self) -> &Self::ID {
-        &self.id
-    }
-
-    fn collection() -> &'static str {
-        "room_settings_local"
-    }
-
-    fn indexes() -> Vec<IndexSpec> {
-        vec![
-            IndexSpec::builder().add_column(columns::ACCOUNT).build(),
-            IndexSpec::builder()
-                .add_column(columns::ACCOUNT)
-                .add_column(columns::ROOM_ID)
-                .unique()
-                .build(),
-        ]
-    }
-}
+define_entity!(LocalRoomSettingsRecord, "room_settings_local",
+    account_idx => { columns: [columns::ACCOUNT], unique: false },
+    room_idx => { columns: [columns::ACCOUNT, columns::ROOM_ID], unique: true }
+);
 
 pub struct LocalRoomSettingsRepository {
     store: Store<PlatformDriver>,
@@ -76,7 +49,7 @@ impl LocalRoomSettingsRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl LocalRoomSettingsRepositoryTrait for LocalRoomSettingsRepository {
-    async fn get(&self, account: &UserId, room_id: &RoomId) -> Result<LocalRoomSettings> {
+    async fn get(&self, account: &AccountId, room_id: &RoomId) -> Result<LocalRoomSettings> {
         let tx = self
             .store
             .transaction_for_reading(&[LocalRoomSettingsRecord::collection()])
@@ -91,7 +64,7 @@ impl LocalRoomSettingsRepositoryTrait for LocalRoomSettingsRepository {
 
     async fn update(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         block: Box<dyn for<'a> FnOnce(&'a mut LocalRoomSettings) + Send>,
     ) -> Result<()> {
@@ -117,7 +90,7 @@ impl LocalRoomSettingsRepositoryTrait for LocalRoomSettingsRepository {
         Ok(())
     }
 
-    async fn clear_cache(&self, account: &UserId) -> Result<()> {
+    async fn clear_cache(&self, account: &AccountId) -> Result<()> {
         let tx = self
             .store
             .transaction_for_reading_and_writing(&[LocalRoomSettingsRecord::collection()])

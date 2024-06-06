@@ -136,7 +136,7 @@ impl Client {
         logger: JSLogger,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
-        let store = open_store(PlatformDriver::new("ProseCache2")).await?;
+        let store = open_store(PlatformDriver::new("ProseDB")).await?;
         let config = config.unwrap_or_default();
 
         static LOGGING_INITIALIZED: AtomicBool = AtomicBool::new(false);

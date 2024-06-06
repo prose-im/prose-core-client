@@ -6,11 +6,12 @@
 use anyhow::Result;
 use minidom::Element;
 
+use prose_core_client::domain::shared::models::AccountId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
 use prose_core_client::dtos::{
     DeviceBundle, MucId, RoomId, SendMessageRequest, SendMessageRequestBody, UserId,
 };
-use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
+use prose_core_client::{account_id, muc_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
 
 use crate::tests::client::helpers::{TestClient, TestDeviceBundle};
@@ -595,19 +596,19 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
     client.expect_load_device_bundle(
         &user_id!("user1@prose.org"),
         &100.into(),
-        Some(DeviceBundle::test(100).await),
+        Some(DeviceBundle::test(account_id!("user1@prose.org"), 100).await),
     );
     client.expect_load_device_bundle(
         &user_id!("user1@prose.org"),
         &101.into(),
-        Some(DeviceBundle::test(101).await),
+        Some(DeviceBundle::test(account_id!("user1@prose.org"), 101).await),
     );
 
     client.expect_load_device_list(&user_id!("user2@prose.org"), [200.into()]);
     client.expect_load_device_bundle(
         &user_id!("user2@prose.org"),
         &200.into(),
-        Some(DeviceBundle::test(200).await),
+        Some(DeviceBundle::test(account_id!("user2@prose.org"), 200).await),
     );
 
     send!(

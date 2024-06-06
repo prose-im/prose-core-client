@@ -7,11 +7,12 @@ use anyhow::Result;
 use minidom::Element;
 
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
+use prose_core_client::domain::shared::models::AccountId;
 use prose_core_client::dtos::{
     DeviceBundle, DeviceId, DeviceInfo, DeviceTrust, SendMessageRequest, SendMessageRequestBody,
     UserId,
 };
-use prose_core_client::{user_id, ClientEvent, ClientRoomEventType};
+use prose_core_client::{account_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
 
 use crate::{event, recv, room_event, send};
@@ -216,8 +217,10 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         .expect_login_with_strategy(
             user_id!("user@prose.org"),
             "secret",
-            LoginStrategy::default()
-                .with_device_bundles([(500.into(), DeviceBundle::test(500).await)]),
+            LoginStrategy::default().with_device_bundles([(
+                500.into(),
+                DeviceBundle::test(account_id!("user@prose.org"), 500).await,
+            )]),
         )
         .await?;
 
@@ -236,19 +239,19 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
     client.expect_load_device_bundle(
         &user_id!("user@prose.org"),
         &500.into(),
-        Some(DeviceBundle::test(500).await),
+        Some(DeviceBundle::test(account_id!("user@prose.org"), 500).await),
     );
 
     client.expect_load_device_list(&user_id!("them@prose.org"), [111.into(), 222.into()]);
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &111.into(),
-        Some(DeviceBundle::test(111).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 111).await),
     );
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &222.into(),
-        Some(DeviceBundle::test(222).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 222).await),
     );
 
     send!(
@@ -357,7 +360,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &111.into(),
-        Some(DeviceBundle::test(111).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 111).await),
     );
 
     send!(
@@ -420,7 +423,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &222.into(),
-        Some(DeviceBundle::test(222).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 222).await),
     );
 
     send!(
@@ -487,12 +490,12 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &111.into(),
-        Some(DeviceBundle::test(111).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 111).await),
     );
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &222.into(),
-        Some(DeviceBundle::test(222).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 222).await),
     );
 
     send!(
@@ -571,7 +574,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &333.into(),
-        Some(DeviceBundle::test(333).await),
+        Some(DeviceBundle::test(account_id!("them@prose.org"), 333).await),
     );
 
     send!(
@@ -699,8 +702,14 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
             user_id!("user@prose.org"),
             "secret",
             LoginStrategy::default().with_device_bundles([
-                (10.into(), DeviceBundle::test(10).await),
-                (20.into(), DeviceBundle::test(20).await),
+                (
+                    10.into(),
+                    DeviceBundle::test(account_id!("user@prose.org"), 10).await,
+                ),
+                (
+                    20.into(),
+                    DeviceBundle::test(account_id!("user@prose.org"), 20).await,
+                ),
             ]),
         )
         .await?;
@@ -719,19 +728,19 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
     client.expect_load_device_bundle(
         &user_id!("user@prose.org"),
         &10.into(),
-        Some(DeviceBundle::test(10).await),
+        Some(DeviceBundle::test(account_id!("user@prose.org"), 10).await),
     );
     client.expect_load_device_bundle(
         &user_id!("user@prose.org"),
         &20.into(),
-        Some(DeviceBundle::test(20).await),
+        Some(DeviceBundle::test(account_id!("user@prose.org"), 20).await),
     );
 
     client.expect_load_device_list(&user_id!("them@prose.org"), [100.into()]);
     client.expect_load_device_bundle(
         &user_id!("them@prose.org"),
         &100.into(),
-        Some(DeviceBundle::test(100).await),
+        Some(DeviceBundle::test(account_id!("user@prose.org"), 100).await),
     );
 
     send!(

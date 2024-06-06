@@ -4,8 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use prose_core_client::dtos::{
-    IdentityKey, IdentityKeyPair, PreKeyBundle, PreKeyRecord, PrivateKey, PublicKey,
-    SignedPreKeyRecord,
+    IdentityKey, IdentityKeyPair, PreKey, PreKeyBundle, PrivateKey, PublicKey, SignedPreKey,
 };
 
 use crate::encryption::signal_repo::{
@@ -33,7 +32,7 @@ impl From<IdentityKeyPair> for KeyPairType {
     }
 }
 
-impl From<SignedPreKeyPairType> for SignedPreKeyRecord {
+impl From<SignedPreKeyPairType> for SignedPreKey {
     fn from(value: SignedPreKeyPairType) -> Self {
         Self {
             id: value.key_id().into(),
@@ -45,7 +44,7 @@ impl From<SignedPreKeyPairType> for SignedPreKeyRecord {
     }
 }
 
-impl From<PreKeyPairType> for PreKeyRecord {
+impl From<PreKeyPairType> for PreKey {
     fn from(value: PreKeyPairType) -> Self {
         Self {
             id: value.key_id.into(),
@@ -55,8 +54,8 @@ impl From<PreKeyPairType> for PreKeyRecord {
     }
 }
 
-impl From<PreKeyRecord> for KeyPairType {
-    fn from(value: PreKeyRecord) -> Self {
+impl From<PreKey> for KeyPairType {
+    fn from(value: PreKey) -> Self {
         Self {
             public_key: value.public_key.into_inner(),
             private_key: value.private_key.into_inner(),
@@ -64,8 +63,8 @@ impl From<PreKeyRecord> for KeyPairType {
     }
 }
 
-impl From<SignedPreKeyRecord> for KeyPairType {
-    fn from(value: SignedPreKeyRecord) -> Self {
+impl From<SignedPreKey> for KeyPairType {
+    fn from(value: SignedPreKey) -> Self {
         Self {
             public_key: value.public_key.into_inner(),
             private_key: value.private_key.into_inner(),

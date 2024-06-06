@@ -12,6 +12,7 @@ use prose_proc_macros::InjectDependencies;
 use crate::app::deps::*;
 use crate::app::dtos::Contact as ContactDTO;
 use crate::domain::contacts::models::Contact;
+use crate::domain::shared::models::AccountId;
 use crate::domain::shared::utils::build_contact_name;
 use crate::dtos::{Group, PresenceSubRequest, PresenceSubRequestId, UserId};
 
@@ -29,13 +30,13 @@ pub struct ContactListService {
 
 impl ContactListService {
     pub async fn load_contacts(&self) -> Result<Vec<ContactDTO>> {
-        let current_id = self.ctx.connected_id()?.into_user_id();
+        let account = self.ctx.connected_account()?;
         let domain_contacts = self.contact_list_domain_service.load_contacts().await?;
 
         let contacts = join_all(
             domain_contacts
                 .into_iter()
-                .map(|c| self.enrich_domain_contact(&current_id, c)),
+                .map(|c| self.enrich_domain_contact(&account, c)),
         )
         .await;
 
@@ -59,6 +60,7 @@ impl ContactListService {
     }
 
     pub async fn load_presence_sub_requests(&self) -> Result<Vec<PresenceSubRequest>> {
+        let account = self.ctx.connected_account()?;
         let requesting_user_ids = self
             .contact_list_domain_service
             .load_presence_sub_requests()
@@ -67,7 +69,7 @@ impl ContactListService {
         let requests = join_all(
             requesting_user_ids
                 .into_iter()
-                .map(|id| self.enrich_presence_sub_request(id)),
+                .map(|id| self.enrich_presence_sub_request(&account, id)),
         )
         .await;
 
@@ -93,17 +95,17 @@ impl ContactListService {
     /// Converts a domain `Contact` to a `Contact` DTO by enriching it with additional data.
     /// Potential errors are ignored since the additional data is deemed optional and we rather
     /// return something than nothing.
-    async fn enrich_domain_contact(&self, current_id: &UserId, contact: Contact) -> ContactDTO {
+    async fn enrich_domain_contact(&self, account: &AccountId, contact: Contact) -> ContactDTO {
         let (profile, user_info) = join!(
-            self.user_profile_repo.get(&contact.id),
-            self.user_info_repo.get_user_info(&contact.id)
+            self.user_profile_repo.get(account, &contact.id),
+            self.user_info_repo.get_user_info(account, &contact.id)
         );
 
         // We'll march on even in the event of a failure…
         let profile = profile.unwrap_or_default().unwrap_or_default();
         let user_info = user_info.unwrap_or_default().unwrap_or_default();
         let name = build_contact_name(&contact.id, &profile);
-        let group = if current_id.is_same_domain(&contact.id) {
+        let group = if account.is_same_domain(&contact.id) {
             Group::Team
         } else {
             Group::Other
@@ -119,10 +121,14 @@ impl ContactListService {
         }
     }
 
-    async fn enrich_presence_sub_request(&self, user_id: UserId) -> PresenceSubRequest {
+    async fn enrich_presence_sub_request(
+        &self,
+        account: &AccountId,
+        user_id: UserId,
+    ) -> PresenceSubRequest {
         let profile = self
             .user_profile_repo
-            .get(&user_id)
+            .get(account, &user_id)
             .await
             .unwrap_or_default()
             .unwrap_or_default();

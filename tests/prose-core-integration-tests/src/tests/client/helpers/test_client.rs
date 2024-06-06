@@ -3,12 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use minidom::Element;
 use std::cmp::max;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use minidom::Element;
 use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 use regex::Regex;

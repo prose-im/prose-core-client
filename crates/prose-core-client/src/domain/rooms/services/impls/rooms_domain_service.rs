@@ -31,7 +31,7 @@ use crate::domain::rooms::services::rooms_domain_service::{
 };
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::settings::models::SyncedRoomSettings;
-use crate::domain::shared::models::{MucId, RoomId, RoomType, UserId};
+use crate::domain::shared::models::{AccountId, MucId, RoomId, RoomType, UserId};
 use crate::dtos::{Availability, RoomState};
 use crate::util::StringExt;
 use crate::ClientRoomEventType;
@@ -67,6 +67,8 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         request: CreateOrEnterRoomRequest,
         sidebar_state: RoomSidebarState,
     ) -> Result<Room, RoomError> {
+        let account = self.ctx.connected_account()?;
+
         let (room, context) = match request {
             CreateOrEnterRoomRequest::Create {
                 service,
@@ -74,25 +76,31 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 behavior,
                 decryption_context,
             } => (
-                self.create_room(&service, room_type, sidebar_state, behavior)
+                self.create_room(&account, &service, room_type, sidebar_state, behavior)
                     .await?,
                 decryption_context,
             ),
             CreateOrEnterRoomRequest::JoinRoom {
-                room_id: room_jid,
+                room_id,
                 password,
                 behavior,
                 decryption_context,
             } => (
-                self.join_room(&room_jid, password.as_deref(), sidebar_state, behavior)
-                    .await?,
+                self.join_room(
+                    &account,
+                    &room_id,
+                    password.as_deref(),
+                    sidebar_state,
+                    behavior,
+                )
+                .await?,
                 decryption_context,
             ),
             CreateOrEnterRoomRequest::JoinDirectMessage {
                 participant,
                 decryption_context,
             } => (
-                self.join_direct_message(&participant, sidebar_state)
+                self.join_direct_message(&account, &participant, sidebar_state)
                     .await?,
                 decryption_context,
             ),
@@ -120,13 +128,16 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
     /// Renames the room identified by `room_jid` to `name`.
     ///
-    /// - If the room is not connected no action is performed.
+    /// - If the room is not connected, no action is performed.
     /// - Panics if the Room is not of type `RoomType::PublicChannel`, `RoomType::PrivateChannel`
     ///   or `RoomType::Generic`.
     /// - Fails with `RoomError::PublicChannelNameConflict` if the room is of type
     ///   `RoomType::PublicChannel` and `name` is already used by another public channel.
     async fn rename_room(&self, room_id: &MucId, name: &str) -> Result<(), RoomError> {
-        let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
+        let Some(room) = self
+            .connected_rooms_repo
+            .get(&self.ctx.connected_account()?, room_id.as_ref())
+        else {
             return Err(RoomError::RoomNotFound);
         };
 
@@ -158,8 +169,8 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
     /// Reconfigures the room identified by `room_jid` according to `spec` and renames it to `new_name`.
     ///
-    /// If the room is not connected no action is performed, otherwise:
-    /// - Panics if the reconfiguration is not not allowed. Allowed reconfigurations are:
+    /// If the room is not connected, no action is performed, otherwise:
+    /// - Panics if the reconfiguration is not allowed. Allowed reconfigurations are:
     ///   - `RoomType::Group` -> `RoomType::PrivateChannel`
     ///   - `RoomType::PublicChannel` -> `RoomType::PrivateChannel`
     ///   - `RoomType::PrivateChannel` -> `RoomType::PublicChannel`
@@ -171,14 +182,16 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         spec: RoomSpec,
         new_name: &str,
     ) -> Result<Room, RoomError> {
-        let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
+        let account = self.ctx.connected_account()?;
+
+        let Some(room) = self.connected_rooms_repo.get(&account, room_id.as_ref()) else {
             return Err(RoomError::RoomNotFound);
         };
 
         match (&room.r#type, spec.room_type()) {
             (RoomType::Group, RoomType::PrivateChannel) => {
                 // Remove room first so that we don't run into problems with reentrancy…
-                self.connected_rooms_repo.delete(room_id.as_ref());
+                self.connected_rooms_repo.delete(&account, room_id.as_ref());
 
                 let service = BareJid::from_parts(None, &room_id.domain());
 
@@ -186,6 +199,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 debug!("Creating new room {}…", new_name);
                 let new_room = match self
                     .create_room(
+                        &account,
                         &service,
                         CreateRoomType::PrivateChannel {
                             name: new_name.to_string(),
@@ -198,7 +212,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     Ok(room) => room,
                     Err(err) => {
                         // Something went wrong, let's put the room back…
-                        _ = self.connected_rooms_repo.set(room);
+                        _ = self.connected_rooms_repo.set(&account, room);
                         return Err(err);
                     }
                 };
@@ -218,7 +232,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     Ok(_) => (),
                     Err(err) => {
                         // If that failed, let's put the initial room back and delete the new room?!
-                        _ = self.connected_rooms_repo.set(room);
+                        _ = self.connected_rooms_repo.set(&account, room);
                         _ = self
                             .room_management_service
                             .destroy_room(new_room_id, None)
@@ -289,9 +303,12 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     .reconfigure_room(room_id, spec, new_name)
                     .await?;
 
-                let Some(room) = self.connected_rooms_repo.update(room_id.as_ref(), {
-                    Box::new(|room| room.by_changing_type(RoomType::PublicChannel))
-                }) else {
+                let Some(room) = self
+                    .connected_rooms_repo
+                    .update(&account, room_id.as_ref(), {
+                        Box::new(|room| room.by_changing_type(RoomType::PublicChannel))
+                    })
+                else {
                     return Err(RequestError::Generic {
                         msg: "Room was modified during reconfiguration".to_string(),
                     }
@@ -307,9 +324,12 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
                 // TODO: Make public channels also members-only so that the member list translates to the private channel
 
-                let Some(room) = self.connected_rooms_repo.update(room_id.as_ref(), {
-                    Box::new(|room| room.by_changing_type(RoomType::PrivateChannel))
-                }) else {
+                let Some(room) = self
+                    .connected_rooms_repo
+                    .update(&account, room_id.as_ref(), {
+                        Box::new(|room| room.by_changing_type(RoomType::PrivateChannel))
+                    })
+                else {
                     return Err(RequestError::Generic {
                         msg: "Room was modified during reconfiguration".to_string(),
                     }
@@ -337,7 +357,9 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
     /// accordingly. Call this method after the room configuration changed.
     /// Returns `RoomError::RoomNotFound` if no room with `room_id` exists.
     async fn reevaluate_room_spec(&self, room_id: &MucId) -> Result<Room, RoomError> {
-        let Some(room) = self.connected_rooms_repo.get(room_id.as_ref()) else {
+        let account = self.ctx.connected_account()?;
+
+        let Some(room) = self.connected_rooms_repo.get(&account, room_id.as_ref()) else {
             return Err(RoomError::RoomNotFound);
         };
 
@@ -361,6 +383,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
 
         self.connected_rooms_repo
             .update(
+                &account,
                 room_id.as_ref(),
                 Box::new(move |room| room.by_changing_type(config.room_type)),
             )
@@ -372,6 +395,7 @@ impl RoomsDomainService {
     #[tracing::instrument(name = "Join room", skip(self, room_id, password), fields(room_id = %room_id))]
     async fn join_room(
         &self,
+        account: &AccountId,
         room_id: &MucId,
         password: Option<&str>,
         sidebar_state: RoomSidebarState,
@@ -380,7 +404,7 @@ impl RoomsDomainService {
         let remove_or_retain_room_on_error =
             |room: Room, error: &RoomError| match behavior.on_failure {
                 JoinRoomFailureBehavior::RemoveOnError => {
-                    self.connected_rooms_repo.delete(room_id.as_ref());
+                    self.connected_rooms_repo.delete(account, room_id.as_ref());
                 }
                 JoinRoomFailureBehavior::RetainOnError => room.set_state(RoomState::Disconnected {
                     error: Some(error.to_string()),
@@ -388,19 +412,15 @@ impl RoomsDomainService {
                 }),
             };
 
-        let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
+        let nickname = build_nickname(account.as_ref());
         let mut room_id = room_id.clone();
-        let availability = self
-            .account_settings_repo
-            .get(&self.ctx.connected_id()?.to_user_id())
-            .await?
-            .availability;
+        let availability = self.account_settings_repo.get(&account).await?.availability;
         let capabilities = &self.ctx.capabilities;
 
         let info = 'info: loop {
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // connecting to it…
-            let room = self.insert_connecting_room(&room_id, &nickname, sidebar_state)?;
+            let room = self.insert_connecting_room(account, &room_id, &nickname, sidebar_state)?;
 
             let full_room_jid = room_id.occupant_id_with_nickname(&nickname)?;
 
@@ -418,7 +438,7 @@ impl RoomsDomainService {
 
                     match (behavior.on_redirect, gone_error.new_location) {
                         (JoinRoomRedirectBehavior::FollowIfGone, Some(new_location)) => {
-                            self.connected_rooms_repo.delete(room_id.as_ref());
+                            self.connected_rooms_repo.delete(account, room_id.as_ref());
                             room_id = new_location;
                             continue;
                         }
@@ -432,22 +452,29 @@ impl RoomsDomainService {
             };
         };
 
-        self.finalize_pending_room(info).await
+        self.finalize_pending_room(account, info).await
     }
 
     async fn join_direct_message(
         &self,
+        account: &AccountId,
         participant: &UserId,
         sidebar_state: RoomSidebarState,
     ) -> Result<Room, RoomError> {
-        match self.connected_rooms_repo.get(participant.as_ref()) {
+        match self.connected_rooms_repo.get(account, participant.as_ref()) {
             Some(room) if room.state() == RoomState::Pending => (),
             None => (),
             Some(room) => return Ok(room),
         }
 
-        let contact_name = self.user_profile_repo.get_display_name(participant).await;
-        let user_info = self.user_info_repo.get_user_info(participant).await;
+        let contact_name = self
+            .user_profile_repo
+            .get_display_name(&account, participant)
+            .await;
+        let user_info = self
+            .user_info_repo
+            .get_user_info(&account, participant)
+            .await;
 
         // Let's ignore potential errors here since the information we're gathering is optional…
         let contact_name = contact_name
@@ -475,28 +502,27 @@ impl RoomsDomainService {
             settings,
         );
 
-        self.connected_rooms_repo.set_or_replace(room.clone());
+        self.connected_rooms_repo
+            .set_or_replace(account, room.clone());
 
         Ok(room)
     }
 
     async fn create_room(
         &self,
+        account: &AccountId,
         service: &BareJid,
         request: CreateRoomType,
         sidebar_state: RoomSidebarState,
         behavior: CreateRoomBehavior,
     ) -> Result<Room, RoomError> {
-        let availability = self
-            .account_settings_repo
-            .get(&self.ctx.connected_id()?.to_user_id())
-            .await?
-            .availability;
+        let availability = self.account_settings_repo.get(account).await?.availability;
         let capabilities = &self.ctx.capabilities;
 
         let result = match request {
             CreateRoomType::Group { participants } => {
                 self.create_or_join_group(
+                    account,
                     &service,
                     participants,
                     sidebar_state,
@@ -514,6 +540,7 @@ impl RoomsDomainService {
                 let channel_id = self.id_provider.new_id();
 
                 self.create_or_join_room_with_spec(
+                    account,
                     &service,
                     &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
@@ -540,6 +567,7 @@ impl RoomsDomainService {
                 let channel_id = self.id_provider.new_id();
 
                 self.create_or_join_room_with_spec(
+                    account,
                     &service,
                     &format!("{}.{}", CHANNEL_PREFIX, channel_id),
                     &name,
@@ -557,7 +585,7 @@ impl RoomsDomainService {
         let info = match result {
             Ok(metadata) => metadata,
             Err(RoomError::RoomIsAlreadyConnected(room_jid)) => {
-                if let Some(room) = self.connected_rooms_repo.get(room_jid.as_ref()) {
+                if let Some(room) = self.connected_rooms_repo.get(account, room_jid.as_ref()) {
                     return Ok(room);
                 };
                 return Err(RoomError::RoomIsAlreadyConnected(room_jid));
@@ -565,11 +593,12 @@ impl RoomsDomainService {
             Err(error) => return Err(error),
         };
 
-        self.finalize_pending_room(info).await
+        self.finalize_pending_room(account, info).await
     }
 
     async fn create_or_join_group(
         &self,
+        account: &AccountId,
         service: &BareJid,
         participants: Vec<UserId>,
         sidebar_state: RoomSidebarState,
@@ -581,7 +610,7 @@ impl RoomsDomainService {
             return Err(RoomError::InvalidNumberOfParticipants);
         }
 
-        let user_jid = self.ctx.connected_id()?.into_user_id();
+        let user_jid = account.to_user_id();
 
         // Load participant infos so that we can build a nice human-readable name for the group…
         let mut participant_names = vec![];
@@ -594,7 +623,7 @@ impl RoomsDomainService {
         for jid in participants_including_self.iter() {
             let participant_name = self
                 .user_profile_repo
-                .get(jid)
+                .get(account, jid)
                 .await?
                 .and_then(|profile| profile.first_name.or(profile.nickname))
                 .unwrap_or_else(|| jid.username().to_uppercase_first_letter());
@@ -605,7 +634,7 @@ impl RoomsDomainService {
         let group_name = participant_names.join(", ");
 
         // We'll create a hash of the sorted jids of our participants. This way users will always
-        // come back to the exact same group if they accidentally try to create it again. Also
+        // come back to the exact same group if they accidentally try to create it again. Also,
         // other participants (other than the creator of the room) are able to do the same without
         // having a bookmark.
         let group_hash = participants_including_self.group_name_hash();
@@ -622,6 +651,7 @@ impl RoomsDomainService {
 
         let info = self
             .create_or_join_room_with_spec(
+                account,
                 service,
                 &group_hash,
                 &group_name,
@@ -673,6 +703,7 @@ impl RoomsDomainService {
 
     async fn create_or_join_room_with_spec<Fut: Future<Output = Result<()>> + 'static>(
         &self,
+        account: &AccountId,
         service: &BareJid,
         room_id: &str,
         room_name: &str,
@@ -697,7 +728,7 @@ impl RoomsDomainService {
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
-            self.insert_connecting_room(&room_jid, &nickname, sidebar_state)?;
+            self.insert_connecting_room(account, &room_jid, &nickname, sidebar_state)?;
 
             // Try to create or enter the room and configure it…
             let result = self
@@ -715,7 +746,7 @@ impl RoomsDomainService {
                 Ok(occupancy) => occupancy,
                 Err(error) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(room_jid.as_ref());
+                    self.connected_rooms_repo.delete(account, room_jid.as_ref());
 
                     // In this case the room existed in the past but was deleted. We'll modify
                     // the name and try again…
@@ -741,12 +772,12 @@ impl RoomsDomainService {
                 }
             };
 
-            match (perform_additional_config)(&room_jid, &mut info).await {
+            match perform_additional_config(&room_jid, &mut info).await {
                 Ok(_) => (),
                 Err(error) => {
                     // Remove pending room again…
-                    self.connected_rooms_repo.delete(room_jid.as_ref());
-                    // Again, if the additional configuration fails and we've created the room
+                    self.connected_rooms_repo.delete(account, room_jid.as_ref());
+                    // Again, if the additional configuration fails, and we've created the room
                     // we'll destroy it again.
                     if info.room_has_been_created {
                         _ = self
@@ -762,7 +793,11 @@ impl RoomsDomainService {
         }
     }
 
-    async fn finalize_pending_room(&self, info: RoomSessionInfo) -> Result<Room, RoomError> {
+    async fn finalize_pending_room(
+        &self,
+        account: &AccountId,
+        info: RoomSessionInfo,
+    ) -> Result<Room, RoomError> {
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
         let room_name = info.config.room_name;
@@ -774,7 +809,7 @@ impl RoomsDomainService {
         for member in info.members {
             let name = self
                 .user_profile_repo
-                .get_display_name(&member.id)
+                .get_display_name(account, &member.id)
                 .await
                 .unwrap_or_default();
             let is_self = member.id == current_user_id;
@@ -813,22 +848,25 @@ impl RoomsDomainService {
             .unwrap_or_default()
             .unwrap_or_else(|| SyncedRoomSettings::new(room_id));
 
-        let Some(room) = self.connected_rooms_repo.update(info.room_id.as_ref(), {
-            let room_name = room_name;
-            Box::new(move |room| {
-                // Convert the temporary room to its final form…
-                let room = room.by_resolving_with_info(
-                    room_name,
-                    room_description,
-                    room_topic,
-                    room_info,
-                    members,
-                    info.participants,
-                    settings,
-                );
-                room
+        let Some(room) = self
+            .connected_rooms_repo
+            .update(account, info.room_id.as_ref(), {
+                let room_name = room_name;
+                Box::new(move |room| {
+                    // Convert the temporary room to its final form…
+                    let room = room.by_resolving_with_info(
+                        room_name,
+                        room_description,
+                        room_topic,
+                        room_info,
+                        members,
+                        info.participants,
+                        settings,
+                    );
+                    room
+                })
             })
-        }) else {
+        else {
             return Err(RoomError::RoomWasModified);
         };
 
@@ -857,6 +895,7 @@ impl RoomsDomainService {
 
     fn insert_connecting_room(
         &self,
+        account: &AccountId,
         room_id: &MucId,
         nickname: &str,
         sidebar_state: RoomSidebarState,
@@ -865,7 +904,7 @@ impl RoomsDomainService {
 
         // If we have a pending room waiting for us, we'll switch that to connecting and do not
         // insert a new one.
-        if let Some(pending_room) = self.connected_rooms_repo.get(room_id.as_ref()) {
+        if let Some(pending_room) = self.connected_rooms_repo.get(account, room_id.as_ref()) {
             if pending_room.state() == RoomState::Pending {
                 pending_room.set_state(RoomState::Connecting);
                 return Ok(pending_room);
@@ -874,7 +913,7 @@ impl RoomsDomainService {
 
         let room = Room::connecting(&room_id, nickname, sidebar_state);
         self.connected_rooms_repo
-            .set(room.clone())
+            .set(account, room.clone())
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_id))?;
         Ok(room)
     }

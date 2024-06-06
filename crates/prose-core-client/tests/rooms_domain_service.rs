@@ -82,15 +82,18 @@ async fn test_joins_room() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(bare!("room@conf.prose.org")))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
+        .return_once(|_, _| None);
 
     deps.connected_rooms_repo
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(room.lock().clone()))
-        .return_once(|_| Ok(()));
+        .with(predicate::always(), predicate::eq(room.lock().clone()))
+        .return_once(|_, _| Ok(()));
 
     deps.room_management_service
         .expect_join_room()
@@ -154,12 +157,15 @@ async fn test_joins_room() -> Result<()> {
     deps.user_profile_repo
         .expect_get_display_name()
         .times(3)
-        .with(predicate::in_iter([
-            user_id!("user1@prose.org"),
-            user_id!("user2@prose.org"),
-            user_id!("user3@prose.org"),
-        ]))
-        .returning(|user_id| {
+        .with(
+            predicate::always(),
+            predicate::in_iter([
+                user_id!("user1@prose.org"),
+                user_id!("user2@prose.org"),
+                user_id!("user3@prose.org"),
+            ]),
+        )
+        .returning(|_, user_id| {
             let username = user_id.formatted_username();
             Box::pin(async move { Ok(Some(username)) })
         });
@@ -177,10 +183,11 @@ async fn test_joins_room() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
+                predicate::always(),
                 predicate::eq(bare!("room@conf.prose.org")),
                 predicate::always(),
             )
-            .return_once(move |_, handler| {
+            .return_once(move |_, _, handler| {
                 let updated_room = handler(room.lock().clone());
                 *room.lock() = updated_room.clone();
                 Some(updated_room)
@@ -338,7 +345,7 @@ async fn test_creates_group() -> Result<()> {
             .expect_get()
             .times(4)
             .in_sequence(&mut seq)
-            .returning(move |jid| {
+            .returning(move |_, jid| {
                 let jid = jid.clone();
                 let account_node = account_node.clone();
 
@@ -363,19 +370,25 @@ async fn test_creates_group() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(group_id.clone().into_inner()))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(group_id.clone().into_inner()),
+        )
+        .return_once(|_, _| None);
 
     deps.connected_rooms_repo
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Room::connecting(
-            &group_id.clone().into(),
-            "jane.doe#3c1234b",
-            RoomSidebarState::InSidebar,
-        )))
-        .return_once(|_| Ok(()));
+        .with(
+            predicate::always(),
+            predicate::eq(Room::connecting(
+                &group_id.clone().into(),
+                "jane.doe#3c1234b",
+                RoomSidebarState::InSidebar,
+            )),
+        )
+        .return_once(|_, _| Ok(()));
 
     {
         let group_jid = group_id.clone();
@@ -423,7 +436,7 @@ async fn test_creates_group() -> Result<()> {
         .expect_get_display_name()
         .times(4)
         .in_sequence(&mut seq)
-        .returning(move |jid| {
+        .returning(move |_, jid| {
             let jid = jid.clone();
             let account_node = account_node.clone();
 
@@ -453,10 +466,11 @@ async fn test_creates_group() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
+                predicate::always(),
                 predicate::eq(group_jid.clone().into_inner()),
                 predicate::always(),
             )
-            .return_once(move |_, handler| {
+            .return_once(move |_, _, handler| {
                 let room = Room::mock_connecting_room(group_jid.clone(), "hash-1");
 
                 let room = handler(room.clone());
@@ -569,22 +583,28 @@ async fn test_joins_direct_message() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(bare!("user2@prose.org")))
-        .return_once(|_| None);
+        .with(predicate::always(), predicate::eq(bare!("user2@prose.org")))
+        .return_once(|_, _| None);
 
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
+        .with(
+            predicate::always(),
+            predicate::eq(user_id!("user2@prose.org")),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
 
     deps.user_info_repo
         .expect_get_user_info()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| {
+        .with(
+            predicate::always(),
+            predicate::eq(user_id!("user2@prose.org")),
+        )
+        .return_once(|_, _| {
             Box::pin(async {
                 Ok(Some(UserInfo {
                     avatar: None,
@@ -604,15 +624,18 @@ async fn test_joins_direct_message() -> Result<()> {
         .expect_set_or_replace()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Room::for_direct_message(
-            &user_id!("user2@prose.org"),
-            "Jennifer Doe",
-            Availability::Available,
-            RoomSidebarState::InSidebar,
-            Default::default(),
-            SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
-        )))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(Room::for_direct_message(
+                &user_id!("user2@prose.org"),
+                "Jennifer Doe",
+                Availability::Available,
+                RoomSidebarState::InSidebar,
+                Default::default(),
+                SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
+            )),
+        )
+        .return_once(|_, _| None);
 
     let service = RoomsDomainService::from(deps.into_deps());
     let room = service
@@ -694,20 +717,24 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!(
-            "org.prose.channel.hash-1@conference.prose.org"
-        )))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("org.prose.channel.hash-1@conference.prose.org")),
+        )
+        .return_once(|_, _| None);
 
     deps.connected_rooms_repo
         .expect_set()
         .once()
-        .with(predicate::eq(Room::connecting(
-            &muc_id!("org.prose.channel.hash-1@conference.prose.org").into(),
-            "jane.doe#3c1234b",
-            RoomSidebarState::InSidebar,
-        )))
-        .return_once(|_| Ok(()));
+        .with(
+            predicate::always(),
+            predicate::eq(Room::connecting(
+                &muc_id!("org.prose.channel.hash-1@conference.prose.org").into(),
+                "jane.doe#3c1234b",
+                RoomSidebarState::InSidebar,
+            )),
+        )
+        .return_once(|_, _| Ok(()));
 
     deps.room_management_service
         .expect_create_or_join_room()
@@ -730,10 +757,11 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         .expect_update()
         .once()
         .with(
+            predicate::always(),
             predicate::eq(bare!("org.prose.channel.hash-1@conference.prose.org")),
             predicate::always(),
         )
-        .return_once(|_, _| {
+        .return_once(|_, _, _| {
             Some(Room::mock(RoomInfo {
                 room_id: muc_id!("org.prose.channel.hash-1@conference.prose.org").into(),
                 user_nickname: "jane.doe#3c1234b".to_string(),
@@ -786,8 +814,11 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(bare!("group@conf.prose.org")))
-        .return_once(|_| {
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("group@conf.prose.org")),
+        )
+        .return_once(|_, _| {
             Some(
                 Room::group(muc_id!("group@conf.prose.org")).with_members(vec![
                     RegisteredMember {
@@ -828,26 +859,35 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         .expect_delete()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(bare!("group@conf.prose.org")))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("group@conf.prose.org")),
+        )
+        .return_once(|_, _| None);
 
     deps.connected_rooms_repo
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(channel_id.clone().into_inner()))
-        .return_once(|_| None);
+        .with(
+            predicate::always(),
+            predicate::eq(channel_id.clone().into_inner()),
+        )
+        .return_once(|_, _| None);
 
     deps.connected_rooms_repo
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Room::connecting(
-            &channel_id.clone().into(),
-            "jane.doe#3c1234b",
-            RoomSidebarState::InSidebar,
-        )))
-        .return_once(|_| Ok(()));
+        .with(
+            predicate::always(),
+            predicate::eq(Room::connecting(
+                &channel_id.clone().into(),
+                "jane.doe#3c1234b",
+                RoomSidebarState::InSidebar,
+            )),
+        )
+        .return_once(|_, _| Ok(()));
 
     {
         let channel_jid = channel_id.clone();
@@ -885,10 +925,11 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
+                predicate::always(),
                 predicate::eq(channel_jid.clone().into_inner()),
                 predicate::always(),
             )
-            .return_once(move |_, _| Some(Room::private_channel(channel_jid.clone())));
+            .return_once(move |_, _, _| Some(Room::private_channel(channel_jid.clone())));
     }
 
     deps.message_migration_domain_service
@@ -964,8 +1005,11 @@ async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Resul
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("channel@conf.prose.org")))
-            .return_once(|_| Some(room));
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("channel@conf.prose.org")),
+            )
+            .return_once(|_, _| Some(room));
     }
 
     deps.room_management_service
@@ -992,10 +1036,11 @@ async fn test_converts_private_to_public_channel_if_it_does_not_exist() -> Resul
             .once()
             .in_sequence(&mut seq)
             .with(
+                predicate::always(),
                 predicate::eq(bare!("channel@conf.prose.org")),
                 predicate::always(),
             )
-            .return_once(|_, handler| Some(handler(room)));
+            .return_once(|_, _, handler| Some(handler(room)));
     }
 
     let service = RoomsDomainService::from(deps.into_deps());
@@ -1024,8 +1069,11 @@ async fn test_converts_private_to_public_channel_name_conflict() -> Result<()> {
         .expect_get()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(bare!("channel@conf.prose.org")))
-        .return_once(|_| {
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("channel@conf.prose.org")),
+        )
+        .return_once(|_, _| {
             Some(
                 Room::private_channel(muc_id!("channel@conf.prose.org")).with_members(vec![
                     RegisteredMember {
@@ -1116,23 +1164,29 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             .expect_get()
             .once()
             .in_sequence(&mut seq)
-            .with(predicate::eq(bare!("user2@prose.org")))
-            .return_once(|_| Some(pending_room));
+            .with(predicate::always(), predicate::eq(bare!("user2@prose.org")))
+            .return_once(|_, _| Some(pending_room));
     }
 
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
+        .with(
+            predicate::always(),
+            predicate::eq(user_id!("user2@prose.org")),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
 
     deps.user_info_repo
         .expect_get_user_info()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| {
+        .with(
+            predicate::always(),
+            predicate::eq(user_id!("user2@prose.org")),
+        )
+        .return_once(|_, _| {
             Box::pin(async {
                 Ok(Some(UserInfo {
                     avatar: None,
@@ -1152,15 +1206,18 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         .expect_set_or_replace()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(Room::for_direct_message(
-            &user_id!("user2@prose.org"),
-            "Jennifer Doe",
-            Availability::Available,
-            RoomSidebarState::InSidebar,
-            Default::default(),
-            SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
-        )))
-        .return_once(|_| Some(pending_room));
+        .with(
+            predicate::always(),
+            predicate::eq(Room::for_direct_message(
+                &user_id!("user2@prose.org"),
+                "Jennifer Doe",
+                Availability::Available,
+                RoomSidebarState::InSidebar,
+                Default::default(),
+                SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
+            )),
+        )
+        .return_once(|_, _| Some(pending_room));
 
     let service = RoomsDomainService::from(deps.into_deps());
     let room = service
@@ -1232,9 +1289,12 @@ async fn test_updates_pending_public_channel() -> Result<()> {
         deps.connected_rooms_repo
             .expect_get()
             .once()
-            .with(predicate::eq(bare!("room@conf.prose.org")))
+            .with(
+                predicate::always(),
+                predicate::eq(bare!("room@conf.prose.org")),
+            )
             .in_sequence(&mut seq)
-            .return_once(|_| Some(pending_room));
+            .return_once(|_, _| Some(pending_room));
     }
 
     deps.account_settings_repo
@@ -1284,11 +1344,11 @@ async fn test_updates_pending_public_channel() -> Result<()> {
         .expect_get_display_name()
         .times(2)
         .in_sequence(&mut seq)
-        .with(predicate::in_iter([
-            user_id!("user1@prose.org"),
-            user_id!("user2@prose.org"),
-        ]))
-        .returning(|user_id| {
+        .with(
+            predicate::always(),
+            predicate::in_iter([user_id!("user1@prose.org"), user_id!("user2@prose.org")]),
+        )
+        .returning(|_, user_id| {
             let username = user_id.formatted_username();
             Box::pin(async move { Ok(Some(username)) })
         });
@@ -1306,10 +1366,11 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             .once()
             .in_sequence(&mut seq)
             .with(
+                predicate::always(),
                 predicate::eq(bare!("room@conf.prose.org")),
                 predicate::always(),
             )
-            .return_once(move |_, handler| {
+            .return_once(move |_, _, handler| {
                 let updated_room = handler(room.lock().clone());
                 *room.lock() = updated_room.clone();
                 Some(updated_room)
@@ -1347,9 +1408,12 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| None);
+        .return_once(|_, _| None);
 
     deps.account_settings_repo
         .expect_get()
@@ -1362,7 +1426,7 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
             .expect_set()
             .once()
             .in_sequence(&mut seq)
-            .return_once(move |room| {
+            .return_once(move |_, room| {
                 retained_room.lock().replace(room);
                 Ok(())
             });
@@ -1409,9 +1473,12 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| None);
+        .return_once(|_, _| None);
 
     deps.account_settings_repo
         .expect_get()
@@ -1422,7 +1489,7 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
         .expect_set()
         .once()
         .in_sequence(&mut seq)
-        .return_once(move |_| Ok(()));
+        .return_once(move |_, _| Ok(()));
 
     deps.room_management_service
         .expect_join_room()
@@ -1435,9 +1502,12 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
     deps.connected_rooms_repo
         .expect_delete()
         .once()
-        .with(predicate::eq(bare!("room@conf.prose.org")))
+        .with(
+            predicate::always(),
+            predicate::eq(bare!("room@conf.prose.org")),
+        )
         .in_sequence(&mut seq)
-        .return_once(|_| None);
+        .return_once(|_, _| None);
 
     let service = RoomsDomainService::from(deps.into_deps());
     let result = service

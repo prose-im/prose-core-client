@@ -52,7 +52,7 @@ use crate::domain::settings::repos::mocks::{
     MockAccountSettingsRepository, MockLocalRoomSettingsRepository,
 };
 use crate::domain::settings::services::mocks::MockSyncedRoomSettingsService;
-use crate::domain::shared::models::ConnectionState;
+use crate::domain::shared::models::{AccountId, ConnectionState};
 use crate::domain::sidebar::services::impls::SidebarDomainServiceDependencies;
 use crate::domain::sidebar::services::mocks::{MockBookmarksService, MockSidebarDomainService};
 use crate::domain::uploads::services::mocks::MockUploadService;
@@ -76,6 +76,10 @@ pub fn mock_muc_service() -> BareJid {
 
 pub fn mock_account_jid() -> UserResourceId {
     user_resource_id!("jane.doe@prose.org/macOS")
+}
+
+pub fn mock_account() -> AccountId {
+    bare!("jane.doe@prose.org").into()
 }
 
 impl Default for AppContext {

@@ -8,16 +8,16 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::{AccountId, UserId};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait BlockListRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get_all(&self) -> Result<Vec<UserId>>;
-    async fn insert(&self, user_id: &UserId) -> Result<bool>;
-    async fn delete(&self, user_id: &UserId) -> Result<bool>;
-    async fn delete_all(&self) -> Result<bool>;
+    async fn get_all(&self, account: &AccountId) -> Result<Vec<UserId>>;
+    async fn insert(&self, account: &AccountId, user_id: &UserId) -> Result<bool>;
+    async fn delete(&self, account: &AccountId, user_id: &UserId) -> Result<bool>;
+    async fn delete_all(&self, account: &AccountId) -> Result<bool>;
 
-    async fn clear_cache(&self) -> Result<()>;
+    async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

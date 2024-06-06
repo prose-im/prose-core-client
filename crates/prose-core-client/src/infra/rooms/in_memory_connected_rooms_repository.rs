@@ -14,6 +14,7 @@ use crate::domain::rooms::models::Room;
 use crate::domain::rooms::repos::{
     ConnectedRoomsReadOnlyRepository, ConnectedRoomsRepository, RoomAlreadyExistsError,
 };
+use crate::domain::shared::models::AccountId;
 
 pub struct InMemoryConnectedRoomsRepository {
     rooms: RwLock<HashMap<BareJid, Room>>,
@@ -28,17 +29,17 @@ impl InMemoryConnectedRoomsRepository {
 }
 
 impl ConnectedRoomsReadOnlyRepository for InMemoryConnectedRoomsRepository {
-    fn get(&self, room_id: &BareJid) -> Option<Room> {
+    fn get(&self, _account: &AccountId, room_id: &BareJid) -> Option<Room> {
         self.rooms.read().get(room_id).cloned()
     }
 
-    fn get_all(&self) -> Vec<Room> {
+    fn get_all(&self, _account: &AccountId) -> Vec<Room> {
         self.rooms.read().values().cloned().collect()
     }
 }
 
 impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
-    fn set(&self, room: Room) -> Result<(), RoomAlreadyExistsError> {
+    fn set(&self, _account: &AccountId, room: Room) -> Result<(), RoomAlreadyExistsError> {
         let mut rooms = self.rooms.write();
 
         if rooms.contains_key(room.room_id.as_ref()) {
@@ -49,13 +50,14 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         Ok(())
     }
 
-    fn set_or_replace(&self, room: Room) -> Option<Room> {
+    fn set_or_replace(&self, _account: &AccountId, room: Room) -> Option<Room> {
         let mut rooms = self.rooms.write();
         rooms.insert(room.room_id.clone().into_bare(), room)
     }
 
     fn update(
         &self,
+        _account: &AccountId,
         room_id: &BareJid,
         block: Box<dyn FnOnce(Room) -> Room + Send>,
     ) -> Option<Room> {
@@ -68,11 +70,11 @@ impl ConnectedRoomsRepository for InMemoryConnectedRoomsRepository {
         Some(modified_room)
     }
 
-    fn delete(&self, room_id: &BareJid) -> Option<Room> {
+    fn delete(&self, _account: &AccountId, room_id: &BareJid) -> Option<Room> {
         self.rooms.write().remove(room_id)
     }
 
-    fn delete_all(&self) -> Vec<Room> {
+    fn delete_all(&self, _account: &AccountId) -> Vec<Room> {
         let rooms = &mut *self.rooms.write();
         let deleted_map = mem::replace(rooms, HashMap::new());
         deleted_map.into_values().collect()

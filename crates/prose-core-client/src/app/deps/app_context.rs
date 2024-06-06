@@ -10,8 +10,8 @@ use parking_lot::RwLock;
 
 use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
-use crate::domain::shared::models::{ConnectionState, MamVersion};
-use crate::dtos::{DecryptionContext, MucId, UserId, UserResourceId};
+use crate::domain::shared::models::{AccountId, ConnectionState, MamVersion};
+use crate::dtos::{DecryptionContext, MucId, UserResourceId};
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -72,8 +72,10 @@ impl AppContext {
             ))
     }
 
-    pub fn connected_account(&self) -> Result<UserId> {
-        Ok(self.connected_id()?.into_user_id())
+    pub fn connected_account(&self) -> Result<AccountId> {
+        Ok(AccountId::from(
+            self.connected_id()?.into_inner().into_bare(),
+        ))
     }
 
     pub fn connection_timestamp(&self) -> Result<DateTime<Utc>> {

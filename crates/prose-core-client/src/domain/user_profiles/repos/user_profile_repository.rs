@@ -8,6 +8,7 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
+use crate::domain::shared::models::AccountId;
 use crate::domain::user_profiles::models::UserProfile;
 use crate::dtos::UserId;
 
@@ -15,14 +16,19 @@ use crate::dtos::UserId;
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get(&self, jid: &UserId) -> Result<Option<UserProfile>>;
-    async fn set(&self, jid: &UserId, profile: &UserProfile) -> Result<()>;
-    async fn delete(&self, jid: &UserId) -> Result<()>;
+    async fn get(&self, account: &AccountId, user_id: &UserId) -> Result<Option<UserProfile>>;
+    async fn set(&self, account: &AccountId, user_id: &UserId, profile: &UserProfile)
+        -> Result<()>;
+    async fn delete(&self, account: &AccountId, user_id: &UserId) -> Result<()>;
 
-    /// Returns the display name for `jid`. Display name is a cascade of first_name, last_name
+    /// Returns the display name for `user_id`. Display name is a cascade of first_name, last_name
     /// and nickname;
-    async fn get_display_name(&self, jid: &UserId) -> Result<Option<String>>;
+    async fn get_display_name(
+        &self,
+        account: &AccountId,
+        user_id: &UserId,
+    ) -> Result<Option<String>>;
 
-    async fn reset_after_reconnect(&self);
-    async fn clear_cache(&self) -> Result<()>;
+    async fn reset_after_reconnect(&self, account: &AccountId);
+    async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

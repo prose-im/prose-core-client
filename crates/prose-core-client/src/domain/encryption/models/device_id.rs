@@ -9,6 +9,8 @@ use std::str::FromStr;
 use minidom::IntoAttributeValue;
 use serde::{Deserialize, Serialize};
 
+use prose_store::{KeyType, RawKey};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct DeviceId(u32);
@@ -54,5 +56,11 @@ impl DeviceId {
 impl Display for DeviceId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl KeyType for DeviceId {
+    fn to_raw_key(&self) -> RawKey {
+        RawKey::Integer(self.0 as i64)
     }
 }

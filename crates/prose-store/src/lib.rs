@@ -14,6 +14,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use crate::repository::Entity;
 
 mod driver;
+mod entity_macro;
 pub mod prelude;
 mod repository;
 mod store;
@@ -188,7 +189,7 @@ pub trait WritableCollection<'tx>: Collection<'tx> {
     ) -> Result<(), Self::Error>;
     fn put<K: KeyType + ?Sized, V: Serialize>(&self, key: &K, value: &V)
         -> Result<(), Self::Error>;
-    fn delete<K: KeyType + ?Sized>(&self, key: &K) -> Result<(), Self::Error>;
+    async fn delete<K: KeyTuple + ?Sized>(&self, key: &K) -> Result<(), Self::Error>;
 
     async fn delete_all_in_index(
         &self,

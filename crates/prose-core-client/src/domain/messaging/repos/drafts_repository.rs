@@ -8,13 +8,14 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
+use crate::domain::shared::models::AccountId;
 use crate::dtos::RoomId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait DraftsRepository: SendUnlessWasm + SyncUnlessWasm {
-    async fn get(&self, room_id: &RoomId) -> Result<Option<String>>;
-    async fn set(&self, room_id: &RoomId, draft: Option<&str>) -> Result<()>;
-    async fn clear_cache(&self) -> Result<()>;
+    async fn get(&self, account: &AccountId, room_id: &RoomId) -> Result<Option<String>>;
+    async fn set(&self, account: &AccountId, room_id: &RoomId, draft: Option<&str>) -> Result<()>;
+    async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

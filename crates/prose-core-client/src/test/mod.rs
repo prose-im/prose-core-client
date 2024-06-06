@@ -31,7 +31,7 @@ mod room_metadata;
 
 pub mod mock_data {
     pub use super::mock_app_dependencies::{
-        mock_account_jid as account_jid, mock_muc_service as muc_service,
+        mock_account as account, mock_account_jid as account_jid, mock_muc_service as muc_service,
         mock_reference_date as reference_date,
     };
 }
@@ -47,6 +47,13 @@ macro_rules! room_id {
 macro_rules! user_id {
     ($jid:expr) => {
         UserId::from($jid.parse::<jid::BareJid>().unwrap())
+    };
+}
+
+#[macro_export]
+macro_rules! account_id {
+    ($jid:expr) => {
+        AccountId::from($jid.parse::<jid::BareJid>().unwrap())
     };
 }
 

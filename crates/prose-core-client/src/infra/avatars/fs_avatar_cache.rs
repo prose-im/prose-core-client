@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::UserId;
+use crate::domain::shared::models::{AccountId, UserId};
 use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
 use crate::infra::avatars::{AvatarCache, MAX_IMAGE_DIMENSIONS};
 
@@ -51,7 +51,8 @@ pub enum FsAvatarCacheError {
 impl AvatarCache for FsAvatarCache {
     async fn cache_avatar_image(
         &self,
-        jid: &UserId,
+        _account: &AccountId,
+        user_id: &UserId,
         image_data: &AvatarData,
         info: &AvatarInfo,
     ) -> Result<()> {
@@ -63,7 +64,7 @@ impl AvatarCache for FsAvatarCache {
         let img = image::load_from_memory_with_format(&image_buf, image_format)?
             .thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);
 
-        let output_path = self.path.join(self.filename_for(jid, &info.checksum));
+        let output_path = self.path.join(self.filename_for(user_id, &info.checksum));
         let mut output_file = std::fs::File::create(&output_path)?;
 
         // Sometimes we encounter e.g. rgb16 pngs and image-rs complains that the JPEG encoder
@@ -75,26 +76,28 @@ impl AvatarCache for FsAvatarCache {
 
     async fn has_cached_avatar_image(
         &self,
-        jid: &UserId,
+        _account: &AccountId,
+        user_id: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<bool> {
-        let path = self.filename_for(jid, image_checksum);
+        let path = self.filename_for(user_id, image_checksum);
         Ok(path.exists())
     }
 
     async fn cached_avatar_image(
         &self,
-        jid: &UserId,
+        _account: &AccountId,
+        user_id: &UserId,
         image_checksum: &AvatarImageId,
     ) -> Result<Option<PlatformImage>> {
-        let path = self.filename_for(jid, image_checksum);
+        let path = self.filename_for(user_id, image_checksum);
         if path.exists() {
             return Ok(Some(path));
         }
         return Ok(None);
     }
 
-    async fn delete_all_cached_images(&self) -> Result<()> {
+    async fn delete_all_cached_images(&self, _account: &AccountId) -> Result<()> {
         for entry in fs::read_dir(&self.path)? {
             let entry = match entry {
                 Ok(entry) => entry,

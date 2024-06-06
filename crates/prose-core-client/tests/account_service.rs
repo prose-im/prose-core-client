@@ -31,15 +31,12 @@ async fn test_set_availability_updates_settings() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get_all()
         .once()
-        .return_once(|| vec![]);
+        .return_once(|_| vec![]);
 
     deps.account_settings_repo
         .expect_update()
         .once()
-        .with(
-            predicate::eq(mock_data::account_jid().into_user_id()),
-            predicate::always(),
-        )
+        .with(predicate::eq(mock_data::account()), predicate::always())
         .return_once(|_, f| {
             Box::pin(async {
                 let mut settings = AccountSettings::default();
@@ -78,7 +75,7 @@ async fn test_sends_availability_to_all_rooms() -> Result<()> {
     deps.connected_rooms_repo
         .expect_get_all()
         .once()
-        .return_once(|| {
+        .return_once(|_| {
             vec![
                 Room::direct_message(user_id!("user@prose.org"), Availability::Available)
                     .with_user_nickname("nick"),

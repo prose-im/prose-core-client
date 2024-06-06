@@ -12,8 +12,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use crate::domain::messaging::models::{
     ArchivedMessageRef, MessageId, MessageLike, MessageRef, MessageTargetId, StanzaId,
 };
-use crate::domain::shared::models::RoomId;
-use crate::dtos::UserId;
+use crate::domain::shared::models::{AccountId, RoomId};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -22,14 +21,14 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     /// Returns all parts (MessageLike) that make up message with `id`. Sorted chronologically.
     async fn get(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         id: &MessageId,
     ) -> Result<Vec<MessageLike>>;
     /// Returns all parts (MessageLike) that make up all messages in `ids`. Sorted chronologically.
     async fn get_all(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         ids: &[MessageId],
     ) -> Result<Vec<MessageLike>>;
@@ -37,25 +36,26 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     /// than `newer_than`.
     async fn get_messages_targeting(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         targeted_ids: &[MessageTargetId],
         newer_than: &DateTime<Utc>,
     ) -> Result<Vec<MessageLike>>;
-    async fn contains(&self, account: &UserId, room_id: &RoomId, id: &MessageId) -> Result<bool>;
+    async fn contains(&self, account: &AccountId, room_id: &RoomId, id: &MessageId)
+        -> Result<bool>;
     async fn append(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         messages: &[MessageLike],
     ) -> Result<()>;
-    async fn clear_cache(&self, account: &UserId) -> Result<()>;
+    async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 
     /// Attempts to look up the message identified by `stanza_id` and returns
     /// its `id` if it was found.
     async fn resolve_message_id(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         stanza_id: &StanzaId,
     ) -> Result<Option<MessageId>>;
@@ -64,7 +64,7 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     /// before `before` (if set).
     async fn get_last_received_message(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         before: Option<DateTime<Utc>>,
     ) -> Result<Option<ArchivedMessageRef>>;
@@ -73,14 +73,14 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     /// before `before` (if set).
     async fn get_last_message(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
     ) -> Result<Option<MessageRef>>;
 
     /// Returns all messages with a timestamp greater than `after`.
     async fn get_messages_after(
         &self,
-        account: &UserId,
+        account: &AccountId,
         room_id: &RoomId,
         after: DateTime<Utc>,
     ) -> Result<Vec<MessageLike>>;

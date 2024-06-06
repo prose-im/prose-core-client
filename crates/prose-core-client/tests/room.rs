@@ -40,8 +40,8 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
-        .with(predicate::eq(user_id!("c@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
+        .with(predicate::always(), predicate::eq(user_id!("c@prose.org")))
+        .return_once(|_, _| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_repo
         .expect_get_all()
@@ -116,8 +116,8 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     deps.user_profile_repo
         .expect_get_display_name()
         .once()
-        .with(predicate::eq(user_id!("c@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
+        .with(predicate::always(), predicate::eq(user_id!("c@prose.org")))
+        .return_once(|_, _| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
 
     deps.message_archive_service
         .expect_load_messages_before()
@@ -456,7 +456,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
 
     deps.user_profile_repo
         .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
@@ -627,7 +627,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
 
     deps.user_profile_repo
         .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
@@ -705,7 +705,7 @@ async fn test_stops_at_last_page() -> Result<()> {
 
     deps.user_profile_repo
         .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
@@ -829,7 +829,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
 
     deps.user_profile_repo
         .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
