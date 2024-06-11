@@ -42,6 +42,7 @@ impl RoomSessionInfo {
                 room_description: None,
                 room_type,
                 mam_version: None,
+                supports_self_ping_optimization: false,
             },
             topic: None,
             user_nickname: mock_data::account_jid().username().to_string(),

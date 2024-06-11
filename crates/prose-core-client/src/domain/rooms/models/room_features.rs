@@ -12,6 +12,8 @@ pub struct RoomFeatures {
     /// Which MAM version does the room support, if any?
     pub mam_version: Option<MamVersion>,
     pub server_time_offset: TimeDelta,
+    /// Does the server support XEP-0410 (MUC Self-Ping)?
+    pub supports_self_ping_optimization: bool,
 }
 
 impl RoomFeatures {

@@ -101,6 +101,7 @@ impl RoomManagementService for XMPPClient {
                 room_description: room_info.description,
                 room_type: spec.room_type(),
                 mam_version: room_info.features.mam_version,
+                supports_self_ping_optimization: room_info.features.supports_self_ping_optimization,
             },
             topic: occupancy.subject,
             user_nickname,
@@ -212,6 +213,7 @@ impl RoomManagementService for XMPPClient {
             room_description: room_info.description,
             room_type,
             mam_version: room_info.features.mam_version,
+            supports_self_ping_optimization: room_info.features.supports_self_ping_optimization,
         })
     }
 
@@ -233,6 +235,11 @@ impl RoomManagementService for XMPPClient {
             .collect::<Vec<_>>();
         muc_mod.update_user_affiliations(room_id, owners).await?;
         Ok(())
+    }
+
+    async fn send_self_ping(&self, occupant_id: &OccupantId) -> Result<(), RequestError> {
+        let ping_mod = self.client.get_mod::<mods::Ping>();
+        ping_mod.send_ping(occupant_id.clone().into_inner()).await
     }
 
     async fn destroy_room(

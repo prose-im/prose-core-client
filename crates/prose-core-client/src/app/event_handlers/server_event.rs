@@ -57,6 +57,7 @@ pub enum ServerEvent {
 pub enum ConnectionEvent {
     Connected,
     Disconnected { error: Option<ConnectionError> },
+    PingTimer,
 }
 
 #[derive(Debug, Clone, PartialEq)]

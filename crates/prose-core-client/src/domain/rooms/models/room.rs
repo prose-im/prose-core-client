@@ -60,6 +60,15 @@ pub enum RoomState {
     },
 }
 
+impl RoomState {
+    pub fn is_disconnected(&self) -> bool {
+        let Self::Disconnected { .. } = self else {
+            return false;
+        };
+        return true;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RoomInfo {
     /// The JID of the room.

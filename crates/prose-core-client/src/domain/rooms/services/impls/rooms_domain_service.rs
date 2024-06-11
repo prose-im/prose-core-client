@@ -10,6 +10,7 @@ use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use jid::{BareJid, NodePart};
 use tracing::{debug, error, info, warn};
+use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::{IDProvider, RequestError};
@@ -34,7 +35,7 @@ use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{AccountId, MucId, RoomId, RoomType, UserId};
 use crate::dtos::{Availability, RoomState};
 use crate::util::StringExt;
-use crate::ClientRoomEventType;
+use crate::{ClientEvent, ClientRoomEventType};
 
 use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
 use super::{build_nickname, ParticipantsVecExt};
@@ -124,6 +125,115 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         }
 
         Ok(room)
+    }
+
+    async fn reconnect_room_if_needed(&self, room_id: &MucId) -> Result<(), RoomError> {
+        let account = self.ctx.connected_account()?;
+        let room = self
+            .connected_rooms_repo
+            .get(&account, room_id.as_ref())
+            .ok_or(RoomError::RoomNotFound)?;
+
+        let occupant_id = room
+            .occupant_id()
+            .expect("A MUC room must have an OccupantId");
+
+        match room.state() {
+            RoomState::Pending
+            | RoomState::Connecting
+            | RoomState::Disconnected {
+                can_retry: false, ..
+            } => {
+                // If the room is in the process of connecting or disconnected with no
+                // chance of retrying, we'll leave it alone.
+                return Ok(());
+            }
+            RoomState::Disconnected {
+                can_retry: true, ..
+            } => {
+                // If the room was already disconnected, we'll try to reconnect it…
+                self.reconnect_room(room_id, room).await?;
+                return Ok(());
+            }
+            RoomState::Connected => (),
+        }
+
+        info!("Sending self-ping to {room_id}");
+
+        let Err(err) = self
+            .room_management_service
+            .send_self_ping(&occupant_id)
+            .await
+        else {
+            // The self-ping succeeded. We're still connected.
+            info!("{room_id} is still connected.");
+            return Ok(());
+        };
+
+        // https://xmpp.org/extensions/xep-0410.html#performingselfping
+        match err {
+            RequestError::Disconnected => {
+                room.set_state(RoomState::Disconnected {
+                    error: None,
+                    can_retry: false,
+                });
+                return Ok(());
+            }
+
+            RequestError::TimedOut => {
+                info!("Ping to {room_id} timed out.");
+                // The MUC service (or another client) is unreachable. The client may indicate
+                // the status to the user and re-attempt the self-ping after some timeout,
+                // until it receives either an error or a success response.
+                room.set_state(RoomState::Disconnected {
+                    error: None,
+                    can_retry: true,
+                });
+                return Ok(());
+            }
+
+            RequestError::XMPP { .. }
+                if err.defined_condition() == Some(DefinedCondition::RemoteServerNotFound)
+                    || err.defined_condition() == Some(DefinedCondition::RemoteServerTimeout) =>
+            {
+                // The remote server is unreachable for unspecified reasons; this can be a
+                // temporary network failure or a server outage. No decision can be made based
+                // on this; Treat like a timeout
+                info!("{room_id} is unreachable.");
+                room.set_state(RoomState::Disconnected {
+                    error: None,
+                    can_retry: true,
+                });
+                return Ok(());
+            }
+
+            RequestError::XMPP { .. }
+                if err.defined_condition() == Some(DefinedCondition::ServiceUnavailable)
+                    || err.defined_condition() == Some(DefinedCondition::FeatureNotImplemented) =>
+            {
+                // The client is joined, but the pinged client does not implement XMPP Ping (XEP-0199).
+                info!("{room_id} is still connected (but doesn't support XMPP Ping).");
+                return Ok(());
+            }
+
+            RequestError::XMPP { .. }
+                if err.defined_condition() == Some(DefinedCondition::ItemNotFound) =>
+            {
+                // the client is joined, but the occupant just changed their name
+                // (e.g. initiated by a different client).
+                info!("{room_id} is still connected.");
+                return Ok(());
+            }
+
+            _ => {
+                // Any other error [4]: the client is probably not joined anymore. It should
+                // perform a re-join.
+            }
+        }
+
+        info!("{room_id} is not connected anymore.");
+        self.reconnect_room(&room_id, room).await?;
+        Ok(())
     }
 
     /// Renames the room identified by `room_jid` to `name`.
@@ -498,6 +608,7 @@ impl RoomsDomainService {
             RoomFeatures {
                 mam_version: self.ctx.mam_version(),
                 server_time_offset: self.ctx.server_time_offset().unwrap_or_default(),
+                supports_self_ping_optimization: false,
             },
             settings,
         );
@@ -793,6 +904,31 @@ impl RoomsDomainService {
         }
     }
 
+    async fn reconnect_room(&self, room_id: &MucId, room: Room) -> Result<(), RoomError> {
+        info!("Reconnecting {room_id}…");
+
+        room.set_state(RoomState::Pending);
+
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        self.create_or_join_room(
+            CreateOrEnterRoomRequest::JoinRoom {
+                room_id: room_id.clone(),
+                password: None,
+                behavior: JoinRoomBehavior {
+                    on_redirect: JoinRoomRedirectBehavior::FollowIfGone,
+                    on_failure: JoinRoomFailureBehavior::RetainOnError,
+                },
+                decryption_context: None,
+            },
+            room.sidebar_state(),
+        )
+        .await?;
+
+        Ok(())
+    }
+
     async fn finalize_pending_room(
         &self,
         account: &AccountId,
@@ -838,6 +974,7 @@ impl RoomsDomainService {
             features: RoomFeatures {
                 mam_version: info.config.mam_version,
                 server_time_offset,
+                supports_self_ping_optimization: info.config.supports_self_ping_optimization,
             },
         };
 

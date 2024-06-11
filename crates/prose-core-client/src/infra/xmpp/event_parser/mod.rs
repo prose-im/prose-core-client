@@ -277,6 +277,7 @@ fn parse_client_event(ctx: &mut Context, event: XMPPClientEvent) -> Result<()> {
         XMPPClientEvent::Disconnected { error } => {
             ctx.push_event(ConnectionEvent::Disconnected { error })
         }
+        XMPPClientEvent::PingTimer => ctx.push_event(ConnectionEvent::PingTimer),
     }
 
     Ok(())

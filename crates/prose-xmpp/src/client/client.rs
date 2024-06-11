@@ -140,10 +140,13 @@ impl ClientInner {
             ConnectionEvent::TimeoutTimer => Self::purge_expired_futures(&self.context),
             ConnectionEvent::PingTimer => {
                 let ping = self.get_mod::<mods::Ping>();
-                match ping.send_ping().await {
+                match ping.send_ping_to_server().await {
                     Ok(_) => (),
                     Err(err) => warn!("Failed to send ping. {}", err),
                 }
+                self.context
+                    .clone()
+                    .schedule_event(ClientEvent::Client(Event::PingTimer));
             }
         }
     }

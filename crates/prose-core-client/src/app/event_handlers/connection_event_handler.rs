@@ -30,15 +30,14 @@ impl ServerEventHandler for ConnectionEventHandler {
 
     async fn handle_event(&self, event: ServerEvent) -> Result<Option<ServerEvent>> {
         match event {
-            ServerEvent::Connection(event) => self.handle_connection_event(event).await?,
-            _ => return Ok(Some(event)),
+            ServerEvent::Connection(event) => self.handle_connection_event(event).await,
+            _ => Ok(Some(event)),
         }
-        Ok(None)
     }
 }
 
 impl ConnectionEventHandler {
-    async fn handle_connection_event(&self, event: ConnectionEvent) -> Result<()> {
+    async fn handle_connection_event(&self, event: ConnectionEvent) -> Result<Option<ServerEvent>> {
         match event {
             ConnectionEvent::Connected => {
                 // We'll send an event from our `connect` method since we need to gather
@@ -52,7 +51,10 @@ impl ConnectionEventHandler {
                         event: ClientConnectionEvent::Disconnect { error },
                     });
             }
+            ConnectionEvent::PingTimer => {
+                return Ok(Some(ServerEvent::Connection(ConnectionEvent::PingTimer)))
+            }
         }
-        Ok(())
+        Ok(None)
     }
 }

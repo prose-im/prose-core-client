@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use jid::BareJid;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
+use prose_xmpp::RequestError;
 
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
@@ -53,6 +54,8 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
     async fn exit_room(&self, occupant_id: &OccupantId) -> Result<(), RoomError>;
 
     async fn set_room_owners(&self, room_id: &MucId, users: &[UserId]) -> Result<(), RoomError>;
+
+    async fn send_self_ping(&self, occupant_id: &OccupantId) -> Result<(), RequestError>;
 
     /// Destroys the room identified by `room_id`. If specified sets `alternate_room` as
     /// replacement room, so that users will be redirected there.

@@ -16,8 +16,8 @@ use crate::app::deps::{
 };
 use crate::app::event_handlers::ServerEventHandler;
 use crate::app::event_handlers::{
-    OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent, UserStatusEvent,
-    UserStatusEventType,
+    ConnectionEvent, OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent,
+    UserStatusEvent, UserStatusEventType,
 };
 use crate::client_event::ClientRoomEventType;
 use crate::domain::rooms::models::Room;
@@ -63,6 +63,12 @@ impl ServerEventHandler for RoomsEventHandler {
                 self.handle_room_event(event).await?;
             }
             ServerEvent::UserStatus(event) => self.handle_user_status_event(event).await?,
+            ServerEvent::Connection(ConnectionEvent::PingTimer) => {
+                self.sidebar_domain_service
+                    .handle_ping_timer_event()
+                    .await?;
+                return Ok(Some(ServerEvent::Connection(ConnectionEvent::PingTimer)));
+            }
             _ => return Ok(Some(event)),
         }
         Ok(None)

@@ -53,7 +53,31 @@ impl Module for Ping {
 }
 
 impl Ping {
-    pub(crate) async fn send_ping(&self) -> Result<()> {
+    pub async fn send_ping(&self, to: impl Into<Jid>) -> Result<(), RequestError> {
+        self.ctx
+            .send_iq(
+                Iq::from_get(self.ctx.generate_id(), ping::Ping)
+                    .with_from(self.ctx.full_jid().clone().into())
+                    .with_to(to.into()),
+            )
+            .await
+            .map(|_| ())
+    }
+
+    pub async fn send_pong(&self, to: Jid, id: impl AsRef<str>) -> Result<(), RequestError> {
+        let iq = Iq {
+            from: None,
+            to: Some(to),
+            id: id.as_ref().to_string(),
+            payload: IqType::Result(None),
+        };
+        self.ctx.send_stanza(iq)?;
+        Ok(())
+    }
+}
+
+impl Ping {
+    pub(crate) async fn send_ping_to_server(&self) -> Result<()> {
         let result = self
             .ctx
             .send_iq(
@@ -71,16 +95,5 @@ impl Ping {
             }
             Err(err) => Err(err.into()),
         }
-    }
-
-    pub async fn send_pong(&self, to: Jid, id: impl AsRef<str>) -> Result<()> {
-        let iq = Iq {
-            from: None,
-            to: Some(to),
-            id: id.as_ref().to_string(),
-            payload: IqType::Result(None),
-        };
-        self.ctx.send_stanza(iq)?;
-        Ok(())
     }
 }

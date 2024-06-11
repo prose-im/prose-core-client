@@ -26,6 +26,7 @@ pub struct RoomConfig {
     pub room_description: Option<String>,
     pub room_type: RoomType,
     pub mam_version: Option<MamVersion>,
+    pub supports_self_ping_optimization: bool,
 }
 
 #[derive(Debug, PartialEq, Clone)]

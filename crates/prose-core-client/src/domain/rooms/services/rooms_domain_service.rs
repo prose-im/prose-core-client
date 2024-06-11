@@ -110,9 +110,13 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
         sidebar_state: RoomSidebarState,
     ) -> Result<Room, RoomError>;
 
-    /// Renames the room identified by `room_jid` to `name`.
+    /// Tries to reestablish the connection of room identified by `room_id` in case the room
+    /// is not connected anymore.
+    async fn reconnect_room_if_needed(&self, room_id: &MucId) -> Result<(), RoomError>;
+
+    /// Renames the room identified by `room_id` to `name`.
     ///
-    /// If the room is not connected no action is performed, otherwise:
+    /// If the room is not connected, no action is performed, otherwise:
     /// - Panics if the Room is not of type `RoomType::PublicChannel`, `RoomType::PrivateChannel`
     ///   or `RoomType::Generic`.
     /// - Fails with `RoomError::PublicChannelNameConflict` if the room is of type
@@ -121,10 +125,10 @@ pub trait RoomsDomainService: SendUnlessWasm + SyncUnlessWasm {
     ///   after processing.
     async fn rename_room(&self, room_id: &MucId, name: &str) -> Result<(), RoomError>;
 
-    /// Reconfigures the room identified by `room_jid` according to `spec` and renames it to `new_name`.
+    /// Reconfigures the room identified by `room_id` according to `spec` and renames it to `new_name`.
     ///
-    /// If the room is not connected no action is performed, otherwise:
-    /// - Panics if the reconfiguration is not not allowed. Allowed reconfigurations are:
+    /// If the room is not connected, no action is performed, otherwise:
+    /// - Panics if the reconfiguration is not allowed. Allowed reconfigurations are:
     ///   - `RoomType::Group` -> `RoomType::PrivateChannel`
     ///   - `RoomType::PublicChannel` -> `RoomType::PrivateChannel`
     ///   - `RoomType::PrivateChannel` -> `RoomType::PublicChannel`

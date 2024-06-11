@@ -572,6 +572,37 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    async fn handle_ping_timer_event(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
+        for room in self.connected_rooms_repo.get_all(&account) {
+            let RoomId::Muc(room_id) = &room.room_id else {
+                // No need to verify the connection for anything other than MUC rooms…
+                continue;
+            };
+
+            let state = room.state();
+
+            match self
+                .rooms_domain_service
+                .reconnect_room_if_needed(&room_id)
+                .await
+            {
+                Ok(_) => (),
+                Err(err) => {
+                    error!("Could not reconnect room. {}", err.to_string())
+                }
+            };
+
+            if room.state() != state {
+                self.client_event_dispatcher
+                    .dispatch_event(ClientEvent::SidebarChanged);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Removes all connected rooms and sidebar items.
     ///
     /// Call this method after logging out.

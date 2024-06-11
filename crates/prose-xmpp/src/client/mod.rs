@@ -37,4 +37,5 @@ pub type ConnectorProvider = Box<dyn Fn() -> Box<dyn Connector> + Send + Sync>;
 pub enum Event {
     Connected,
     Disconnected { error: Option<ConnectionError> },
+    PingTimer,
 }

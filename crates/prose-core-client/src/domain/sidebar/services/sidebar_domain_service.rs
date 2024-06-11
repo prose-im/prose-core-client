@@ -152,6 +152,9 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// - Dispatches a `ClientEvent::SidebarChanged` event after processing.
     async fn handle_changed_room_config(&self, room_id: &MucId) -> Result<()>;
 
+    /// Handles a ping timer event by reevaluating the connection of all rooms in the sidebar.
+    async fn handle_ping_timer_event(&self) -> Result<()>;
+
     /// Removes all connected rooms and sidebar items.
     ///
     /// Call this method after logging out.
