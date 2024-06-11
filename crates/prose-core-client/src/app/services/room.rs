@@ -421,7 +421,7 @@ impl<Kind> Room<Kind> {
     pub async fn mark_as_read(&self) -> Result<()> {
         let Some(message_ref) = self
             .message_repo
-            .get_last_message(&self.ctx.connected_account()?, &self.data.room_id)
+            .get_last_received_message(&self.ctx.connected_account()?, &self.data.room_id, None)
             .await?
         else {
             return Ok(());
@@ -435,9 +435,9 @@ impl<Kind> Room<Kind> {
             }
 
             if let Some(former_message_ref) = settings.last_read_message.take() {
-                updated_message_ids.push(former_message_ref.id);
+                updated_message_ids.push(former_message_ref.stanza_id);
             }
-            updated_message_ids.push(message_ref.id.clone());
+            updated_message_ids.push(message_ref.stanza_id.clone());
             settings.last_read_message = Some(message_ref);
         })
         .await;
@@ -603,7 +603,7 @@ impl<Kind> Room<Kind> {
             .settings()
             .last_read_message
             .as_ref()
-            .map(|msg| msg.id.clone());
+            .map(|msg| msg.stanza_id.clone());
 
         async fn resolve_message_sender<'a, Kind>(
             account: &AccountId,
@@ -650,7 +650,8 @@ impl<Kind> Room<Kind> {
                 })
             }
 
-            let is_last_read_message = message.id == last_read_message_id;
+            let is_last_read_message =
+                message.stanza_id.is_some() && message.stanza_id == last_read_message_id;
 
             message_dtos.push(MessageDTO {
                 id: message.id,

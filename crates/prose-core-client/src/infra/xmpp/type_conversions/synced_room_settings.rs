@@ -29,7 +29,10 @@ impl TryFrom<Element> for SyncedRoomSettings {
                 },
             )?,
             last_read_message: value
-                .get_child("message-ref", message_ref::ns::PROSE_MESSAGE_REF)
+                .get_child(
+                    "archived-message-ref",
+                    message_ref::ns::PROSE_ARCHIVED_MESSAGE_REF,
+                )
                 .cloned()
                 .map(TryFrom::try_from)
                 .transpose()?,

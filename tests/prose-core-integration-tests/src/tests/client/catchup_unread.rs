@@ -9,7 +9,9 @@ use minidom::Element;
 use pretty_assertions::assert_eq;
 use xmpp_parsers::mam::QueryId;
 
-use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageRef};
+use prose_core_client::domain::messaging::models::{
+    ArchivedMessageRef, MessageLikePayload, MessageRef,
+};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::AccountId;
@@ -68,8 +70,8 @@ async fn test_maintains_message_count_from_prior_runs() -> Result<()> {
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(MessageRef {
-            id: MessageBuilder::id_for_index(1),
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(1),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
         }),
     });
@@ -149,8 +151,8 @@ async fn test_loads_unread_messages() -> Result<()> {
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(MessageRef {
-            id: MessageBuilder::id_for_index(1),
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(1),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
         }),
     });
@@ -243,7 +245,10 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
     client.push_ctx(
         [
             ("OTHER_USER_ID".into(), user_id.to_string()),
-            ("MSG_ID".into(), MessageBuilder::id_for_index(2).to_string()),
+            (
+                "MSG_STANZA_ID".into(),
+                MessageBuilder::stanza_id_for_index(2).to_string(),
+            ),
             (
                 "MSG_TIMESTAMP".into(),
                 Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00)
@@ -261,7 +266,7 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
           <items node="https://prose.org/protocol/room_settings">
             <item id="{{OTHER_USER_ID}}" publisher="{{USER_ID}}">
               <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="user:{{OTHER_USER_ID}}">
-                <message-ref xmlns="https://prose.org/protocol/message_ref" id="{{MSG_ID}}" ts="{{MSG_TIMESTAMP}}" />
+                <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="{{MSG_TIMESTAMP}}" />
               </room-settings>
             </item>
           </items>
@@ -302,8 +307,8 @@ async fn test_marks_first_unread_message() -> Result<()> {
     strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(MessageRef {
-            id: MessageBuilder::id_for_index(2),
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(2),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap(),
         }),
     });
@@ -428,8 +433,8 @@ async fn test_mark_as_unread_saves_settings() -> Result<()> {
     join_room_strategy.room_settings = Some(SyncedRoomSettings {
         room_id: room_id.clone(),
         encryption_enabled: false,
-        last_read_message: Some(MessageRef {
-            id: MessageBuilder::id_for_index(1),
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(1),
             timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
         }),
     });
@@ -450,8 +455,8 @@ async fn test_mark_as_unread_saves_settings() -> Result<()> {
         [
             ("ROOM_ID".into(), room_id.to_string()),
             (
-                "MESSAGE_ID".into(),
-                MessageBuilder::id_for_index(3).to_string(),
+                "MSG_STANZA_ID".into(),
+                MessageBuilder::stanza_id_for_index(3).to_string(),
             ),
         ]
         .into(),
@@ -465,7 +470,7 @@ async fn test_mark_as_unread_saves_settings() -> Result<()> {
             <publish node="https://prose.org/protocol/room_settings">
               <item id="{{ROOM_ID}}">
                 <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
-                  <message-ref xmlns="https://prose.org/protocol/message_ref" id="{{MESSAGE_ID}}" ts="2024-04-26T11:00:00+00:00" />
+                  <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="2024-04-26T11:00:00+00:00" />
                   <encryption type="none" />
                 </room-settings>
               </item>
