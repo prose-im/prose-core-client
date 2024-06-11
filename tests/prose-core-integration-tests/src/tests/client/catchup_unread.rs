@@ -9,23 +9,23 @@ use minidom::Element;
 use pretty_assertions::assert_eq;
 use xmpp_parsers::mam::QueryId;
 
-use prose_core_client::domain::messaging::models::{
-    ArchivedMessageRef, MessageLikePayload, MessageRef,
-};
+use prose_core_client::domain::messaging::models::{ArchivedMessageRef, MessageLikePayload};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::AccountId;
 use prose_core_client::dtos::{Mention, MucId, OccupantId, RoomId, UnicodeScalarIndex, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::{ConstantTimeProvider, MessageBuilder};
-use prose_core_client::{account_id, muc_id, occupant_id, user_id, ClientEvent};
+use prose_core_client::{
+    account_id, muc_id, occupant_id, user_id, ClientEvent, ClientRoomEventType,
+};
 use prose_proc_macros::mt_test;
 use prose_xmpp::stanza::Message;
 use prose_xmpp::TimeProvider;
 
 use crate::tests::client::helpers::{JoinRoomStrategy, StartDMStrategy, TestClient};
 use crate::tests::store;
-use crate::{event, recv, send};
+use crate::{event, recv, room_event, send};
 
 #[mt_test]
 async fn test_maintains_message_count_from_prior_runs() -> Result<()> {
@@ -521,6 +521,244 @@ async fn test_mark_as_unread_saves_settings() -> Result<()> {
 
     // This shouldn't do anything, since the last read message did not change.
     room.mark_as_read().await?;
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_set_unread_message_saves_settings() -> Result<()> {
+    let store = store().await.expect("Failed to set up store.");
+
+    let account = account_id!("user@prose.org");
+    let muc_id = muc_id!("room@conf.prose.org");
+    let room_id = RoomId::Muc(muc_id.clone());
+
+    let mut messages = [
+        MessageBuilder::new_with_index(1)
+            .set_from(occupant_id!("room@conf.prose.org/friend"))
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap())
+            .build_message_like(),
+        MessageBuilder::new_with_index(2)
+            .set_from(occupant_id!("room@conf.prose.org/friend"))
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00).unwrap())
+            .build_message_like(),
+        MessageBuilder::new_with_index(3)
+            .set_from(occupant_id!("room@conf.prose.org/friend"))
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap())
+            .build_message_like(),
+        MessageBuilder::new_with_index(4)
+            .set_from(occupant_id!("room@conf.prose.org/friend"))
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 27, 11, 00, 00).unwrap())
+            .build_message_like(),
+        MessageBuilder::new_with_index(5)
+            .set_from(occupant_id!("room@conf.prose.org/friend"))
+            .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 28, 11, 00, 00).unwrap())
+            .build_message_like(),
+    ];
+
+    messages[2].stanza_id = None;
+    messages[3].stanza_id = None;
+
+    let message_repo = CachingMessageRepository::new(store.clone());
+    message_repo.append(&account, &room_id, &messages).await?;
+
+    let now = Utc::now();
+
+    let client = TestClient::builder()
+        .set_store(store)
+        .set_time_provider(ConstantTimeProvider::new(now.clone()))
+        .build()
+        .await;
+    client.expect_login(account.to_user_id(), "secret").await?;
+
+    let mut join_room_strategy = JoinRoomStrategy::default();
+    join_room_strategy.room_settings = Some(SyncedRoomSettings {
+        room_id: room_id.clone(),
+        encryption_enabled: false,
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(1),
+            timestamp: Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap(),
+        }),
+    });
+
+    client
+        .join_room_with_strategy(muc_id.clone(), "anon-id", join_room_strategy)
+        .await?;
+
+    client.push_ctx(
+        [
+            ("ROOM_ID".into(), room_id.to_string()),
+            (
+                "MSG_STANZA_ID".into(),
+                MessageBuilder::stanza_id_for_index(2).to_string(),
+            ),
+        ]
+        .into(),
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}">
+                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
+                  <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="2024-04-26T10:00:00+00:00" />
+                  <encryption type="none" />
+                </room-settings>
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    client.pop_ctx();
+
+    room_event!(
+        client,
+        room_id.clone(),
+        ClientRoomEventType::MessagesUpdated {
+            message_ids: vec![
+                MessageBuilder::id_for_index(1),
+                MessageBuilder::id_for_index(2)
+            ]
+        }
+    );
+
+    event!(client, ClientEvent::SidebarChanged);
+
+    let room = client.get_room(room_id.clone()).await.to_generic_room();
+    room.set_last_read_message(&MessageBuilder::id_for_index(4))
+        .await?;
+
+    let sidebar_items = client.sidebar.sidebar_items().await;
+    assert_eq!(1, sidebar_items.len());
+
+    let sidebar_item = sidebar_items
+        .get(0)
+        .expect("Expected at least one SidebarItem");
+    assert_eq!(3, sidebar_item.unread_count);
+
+    client.push_ctx(
+        [
+            ("ROOM_ID".into(), room_id.to_string()),
+            (
+                "MSG_STANZA_ID".into(),
+                MessageBuilder::stanza_id_for_index(5).to_string(),
+            ),
+        ]
+        .into(),
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}">
+                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
+                  <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="2024-04-28T11:00:00+00:00" />
+                  <encryption type="none" />
+                </room-settings>
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}" />
+            </publish>
+          </pubsub>
+        </iq>
+        "#
+    );
+
+    client.pop_ctx();
+
+    room_event!(
+        client,
+        room_id.clone(),
+        ClientRoomEventType::MessagesUpdated {
+            message_ids: vec![
+                MessageBuilder::id_for_index(2),
+                MessageBuilder::id_for_index(5)
+            ]
+        }
+    );
+
+    event!(client, ClientEvent::SidebarChanged);
+
+    room.set_last_read_message(&MessageBuilder::id_for_index(5))
+        .await?;
+
+    let sidebar_items = client.sidebar.sidebar_items().await;
+    assert_eq!(1, sidebar_items.len());
+
+    let sidebar_item = sidebar_items
+        .get(0)
+        .expect("Expected at least one SidebarItem");
+    assert_eq!(0, sidebar_item.unread_count);
 
     Ok(())
 }

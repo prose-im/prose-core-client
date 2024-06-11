@@ -70,6 +70,7 @@ export interface RoomBase {
     loadDraft(): Promise<string>;
     
     markAsRead(): Promise<void>;
+    setLastReadMessage(messageID: string): Promise<void>;
 }
 
 export interface RoomMUC {
@@ -393,6 +394,15 @@ macro_rules! base_room_impl {
             #[wasm_bindgen(js_name = "markAsRead")]
             pub async fn mark_as_read(&self) -> Result<()> {
                 Ok(self.room.mark_as_read().await.map_err(WasmError::from)?)
+            }
+
+            #[wasm_bindgen(js_name = "setLastReadMessage")]
+            pub async fn set_last_read_message(&self, message_id: &str) -> Result<()> {
+                self.room
+                    .set_last_read_message(&message_id.into())
+                    .await
+                    .map_err(WasmError::from)?;
+                Ok(())
             }
         }
     };

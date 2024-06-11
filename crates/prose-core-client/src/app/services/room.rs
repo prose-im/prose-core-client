@@ -24,8 +24,8 @@ use crate::app::deps::{
     DynSyncedRoomSettingsService, DynTimeProvider, DynUserProfileRepository,
 };
 use crate::domain::messaging::models::{
-    send_message_request, Emoji, Message, MessageId, MessageLike, MessageLikeError, MessageParser,
-    MessageTargetId,
+    send_message_request, ArchivedMessageRef, Emoji, Message, MessageId, MessageLike,
+    MessageLikeError, MessageParser, MessageTargetId,
 };
 use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
@@ -418,38 +418,58 @@ impl<Kind> Room<Kind> {
         })
     }
 
+    pub async fn set_last_read_message(&self, id: &MessageId) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
+        let mut messages = self
+            .message_repo
+            .get(&account, &self.data.room_id, id)
+            .await?;
+
+        if messages.is_empty() {
+            return Err(anyhow!("No message exists with id {id}."));
+        }
+
+        let message = messages.swap_remove(0);
+
+        if let Some(stanza_id) = message.stanza_id {
+            return self
+                .set_last_read_message_ref(
+                    &account,
+                    Some(ArchivedMessageRef {
+                        stanza_id,
+                        timestamp: message.timestamp,
+                    }),
+                    true,
+                )
+                .await;
+        }
+
+        self.set_last_read_message_ref(
+            &account,
+            self.message_repo
+                .get_last_received_message(&account, &self.data.room_id, Some(message.timestamp))
+                .await?,
+            true,
+        )
+        .await?;
+
+        Ok(())
+    }
+
     pub async fn mark_as_read(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
         let Some(message_ref) = self
             .message_repo
-            .get_last_received_message(&self.ctx.connected_account()?, &self.data.room_id, None)
+            .get_last_received_message(&account, &self.data.room_id, None)
             .await?
         else {
             return Ok(());
         };
 
-        let mut updated_message_ids = vec![];
-
-        self.update_synced_settings(|settings| {
-            if settings.last_read_message.as_ref() == Some(&message_ref) {
-                return;
-            }
-
-            if let Some(former_message_ref) = settings.last_read_message.take() {
-                updated_message_ids.push(former_message_ref.stanza_id);
-            }
-            updated_message_ids.push(message_ref.stanza_id.clone());
-            settings.last_read_message = Some(message_ref);
-        })
-        .await;
-
-        if updated_message_ids.is_empty() {
-            return Ok(());
-        }
-
-        self.inner.data.set_needs_update_statistics();
-        self.client_event_dispatcher
-            .dispatch_event(ClientEvent::SidebarChanged);
-
+        self.set_last_read_message_ref(&account, Some(message_ref), false)
+            .await?;
         Ok(())
     }
 
@@ -831,6 +851,65 @@ impl<Kind> Room<Kind> {
                 error!("Failed to save updated room settings. {}", err.to_string())
             }
         }
+    }
+
+    async fn set_last_read_message_ref(
+        &self,
+        account: &AccountId,
+        message_ref: Option<ArchivedMessageRef>,
+        send_message_changed_events: bool,
+    ) -> Result<()> {
+        let mut updated_stanza_ids = vec![];
+
+        self.update_synced_settings(|settings| {
+            if settings.last_read_message == message_ref {
+                return;
+            }
+
+            if let Some(former_message_ref) = settings.last_read_message.take() {
+                updated_stanza_ids.push(former_message_ref.stanza_id);
+            }
+
+            if let Some(stanza_id) = message_ref.as_ref().map(|r| r.stanza_id.clone()) {
+                updated_stanza_ids.push(stanza_id);
+            }
+
+            settings.last_read_message = message_ref;
+        })
+        .await;
+
+        if updated_stanza_ids.is_empty() {
+            return Ok(());
+        }
+
+        if send_message_changed_events {
+            let mut updated_message_ids = vec![];
+
+            for id in updated_stanza_ids {
+                if let Some(message_id) = self
+                    .message_repo
+                    .resolve_message_id(&account, &self.data.room_id, &id)
+                    .await?
+                {
+                    updated_message_ids.push(message_id);
+                }
+            }
+
+            if !updated_message_ids.is_empty() {
+                self.client_event_dispatcher.dispatch_room_event(
+                    self.data.clone(),
+                    ClientRoomEventType::MessagesUpdated {
+                        message_ids: updated_message_ids,
+                    },
+                )
+            }
+        }
+
+        self.inner.data.set_needs_update_statistics();
+        self.client_event_dispatcher
+            .dispatch_event(ClientEvent::SidebarChanged);
+
+        Ok(())
     }
 }
 
