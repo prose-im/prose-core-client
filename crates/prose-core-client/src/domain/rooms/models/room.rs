@@ -20,7 +20,7 @@ use crate::domain::rooms::models::{
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{AccountId, Availability, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
-use crate::dtos::OccupantId;
+use crate::dtos::{OccupantId, ParticipantId};
 
 /// Contains information about a connected room and its state.
 #[derive(Debug, Clone)]
@@ -234,17 +234,28 @@ impl Room {
             .get_messages_after(account, &self.room_id, last_read_message_timestamp)
             .await?;
 
-        for message in messages {
-            if let MessageLikePayload::Message { ref mentions, .. } = message.payload {
-                for mention in mentions {
-                    if account == &mention.user {
-                        stats.mentions_count += 1;
-                        break;
-                    }
-                }
+        let our_participant_id = self
+            .occupant_id()
+            .map(ParticipantId::Occupant)
+            .unwrap_or_else(|| ParticipantId::User(account.to_user_id()));
 
-                stats.unread_count += 1;
+        for message in messages {
+            let MessageLikePayload::Message { ref mentions, .. } = message.payload else {
+                continue;
+            };
+
+            if message.from == our_participant_id {
+                continue;
             }
+
+            for mention in mentions {
+                if account == &mention.user {
+                    stats.mentions_count += 1;
+                    break;
+                }
+            }
+
+            stats.unread_count += 1;
         }
 
         self.inner.details.write().statistics = stats.clone();

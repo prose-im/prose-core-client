@@ -27,17 +27,46 @@ pub struct JoinRoomStrategy {
     pub expect_catchup: Box<dyn FnOnce(&TestClient, &MucId)>,
 }
 
-#[derive(Default)]
-pub struct StartDMStrategy {
-    pub room_settings: Option<SyncedRoomSettings>,
-}
-
 impl Default for JoinRoomStrategy {
     fn default() -> Self {
         JoinRoomStrategy {
             room_settings: None,
             expect_catchup: Box::new(|client, room_id| client.expect_muc_catchup(room_id)),
         }
+    }
+}
+
+impl JoinRoomStrategy {
+    pub fn with_catch_up_handler(
+        mut self,
+        handler: impl FnOnce(&TestClient, &MucId) + 'static,
+    ) -> Self {
+        self.expect_catchup = Box::new(handler);
+        self
+    }
+}
+
+pub struct StartDMStrategy {
+    pub room_settings: Option<SyncedRoomSettings>,
+    pub expect_catchup: Box<dyn FnOnce(&TestClient, &UserId)>,
+}
+
+impl Default for StartDMStrategy {
+    fn default() -> Self {
+        Self {
+            room_settings: None,
+            expect_catchup: Box::new(|client, user_id| client.expect_catchup(user_id)),
+        }
+    }
+}
+
+impl StartDMStrategy {
+    pub fn with_catch_up_handler(
+        mut self,
+        handler: impl FnOnce(&TestClient, &UserId) + 'static,
+    ) -> Self {
+        self.expect_catchup = Box::new(handler);
+        self
     }
 }
 
@@ -332,7 +361,7 @@ impl TestClient {
         );
 
         self.expect_load_settings(user_id.clone(), strategy.room_settings);
-        self.expect_catchup(&user_id);
+        (strategy.expect_catchup)(&self, &user_id);
 
         self.expect_set_bookmark(
             &RoomId::User(user_id.clone()),
@@ -605,6 +634,14 @@ impl TestClient {
     }
 
     pub fn expect_catchup(&self, room_id: &UserId) {
+        self.expect_catchup_with_config(room_id, None);
+    }
+
+    pub fn expect_catchup_with_config(
+        &self,
+        room_id: &UserId,
+        messages: impl IntoIterator<Item = ArchivedMessage>,
+    ) {
         let start =
             self.time_provider.now() - Duration::seconds(self.app_config.max_catchup_duration_secs);
 
@@ -639,6 +676,15 @@ impl TestClient {
             </iq>
             "#
         );
+
+        let query_id = QueryId(self.id_provider.id_with_offset(1));
+
+        for mut archived_message in messages.into_iter() {
+            archived_message.query_id = Some(query_id.clone());
+
+            let message = Message::new().set_archived_message(archived_message);
+            self.receive_element(Element::from(message), file!(), line!());
+        }
 
         recv!(
             self,
