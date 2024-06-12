@@ -215,13 +215,13 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
         "#
     );
 
-    client.expect_send_vard_request(&user_id!("user1@prose.org"));
+    client.expect_load_vcard(&user_id!("user1@prose.org"));
     client.receive_not_found_iq_response();
 
-    client.expect_send_vard_request(&user_id!("user2@prose.org"));
+    client.expect_load_vcard(&user_id!("user2@prose.org"));
     client.receive_not_found_iq_response();
 
-    client.expect_send_vard_request(&user_id!("user3@prose.org"));
+    client.expect_load_vcard(&user_id!("user3@prose.org"));
     client.receive_not_found_iq_response();
 
     client.expect_load_settings(room_id.clone(), None);
@@ -518,10 +518,10 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
         "#
     );
 
-    client.expect_send_vard_request(&user_id!("user1@prose.org"));
+    client.expect_load_vcard(&user_id!("user1@prose.org"));
     client.receive_not_found_iq_response();
 
-    client.expect_send_vard_request(&user_id!("user2@prose.org"));
+    client.expect_load_vcard(&user_id!("user2@prose.org"));
     client.receive_not_found_iq_response();
 
     client.expect_load_settings(room_id.clone(), None);
@@ -684,7 +684,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
         }
     );
 
-    client.expect_send_vard_request(&user_id!("user@prose.org"));
+    client.expect_load_vcard(&user_id!("user@prose.org"));
     client.receive_not_found_iq_response();
 
     client.receive_next().await;

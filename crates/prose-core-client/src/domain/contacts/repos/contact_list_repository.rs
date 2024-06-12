@@ -26,5 +26,6 @@ pub trait ContactListRepository: SendUnlessWasm + SyncUnlessWasm {
     ) -> Result<bool>;
     async fn delete(&self, account: &AccountId, contact_id: &UserId) -> Result<bool>;
 
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()>;
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

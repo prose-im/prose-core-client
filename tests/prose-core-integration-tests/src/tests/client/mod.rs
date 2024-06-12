@@ -8,3 +8,4 @@ mod helpers;
 mod muc;
 mod muc_omemo;
 mod omemo;
+mod reconnect;

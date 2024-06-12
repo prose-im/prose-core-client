@@ -59,6 +59,9 @@ export interface ProseClientDelegate {
     /// A message was deleted.
     messagesDeleted(client: ProseClient, room: Room, messageIDs: string[]): void
     
+    /// The room went offline, came back online and contains new messages.
+    messagesNeedReload(client: ProseClient, room: Room): void
+    
     /// Attributes changed like name or topic.
     roomAttributesChanged(client: ProseClient, room: Room): void
     
@@ -140,6 +143,13 @@ extern "C" {
         client: Client,
         room: JsValue,
         ids: Vec<JsValue>,
+    ) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "messagesNeedReload")]
+    fn messages_need_reload(
+        this: &JSDelegate,
+        client: Client,
+        room: JsValue,
     ) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "roomAttributesChanged")]
@@ -266,6 +276,9 @@ impl Delegate {
                 ClientRoomEventType::MessagesDeleted { message_ids } => self
                     .inner
                     .messages_deleted(client, room.into_js_value(), message_ids.into_js_array())?,
+                ClientRoomEventType::MessagesNeedReload => self
+                    .inner
+                    .messages_need_reload(client, room.into_js_value())?,
                 ClientRoomEventType::ComposingUsersChanged => self
                     .inner
                     .composing_users_changed(client, room.into_js_value())?,

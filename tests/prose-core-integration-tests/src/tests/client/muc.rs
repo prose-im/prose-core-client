@@ -79,7 +79,7 @@ async fn test_receives_chat_states() -> Result<()> {
         ClientRoomEventType::ParticipantsChanged
     );
 
-    client.expect_send_vard_request(&user_id!("user2@prose.org"));
+    client.expect_load_vcard(&user_id!("user2@prose.org"));
     client.receive_not_found_iq_response();
 
     room_event!(

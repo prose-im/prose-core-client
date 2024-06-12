@@ -36,13 +36,13 @@ pub struct MessageArchiveDomainService {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
-    async fn catchup_room(&self, room: &Room, context: DecryptionContext) -> Result<()> {
+    async fn catchup_room(&self, room: &Room, context: DecryptionContext) -> Result<bool> {
         if !room.features.is_mam_supported() {
             info!(
                 "Skipping catchup on {} since it does not support MAM.",
                 room.room_id
             );
-            return Ok(());
+            return Ok(false);
         }
 
         let account = self.ctx.connected_account()?;
@@ -104,6 +104,11 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
                 .await;
         }
 
+        info!(
+            "Finished catching up {}. Loaded {} messages.",
+            room.room_id,
+            messages.len()
+        );
         self.message_repo
             .append(&account, &room.room_id, &messages)
             .await?;
@@ -119,7 +124,8 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
 
         room.set_needs_update_statistics();
 
-        Ok(())
+        let new_messages_found = !messages.is_empty();
+        Ok(new_messages_found)
     }
 }
 

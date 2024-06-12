@@ -68,6 +68,10 @@ impl BlockListRepository for CachingBlockListRepository {
         Ok(has_entries)
     }
 
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()> {
+        self.clear_cache(account).await
+    }
+
     async fn clear_cache(&self, _account: &AccountId) -> Result<()> {
         self.blocked_users.write().take();
         Ok(())

@@ -155,6 +155,9 @@ pub trait SidebarDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// Handles a ping timer event by reevaluating the connection of all rooms in the sidebar.
     async fn handle_ping_timer_event(&self) -> Result<()>;
 
+    /// Handles a disconnect event by setting all rooms to disconnected.
+    async fn handle_disconnect(&self) -> Result<()>;
+
     /// Removes all connected rooms and sidebar items.
     ///
     /// Call this method after logging out.

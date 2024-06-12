@@ -168,6 +168,14 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
         Ok(())
     }
 
+    async fn reset_before_reconnect(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+        self.contact_list_repo
+            .reset_before_reconnect(&account)
+            .await?;
+        Ok(())
+    }
+
     async fn clear_cache(&self) -> Result<()> {
         let account = self.ctx.connected_account()?;
         self.contact_list_repo.clear_cache(&account).await?;

@@ -36,5 +36,6 @@ pub trait ContactListDomainService: SendUnlessWasm + SyncUnlessWasm {
     async fn handle_removed_contact(&self, user_id: &UserId) -> Result<()>;
     async fn handle_presence_sub_request(&self, from: &UserId) -> Result<()>;
 
+    async fn reset_before_reconnect(&self) -> Result<()>;
     async fn clear_cache(&self) -> Result<()>;
 }

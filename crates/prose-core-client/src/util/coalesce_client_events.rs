@@ -86,6 +86,7 @@ fn should_dedup_room_events(
             ids_b.extend(ids_a.drain(..));
             true
         }
+        (ClientRoomEventType::MessagesNeedReload, ClientRoomEventType::MessagesNeedReload) => true,
         (ClientRoomEventType::AttributesChanged, ClientRoomEventType::AttributesChanged) => true,
         (ClientRoomEventType::ParticipantsChanged, ClientRoomEventType::ParticipantsChanged) => {
             true
@@ -98,6 +99,7 @@ fn should_dedup_room_events(
         (ClientRoomEventType::MessagesAppended { .. }, _) => false,
         (ClientRoomEventType::MessagesUpdated { .. }, _) => false,
         (ClientRoomEventType::MessagesDeleted { .. }, _) => false,
+        (ClientRoomEventType::MessagesNeedReload, _) => false,
         (ClientRoomEventType::AttributesChanged, _) => false,
         (ClientRoomEventType::ParticipantsChanged, _) => false,
         (ClientRoomEventType::ComposingUsersChanged, _) => false,
@@ -148,9 +150,10 @@ fn order_key_for_room_event(event: &ClientRoomEventType) -> i32 {
         ClientRoomEventType::MessagesAppended { .. } => 0,
         ClientRoomEventType::MessagesUpdated { .. } => 1,
         ClientRoomEventType::MessagesDeleted { .. } => 2,
-        ClientRoomEventType::AttributesChanged => 3,
-        ClientRoomEventType::ParticipantsChanged => 4,
-        ClientRoomEventType::ComposingUsersChanged => 5,
+        ClientRoomEventType::MessagesNeedReload => 3,
+        ClientRoomEventType::AttributesChanged => 4,
+        ClientRoomEventType::ParticipantsChanged => 5,
+        ClientRoomEventType::ComposingUsersChanged => 6,
     }
 }
 

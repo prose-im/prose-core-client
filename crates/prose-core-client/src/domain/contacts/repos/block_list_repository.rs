@@ -19,5 +19,6 @@ pub trait BlockListRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn delete(&self, account: &AccountId, user_id: &UserId) -> Result<bool>;
     async fn delete_all(&self, account: &AccountId) -> Result<bool>;
 
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()>;
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

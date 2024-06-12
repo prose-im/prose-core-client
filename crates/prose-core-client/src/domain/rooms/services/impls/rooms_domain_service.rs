@@ -5,6 +5,7 @@
 
 use std::future::Future;
 use std::iter;
+use std::ops::Deref;
 
 use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
@@ -60,6 +61,64 @@ pub struct RoomsDomainService {
     user_profile_repo: DynUserProfileRepository,
 }
 
+/// Represents the outcome of attempting to fetch or create a Room in the `ConnectedRoomsRepository`.
+///
+/// This enum indicates whether the Room was found to exist in the repository before the operation
+/// or if it had to be created. Note that this does not reflect whether the room was created on the
+/// server. For server creation status, refer to `RoomSessionInfo.room_has_been_created`.
+enum RoomStatus {
+    /// The Room did not exist in the repository and was newly created.
+    IsNew(Room),
+    /// The Room already existed in the repository.
+    Exists(Room),
+}
+
+impl RoomStatus {
+    fn is_new(&self) -> bool {
+        match self {
+            RoomStatus::IsNew(_) => true,
+            RoomStatus::Exists(_) => false,
+        }
+    }
+}
+
+impl From<RoomStatus> for Room {
+    fn from(value: RoomStatus) -> Self {
+        match value {
+            RoomStatus::IsNew(room) => room,
+            RoomStatus::Exists(room) => room,
+        }
+    }
+}
+
+impl Deref for RoomStatus {
+    type Target = Room;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            RoomStatus::IsNew(room) => room,
+            RoomStatus::Exists(room) => room,
+        }
+    }
+}
+
+/// Used to create a RoomStatus
+enum RoomInfoStatus {
+    IsNew(RoomSessionInfo),
+    Exists(RoomSessionInfo),
+}
+
+impl Deref for RoomInfoStatus {
+    type Target = RoomSessionInfo;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            RoomInfoStatus::IsNew(info) => info,
+            RoomInfoStatus::Exists(info) => info,
+        }
+    }
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl RoomsDomainServiceTrait for RoomsDomainService {
@@ -110,12 +169,22 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
         let needs_finalize_context = context.is_none();
         let context = context.unwrap_or_default();
 
-        if let Err(err) = self
+        match self
             .message_archive_domain_service
             .catchup_room(&room, context.clone())
             .await
         {
-            error!("Failed to catch up room. {}", err.to_string())
+            Ok(new_messages_found) => {
+                // If the room existed before, and we found new messages notify clients so that
+                // they can reload the messages.
+                if !room.is_new() && new_messages_found {
+                    self.client_event_dispatcher
+                        .dispatch_room_event(room.clone(), ClientRoomEventType::MessagesNeedReload);
+                }
+            }
+            Err(err) => {
+                error!("Failed to catch up room. {}", err.to_string())
+            }
         }
 
         if needs_finalize_context {
@@ -124,7 +193,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 .await;
         }
 
-        Ok(room)
+        Ok(room.into())
     }
 
     async fn reconnect_room_if_needed(&self, room_id: &MucId) -> Result<(), RoomError> {
@@ -175,7 +244,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
             RequestError::Disconnected => {
                 room.set_state(RoomState::Disconnected {
                     error: None,
-                    can_retry: false,
+                    can_retry: true,
                 });
                 return Ok(());
             }
@@ -401,7 +470,7 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                     }
                 }
 
-                Ok(new_room)
+                Ok(new_room.into())
             }
             (RoomType::PrivateChannel, RoomType::PublicChannel) => {
                 // Ensure that the new name doesn't exist already.
@@ -510,7 +579,7 @@ impl RoomsDomainService {
         password: Option<&str>,
         sidebar_state: RoomSidebarState,
         behavior: JoinRoomBehavior,
-    ) -> Result<Room, RoomError> {
+    ) -> Result<RoomStatus, RoomError> {
         let remove_or_retain_room_on_error =
             |room: Room, error: &RoomError| match behavior.on_failure {
                 JoinRoomFailureBehavior::RemoveOnError => {
@@ -539,10 +608,16 @@ impl RoomsDomainService {
                 .join_room(&full_room_jid, password, capabilities, availability)
                 .await
             {
-                Ok(info) => break 'info info,
+                Ok(info) => {
+                    break 'info if room.is_new() {
+                        RoomInfoStatus::IsNew(info)
+                    } else {
+                        RoomInfoStatus::Exists(info)
+                    }
+                }
                 Err(error) => {
                     let Some(gone_error) = error.gone_err() else {
-                        remove_or_retain_room_on_error(room, &error);
+                        remove_or_retain_room_on_error(room.into(), &error);
                         return Err(error);
                     };
 
@@ -554,7 +629,7 @@ impl RoomsDomainService {
                         }
                         (JoinRoomRedirectBehavior::FollowIfGone, None)
                         | (JoinRoomRedirectBehavior::FailIfGone, _) => {
-                            remove_or_retain_room_on_error(room, &error);
+                            remove_or_retain_room_on_error(room.into(), &error);
                             return Err(error);
                         }
                     }
@@ -570,12 +645,14 @@ impl RoomsDomainService {
         account: &AccountId,
         participant: &UserId,
         sidebar_state: RoomSidebarState,
-    ) -> Result<Room, RoomError> {
-        match self.connected_rooms_repo.get(account, participant.as_ref()) {
-            Some(room) if room.state() == RoomState::Pending => (),
-            None => (),
-            Some(room) => return Ok(room),
-        }
+    ) -> Result<RoomStatus, RoomError> {
+        let room_is_new = match self.connected_rooms_repo.get(account, participant.as_ref()) {
+            Some(room) if room.state() == RoomState::Pending || room.state().is_disconnected() => {
+                false
+            }
+            None => true,
+            Some(room) => return Ok(RoomStatus::Exists(room)),
+        };
 
         let contact_name = self
             .user_profile_repo
@@ -616,7 +693,13 @@ impl RoomsDomainService {
         self.connected_rooms_repo
             .set_or_replace(account, room.clone());
 
-        Ok(room)
+        let status = if room_is_new {
+            RoomStatus::IsNew(room)
+        } else {
+            RoomStatus::Exists(room)
+        };
+
+        Ok(status)
     }
 
     async fn create_room(
@@ -626,7 +709,7 @@ impl RoomsDomainService {
         request: CreateRoomType,
         sidebar_state: RoomSidebarState,
         behavior: CreateRoomBehavior,
-    ) -> Result<Room, RoomError> {
+    ) -> Result<RoomStatus, RoomError> {
         let availability = self.account_settings_repo.get(account).await?.availability;
         let capabilities = &self.ctx.capabilities;
 
@@ -697,7 +780,7 @@ impl RoomsDomainService {
             Ok(metadata) => metadata,
             Err(RoomError::RoomIsAlreadyConnected(room_jid)) => {
                 if let Some(room) = self.connected_rooms_repo.get(account, room_jid.as_ref()) {
-                    return Ok(room);
+                    return Ok(RoomStatus::Exists(room));
                 };
                 return Err(RoomError::RoomIsAlreadyConnected(room_jid));
             }
@@ -716,7 +799,7 @@ impl RoomsDomainService {
         behavior: CreateRoomBehavior,
         capabilities: &Capabilities,
         availability: Availability,
-    ) -> Result<RoomSessionInfo, RoomError> {
+    ) -> Result<RoomInfoStatus, RoomError> {
         if participants.len() < 2 {
             return Err(RoomError::InvalidNumberOfParticipants);
         }
@@ -824,7 +907,7 @@ impl RoomsDomainService {
         capabilities: &Capabilities,
         availability: Availability,
         perform_additional_config: impl FnOnce(&MucId, &mut RoomSessionInfo) -> Fut,
-    ) -> Result<RoomSessionInfo, RoomError> {
+    ) -> Result<RoomInfoStatus, RoomError> {
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
 
         let mut attempt = 0;
@@ -839,7 +922,9 @@ impl RoomsDomainService {
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
-            self.insert_connecting_room(account, &room_jid, &nickname, sidebar_state)?;
+            let room_is_new = self
+                .insert_connecting_room(account, &room_jid, &nickname, sidebar_state)?
+                .is_new();
 
             // Try to create or enter the room and configure it…
             let result = self
@@ -900,7 +985,13 @@ impl RoomsDomainService {
                 }
             }
 
-            return Ok(info);
+            let status = if room_is_new {
+                RoomInfoStatus::IsNew(info)
+            } else {
+                RoomInfoStatus::Exists(info)
+            };
+
+            return Ok(status);
         }
     }
 
@@ -932,8 +1023,13 @@ impl RoomsDomainService {
     async fn finalize_pending_room(
         &self,
         account: &AccountId,
-        info: RoomSessionInfo,
-    ) -> Result<Room, RoomError> {
+        info: RoomInfoStatus,
+    ) -> Result<RoomStatus, RoomError> {
+        let (info, room_is_new) = match info {
+            RoomInfoStatus::IsNew(info) => (info, true),
+            RoomInfoStatus::Exists(info) => (info, false),
+        };
+
         // It could be the case that the room_jid was modified, i.e. if the preferred JID was
         // taken already.
         let room_name = info.config.room_name;
@@ -1007,7 +1103,13 @@ impl RoomsDomainService {
             return Err(RoomError::RoomWasModified);
         };
 
-        Ok(room)
+        let status = if room_is_new {
+            RoomStatus::IsNew(room)
+        } else {
+            RoomStatus::Exists(room)
+        };
+
+        Ok(status)
     }
 
     async fn is_public_channel_name_unique(&self, channel_name: &str) -> Result<bool> {
@@ -1036,15 +1138,16 @@ impl RoomsDomainService {
         room_id: &MucId,
         nickname: &str,
         sidebar_state: RoomSidebarState,
-    ) -> Result<Room, RoomError> {
+    ) -> Result<RoomStatus, RoomError> {
         let room_id = RoomId::Muc(room_id.clone());
 
         // If we have a pending room waiting for us, we'll switch that to connecting and do not
         // insert a new one.
         if let Some(pending_room) = self.connected_rooms_repo.get(account, room_id.as_ref()) {
-            if pending_room.state() == RoomState::Pending {
+            if pending_room.state() == RoomState::Pending || pending_room.state().is_disconnected()
+            {
                 pending_room.set_state(RoomState::Connecting);
-                return Ok(pending_room);
+                return Ok(RoomStatus::Exists(pending_room));
             }
         }
 
@@ -1052,6 +1155,6 @@ impl RoomsDomainService {
         self.connected_rooms_repo
             .set(account, room.clone())
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_id))?;
-        Ok(room)
+        Ok(RoomStatus::IsNew(room))
     }
 }

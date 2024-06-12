@@ -14,5 +14,6 @@ use crate::domain::rooms::models::Room;
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait MessageArchiveDomainService: SendUnlessWasm + SyncUnlessWasm {
-    async fn catchup_room(&self, room: &Room, context: DecryptionContext) -> Result<()>;
+    /// Returns `true` if new messages were found.
+    async fn catchup_room(&self, room: &Room, context: DecryptionContext) -> Result<bool>;
 }

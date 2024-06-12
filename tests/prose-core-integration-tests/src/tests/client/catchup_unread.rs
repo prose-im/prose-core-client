@@ -165,6 +165,8 @@ async fn test_does_not_count_sent_messages_in_dm_as_unread() -> Result<()> {
             StartDMStrategy::default().with_catch_up_handler(|client, user_id| {
                 client.expect_catchup_with_config(
                     user_id,
+                    client.time_provider.now()
+                        - Duration::seconds(client.app_config.max_catchup_duration_secs),
                     vec![
                         MessageBuilder::new_with_index(1)
                             .set_from(user_id!("other@prose.org"))
@@ -383,14 +385,18 @@ async fn test_marks_first_unread_message() -> Result<()> {
     let client = TestClient::builder().set_store(store).build().await;
     client.expect_login(account, "secret").await?;
 
-    let mut strategy = StartDMStrategy::default();
-    strategy.room_settings = Some(SyncedRoomSettings {
-        room_id: room_id.clone(),
-        encryption_enabled: false,
-        last_read_message: Some(ArchivedMessageRef {
-            stanza_id: MessageBuilder::stanza_id_for_index(2),
-            timestamp: Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap(),
-        }),
+    let strategy = StartDMStrategy::default().with_load_settings_handler(move |client, user_id| {
+        client.expect_load_settings(
+            user_id.clone(),
+            Some(SyncedRoomSettings {
+                room_id: room_id.clone(),
+                encryption_enabled: false,
+                last_read_message: Some(ArchivedMessageRef {
+                    stanza_id: MessageBuilder::stanza_id_for_index(2),
+                    timestamp: Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap(),
+                }),
+            }),
+        )
     });
 
     let room = client

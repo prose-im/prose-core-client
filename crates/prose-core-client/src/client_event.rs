@@ -54,6 +54,9 @@ pub enum ClientRoomEventType {
     /// A message was deleted.
     MessagesDeleted { message_ids: Vec<MessageId> },
 
+    /// The room went offline, came back online and contains new messages.
+    MessagesNeedReload,
+
     /// Attributes changed like name or topic.
     AttributesChanged,
 

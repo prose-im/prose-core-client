@@ -139,6 +139,11 @@ impl UserDeviceRepositoryTrait for CachingUserDeviceRepository {
         Ok(())
     }
 
+    async fn reset_before_reconnect(&self, _account: &AccountId) -> Result<()> {
+        self.updated_devices.lock().clear();
+        Ok(())
+    }
+
     async fn clear_cache(&self, account: &AccountId) -> Result<()> {
         self.updated_devices.lock().clear();
 

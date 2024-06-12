@@ -5,7 +5,6 @@
 
 use anyhow::{bail, format_err, Context, Result};
 use async_trait::async_trait;
-use futures::future::join_all;
 use jid::BareJid;
 use tracing::{error, info};
 
@@ -23,6 +22,7 @@ use crate::domain::rooms::services::impls::build_nickname;
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::shared::models::{MucId, ParticipantId, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
+use crate::util::join_all;
 use crate::ClientEvent;
 
 use super::super::SidebarDomainService as SidebarDomainServiceTrait;
@@ -44,7 +44,6 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     ///
     /// Loads the remote bookmarks then proceeds with the logic details
     /// in `extend_items_from_bookmarks`.
-    #[tracing::instrument(skip(self))]
     async fn populate_sidebar(&self, context: DecryptionContext) -> Result<()> {
         let bookmarks = self.bookmarks_service.load_bookmarks().await?;
         self.extend_items_from_bookmarks(bookmarks, context).await?;
@@ -603,6 +602,19 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
         Ok(())
     }
 
+    async fn handle_disconnect(&self) -> Result<()> {
+        for room in self
+            .connected_rooms_repo
+            .get_all(&self.ctx.connected_account()?)
+        {
+            room.set_state(RoomState::Disconnected {
+                error: None,
+                can_retry: true,
+            })
+        }
+        Ok(())
+    }
+
     /// Removes all connected rooms and sidebar items.
     ///
     /// Call this method after logging out.
@@ -636,7 +648,12 @@ impl SidebarDomainService {
         // Insert a pending room for each bookmark so that we're able to draw the sidebar
         // before each room is connected.
         for bookmark in &bookmarks {
-            if rooms.iter().find(|r| r.room_id == bookmark.jid).is_some() {
+            if rooms
+                .iter()
+                .find(|r| r.room_id == bookmark.jid && !r.state().is_disconnected())
+                .is_some()
+            {
+                info!("Skipping {} which is already connected.", bookmark.jid);
                 continue;
             }
             rooms_changed = true;
@@ -671,7 +688,10 @@ impl SidebarDomainService {
 
         // Now collect the futures to connect each room…
         for bookmark in bookmarks {
-            if let Some(room) = rooms.iter().find(|r| r.room_id == bookmark.jid) {
+            if let Some(room) = rooms
+                .iter()
+                .find(|r| r.room_id == bookmark.jid && !r.state().is_disconnected())
+            {
                 if room.sidebar_state() != bookmark.sidebar_state {
                     // We have a room for that bookmark already, let's just update its sidebar_state…
                     room.set_sidebar_state(bookmark.sidebar_state);

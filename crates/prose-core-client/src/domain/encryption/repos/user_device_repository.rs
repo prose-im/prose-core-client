@@ -25,6 +25,8 @@ pub trait UserDeviceRepository: SendUnlessWasm + SyncUnlessWasm {
         user_id: &UserId,
         devices: Vec<Device>,
     ) -> Result<()>;
+
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()>;
     /// Deletes all cached devices for all users.
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

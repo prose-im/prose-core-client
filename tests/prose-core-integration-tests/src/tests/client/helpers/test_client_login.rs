@@ -5,8 +5,10 @@
 
 use anyhow::Result;
 use jid::BareJid;
+use minidom::Element;
+use xmpp_parsers::pubsub;
 
-use prose_core_client::dtos::{DeviceBundle, DeviceId, UserId};
+use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId};
 use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
 use prose_xmpp::{IDProvider, TimeProvider};
 
@@ -14,10 +16,20 @@ use crate::{event, recv, send};
 
 use super::TestClient;
 
-#[derive(Default)]
 pub struct LoginStrategy {
     pub device_bundles: Vec<(DeviceId, DeviceBundle)>,
     pub offline_messages: Vec<prose_xmpp::stanza::Message>,
+    pub bookmarks_handler: Box<dyn FnOnce(&TestClient)>,
+}
+
+impl Default for LoginStrategy {
+    fn default() -> Self {
+        Self {
+            device_bundles: vec![],
+            offline_messages: vec![],
+            bookmarks_handler: Box::new(|client| client.expect_load_bookmarks(None)),
+        }
+    }
 }
 
 impl LoginStrategy {
@@ -34,6 +46,11 @@ impl LoginStrategy {
         offline_messages: impl IntoIterator<Item = prose_xmpp::stanza::Message>,
     ) -> Self {
         self.offline_messages = offline_messages.into_iter().collect::<Vec<_>>();
+        self
+    }
+
+    pub fn with_bookmarks_handler(mut self, handler: impl FnOnce(&TestClient) + 'static) -> Self {
+        self.bookmarks_handler = Box::new(handler);
         self
     }
 }
@@ -158,27 +175,9 @@ impl TestClient {
         self.connect(&user, Secret::new(password.as_ref().to_string()))
             .await?;
 
-        send!(
-            self,
-            r#"
-            <iq xmlns="jabber:client" id="{{ID}}" type="get">
-              <pubsub xmlns="http://jabber.org/protocol/pubsub">
-                <items node="https://prose.org/protocol/bookmark" />
-              </pubsub>
-            </iq>
-            "#
-        );
+        (config.bookmarks_handler)(self);
 
-        recv!(
-            self,
-            r#"
-            <iq xmlns="jabber:client" id="{{ID}}" type="result">
-              <pubsub xmlns="http://jabber.org/protocol/pubsub">
-                <items node="https://prose.org/protocol/bookmark"/>
-              </pubsub>
-            </iq>
-            "#
-        );
+        self.pop_ctx();
 
         self.rooms.start_observing_rooms().await?;
 
@@ -380,6 +379,46 @@ impl TestClient {
           <blocklist xmlns="urn:xmpp:blocking" />
         </iq>
         "#
+        );
+    }
+
+    pub fn expect_load_bookmarks(&self, bookmarks: impl IntoIterator<Item = Bookmark>) {
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" type="get">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="https://prose.org/protocol/bookmark" />
+              </pubsub>
+            </iq>
+            "#
+        );
+
+        let bookmarks = bookmarks
+            .into_iter()
+            .map(|bookmark| {
+                String::from(&Element::from(pubsub::pubsub::Item(pubsub::Item {
+                    id: Some(pubsub::ItemId(bookmark.jid.to_string())),
+                    publisher: None,
+                    payload: Some(Element::from(bookmark.clone())),
+                })))
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        self.push_ctx([("BOOKMARKS".into(), bookmarks)].into());
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" type="result">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items node="https://prose.org/protocol/bookmark">
+                    {{BOOKMARKS}}
+                </items>
+              </pubsub>
+            </iq>
+            "#
         );
     }
 

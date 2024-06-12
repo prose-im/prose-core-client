@@ -29,6 +29,6 @@ pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
         user_id: &UserId,
     ) -> Result<Option<String>>;
 
-    async fn reset_after_reconnect(&self, account: &AccountId);
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()>;
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

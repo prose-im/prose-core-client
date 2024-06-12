@@ -91,6 +91,10 @@ impl ContactListRepository for CachingContactsRepository {
         self.contacts.write().take();
         Ok(())
     }
+
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()> {
+        self.clear_cache(account).await
+    }
 }
 
 impl CachingContactsRepository {

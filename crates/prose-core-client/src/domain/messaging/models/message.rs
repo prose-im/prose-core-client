@@ -153,10 +153,7 @@ impl Message {
                 MessageTargetId::MessageId(ref id) => id,
                 MessageTargetId::StanzaId(stanza_id) => {
                     let Some(id) = stanza_to_id_map.get(&stanza_id) else {
-                        info!(
-                            "Could not resolve StanzaId '{stanza_id}' to a MessageId \n{:?}\n{:?}",
-                            stanza_to_id_map, messages_map
-                        );
+                        info!("Could not resolve StanzaId '{stanza_id}' to a MessageId");
                         continue;
                     };
                     id

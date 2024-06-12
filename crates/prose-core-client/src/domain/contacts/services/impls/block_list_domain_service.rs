@@ -114,6 +114,13 @@ impl BlockListDomainServiceTrait for BlockListDomainService {
         Ok(())
     }
 
+    async fn reset_before_reconnect(&self) -> Result<()> {
+        self.block_list_repo
+            .reset_before_reconnect(&self.ctx.connected_account()?)
+            .await?;
+        Ok(())
+    }
+
     async fn clear_cache(&self) -> Result<()> {
         self.block_list_repo
             .clear_cache(&self.ctx.connected_account()?)

@@ -5,7 +5,7 @@
 
 use chrono::{DateTime, Utc};
 use secrecy::Secret;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use prose_proc_macros::InjectDependencies;
 use prose_xmpp::{ConnectionError, IDProvider, TimeProvider};
@@ -152,6 +152,8 @@ impl ConnectionService {
                 msg: err.to_string(),
             })?;
 
+        self.reset_services_before_reconnect(&account).await;
+
         if let Err(error) = self.block_list_domain_service.load_block_list().await {
             error!("Failed to load block list. {}", error.to_string());
         }
@@ -162,8 +164,6 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
-
-        self.user_profile_repo.reset_after_reconnect(&account).await;
 
         self.ctx.set_connection_state(ConnectionState::Connected);
 
@@ -192,6 +192,51 @@ impl ConnectionService {
     pub async fn disconnect(&self) {
         self.connection_service.disconnect().await;
         self.ctx.connection_properties.write().take();
+    }
+}
+
+impl ConnectionService {
+    async fn reset_services_before_reconnect(&self, account: &AccountId) {
+        _ = self
+            .user_profile_repo
+            .reset_before_reconnect(&account)
+            .await
+            .inspect_err(|err| {
+                warn!(
+                    "Failed to reset UserProfileRepository after reconnect. {}",
+                    err.to_string()
+                )
+            });
+        _ = self
+            .contact_list_domain_service
+            .reset_before_reconnect()
+            .await
+            .inspect_err(|err| {
+                warn!(
+                    "Failed to reset ContactListDomainService after reconnect. {}",
+                    err.to_string()
+                )
+            });
+        _ = self
+            .block_list_domain_service
+            .reset_before_reconnect()
+            .await
+            .inspect_err(|err| {
+                warn!(
+                    "Failed to reset BlockListDomainService after reconnect. {}",
+                    err.to_string()
+                )
+            });
+        _ = self
+            .encryption_domain_service
+            .reset_before_reconnect()
+            .await
+            .inspect_err(|err| {
+                warn!(
+                    "Failed to reset EncryptionDomainService after reconnect. {}",
+                    err.to_string()
+                )
+            });
     }
 }
 

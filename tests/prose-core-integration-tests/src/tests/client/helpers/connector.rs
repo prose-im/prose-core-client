@@ -53,6 +53,19 @@ impl Connector {
         (connection.inner.event_handler)(&connection, ConnectionEvent::Stanza(received_element))
             .await;
     }
+
+    pub async fn send_disconnect(&self) {
+        let connection = self
+            .current_connection
+            .lock()
+            .clone()
+            .expect("Client is not connected");
+        (connection.inner.event_handler)(
+            &connection,
+            ConnectionEvent::Disconnected { error: None },
+        )
+        .await;
+    }
 }
 
 #[async_trait]

@@ -113,8 +113,9 @@ impl UserProfileRepository for CachingUserProfileRepository {
             .and_then(|p| p.full_name().or(p.nickname)))
     }
 
-    async fn reset_after_reconnect(&self, _account: &AccountId) {
+    async fn reset_before_reconnect(&self, _account: &AccountId) -> Result<()> {
         self.requested_user_profiles.lock().clear();
+        Ok(())
     }
 
     async fn clear_cache(&self, account: &AccountId) -> Result<()> {

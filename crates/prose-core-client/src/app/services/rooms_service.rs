@@ -31,7 +31,6 @@ pub struct RoomsService {
 }
 
 impl RoomsService {
-    #[tracing::instrument(skip(self))]
     pub async fn start_observing_rooms(&self) -> Result<()> {
         let Some(context) = self.ctx.decryption_context() else {
             return Ok(());

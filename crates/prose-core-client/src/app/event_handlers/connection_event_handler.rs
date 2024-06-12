@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::{DynAppContext, DynClientEventDispatcher};
+use crate::app::deps::{DynAppContext, DynClientEventDispatcher, DynSidebarDomainService};
 use crate::app::event_handlers::{ConnectionEvent, ServerEvent, ServerEventHandler};
 use crate::domain::shared::models::ConnectionState;
 use crate::{ClientEvent, ConnectionEvent as ClientConnectionEvent};
@@ -19,6 +19,8 @@ pub struct ConnectionEventHandler {
     ctx: DynAppContext,
     #[inject]
     client_event_dispatcher: DynClientEventDispatcher,
+    #[inject]
+    sidebar_domain_service: DynSidebarDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -46,6 +48,7 @@ impl ConnectionEventHandler {
             }
             ConnectionEvent::Disconnected { error } => {
                 self.ctx.set_connection_state(ConnectionState::Disconnected);
+                self.sidebar_domain_service.handle_disconnect().await?;
                 self.client_event_dispatcher
                     .dispatch_event(ClientEvent::ConnectionStatusChanged {
                         event: ClientConnectionEvent::Disconnect { error },

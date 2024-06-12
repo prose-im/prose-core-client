@@ -44,7 +44,7 @@ async fn test_joins_room() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(false) }));
 
     deps.encryption_domain_service
         .expect_finalize_decryption()
@@ -300,7 +300,7 @@ async fn test_creates_group() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(false) }));
 
     deps.encryption_domain_service
         .expect_finalize_decryption()
@@ -573,7 +573,7 @@ async fn test_joins_direct_message() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(false) }));
 
     deps.encryption_domain_service
         .expect_finalize_decryption()
@@ -677,7 +677,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(false) }));
 
     deps.encryption_domain_service
         .expect_finalize_decryption()
@@ -1134,7 +1134,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(false) }));
 
     deps.encryption_domain_service
         .expect_finalize_decryption()
@@ -1260,7 +1260,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
     deps.message_archive_domain_service
         .expect_catchup_room()
         .once()
-        .return_once(|_, _| Box::pin(async move { Ok(()) }));
+        .return_once(|_, _| Box::pin(async move { Ok(false) }));
 
     deps.encryption_domain_service
         .expect_finalize_decryption()

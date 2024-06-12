@@ -10,8 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::encryption::models::{DecryptionContext, DeviceId, DeviceInfo, DeviceList};
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload, MessageId};
-use crate::domain::shared::models::UserId;
-use crate::dtos::RoomId;
+use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(Debug, thiserror::Error)]
 pub enum EncryptionError {
@@ -76,5 +75,6 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         device_list: DeviceList,
     ) -> Result<()>;
 
+    async fn reset_before_reconnect(&self) -> Result<()>;
     async fn clear_cache(&self) -> Result<()>;
 }

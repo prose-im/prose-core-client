@@ -275,6 +275,10 @@ impl TestClient {
     pub async fn receive_next(&self) {
         self.connector.receive_next().await
     }
+
+    pub async fn simulate_disconnect(&self) {
+        self.connector.send_disconnect().await
+    }
 }
 
 impl TestClient {
@@ -325,13 +329,28 @@ impl TestClient {
 }
 
 impl TestClient {
-    pub fn expect_send_vard_request(&self, user_id: &UserId) {
+    pub fn expect_load_vcard(&self, user_id: &UserId) {
         self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
         send!(
             self,
             r#"
             <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
               <vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0" />
+            </iq>
+            "#
+        );
+        self.pop_ctx();
+    }
+
+    pub fn expect_load_avatar_metadata(&self, user_id: &UserId) {
+        self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+        send!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <items max_items="1" node="urn:xmpp:avatar:metadata" />
+              </pubsub>
             </iq>
             "#
         );

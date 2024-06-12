@@ -10,7 +10,6 @@ use aes_gcm::aead::Aead;
 use aes_gcm::{AeadCore, Aes128Gcm, KeyInit};
 use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
-use futures::future::join_all;
 use parking_lot::Mutex;
 use rand::prelude::SliceRandom;
 use tracing::{error, info, warn};
@@ -34,6 +33,7 @@ use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload};
 use crate::domain::shared::models::{AccountId, UserId};
 use crate::dtos::{EncryptionKey, MessageId, PreKeyId, RoomId};
+use crate::util::join_all;
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
 
@@ -260,7 +260,8 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
                         .encrypt_key(&account, user_id, &device_id, &dek_and_mac, &now)
                         .await
                 }
-            });
+            })
+            .collect::<Vec<_>>();
 
         let messages = join_all(encrypt_message_futures)
             .await
@@ -561,6 +562,12 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             .await
             .context("Failed to publish our updated device list")?;
 
+        Ok(())
+    }
+
+    async fn reset_before_reconnect(&self) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+        self.user_device_repo.clear_cache(&account).await?;
         Ok(())
     }
 
