@@ -27,6 +27,7 @@ pub struct JoinRoomStrategy {
     pub room_type: RoomType,
     pub room_settings: Option<SyncedRoomSettings>,
     pub expect_catchup: Box<dyn FnOnce(&TestClient, &MucId)>,
+    pub expect_load_vcard: Box<dyn FnOnce(&TestClient, &MucId, &UserId)>,
 }
 
 impl Default for JoinRoomStrategy {
@@ -36,6 +37,24 @@ impl Default for JoinRoomStrategy {
             room_type: RoomType::PublicChannel,
             room_settings: None,
             expect_catchup: Box::new(|client, room_id| client.expect_muc_catchup(room_id)),
+            expect_load_vcard: Box::new(|client, room_id, user_id| {
+                client.expect_load_vcard(&user_id);
+                recv!(
+                    client,
+                    r#"
+                    <iq xmlns='jabber:client' id="{{ID}}" type="result">
+                      <vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'>
+                        <adr>
+                          <country>Germany</country>
+                          <locality>Berlin</locality>
+                        </adr>
+                        <email><text>user@prose.org</text></email>
+                        <nickname><text>Joe</text></nickname>
+                      </vcard>
+                    </iq>
+                    "#
+                );
+            }),
         }
     }
 }
@@ -56,6 +75,14 @@ impl JoinRoomStrategy {
         handler: impl FnOnce(&TestClient, &MucId) + 'static,
     ) -> Self {
         self.expect_catchup = Box::new(handler);
+        self
+    }
+
+    pub fn with_vcard_handler(
+        mut self,
+        handler: impl FnOnce(&TestClient, &MucId, &UserId) + 'static,
+    ) -> Self {
+        self.expect_load_vcard = Box::new(handler);
         self
     }
 }
@@ -284,26 +311,10 @@ impl TestClient {
         "#
         );
 
-        send!(
+        (strategy.expect_load_vcard)(
             self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" to="user@prose.org" type="get">
-            <vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'/>
-        </iq>"#
-        );
-        recv!(
-            self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" type="result">
-            <vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'>
-                <adr>
-                    <country>Germany</country>
-                    <locality>Berlin</locality>
-                </adr>
-                <email><text>user@prose.org</text></email>
-                <nickname><text>Joe</text></nickname>
-            </vcard>
-        </iq>"#
+            &room_id,
+            &self.connected_user_id().unwrap().to_user_id(),
         );
 
         self.expect_load_settings(room_id.clone(), strategy.room_settings);

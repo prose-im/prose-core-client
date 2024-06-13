@@ -279,6 +279,14 @@ impl TestClient {
     pub async fn simulate_disconnect(&self) {
         self.connector.send_disconnect().await
     }
+
+    pub async fn simulate_ping_timer(&self) {
+        self.connector.send_ping_timer_event().await
+    }
+
+    pub async fn simulate_timeout_timer(&self) {
+        self.connector.send_timeout_timer_event().await
+    }
 }
 
 impl TestClient {

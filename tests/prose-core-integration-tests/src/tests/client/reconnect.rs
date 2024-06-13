@@ -16,7 +16,7 @@ use prose_proc_macros::mt_test;
 use prose_xmpp::TimeProvider;
 
 use crate::tests::client::helpers::{JoinRoomStrategy, LoginStrategy, StartDMStrategy, TestClient};
-use crate::{event, room_event};
+use crate::{event, recv, room_event, send};
 
 #[mt_test]
 async fn test_reconnect_catches_up_rooms() -> anyhow::Result<()> {
@@ -153,6 +153,111 @@ async fn test_reconnect_catches_up_rooms() -> anyhow::Result<()> {
 
     assert_eq!(2, dm_item.unread_count);
     assert_eq!(1, group_item.unread_count);
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_reconnects_muc_room_after_failed_self_ping() -> anyhow::Result<()> {
+    let client = TestClient::new().await;
+
+    client
+        .expect_login_with_strategy(
+            user_id!("user@prose.org"),
+            "secret",
+            LoginStrategy::default().with_bookmarks_handler(|client| {
+                client.expect_load_bookmarks([Bookmark::group(
+                    muc_id!("group@conf.prose.org"),
+                    "My Group",
+                )
+                .set_sidebar_state(RoomSidebarState::InSidebar)]);
+
+                event!(client, ClientEvent::SidebarChanged);
+
+                client.expect_join_room_with_strategy(
+                    muc_id!("group@conf.prose.org"),
+                    "anon-id",
+                    JoinRoomStrategy::default()
+                        .with_room_name("My Group")
+                        .with_room_type(RoomType::Group),
+                );
+
+                event!(client, ClientEvent::SidebarChanged);
+            }),
+        )
+        .await?;
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" type="get">
+          <ping xmlns="urn:xmpp:ping" />
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result" />
+        "#
+    );
+
+    let occupant_id = client.build_occupant_id(&muc_id!("group@conf.prose.org"));
+    client.push_ctx([("OCCUPANT_ID".into(), occupant_id.to_string())].into());
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="{{OCCUPANT_ID}}" type="get">
+          <ping xmlns="urn:xmpp:ping" />
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="error">
+          <error type="cancel">
+            <not-acceptable xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+          </error>
+        </iq>
+        "#
+    );
+
+    client.pop_ctx();
+
+    event!(client, ClientEvent::SidebarChanged);
+
+    client.expect_join_room_with_strategy(
+        muc_id!("group@conf.prose.org"),
+        "anon-id",
+        JoinRoomStrategy::default()
+            .with_room_name("My Group")
+            .with_room_type(RoomType::Group)
+            .with_catch_up_handler(|client, room_id| {
+                client.expect_muc_catchup_with_config(
+                    room_id,
+                    client.time_provider.now(),
+                    vec![MessageBuilder::new_with_index(1)
+                        .set_from(occupant_id!("group@conf.prose.org/other"))
+                        .build_archived_message("", None)],
+                );
+            })
+            .with_vcard_handler(|_, _, _| {
+                // User Infos remain cached
+            }),
+    );
+
+    room_event!(
+        client,
+        muc_id!("group@conf.prose.org"),
+        ClientRoomEventType::MessagesNeedReload
+    );
+    event!(client, ClientEvent::SidebarChanged);
+
+    client.simulate_ping_timer().await;
 
     Ok(())
 }

@@ -66,6 +66,24 @@ impl Connector {
         )
         .await;
     }
+
+    pub async fn send_ping_timer_event(&self) {
+        let connection = self
+            .current_connection
+            .lock()
+            .clone()
+            .expect("Client is not connected");
+        (connection.inner.event_handler)(&connection, ConnectionEvent::PingTimer).await;
+    }
+
+    pub async fn send_timeout_timer_event(&self) {
+        let connection = self
+            .current_connection
+            .lock()
+            .clone()
+            .expect("Client is not connected");
+        (connection.inner.event_handler)(&connection, ConnectionEvent::TimeoutTimer).await;
+    }
 }
 
 #[async_trait]
