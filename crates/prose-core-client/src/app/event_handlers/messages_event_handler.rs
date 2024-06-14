@@ -252,6 +252,13 @@ impl MessagesEventHandler {
 
         let Some(room) = room else {
             error!("Received message from sender ('{room_id}') for which we do not have a room.");
+
+            // Save the message regardless. The SidebarDomainService should have created a room by
+            // now, but we still don't want to send a messagesUpdated event for a fresh room.
+            self.messages_repo
+                .append(&account, &room_id, &[message])
+                .await?;
+
             return Ok(());
         };
 
