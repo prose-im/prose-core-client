@@ -61,6 +61,7 @@ pub enum Event {
     },
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum AvatarData {
     Base64(String),
     Data(Vec<u8>),
