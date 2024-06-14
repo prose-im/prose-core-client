@@ -21,11 +21,11 @@ use crate::connector::{
 };
 
 pub struct Connector {
-    connection: Arc<Connection>,
+    connection: Connection,
 }
 
 impl Connector {
-    pub fn provider(connection: Arc<Connection>) -> ConnectorProvider {
+    pub fn provider(connection: Connection) -> ConnectorProvider {
         Box::new(move || {
             Box::new(Connector {
                 connection: connection.clone(),
@@ -99,7 +99,7 @@ impl Connection {
             .collect()
     }
 
-    pub fn connector(self: &Arc<Self>) -> Box<dyn ConnectorTrait> {
+    pub fn connector(&self) -> Box<dyn ConnectorTrait> {
         Box::new(Connector {
             connection: self.clone(),
         })
@@ -143,14 +143,4 @@ impl ConnectionTrait for Connection {
     }
 
     fn disconnect(&self) {}
-}
-
-impl ConnectionTrait for Arc<Connection> {
-    fn send_stanza(&self, stanza: Element) -> Result<()> {
-        self.as_ref().send_stanza(stanza)
-    }
-
-    fn disconnect(&self) {
-        self.as_ref().disconnect()
-    }
 }

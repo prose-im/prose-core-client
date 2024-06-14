@@ -23,7 +23,7 @@ pub trait ClientTestAdditions {
 
 pub struct ConnectedClient {
     pub client: Client,
-    pub connection: Arc<Connection>,
+    pub connection: Connection,
     pub id_provider: Arc<IncrementingIDProvider>,
     pub sent_events: Arc<RwLock<Vec<Event>>>,
 }
@@ -38,7 +38,7 @@ impl ClientTestAdditions for Client {
     }
 
     async fn connected_client_with_current_user(jid: FullJid) -> Result<ConnectedClient> {
-        let connection = Arc::new(Connection::default());
+        let connection = Connection::default();
         let id_provider = Arc::new(IncrementingIDProvider::new("id"));
         let sent_events = Arc::new(RwLock::new(vec![]));
 
