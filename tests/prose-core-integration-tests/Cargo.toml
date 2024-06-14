@@ -9,6 +9,7 @@ publish = false
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
+ctor = "0.2"
 jid = { workspace = true }
 minidom = { workspace = true }
 parking_lot = { workspace = true }
@@ -19,6 +20,8 @@ prose-store = { path = "../../crates/prose-store" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 regex = "1.10"
 tempfile = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 xml-rs = "0.8"
 xmpp-parsers = { workspace = true }
 

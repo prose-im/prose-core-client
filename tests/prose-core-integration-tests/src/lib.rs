@@ -5,6 +5,12 @@
 
 #![feature(panic_info_message)]
 
+#[cfg(not(target_arch = "wasm32"))]
+#[ctor::ctor]
+fn init() {
+    let _ = tracing_subscriber::fmt().with_test_writer().try_init();
+}
+
 #[cfg(test)]
 mod tests;
 
