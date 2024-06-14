@@ -107,7 +107,7 @@ impl Default for StartDMStrategy {
                 client.receive_not_found_iq_response();
             }),
             expect_load_settings: Box::new(|client, user_id| {
-                client.expect_load_settings(user_id.clone(), None);
+                client.expect_load_synced_room_settings(user_id.clone(), None);
             }),
         }
     }
@@ -317,7 +317,7 @@ impl TestClient {
             &self.connected_user_id().unwrap().to_user_id(),
         );
 
-        self.expect_load_settings(room_id.clone(), strategy.room_settings);
+        self.expect_load_synced_room_settings(room_id.clone(), strategy.room_settings);
         (strategy.expect_catchup)(&self, &room_id);
 
         self.pop_ctx();
@@ -544,7 +544,69 @@ impl TestClient {
         self.pop_ctx();
     }
 
-    pub fn expect_load_settings(
+    pub fn expect_save_synced_room_settings(&self, settings: SyncedRoomSettings) {
+        self.push_ctx(
+            [
+                ("ROOM_ID".into(), settings.room_id.to_string()),
+                (
+                    "ROOM_SETTINGS".into(),
+                    String::from(&Element::from(settings)),
+                ),
+            ]
+            .into(),
+        );
+
+        send!(
+            self,
+            r#"
+        <iq xmlns="jabber:client" id="{{ID}}" type="set">
+          <pubsub xmlns="http://jabber.org/protocol/pubsub">
+            <publish node="https://prose.org/protocol/room_settings">
+              <item id="{{ROOM_ID}}">
+                {{ROOM_SETTINGS}}
+              </item>
+            </publish>
+            <publish-options>
+              <x xmlns="jabber:x:data" type="submit">
+                <field type="hidden" var="FORM_TYPE">
+                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
+                </field>
+                <field type="boolean" var="pubsub#persist_items">
+                  <value>true</value>
+                </field>
+                <field var="pubsub#access_model">
+                  <value>whitelist</value>
+                </field>
+                <field var="pubsub#max_items">
+                  <value>256</value>
+                </field>
+                <field type="list-single" var="pubsub#send_last_published_item">
+                  <value>never</value>
+                </field>
+              </x>
+            </publish-options>
+          </pubsub>
+        </iq>
+        "#
+        );
+
+        recv!(
+            self,
+            r#"
+            <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
+              <pubsub xmlns="http://jabber.org/protocol/pubsub">
+                <publish node="https://prose.org/protocol/room_settings">
+                  <item id="{{ROOM_ID}}" />
+                </publish>
+              </pubsub>
+            </iq>
+            "#
+        );
+
+        self.pop_ctx();
+    }
+
+    pub fn expect_load_synced_room_settings(
         &self,
         room_id: impl Into<RoomId>,
         settings: Option<SyncedRoomSettings>,

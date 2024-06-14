@@ -224,7 +224,7 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
     client.expect_load_vcard(&user_id!("user3@prose.org"));
     client.receive_not_found_iq_response();
 
-    client.expect_load_settings(room_id.clone(), None);
+    client.expect_load_synced_room_settings(room_id.clone(), None);
     client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(
         &RoomId::Muc(room_id.clone()),
@@ -524,7 +524,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
     client.expect_load_vcard(&user_id!("user2@prose.org"));
     client.receive_not_found_iq_response();
 
-    client.expect_load_settings(room_id.clone(), None);
+    client.expect_load_synced_room_settings(room_id.clone(), None);
     client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(
         &RoomId::Muc(room_id.clone()),

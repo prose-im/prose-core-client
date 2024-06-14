@@ -386,7 +386,7 @@ async fn test_marks_first_unread_message() -> Result<()> {
     client.expect_login(account, "secret").await?;
 
     let strategy = StartDMStrategy::default().with_load_settings_handler(move |client, user_id| {
-        client.expect_load_settings(
+        client.expect_load_synced_room_settings(
             user_id.clone(),
             Some(SyncedRoomSettings {
                 room_id: room_id.clone(),
@@ -537,68 +537,14 @@ async fn test_mark_as_unread_saves_settings() -> Result<()> {
         .expect("Expected at least one SidebarItem");
     assert_eq!(2, sidebar_item.unread_count);
 
-    client.push_ctx(
-        [
-            ("ROOM_ID".into(), room_id.to_string()),
-            (
-                "MSG_STANZA_ID".into(),
-                MessageBuilder::stanza_id_for_index(3).to_string(),
-            ),
-        ]
-        .into(),
-    );
-
-    send!(
-        client,
-        r#"
-        <iq xmlns="jabber:client" id="{{ID}}" type="set">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <publish node="https://prose.org/protocol/room_settings">
-              <item id="{{ROOM_ID}}">
-                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
-                  <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="2024-04-26T11:00:00+00:00" />
-                  <encryption type="none" />
-                </room-settings>
-              </item>
-            </publish>
-            <publish-options>
-              <x xmlns="jabber:x:data" type="submit">
-                <field type="hidden" var="FORM_TYPE">
-                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
-                </field>
-                <field type="boolean" var="pubsub#persist_items">
-                  <value>true</value>
-                </field>
-                <field var="pubsub#access_model">
-                  <value>whitelist</value>
-                </field>
-                <field var="pubsub#max_items">
-                  <value>256</value>
-                </field>
-                <field type="list-single" var="pubsub#send_last_published_item">
-                  <value>never</value>
-                </field>
-              </x>
-            </publish-options>
-          </pubsub>
-        </iq>
-        "#
-    );
-
-    recv!(
-        client,
-        r#"
-        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <publish node="https://prose.org/protocol/room_settings">
-              <item id="{{ROOM_ID}}" />
-            </publish>
-          </pubsub>
-        </iq>
-        "#
-    );
-
-    client.pop_ctx();
+    client.expect_save_synced_room_settings(SyncedRoomSettings {
+        room_id: room_id.clone(),
+        encryption_enabled: false,
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(3),
+            timestamp: Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap(),
+        }),
+    });
 
     event!(client, ClientEvent::SidebarChanged);
 
@@ -671,68 +617,14 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
         .join_room_with_strategy(muc_id.clone(), "anon-id", join_room_strategy)
         .await?;
 
-    client.push_ctx(
-        [
-            ("ROOM_ID".into(), room_id.to_string()),
-            (
-                "MSG_STANZA_ID".into(),
-                MessageBuilder::stanza_id_for_index(2).to_string(),
-            ),
-        ]
-        .into(),
-    );
-
-    send!(
-        client,
-        r#"
-        <iq xmlns="jabber:client" id="{{ID}}" type="set">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <publish node="https://prose.org/protocol/room_settings">
-              <item id="{{ROOM_ID}}">
-                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
-                  <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="2024-04-26T10:00:00+00:00" />
-                  <encryption type="none" />
-                </room-settings>
-              </item>
-            </publish>
-            <publish-options>
-              <x xmlns="jabber:x:data" type="submit">
-                <field type="hidden" var="FORM_TYPE">
-                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
-                </field>
-                <field type="boolean" var="pubsub#persist_items">
-                  <value>true</value>
-                </field>
-                <field var="pubsub#access_model">
-                  <value>whitelist</value>
-                </field>
-                <field var="pubsub#max_items">
-                  <value>256</value>
-                </field>
-                <field type="list-single" var="pubsub#send_last_published_item">
-                  <value>never</value>
-                </field>
-              </x>
-            </publish-options>
-          </pubsub>
-        </iq>
-        "#
-    );
-
-    recv!(
-        client,
-        r#"
-        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <publish node="https://prose.org/protocol/room_settings">
-              <item id="{{ROOM_ID}}" />
-            </publish>
-          </pubsub>
-        </iq>
-        "#
-    );
-
-    client.pop_ctx();
+    client.expect_save_synced_room_settings(SyncedRoomSettings {
+        room_id: room_id.clone(),
+        encryption_enabled: false,
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(2),
+            timestamp: messages[1].timestamp.clone(),
+        }),
+    });
 
     room_event!(
         client,
@@ -759,68 +651,14 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
         .expect("Expected at least one SidebarItem");
     assert_eq!(3, sidebar_item.unread_count);
 
-    client.push_ctx(
-        [
-            ("ROOM_ID".into(), room_id.to_string()),
-            (
-                "MSG_STANZA_ID".into(),
-                MessageBuilder::stanza_id_for_index(5).to_string(),
-            ),
-        ]
-        .into(),
-    );
-
-    send!(
-        client,
-        r#"
-        <iq xmlns="jabber:client" id="{{ID}}" type="set">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <publish node="https://prose.org/protocol/room_settings">
-              <item id="{{ROOM_ID}}">
-                <room-settings xmlns="https://prose.org/protocol/room_settings" room-id="muc:{{ROOM_ID}}">
-                  <archived-message-ref xmlns="https://prose.org/protocol/archived_message_ref" stanza-id="{{MSG_STANZA_ID}}" ts="2024-04-28T11:00:00+00:00" />
-                  <encryption type="none" />
-                </room-settings>
-              </item>
-            </publish>
-            <publish-options>
-              <x xmlns="jabber:x:data" type="submit">
-                <field type="hidden" var="FORM_TYPE">
-                  <value>http://jabber.org/protocol/pubsub#publish-options</value>
-                </field>
-                <field type="boolean" var="pubsub#persist_items">
-                  <value>true</value>
-                </field>
-                <field var="pubsub#access_model">
-                  <value>whitelist</value>
-                </field>
-                <field var="pubsub#max_items">
-                  <value>256</value>
-                </field>
-                <field type="list-single" var="pubsub#send_last_published_item">
-                  <value>never</value>
-                </field>
-              </x>
-            </publish-options>
-          </pubsub>
-        </iq>
-        "#
-    );
-
-    recv!(
-        client,
-        r#"
-        <iq xmlns="jabber:client" id="{{ID}}" to="{{USER_ID}}" type="result">
-          <pubsub xmlns="http://jabber.org/protocol/pubsub">
-            <publish node="https://prose.org/protocol/room_settings">
-              <item id="{{ROOM_ID}}" />
-            </publish>
-          </pubsub>
-        </iq>
-        "#
-    );
-
-    client.pop_ctx();
+    client.expect_save_synced_room_settings(SyncedRoomSettings {
+        room_id: room_id.clone(),
+        encryption_enabled: false,
+        last_read_message: Some(ArchivedMessageRef {
+            stanza_id: MessageBuilder::stanza_id_for_index(5),
+            timestamp: messages[4].timestamp.clone(),
+        }),
+    });
 
     room_event!(
         client,
