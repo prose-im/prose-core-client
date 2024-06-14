@@ -518,6 +518,45 @@ async fn test_chrono_types() -> Result<()> {
 }
 
 #[async_test]
+async fn test_date_time_precision() -> Result<()> {
+    let store = store().await?;
+
+    let tx = store
+        .transaction_for_reading_and_writing(&[collections::BOOK])
+        .await?;
+    let collection = tx.writeable_collection(collections::BOOK)?;
+
+    let book = Book {
+        title: "My Book".to_string(),
+        published_at: Utc.from_utc_datetime(
+            &NaiveDate::from_ymd_opt(2020, 01, 02)
+                .unwrap()
+                .and_hms_milli_opt(03, 04, 05, 678)
+                .unwrap(),
+        ),
+    };
+
+    collection.set("id-1", &book).await?;
+    tx.commit().await?;
+
+    let tx = store.transaction_for_reading(&[collections::BOOK]).await?;
+    let collection = tx.readable_collection(collections::BOOK)?;
+
+    println!(
+        "{:?}",
+        collection
+            .get::<_, Book>("id-1")
+            .await?
+            .unwrap()
+            .published_at
+    );
+
+    assert_eq!(Some(book), collection.get("id-1").await?);
+
+    Ok(())
+}
+
+#[async_test]
 async fn test_put_no_conflict() -> Result<()> {
     let store = store().await?;
 
