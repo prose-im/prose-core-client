@@ -7,6 +7,7 @@ use std::ops::Deref;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use chrono::TimeDelta;
 use jid::Jid;
 use tracing::{error, info, warn};
 use xmpp_parsers::message::MessageType;
@@ -209,11 +210,16 @@ impl MessagesEventHandler {
         let room = self.connected_rooms_repo.get(&account, room_id.as_ref());
         let now = self.time_provider.now();
 
+        let server_time = now
+            + room
+                .as_ref()
+                .map(|room| room.features.server_time_offset)
+                .or_else(|| self.ctx.server_time_offset())
+                .unwrap_or_else(|| TimeDelta::zero());
+
         let parser = MessageParser::new(
             room.clone(),
-            room.as_ref()
-                .map(|room| room.features.local_time_to_server_time(now))
-                .unwrap_or(now),
+            server_time,
             self.encryption_domain_service.clone(),
             self.ctx.decryption_context(),
         );

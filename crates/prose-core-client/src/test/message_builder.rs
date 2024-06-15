@@ -56,23 +56,42 @@ impl MessageBuilder {
     }
 }
 
+impl MessageLikePayload {
+    pub fn message(body: impl Into<String>) -> Self {
+        Self::Message {
+            body: body.into(),
+            attachments: vec![],
+            mentions: vec![],
+            encryption_info: None,
+            is_transient: false,
+        }
+    }
+}
+
 impl MessageBuilder {
     pub fn new_with_index(idx: u32) -> Self {
+        Self::new_with_id(
+            Self::id_for_index(idx),
+            mock_data::reference_date() + Duration::minutes(idx.into()),
+            MessageLikePayload::message(format!("Message {}", idx)),
+        )
+        .set_stanza_id(Some(Self::stanza_id_for_index(idx)))
+    }
+
+    pub fn new_with_id(
+        id: impl Into<MessageId>,
+        timestamp: DateTime<Utc>,
+        payload: MessageLikePayload,
+    ) -> Self {
         MessageBuilder {
-            id: Self::id_for_index(idx),
-            stanza_id: Some(Self::stanza_id_for_index(idx)),
+            id: id.into(),
+            stanza_id: None,
             from: ParticipantId::User(BareJid::ours().into()),
             from_name: None,
             to: BareJid::theirs(),
             target_message_idx: None,
-            payload: MessageLikePayload::Message {
-                body: format!("Message {}", idx),
-                attachments: vec![],
-                mentions: vec![],
-                encryption_info: None,
-                is_transient: false,
-            },
-            timestamp: mock_data::reference_date() + Duration::minutes(idx.into()),
+            payload,
+            timestamp,
             is_read: false,
             is_edited: false,
             is_delivered: false,

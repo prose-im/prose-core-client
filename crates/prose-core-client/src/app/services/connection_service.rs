@@ -14,7 +14,8 @@ use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynBlockListDomainService,
     DynClientEventDispatcher, DynConnectionService, DynContactListDomainService,
     DynEncryptionDomainService, DynIDProvider, DynOfflineMessagesRepository,
-    DynServerEventHandlerQueue, DynTimeProvider, DynUserAccountService, DynUserProfileRepository,
+    DynServerEventHandlerQueue, DynSidebarDomainService, DynTimeProvider, DynUserAccountService,
+    DynUserProfileRepository,
 };
 use crate::app::event_handlers::ServerEvent;
 use crate::client_event::ConnectionEvent;
@@ -45,6 +46,8 @@ pub struct ConnectionService {
     encryption_domain_service: DynEncryptionDomainService,
     #[inject]
     user_profile_repo: DynUserProfileRepository,
+    #[inject]
+    sidebar_domain_service: DynSidebarDomainService,
     #[inject]
     time_provider: DynTimeProvider,
     #[inject]
@@ -191,6 +194,8 @@ impl ConnectionService {
 
     pub async fn disconnect(&self) {
         self.connection_service.disconnect().await;
+        self.ctx.set_connection_state(ConnectionState::Disconnected);
+        _ = self.sidebar_domain_service.handle_disconnect().await;
         self.ctx.connection_properties.write().take();
     }
 }

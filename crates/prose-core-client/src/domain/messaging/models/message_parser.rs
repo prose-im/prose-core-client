@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, SubsecRound, Utc};
 use jid::Jid;
 use tracing::{error, warn};
 use xmpp_parsers::message::MessageType;
@@ -43,7 +43,7 @@ impl MessageParser {
     ) -> Self {
         Self {
             room,
-            timestamp: now,
+            timestamp: now.round_subsecs(0),
             encryption_domain_service,
             decryption_context,
         }

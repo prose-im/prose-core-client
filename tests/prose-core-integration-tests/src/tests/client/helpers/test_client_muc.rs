@@ -37,7 +37,7 @@ impl Default for JoinRoomStrategy {
             room_type: RoomType::PublicChannel,
             room_settings: None,
             expect_catchup: Box::new(|client, room_id| client.expect_muc_catchup(room_id)),
-            expect_load_vcard: Box::new(|client, room_id, user_id| {
+            expect_load_vcard: Box::new(|client, _room_id, user_id| {
                 client.expect_load_vcard(&user_id);
                 recv!(
                     client,
@@ -176,11 +176,7 @@ impl TestClient {
     ) -> Result<()> {
         let room_name = strategy.room_name.clone();
         self.expect_join_room_with_strategy(room_id.clone(), anon_occupant_id, strategy);
-        self.expect_set_bookmark(
-            &RoomId::Muc(room_id.clone()),
-            room_name,
-            BookmarkType::PublicChannel,
-        );
+        self.expect_set_bookmark(room_id.clone(), room_name, BookmarkType::PublicChannel);
         event!(self, ClientEvent::SidebarChanged);
 
         self.rooms.join_room(&room_id, None).await?;
@@ -335,7 +331,7 @@ impl TestClient {
     ) -> Result<RoomEnvelope> {
         self.expect_start_dm_with_strategy(user_id.clone(), strategy);
         self.expect_set_bookmark(
-            &RoomId::User(user_id.clone()),
+            user_id.clone(),
             user_id.formatted_username(),
             BookmarkType::DirectMessage,
         );
@@ -355,13 +351,13 @@ impl TestClient {
 
     pub fn expect_set_bookmark(
         &self,
-        room_id: &RoomId,
+        room_id: impl Into<RoomId>,
         name: impl Into<String>,
         kind: BookmarkType,
     ) {
         self.push_ctx(
             [
-                ("ROOM_ID".into(), room_id.to_string()),
+                ("ROOM_ID".into(), room_id.into().to_string()),
                 ("BOOKMARK_NAME".into(), name.into()),
                 ("BOOKMARK_TYPE".into(), kind.into_attribute_value().unwrap()),
             ]

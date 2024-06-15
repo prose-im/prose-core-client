@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 use parking_lot::Mutex;
 
 use prose_xmpp::TimeProvider;
@@ -13,6 +13,12 @@ use prose_xmpp::TimeProvider;
 #[derive(Clone)]
 pub struct ConstantTimeProvider {
     pub time: Arc<Mutex<DateTime<Utc>>>,
+}
+
+impl Default for ConstantTimeProvider {
+    fn default() -> Self {
+        Self::new(Utc::now())
+    }
 }
 
 impl ConstantTimeProvider {
@@ -40,9 +46,25 @@ impl ConstantTimeProvider {
     }
 
     pub fn set_ymd_hms(&self, year: i32, month: u32, day: u32, hour: u32, min: u32, sec: u32) {
-        *self.time.lock() = Utc
-            .with_ymd_and_hms(year, month, day, hour, min, sec)
-            .unwrap()
+        self.set_ymd_hms_millis(year, month, day, hour, min, sec, 0)
+    }
+
+    pub fn set_ymd_hms_millis(
+        &self,
+        year: i32,
+        month: u32,
+        day: u32,
+        hour: u32,
+        min: u32,
+        sec: u32,
+        milli: u32,
+    ) {
+        *self.time.lock() = Utc.from_utc_datetime(
+            &NaiveDate::from_ymd_opt(year, month, day)
+                .unwrap()
+                .and_hms_milli_opt(hour, min, sec, milli)
+                .unwrap(),
+        )
     }
 }
 

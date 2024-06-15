@@ -10,7 +10,7 @@ use xmpp_parsers::pubsub;
 
 use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId};
 use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
-use prose_xmpp::{IDProvider, TimeProvider};
+use prose_xmpp::IDProvider;
 
 use crate::{event, recv, send};
 
@@ -120,17 +120,6 @@ impl TestClient {
 
         self.expect_request_server_capabilities();
 
-        self.push_ctx(
-            [(
-                "SERVER_TIME".to_string(),
-                self.time_provider
-                    .now()
-                    .format("%Y-%m-%dT%H:%M:%SZ")
-                    .to_string(),
-            )]
-            .into(),
-        );
-
         send!(
             self,
             r#"
@@ -140,19 +129,19 @@ impl TestClient {
             "#
         );
 
+        // Let's not return a server time. otherwise timestamps for received messages will be
+        // off by a few milliseconds.
         recv!(
             self,
             r#"
-            <iq xmlns="jabber:client" from="{{SERVER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
-              <time xmlns="urn:xmpp:time">
-                <tzo>+00:00</tzo>
-                <utc>{{SERVER_TIME}}</utc>
-              </time>
+            <iq xmlns="jabber:client" from="{{SERVER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="error">
+              <time xmlns="urn:xmpp:time" />
+              <error type="cancel">
+                <feature-not-implemented xmlns="urn:ietf:params:xml:ns:xmpp-stanzas" />
+              </error>
             </iq>
             "#
         );
-
-        self.pop_ctx();
 
         self.expect_load_block_list();
 

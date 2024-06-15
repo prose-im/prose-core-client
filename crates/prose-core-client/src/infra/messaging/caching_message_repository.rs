@@ -247,7 +247,7 @@ impl MessagesRepository for CachingMessageRepository {
                     true,
                 ),
                 |(result, is_placeholder), (_, message)| {
-                    if message.timestamp >= before || message.timestamp <= result.timestamp {
+                    if message.timestamp >= before || message.timestamp < result.timestamp {
                         return (result, is_placeholder);
                     }
 
