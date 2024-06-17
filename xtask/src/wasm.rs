@@ -4,17 +4,18 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::collections::HashMap;
-use std::env;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::{env, fs};
 
-use crate::paths;
 use anyhow::{anyhow, Result};
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
 use url::Url;
 use xshell::{cmd, Shell};
+
+use crate::paths;
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -29,7 +30,8 @@ enum Command {
         #[arg(long)]
         dev: bool,
     },
-    Publish {},
+    Publish,
+    BumpPatch,
 }
 
 const NPM_SCOPE: &str = "prose-im";
@@ -53,7 +55,8 @@ impl Args {
                     },
                 )
             }
-            Command::Publish {} => publish(&sh).await,
+            Command::Publish => publish(&sh).await,
+            Command::BumpPatch => bump_patch(&sh).await,
         }
     }
 }
@@ -269,6 +272,43 @@ async fn publish(sh: &Shell) -> Result<()> {
 
     // Upload release archive to NPM
     run_release_npm(sh, &npm_token, &file_path)?;
+
+    Ok(())
+}
+
+async fn bump_patch(sh: &Shell) -> Result<()> {
+    let manifest_path = env::current_dir()?
+        .join(paths::BINDINGS)
+        .join(paths::bindings::WASM)
+        .join("Cargo.toml");
+
+    // Read Cargo.toml
+    let manifest_content = fs::read_to_string(&manifest_path)?;
+    let mut manifest = manifest_content.parse::<toml_edit::DocumentMut>()?;
+
+    // Get current version
+    let version_str = manifest["package"]["version"]
+        .as_str()
+        .ok_or_else(|| anyhow!("Missing version in {}.", manifest_path.display()))?;
+    let mut version = version_str.parse::<semver::Version>()?;
+
+    // Increment patch version
+    version.patch += 1;
+
+    // Update the version in the manifest
+    manifest["package"]["version"] = toml_edit::value(version.to_string());
+    fs::write(&manifest_path, manifest.to_string())?;
+
+    let version = version.to_string();
+    let manifest_path = manifest_path.display().to_string();
+    let commit_message = format!("chore(sdk-js): Bump version to {version}");
+
+    // Commit changes
+    cmd!(sh, "git add {manifest_path}").run()?;
+    cmd!(sh, "git commit -m {commit_message}").run()?;
+
+    // Create a Git tag
+    cmd!(sh, "git tag {version}").run()?;
 
     Ok(())
 }
