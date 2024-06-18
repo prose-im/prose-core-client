@@ -243,7 +243,7 @@ impl TestClient {
             self,
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
-            <query xmlns='http://jabber.org/protocol/disco#info'/>
+          <query xmlns='http://jabber.org/protocol/disco#info'/>
         </iq>"#
         );
         recv!(self, strategy.room_type.get_response());
@@ -253,7 +253,7 @@ impl TestClient {
             r#"
         <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
             <query xmlns='http://jabber.org/protocol/muc#admin'>
-                <item xmlns='http://jabber.org/protocol/muc#user' affiliation="owner"/>
+              <item xmlns='http://jabber.org/protocol/muc#user' affiliation="owner"/>
             </query>
         </iq>
         "#

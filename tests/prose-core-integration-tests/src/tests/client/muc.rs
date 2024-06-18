@@ -4,9 +4,11 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use jid::BareJid;
 use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::shared::models::AnonOccupantId;
+use prose_core_client::domain::sidebar::models::BookmarkType;
 use prose_core_client::dtos::{MucId, SendMessageRequest, SendMessageRequestBody, UserId};
 use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
@@ -25,6 +27,435 @@ async fn test_joins_room() -> Result<()> {
 
     client
         .join_room(muc_id!("room@conference.prose.org"), "anon-id")
+        .await?;
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_creates_public_channel() -> Result<()> {
+    let client = TestClient::new().await;
+
+    client
+        .expect_login(user_id!("user@prose.org"), "secret")
+        .await?;
+
+    let room_id = muc_id!("org.prose.channel.short-id-2@conference.prose.org");
+    let occupant_id = client.build_occupant_id(&room_id);
+    let room_name = "My Public Channel";
+
+    client.push_ctx(
+        [
+            (
+                "MUC_SERVICE_ID".into(),
+                BareJid::from_parts(None, &room_id.as_ref().domain()).to_string(),
+            ),
+            ("OCCUPANT_ID".into(), occupant_id.to_string()),
+            ("ROOM_ID".into(), room_id.to_string()),
+            ("ROOM_NAME".into(), room_name.into()),
+        ]
+        .into(),
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{MUC_SERVICE_ID}}" type="get">
+          <query xmlns="http://jabber.org/protocol/disco#items" />
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{MUC_SERVICE_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/disco#items">
+            <item jid="general@groups.prose.org" name="general" />
+          </query>
+        </iq>
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <presence xmlns='jabber:client' to="{{OCCUPANT_ID}}">
+            <show>chat</show>
+            <x xmlns='http://jabber.org/protocol/muc'>
+              <history maxstanzas="0" />
+            </x>
+            <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}"/>
+        </presence>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <presence xmlns="jabber:client" from="{{OCCUPANT_ID}}" xml:lang="en">
+          <show>chat</show>
+          <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}" />
+          <occupant-id xmlns="urn:xmpp:occupant-id:0" id="{{ANON_OCCUPANT_ID}}" />
+          <x xmlns="http://jabber.org/protocol/muc#user">
+            <status code="201" />
+            <item affiliation="owner" jid="{{USER_RESOURCE_ID}}" role="moderator" />
+            <status code="110" />
+          </x>
+        </presence>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="{{ROOM_ID}}" to="{{USER_RESOURCE_ID}}" type="groupchat">
+          <subject />
+        </message>        
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{ROOM_ID}}" type="get">
+            <query xmlns="http://jabber.org/protocol/muc#owner" />
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/muc#owner">
+            <x xmlns="jabber:x:data" type="form">
+              <title>Configuration for {{ROOM_ID}}</title>
+              <instructions>Complete and submit this form to configure the room.</instructions>
+              <field type="hidden" var="FORM_TYPE">
+                <value>http://jabber.org/protocol/muc#roomconfig</value>
+              </field>
+              <field type="fixed">
+                <value>Room information</value>
+              </field>
+              <field label="Title" type="text-single" var="muc#roomconfig_roomname" />
+              <field label="Description" type="text-single" var="muc#roomconfig_roomdesc">
+                <desc>A brief description of the room</desc>
+                <value />
+              </field>
+              <field label="Language tag for room (e.g. &apos;en&apos;, &apos;de&apos;, &apos;fr&apos; etc.)" type="text-single" var="muc#roomconfig_lang">
+                <desc>Indicate the primary language spoken in this room</desc>
+                <validate xmlns="http://jabber.org/protocol/xdata-validate" datatype="xs:language" />
+                <value>en</value>
+              </field>
+              <field label="Persistent (room should remain even when it is empty)" type="boolean" var="muc#roomconfig_persistentroom">
+                <desc>Rooms are automatically deleted when they are empty, unless this option is enabled</desc>
+              </field>
+              <field label="Include room information in public lists" type="boolean" var="muc#roomconfig_publicroom">
+                <desc>Enable this to allow people to find the room</desc>
+                <value>0</value>
+              </field>
+              <field type="fixed">
+                <value>Access to the room</value>
+              </field>
+              <field label="Password" type="text-private" var="muc#roomconfig_roomsecret">
+                <value />
+              </field>
+              <field label="Only allow members to join" type="boolean" var="muc#roomconfig_membersonly">
+                <desc>Enable this to only allow access for room owners, admins and members</desc>
+              </field>
+              <field label="Allow members to invite new members" type="boolean" var="{http://prosody.im/protocol/muc}roomconfig_allowmemberinvites" />
+              <field type="fixed">
+                <value>Permissions in the room</value>
+              </field>
+              <field label="Allow anyone to set the room&apos;s subject" type="boolean" var="muc#roomconfig_changesubject">
+                <desc>Choose whether anyone, or only moderators, may set the room's subject</desc>
+              </field>
+              <field label="Moderated (require permission to speak)" type="boolean" var="muc#roomconfig_moderatedroom">
+                <desc>In moderated rooms occupants must be given permission to speak by a room moderator</desc>
+              </field>
+              <field label="Addresses (JIDs) of room occupants may be viewed by:" type="list-single" var="muc#roomconfig_whois">
+                <option label="Moderators only">
+                  <value>moderators</value>
+                </option>
+                <option label="Anyone">
+                  <value>anyone</value>
+                </option>
+                <value>moderators</value>
+              </field>
+              <field type="fixed">
+                <value>Other options</value>
+              </field>
+              <field label="Maximum number of history messages returned by room" type="text-single" var="muc#roomconfig_historylength">
+                <desc>Specify the maximum number of previous messages that should be sent to users when they join the room</desc>
+                <validate xmlns="http://jabber.org/protocol/xdata-validate" datatype="xs:integer" />
+                <value>20</value>
+              </field>
+              <field label="Default number of history messages returned by room" type="text-single" var="muc#roomconfig_defaulthistorymessages">
+                <desc>Specify the number of previous messages sent to new users when they join the room</desc>
+                <validate xmlns="http://jabber.org/protocol/xdata-validate" datatype="xs:integer" />
+                <value>20</value>
+              </field>
+              <field label="Only show participants with roles:" type="list-multi" var="muc#roomconfig_presencebroadcast">
+                <option label="none">
+                  <value>none</value>
+                </option>
+                <option label="visitor">
+                  <value>visitor</value>
+                </option>
+                <option label="participant">
+                  <value>participant</value>
+                </option>
+                <option label="moderator">
+                  <value>moderator</value>
+                </option>
+                <value>moderator</value>
+                <value>visitor</value>
+                <value>participant</value>
+              </field>
+              <field label="Archive chat on server" type="boolean" var="muc#roomconfig_enablearchiving">
+                <value>1</value>
+              </field>
+            </x>
+          </query>
+        </iq>
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{ROOM_ID}}" type="set">
+          <query xmlns="http://jabber.org/protocol/muc#owner">
+            <x xmlns="jabber:x:data" type="submit">
+              <field type="hidden" var="FORM_TYPE">
+                <value>http://jabber.org/protocol/muc#roomconfig</value>
+              </field>
+              <field label="Title" var="muc#roomconfig_roomname">
+                <value>{{ROOM_NAME}}</value>
+              </field>
+              <field label="Description" var="muc#roomconfig_roomdesc">
+                <value />
+              </field>
+              <field label="Language tag for room (e.g. &apos;en&apos;, &apos;de&apos;, &apos;fr&apos; etc.)" var="muc#roomconfig_lang">
+                <value>en</value>
+              </field>
+              <field label="Persistent (room should remain even when it is empty)" type="boolean" var="muc#roomconfig_persistentroom">
+                <value>true</value>
+              </field>
+              <field label="Include room information in public lists" type="boolean" var="muc#roomconfig_publicroom">
+                <value>true</value>
+              </field>
+              <field label="Password" type="text-private" var="muc#roomconfig_roomsecret">
+                <value />
+              </field>
+              <field label="Only allow members to join" type="boolean" var="muc#roomconfig_membersonly">
+                <value>false</value>
+              </field>
+              <field label="Allow members to invite new members" type="boolean" var="{http://prosody.im/protocol/muc}roomconfig_allowmemberinvites">
+                <value>true</value>
+              </field>
+              <field label="Allow anyone to set the room&apos;s subject" type="boolean" var="muc#roomconfig_changesubject">
+                <value>true</value>
+              </field>
+              <field label="Moderated (require permission to speak)" type="boolean" var="muc#roomconfig_moderatedroom">
+                <value>false</value>
+              </field>
+              <field label="Addresses (JIDs) of room occupants may be viewed by:" type="list-single" var="muc#roomconfig_whois">
+                <option label="Moderators only">
+                  <value>moderators</value>
+                </option>
+                <option label="Anyone">
+                  <value>anyone</value>
+                </option>
+                <value>anyone</value>
+              </field>
+              <field label="Maximum number of history messages returned by room" var="muc#roomconfig_historylength">
+                <value>20</value>
+              </field>
+              <field label="Default number of history messages returned by room" var="muc#roomconfig_defaulthistorymessages">
+                <value>0</value>
+              </field>
+              <field label="Only show participants with roles:" type="list-multi" var="muc#roomconfig_presencebroadcast">
+                <option label="none">
+                  <value>none</value>
+                </option>
+                <option label="visitor">
+                  <value>visitor</value>
+                </option>
+                <option label="participant">
+                  <value>participant</value>
+                </option>
+                <option label="moderator">
+                  <value>moderator</value>
+                </option>
+                <value>moderator</value>
+                <value>participant</value>
+                <value>visitor</value>
+              </field>
+              <field label="Archive chat on server" type="boolean" var="muc#roomconfig_enablearchiving">
+                <value>1</value>
+              </field>
+            </x>
+          </query>
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result" />
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <message xmlns="jabber:client" from="{{ROOM_ID}}" to="{{USER_RESOURCE_ID}}" type="groupchat">
+          <x xmlns="http://jabber.org/protocol/muc#user">
+            <status code="170" />
+            <status code="172" />
+            <status code="104" />
+          </x>
+        </message>
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{ROOM_ID}}" type="get">
+          <query xmlns="http://jabber.org/protocol/disco#info" />
+        </iq>
+        "#
+    );
+
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/disco#info">
+            <feature var="muc_unsecured" />
+            <identity category="conference" name="{{ROOM_NAME}}" type="text" />
+            <feature var="http://jabber.org/protocol/muc#request" />
+            <feature var="http://jabber.org/protocol/muc" />
+            <feature var="http://jabber.org/protocol/muc#stable_id" />
+            <feature var="http://jabber.org/protocol/muc#self-ping-optimization" />
+            <feature var="muc_unmoderated" />
+            <feature var="muc_persistent" />
+            <feature var="muc_open" />
+            <feature var="jabber:iq:register" />
+            <feature var="urn:xmpp:mam:2" />
+            <feature var="urn:xmpp:mam:2#extended" />
+            <feature var="urn:xmpp:sid:0" />
+            <feature var="urn:xmpp:occupant-id:0" />
+            <feature var="muc_public" />
+            <feature var="muc_nonanonymous" />
+            <x xmlns="jabber:x:data" type="result">
+              <field type="hidden" var="FORM_TYPE">
+                <value>http://jabber.org/protocol/muc#roominfo</value>
+              </field>
+              <field label="Title" type="text-single" var="muc#roomconfig_roomname">
+                <value>{{ROOM_NAME}}</value>
+              </field>
+              <field type="text-single" var="muc#roominfo_lang">
+                <value>en</value>
+              </field>
+              <field label="Description" type="text-single" var="muc#roominfo_description">
+                <value />
+              </field>
+              <field type="boolean" var="muc#roomconfig_changesubject">
+                <value>1</value>
+              </field>
+              <field label="Number of occupants" type="text-single" var="muc#roominfo_occupants">
+                <value>1</value>
+              </field>
+              <field label="Allow members to invite new members" type="boolean" var="{http://prosody.im/protocol/muc}roomconfig_allowmemberinvites">
+                <value>1</value>
+              </field>
+              <field label="Allow users to invite other users" type="boolean" var="muc#roomconfig_allowinvites">
+                <value>1</value>
+              </field>
+            </x>
+          </query>
+        </iq>
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{ROOM_ID}}" type="get">
+          <query xmlns="http://jabber.org/protocol/muc#admin">
+            <item xmlns="http://jabber.org/protocol/muc#user" affiliation="owner" />
+          </query>
+        </iq>
+        "#
+    );
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/muc#admin">
+            <item affiliation="owner" jid="{{USER_ID}}" />
+          </query>
+        </iq>
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{ROOM_ID}}" type="get">
+          <query xmlns="http://jabber.org/protocol/muc#admin">
+            <item xmlns="http://jabber.org/protocol/muc#user" affiliation="member" />
+          </query>
+        </iq>
+        "#
+    );
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/muc#admin" />
+        </iq>
+        "#
+    );
+
+    send!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" id="{{ID}}" to="{{ROOM_ID}}" type="get">
+          <query xmlns="http://jabber.org/protocol/muc#admin">
+            <item xmlns="http://jabber.org/protocol/muc#user" affiliation="admin" />
+          </query>
+        </iq>
+        "#
+    );
+    recv!(
+        client,
+        r#"
+        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="result">
+          <query xmlns="http://jabber.org/protocol/muc#admin" />
+        </iq>
+        "#
+    );
+
+    client.pop_ctx();
+
+    client.expect_load_vcard(&user_id!("user@prose.org"));
+    client.receive_not_found_iq_response();
+
+    client.expect_load_synced_room_settings(room_id.clone(), None);
+    client.expect_muc_catchup(&room_id);
+    client.expect_set_bookmark(room_id.clone(), room_name, BookmarkType::PublicChannel);
+
+    event!(client, ClientEvent::SidebarChanged);
+
+    client
+        .rooms
+        .create_room_for_public_channel(room_name)
         .await?;
 
     Ok(())
