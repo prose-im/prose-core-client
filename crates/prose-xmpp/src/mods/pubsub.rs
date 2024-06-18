@@ -99,6 +99,7 @@ impl PubSub {
             self.ctx.generate_id(),
             DiscoItemsQuery {
                 node: Some(node.as_ref().to_string()),
+                rsm: None,
             },
         );
 

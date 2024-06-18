@@ -35,7 +35,7 @@ impl RoomParticipationService for XMPPClient {
                     MediatedInvite {
                         invites: vec![mediated_invite::Invite {
                             from: None,
-                            to: Some(Jid::Bare(participant.clone().into_inner())),
+                            to: Some(Jid::from(participant.clone().into_inner())),
                             reason: None,
                         }],
                         password: None,

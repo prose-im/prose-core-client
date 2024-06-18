@@ -115,7 +115,9 @@ impl FormConfig {
                 // No, but maybe the field already has a (default-)value configured
                 // or is not required?
                 if !field.values.is_empty() || !field.required {
-                    configured_fields.push(field.clone());
+                    let mut configured_field = field.clone();
+                    configured_field.validate = None;
+                    configured_fields.push(configured_field);
                     continue;
                 }
                 // Nope. So we'll stop right here.
@@ -129,6 +131,7 @@ impl FormConfig {
 
             let mut configured_field = field.clone();
             value.value.apply_to_field(&var, &mut configured_field)?;
+            configured_field.validate = None;
             configured_fields.push(configured_field);
         }
 

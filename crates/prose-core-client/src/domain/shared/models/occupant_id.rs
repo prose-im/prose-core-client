@@ -21,11 +21,11 @@ pub struct OccupantId(FullJid);
 
 impl OccupantId {
     pub fn nickname(&self) -> &str {
-        self.0.resource_str()
+        self.0.resource()
     }
 
     pub fn formatted_nickname(&self) -> String {
-        self.0.resource_str().capitalized_display_name()
+        self.0.resource().capitalized_display_name()
     }
 
     pub fn muc_id(&self) -> MucId {

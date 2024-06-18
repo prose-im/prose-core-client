@@ -36,7 +36,7 @@ impl From<PublicRoomInfo> for Channel {
             jid: bare_jid.clone().into(),
             name: value
                 .name
-                .or(bare_jid.node_str().map(|n| n.to_string()))
+                .or(bare_jid.node().map(|n| n.to_string()))
                 .unwrap_or(value.id.to_string()),
         }
     }

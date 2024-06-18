@@ -71,7 +71,7 @@ impl Module for Chat {
             // Ignore messages from invalid senders.
             // CVE-2017-5589
             // https://rt-solutions.de/en/cve-2017-5589_xmpp_carbons/
-            if stanza.from == Some(Jid::Bare(self.ctx.bare_jid())) {
+            if stanza.from == Some(Jid::from(self.ctx.bare_jid())) {
                 self.ctx
                     .schedule_event(ClientEvent::Chat(Event::Carbon(Carbon::Received(
                         received_carbon.forwarded,

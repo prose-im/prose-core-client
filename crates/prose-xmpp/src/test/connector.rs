@@ -80,6 +80,7 @@ impl Connection {
                 Some(DiscoItemsResult {
                     node: None,
                     items: vec![],
+                    rsm: None,
                 }),
             )
             .into()]

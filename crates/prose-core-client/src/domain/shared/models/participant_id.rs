@@ -75,8 +75,8 @@ impl From<UserEndpointId> for ParticipantId {
 impl From<ParticipantId> for Jid {
     fn from(value: ParticipantId) -> Self {
         match value {
-            ParticipantId::User(id) => Jid::Bare(id.into_inner()),
-            ParticipantId::Occupant(id) => Jid::Full(id.into_inner()),
+            ParticipantId::User(id) => Jid::from(id.into_inner()),
+            ParticipantId::Occupant(id) => Jid::from(id.into_inner()),
         }
     }
 }

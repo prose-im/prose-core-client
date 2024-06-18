@@ -24,13 +24,13 @@ impl BareJid {
     /// The node part of the Jabber ID, if it exists, else None.
     #[wasm_bindgen(getter)]
     pub fn node(&self) -> Option<String> {
-        self.0.node_str().map(ToString::to_string)
+        self.0.node().map(ToString::to_string)
     }
 
     /// The domain of the Jabber ID.
     #[wasm_bindgen(getter)]
     pub fn domain(&self) -> String {
-        self.0.domain_str().to_string()
+        self.0.domain().to_string()
     }
 
     #[wasm_bindgen(js_name = "toString")]
@@ -45,7 +45,7 @@ impl BareJid {
 
 impl BareJid {
     pub fn to_full_jid_with_resource(&self, resource: &jid::ResourcePart) -> jid::FullJid {
-        jid::FullJid::from_parts(self.0.node().as_ref(), &self.0.domain(), resource)
+        jid::FullJid::from_parts(self.0.node(), &self.0.domain(), resource)
     }
 }
 
@@ -75,7 +75,7 @@ impl From<BareJid> for jid::BareJid {
 
 impl From<&BareJid> for jid::Jid {
     fn from(value: &BareJid) -> Self {
-        jid::Jid::Bare(value.0.clone())
+        jid::Jid::from(value.0.clone())
     }
 }
 

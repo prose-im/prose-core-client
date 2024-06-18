@@ -248,7 +248,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
                     .set_from(full!("room@groups.prose.org/them"))
                     .set_body("Hello World")
                     .set_muc_user(MucUser {
-                        jid: Some(Jid::Bare(bare!("them@prose.org"))),
+                        jid: Some(Jid::from(bare!("them@prose.org"))),
                         affiliation: Affiliation::Member,
                         role: Role::Participant,
                     }),

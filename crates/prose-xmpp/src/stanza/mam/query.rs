@@ -145,9 +145,11 @@ impl From<Filter> for DataForm {
                 type_: FieldType::TextMulti,
                 label: None,
                 required: false,
+                desc: None,
                 options: vec![],
                 values: ids.into_iter().map(|id| id.into_inner()).collect(),
                 media: vec![],
+                validate: None,
             }),
             None => {}
         }

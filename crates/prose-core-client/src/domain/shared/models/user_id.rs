@@ -35,11 +35,11 @@ impl UserId {
     }
 
     pub fn username(&self) -> &str {
-        self.0.node_str().expect("Missing node in UserId")
+        self.0.node().expect("Missing node in UserId")
     }
 
     pub fn formatted_username(&self) -> String {
-        let Some(node) = self.0.node_str() else {
+        let Some(node) = self.0.node() else {
             return self.to_string().to_uppercase_first_letter();
         };
         node.capitalized_display_name()
@@ -52,7 +52,7 @@ impl UserId {
 
 impl From<BareJid> for UserId {
     fn from(value: BareJid) -> Self {
-        assert!(value.node_str().is_some(), "Missing node in UserId");
+        assert!(value.node().is_some(), "Missing node in UserId");
         UserId(value)
     }
 }
@@ -119,6 +119,6 @@ impl Ord for UserId {
         if ord != Ordering::Equal {
             return ord;
         }
-        self.0.domain_str().cmp(other.0.domain_str())
+        self.0.domain().cmp(other.0.domain())
     }
 }

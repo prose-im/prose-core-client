@@ -82,7 +82,7 @@ impl FromStr for MucId {
 
 impl From<MucId> for Jid {
     fn from(value: MucId) -> Self {
-        Jid::Bare(value.0)
+        Jid::from(value.0)
     }
 }
 

@@ -55,7 +55,7 @@ impl UserAccountService for XMPPClient {
     ) -> Result<()> {
         let status_mod = self.client.get_mod::<mods::Status>();
         status_mod.send_presence(
-            room_id.map(|id| Jid::Full(id.into_inner())),
+            room_id.map(|id| Jid::from(id.into_inner())),
             Some(availability.try_into()?),
             None,
             Some(capabilities.into()),

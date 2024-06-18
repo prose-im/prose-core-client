@@ -146,7 +146,8 @@ impl Caps {
         let response = self
             .ctx
             .send_iq(
-                Iq::from_get(self.ctx.generate_id(), DiscoItemsQuery { node }).with_to(from.into()),
+                Iq::from_get(self.ctx.generate_id(), DiscoItemsQuery { node, rsm: None })
+                    .with_to(from.into()),
             )
             .await?
             .ok_or(RequestError::UnexpectedResponse)?;

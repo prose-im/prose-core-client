@@ -3,8 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::{bail, Result};
-use jid::Jid;
+use anyhow::{anyhow, bail, Result};
 use minidom::Element;
 use tracing::info;
 use xmpp_parsers::message::MessageType;
@@ -88,9 +87,9 @@ fn parse_chat_event(ctx: &mut Context, event: XMPPChatEvent) -> Result<()> {
             chat_state,
             message_type,
         } => {
-            let Jid::Full(from) = from else {
-                bail!("Expected FullJid in ChatState")
-            };
+            let from = from
+                .try_into_full()
+                .map_err(|_| anyhow!("Expected FullJid in ChatState"))?;
 
             let user_id = match message_type {
                 MessageType::Groupchat => UserEndpointId::Occupant(from.into()),
@@ -149,9 +148,9 @@ fn parse_block_list_event(ctx: &mut Context, event: XMPPBlockListEvent) -> Resul
 fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
     match event {
         XMPPMUCEvent::DirectInvite { from, invite } => {
-            let Jid::Full(from) = from else {
-                bail!("Expected FullJid in direct invite")
-            };
+            let from = from
+                .try_into_full()
+                .map_err(|_| anyhow!("Expected FullJid in direct invite"))?;
 
             ctx.push_event(RoomEvent {
                 room_id: MucId::from(invite.jid),
@@ -162,15 +161,16 @@ fn parse_muc_event(ctx: &mut Context, event: XMPPMUCEvent) -> Result<()> {
             })
         }
         XMPPMUCEvent::MediatedInvite { from, invite } => {
-            let Jid::Bare(from) = from else {
-                bail!("Expected BareJid for room in mediated invite")
-            };
+            let from = from.into_bare();
 
-            let Some(embedded_invite) = invite.invites.first() else {
+            let Some(embedded_invite) = invite.invites.into_iter().next() else {
                 bail!("Expected MediatedInvite to contain at least one embedded invite.")
             };
 
-            let Some(Jid::Full(sender_jid)) = &embedded_invite.from else {
+            let Some(sender_jid) = embedded_invite
+                .from
+                .and_then(|from| from.try_into_full().ok())
+            else {
                 bail!("Expected FullJid in embedded invite of MediatedInvite.")
             };
 
@@ -203,9 +203,9 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
             })
         }
         XMPPCapsEvent::Caps { from, caps } => {
-            let Jid::Full(from) = from else {
-                bail!("Expected FullJid in caps element. Found '{from}' instead.")
-            };
+            let from = from.try_into_full().map_err(|bare| {
+                anyhow!("Expected FullJid in caps element. Found '{bare}' instead.")
+            })?;
 
             ctx.push_event(UserResourceEvent {
                 user_id: UserResourceId::from(from),
