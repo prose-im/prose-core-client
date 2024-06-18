@@ -48,7 +48,7 @@ impl UserInfoService for XMPPClient {
 
         match profile
             .load_avatar_image(
-                Jid::Bare(from.clone().into_inner()),
+                Jid::from(from.clone().into_inner()),
                 &Sha1HexAttribute::from_str(&image_id.as_ref())?,
             )
             .await

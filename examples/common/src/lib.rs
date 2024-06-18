@@ -65,7 +65,7 @@ pub fn load_credentials() -> (FullJid, String) {
     if let (Some(account_jid), Some(account_password)) = (jid_arg, password_arg) {
         return (
             FullJid::from_parts(
-                account_jid.node().as_ref(),
+                account_jid.node(),
                 &account_jid.domain(),
                 &ResourcePart::new(&format!("cli-{}", Instant::now().elapsed().as_nanos()))
                     .unwrap(),

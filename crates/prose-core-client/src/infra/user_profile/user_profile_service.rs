@@ -40,10 +40,10 @@ impl UserProfileService for XMPPClient {
         let profile = self.client.get_mod::<mods::Profile>();
 
         let entity_time = profile
-            .load_entity_time(Jid::Full(from.clone().into_inner()))
+            .load_entity_time(Jid::from(from.clone().into_inner()))
             .await?;
         let last_activity = profile
-            .load_last_activity(Jid::Full(from.clone().into_inner()))
+            .load_last_activity(Jid::from(from.clone().into_inner()))
             .await?;
 
         let metadata = UserMetadata {

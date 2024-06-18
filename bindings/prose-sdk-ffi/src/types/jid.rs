@@ -18,7 +18,7 @@ impl JID {
                 .as_ref()
                 .map(|node| NodePart::new(node))
                 .transpose()?
-                .as_ref(),
+                .as_deref(),
             &DomainPart::new(&self.domain)?,
         ))
     }
@@ -45,7 +45,7 @@ impl From<JID> for BareJid {
                 .node
                 .as_ref()
                 .map(|node| NodePart::new(node).unwrap())
-                .as_ref(),
+                .as_deref(),
             &DomainPart::new(&value.domain).unwrap(),
         )
     }

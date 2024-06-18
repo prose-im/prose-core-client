@@ -8,7 +8,6 @@ use std::ops::Deref;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::TimeDelta;
-use jid::Jid;
 use tracing::{error, info, warn};
 use xmpp_parsers::message::MessageType;
 
@@ -106,15 +105,15 @@ impl ReceivedMessage {
         };
 
         if message.is_groupchat_message() {
-            let Jid::Full(from) = from else {
+            let Ok(from) = from.try_into_full() else {
                 error!("Expected FullJid in received groupchat message");
                 return None;
             };
             UserEndpointId::Occupant(from.into())
         } else {
-            match from {
-                Jid::Bare(from) => UserEndpointId::User(from.into()),
-                Jid::Full(from) => UserEndpointId::UserResource(from.into()),
+            match from.try_into_full() {
+                Ok(full) => UserEndpointId::UserResource(full.into()),
+                Err(bare) => UserEndpointId::User(bare.into()),
             }
         }
         .into()
@@ -153,7 +152,12 @@ impl MessagesEventHandler {
                 // I.e. `from` is 'room@groups.prose.org/me' and `to` is 'me@prose.org/res'
                 // In this case we want to treat it as a sent message…
                 if message.type_ == MessageType::Groupchat {
-                    let Some(Jid::Full(from)) = &message.from else {
+                    let Some(from) = message
+                        .from
+                        .as_ref()
+                        .and_then(|from| from.try_as_full().ok())
+                        .cloned()
+                    else {
                         error!("Expected FullJid in received groupchat message");
                         return Ok(());
                     };

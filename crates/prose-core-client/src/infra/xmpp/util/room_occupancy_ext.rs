@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::{bail, Result};
-use jid::Jid;
 use tracing::error;
 use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::presence::Presence;
@@ -41,7 +40,11 @@ impl RoomOccupancyExt for RoomOccupancy {
 }
 
 fn self_participant(presence: &Presence, muc_user: &MucUser) -> Result<RoomSessionParticipant> {
-    let Some(Jid::Full(from)) = &presence.from else {
+    let Some(from) = presence
+        .from
+        .as_ref()
+        .and_then(|from| from.try_as_full().ok())
+    else {
         bail!("Expected FullJid in MUC presence.")
     };
 

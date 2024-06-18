@@ -109,8 +109,14 @@ impl MUC {
         let response = self
             .ctx
             .send_iq(
-                Iq::from_get(self.ctx.generate_id(), DiscoItemsQuery { node: None })
-                    .with_to(Jid::Bare(service.clone())),
+                Iq::from_get(
+                    self.ctx.generate_id(),
+                    DiscoItemsQuery {
+                        node: None,
+                        rsm: None,
+                    },
+                )
+                .with_to(Jid::from(service.clone())),
             )
             .await?
             .ok_or(RequestError::UnexpectedResponse)?;
@@ -483,7 +489,11 @@ impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>, Vec<Message>, Option
             move |state, element| {
                 match element {
                     XMPPElement::Presence(presence) => {
-                        let Some(Jid::Full(from)) = &presence.from else {
+                        let Some(from) = &presence
+                            .from
+                            .as_ref()
+                            .and_then(|from| from.try_as_full().ok())
+                        else {
                             return Ok(ElementReducerPoll::Pending(Some(presence.into())));
                         };
 

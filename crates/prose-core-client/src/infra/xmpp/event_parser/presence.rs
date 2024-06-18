@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, Result};
 use jid::Jid;
 use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::presence::Presence;
@@ -36,9 +36,9 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
         return parse_muc_presence(ctx, from, availability, presence, muc_user.try_into()?);
     }
 
-    let user_id = match from {
-        Jid::Bare(jid) => UserId::from(jid).into(),
-        Jid::Full(jid) => UserResourceId::from(jid).into(),
+    let user_id = match from.try_into_full() {
+        Ok(full) => UserResourceId::from(full).into(),
+        Err(bare) => UserId::from(bare).into(),
     };
 
     ctx.push_event(UserStatusEvent {
@@ -59,9 +59,9 @@ fn parse_muc_presence(
     presence: Presence,
     mut muc_user: MucUser,
 ) -> Result<()> {
-    let Jid::Full(from) = from else {
-        bail!("Expected FullJid in MUC presence.")
-    };
+    let from = from
+        .try_into_full()
+        .map_err(|_| anyhow!("Expected FullJid in MUC presence."))?;
 
     let occupant_id = OccupantId::from(from);
 

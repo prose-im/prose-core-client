@@ -8,7 +8,7 @@ use std::sync::{Arc, Weak};
 use std::time::SystemTime;
 
 use anyhow::Result;
-use jid::{BareJid, DomainPart, FullJid, Jid, NodePart, ResourcePart};
+use jid::{BareJid, DomainPart, FullJid, NodePart, ResourcePart};
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
 use tracing::instrument;
@@ -125,7 +125,7 @@ impl ModuleContext {
             ))
     }
     pub(crate) fn bare_jid(&self) -> BareJid {
-        Jid::Full(self.full_jid()).into_bare()
+        self.full_jid().to_bare()
     }
 
     pub(crate) fn server_jid(&self) -> BareJid {

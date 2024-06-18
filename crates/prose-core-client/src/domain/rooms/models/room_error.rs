@@ -52,7 +52,7 @@ impl RoomError {
             err:
                 StanzaError {
                     defined_condition,
-                    new_location,
+                    alternate_address,
                     ..
                 },
         } = error
@@ -65,7 +65,9 @@ impl RoomError {
         }
 
         Some(GoneError {
-            new_location: new_location.as_ref().and_then(|l| MucId::from_iri(l).ok()),
+            new_location: alternate_address
+                .as_ref()
+                .and_then(|l| MucId::from_iri(l).ok()),
         })
     }
 

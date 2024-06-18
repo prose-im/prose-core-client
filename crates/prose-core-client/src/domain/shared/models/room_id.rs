@@ -84,7 +84,7 @@ impl RoomId {
     pub fn to_display_name(&self) -> String {
         use crate::util::StringExt;
 
-        let Some(node) = self.as_ref().node_str() else {
+        let Some(node) = self.as_ref().node() else {
             return self.to_string().to_uppercase_first_letter();
         };
         node.capitalized_display_name()

@@ -36,7 +36,7 @@ impl TryFrom<pubsub::Item> for ConferenceBookmark {
 impl From<bookmarks::Conference> for ConferenceBookmark {
     fn from(conference: bookmarks::Conference) -> Self {
         ConferenceBookmark {
-            jid: Jid::Bare(conference.jid),
+            jid: Jid::from(conference.jid),
             conference: Conference {
                 autojoin: if conference.autojoin == bookmarks::Autojoin::True {
                     Autojoin::True

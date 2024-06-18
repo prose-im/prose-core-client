@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use chrono::{DateTime, SubsecRound, Utc};
-use jid::Jid;
 use tracing::{error, warn};
 use xmpp_parsers::message::MessageType;
 
@@ -146,12 +145,12 @@ impl MessageParser {
                         })
                 });
 
-            let Jid::Full(from) = from else {
-                return Err(StanzaParseError::ParseError {
+            let from = from
+                .try_as_full()
+                .map_err(|_| StanzaParseError::ParseError {
                     error: "Expected `from` attribute to contain FullJid for groupchat message"
                         .to_string(),
-                });
-            };
+                })?;
             Ok((
                 ParticipantId::Occupant(OccupantId::from(from.clone())),
                 user_id,

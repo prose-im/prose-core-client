@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::bail;
-use jid::Jid;
 use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::presence::Presence;
 
@@ -22,7 +21,7 @@ impl TryFrom<Presence> for RoomSessionParticipant {
         let anon_occupant_id = value.anon_occupant_id();
         let availability = value.availability();
 
-        let Some(Jid::Full(from)) = value.from else {
+        let Some(from) = value.from.and_then(|from| from.try_into_full().ok()) else {
             bail!("Expected FullJid in MUC presence.")
         };
 

@@ -57,9 +57,9 @@ impl UserEndpointId {
 
     pub fn into_jid(self) -> Jid {
         match self {
-            UserEndpointId::User(id) => Jid::Bare(id.into_inner()),
-            UserEndpointId::UserResource(id) => Jid::Full(id.into_inner()),
-            UserEndpointId::Occupant(id) => Jid::Full(id.into_inner()),
+            UserEndpointId::User(id) => Jid::from(id.into_inner()),
+            UserEndpointId::UserResource(id) => Jid::from(id.into_inner()),
+            UserEndpointId::Occupant(id) => Jid::from(id.into_inner()),
         }
     }
 }
