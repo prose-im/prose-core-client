@@ -603,10 +603,12 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
     }
 
     async fn handle_disconnect(&self) -> Result<()> {
-        for room in self
-            .connected_rooms_repo
-            .get_all(&self.ctx.connected_account()?)
-        {
+        let Some(account) = self.ctx.connected_account().ok() else {
+            // The client as been explicitly disconnected. No need to update the rooms.
+            return Ok(());
+        };
+
+        for room in self.connected_rooms_repo.get_all(&account) {
             room.set_state(RoomState::Disconnected {
                 error: None,
                 can_retry: true,
