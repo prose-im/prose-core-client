@@ -18,12 +18,13 @@ use crate::client::ClientInner;
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::RoomType;
 use crate::util::coalesce_client_events;
-use crate::{Client, ClientDelegate, ClientEvent, ClientRoomEventType};
+use crate::{Client, ClientDelegate, ClientEvent, ClientRoomEventType, ConnectionEvent};
 
 pub struct CoalescingClientEventDispatcher {
     client_inner: Arc<OnceLock<Weak<ClientInner>>>,
     room_factory: OnceLock<DynRoomFactory>,
     sender: Sender<ClientEvent>,
+    delegate: Option<Arc<Box<dyn ClientDelegate>>>,
 }
 
 impl CoalescingClientEventDispatcher {
@@ -33,7 +34,9 @@ impl CoalescingClientEventDispatcher {
         let mut events_stream = ReceiverStream::new(rx).throttled(Duration::from_millis(200));
         let client_inner = Arc::new(OnceLock::<Weak<ClientInner>>::new());
 
-        if let Some(delegate) = delegate {
+        let delegate = delegate.map(Arc::new);
+
+        if let Some(delegate) = delegate.clone() {
             let client_inner = client_inner.clone();
             spawn(async move {
                 while let Some(mut events) = events_stream.next().await {
@@ -60,6 +63,7 @@ impl CoalescingClientEventDispatcher {
             client_inner,
             room_factory: Default::default(),
             sender: tx,
+            delegate,
         }
     }
 
@@ -80,6 +84,27 @@ impl CoalescingClientEventDispatcher {
 
 impl ClientEventDispatcherTrait for CoalescingClientEventDispatcher {
     fn dispatch_event(&self, event: ClientEvent) {
+        if let ClientEvent::ConnectionStatusChanged {
+            event: ConnectionEvent::Disconnect { .. },
+        } = event
+        {
+            let Some(delegate) = &self.delegate else {
+                return;
+            };
+
+            let Some(client_inner) = self
+                .client_inner
+                .get()
+                .expect("ClientInner was not set on ClientEventDispatcher")
+                .upgrade()
+            else {
+                return;
+            };
+
+            let client = Client::from(client_inner);
+            return delegate.handle_event(client, event);
+        };
+
         debug!(event = ?event, "Enqueuing event");
         _ = self.sender.try_send(event);
     }
