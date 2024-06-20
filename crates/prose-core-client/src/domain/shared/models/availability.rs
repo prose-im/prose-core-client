@@ -13,6 +13,7 @@ pub enum Availability {
     Unavailable,
     DoNotDisturb,
     Away,
+    Invisible,
 }
 
 impl Display for Availability {
@@ -25,6 +26,7 @@ impl Display for Availability {
                 Availability::Unavailable => "unavailable",
                 Availability::DoNotDisturb => "do not disturb",
                 Availability::Away => "away",
+                Availability::Invisible => "invisible",
             }
         )
     }

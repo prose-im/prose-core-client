@@ -27,6 +27,7 @@ pub enum Availability {
     Unavailable = 1,
     DoNotDisturb = 2,
     Away = 3,
+    Invisible = 4,
 }
 
 #[wasm_bindgen]
@@ -56,6 +57,7 @@ impl From<Availability> for CoreAvailability {
             Availability::Unavailable => CoreAvailability::Unavailable,
             Availability::DoNotDisturb => CoreAvailability::DoNotDisturb,
             Availability::Away => CoreAvailability::Away,
+            Availability::Invisible => CoreAvailability::Invisible,
         }
     }
 }
@@ -135,6 +137,7 @@ impl From<CoreAvailability> for Availability {
             CoreAvailability::Unavailable => Availability::Unavailable,
             CoreAvailability::DoNotDisturb => Availability::DoNotDisturb,
             CoreAvailability::Away => Availability::Away,
+            CoreAvailability::Invisible => Availability::Invisible,
         }
     }
 }

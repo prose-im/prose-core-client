@@ -125,6 +125,7 @@ enum Availability {
     "Unavailable",
     "DoNotDisturb",
     "Away",
+    "Invisible",
 };
 
 enum Group {

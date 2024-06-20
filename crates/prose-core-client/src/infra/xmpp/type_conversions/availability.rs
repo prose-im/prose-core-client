@@ -17,7 +17,7 @@ impl From<(Option<presence::Type>, Option<presence::Show>)> for Availability {
             (None, Some(presence::Show::Away)) => Availability::Away,
             (None, Some(presence::Show::Chat)) => Availability::Available,
             (None, Some(presence::Show::Dnd)) => Availability::DoNotDisturb,
-            (None, Some(presence::Show::Xa)) => Availability::Away,
+            (None, Some(presence::Show::Xa)) => Availability::Invisible,
             (Some(_), _) => Availability::Unavailable,
         }
     }
@@ -34,6 +34,7 @@ impl TryFrom<Availability> for presence::Show {
             )),
             Availability::DoNotDisturb => Ok(presence::Show::Dnd),
             Availability::Away => Ok(presence::Show::Away),
+            Availability::Invisible => Ok(presence::Show::Xa),
         }
     }
 }
