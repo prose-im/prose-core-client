@@ -9,6 +9,7 @@ anyhow = "1.0"
 #cargo-swift = "0.5"
 clap = { version = "4.3", features = ["derive"] }
 http = "0.2"
+jid = { workspace = true }
 octocrab = "0.23"
 reqwest = { version = "0.11", features = ["stream"] }
 semver = "1.0"
