@@ -19,6 +19,7 @@ use prose_xmpp::test::BareJidTestAdditions;
 use crate::domain::messaging::models::{
     Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
 };
+use crate::domain::shared::models::AnonOccupantId;
 use crate::dtos::{Message as MessageDTO, MessageSender, ParticipantId, Reaction as ReactionDTO};
 use crate::test::mock_data;
 
@@ -35,6 +36,7 @@ pub struct MessageBuilder {
     id: MessageId,
     stanza_id: Option<StanzaId>,
     from: ParticipantId,
+    from_anon: Option<AnonOccupantId>,
     from_name: Option<String>,
     to: BareJid,
     target_message_idx: Option<u32>,
@@ -87,6 +89,7 @@ impl MessageBuilder {
             id: id.into(),
             stanza_id: None,
             from: ParticipantId::User(BareJid::ours().into()),
+            from_anon: None,
             from_name: None,
             to: BareJid::theirs(),
             target_message_idx: None,
@@ -111,6 +114,11 @@ impl MessageBuilder {
 
     pub fn set_from(mut self, from: impl Into<ParticipantId>) -> Self {
         self.from = from.into();
+        self
+    }
+
+    pub fn set_from_anon(mut self, from: impl Into<AnonOccupantId>) -> Self {
+        self.from_anon = Some(from.into());
         self
     }
 
@@ -276,6 +284,12 @@ impl MessageBuilder {
             })
             .set_to(self.to)
             .set_from(self.from);
+
+        if let Some(from_anon) = self.from_anon {
+            message = message.add_payload(xmpp_parsers::occupant_id::OccupantId {
+                id: from_anon.to_string(),
+            });
+        }
 
         match self.payload {
             MessageLikePayload::Error { message: error } => {

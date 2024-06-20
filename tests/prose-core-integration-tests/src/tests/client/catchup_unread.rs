@@ -356,7 +356,7 @@ async fn test_rounds_timestamps() -> Result<()> {
 }
 
 #[mt_test]
-async fn test_does_not_count_sent_messages_in_muc_as_unread() -> Result<()> {
+async fn test_does_not_count_sent_messages_in_anon_muc_as_unread() -> Result<()> {
     let client = TestClient::new().await;
 
     client
@@ -393,7 +393,53 @@ async fn test_does_not_count_sent_messages_in_muc_as_unread() -> Result<()> {
 
     let sidebar_items = client.sidebar.sidebar_items().await;
     assert_eq!(1, sidebar_items.len());
-    assert_eq!(*&sidebar_items[0].unread_count, 2);
+    assert_eq!(2, *&sidebar_items[0].unread_count);
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_does_not_count_sent_messages_in_muc_as_unread() -> Result<()> {
+    let client = TestClient::new().await;
+
+    client
+        .expect_login(user_id!("user@prose.org"), "secret")
+        .await?;
+
+    let room_id = muc_id!("room@conf.prose.org");
+    let our_occupant_id = client.build_occupant_id(&room_id);
+
+    client
+        .join_room_with_strategy(
+            room_id,
+            "anon-id",
+            JoinRoomStrategy::default().with_catch_up_handler(move |client, room_id| {
+                client.expect_muc_catchup_with_config(
+                    room_id,
+                    client.time_provider.now()
+                        - Duration::seconds(client.app_config.max_catchup_duration_secs),
+                    vec![
+                        MessageBuilder::new_with_index(1)
+                            .set_from(occupant_id!("room@conf.prose.org/friend"))
+                            .build_archived_message("", None),
+                        MessageBuilder::new_with_index(2)
+                            .set_from(our_occupant_id.clone())
+                            // Specifying the anon occupant id here will help the MessageParser
+                            // lookup our real JID.
+                            .set_from_anon("anon-id")
+                            .build_archived_message("", None),
+                        MessageBuilder::new_with_index(3)
+                            .set_from(occupant_id!("room@conf.prose.org/friend"))
+                            .build_archived_message("", None),
+                    ],
+                );
+            }),
+        )
+        .await?;
+
+    let sidebar_items = client.sidebar.sidebar_items().await;
+    assert_eq!(1, sidebar_items.len());
+    assert_eq!(2, *&sidebar_items[0].unread_count);
 
     Ok(())
 }

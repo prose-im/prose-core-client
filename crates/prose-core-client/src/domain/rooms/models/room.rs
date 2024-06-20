@@ -234,17 +234,25 @@ impl Room {
             .get_messages_after(account, &self.room_id, last_read_message_timestamp)
             .await?;
 
-        let our_participant_id = self
-            .occupant_id()
-            .map(ParticipantId::Occupant)
-            .unwrap_or_else(|| ParticipantId::User(account.to_user_id()));
+        let our_user_id = ParticipantId::User(account.to_user_id());
+        let our_participant_id = self.occupant_id().map(ParticipantId::Occupant);
+
+        let is_muc = self.room_id.is_muc_room();
 
         for message in messages {
             let MessageLikePayload::Message { ref mentions, .. } = message.payload else {
                 continue;
             };
 
-            if message.from == our_participant_id {
+            let is_our_message = if is_muc {
+                // We're generally trying to resolve OccupantIDs into UserIDs if possible.
+                // So the sender could be either/or depending on the room configuration.
+                Some(&message.from) == our_participant_id.as_ref() || message.from == our_user_id
+            } else {
+                message.from == our_user_id
+            };
+
+            if is_our_message {
                 continue;
             }
 
