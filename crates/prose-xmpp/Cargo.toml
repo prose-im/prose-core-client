@@ -19,7 +19,7 @@ async-trait = { workspace = true }
 base64 = { workspace = true }
 chrono = { workspace = true, features = ["clock"] }
 insta = { workspace = true, features = ["json"], optional = true }
-jid = { workspace = true }
+jid = { workspace = true, features = ["serde"] }
 minidom = { workspace = true }
 parking_lot = { workspace = true }
 prose-proc-macros = { path = "../prose-proc-macros" }
