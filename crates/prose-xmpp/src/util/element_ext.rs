@@ -17,6 +17,8 @@ pub trait ElementExt {
 
     fn attr_bool(&self, name: impl AsRef<str>) -> Result<Option<bool>, ParseError>;
     fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, ParseError>;
+
+    fn non_empty_text(&self) -> Option<String>;
 }
 
 pub trait ElementBuilderExt {
@@ -61,6 +63,11 @@ impl ElementExt for Element {
 
     fn attr_bool_req(&self, name: impl AsRef<str>) -> Result<bool, ParseError> {
         parse_bool(self.attr_req(name)?)
+    }
+
+    fn non_empty_text(&self) -> Option<String> {
+        let text = self.text();
+        (!text.is_empty()).then_some(text)
     }
 }
 

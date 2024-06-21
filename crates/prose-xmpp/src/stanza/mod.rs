@@ -10,7 +10,8 @@ pub use last_activity::LastActivityRequest;
 pub use message::Message;
 pub use pubsub::PubSubMessage;
 pub use user_activity::UserActivity;
-pub use vcard::VCard4;
+pub use vcard::VCard;
+pub use vcard4::VCard4;
 
 pub mod avatar;
 pub mod conference_bookmark;
@@ -25,3 +26,4 @@ pub mod pubsub;
 pub mod references;
 pub mod user_activity;
 pub mod vcard;
+pub mod vcard4;
