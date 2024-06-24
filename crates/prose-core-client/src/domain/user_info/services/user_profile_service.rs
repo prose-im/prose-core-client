@@ -10,8 +10,7 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::shared::models::{UserId, UserResourceId};
-use crate::domain::user_info::models::UserMetadata;
-use crate::domain::user_profiles::models::UserProfile;
+use crate::domain::user_info::models::{UserMetadata, UserProfile};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]

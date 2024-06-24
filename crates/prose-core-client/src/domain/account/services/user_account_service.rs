@@ -10,8 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserStatus};
-use crate::domain::user_profiles::models::UserProfile;
+use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::OccupantId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

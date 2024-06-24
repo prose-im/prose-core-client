@@ -18,8 +18,7 @@ use crate::domain::{
         AnonOccupantId, Availability, CapabilitiesId, OccupantId, RequestId, SenderId,
         UserEndpointId, UserId, UserResourceId,
     },
-    user_info::models::{AvatarMetadata, UserStatus},
-    user_profiles::models::UserProfile,
+    user_info::models::{AvatarMetadata, UserProfile, UserStatus},
 };
 use crate::dtos::RoomId;
 

@@ -11,8 +11,7 @@ use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::*;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarMetadata, UserStatus};
-use crate::domain::user_profiles::models::UserProfile;
+use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::{AccountInfo, DeviceId, DeviceInfo};
 use crate::ClientEvent;
 

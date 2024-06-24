@@ -13,8 +13,7 @@ use prose_xmpp::stanza::VCard4;
 use crate::domain::account::services::UserAccountService;
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserStatus};
-use crate::domain::user_profiles::models::UserProfile;
+use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::OccupantId;
 use crate::infra::xmpp::XMPPClient;
 

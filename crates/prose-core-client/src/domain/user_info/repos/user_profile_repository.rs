@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::shared::models::AccountId;
-use crate::domain::user_profiles::models::UserProfile;
+use crate::domain::user_info::models::UserProfile;
 use crate::dtos::UserId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

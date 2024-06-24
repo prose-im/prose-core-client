@@ -40,10 +40,10 @@ use crate::domain::settings::repos::{AccountSettingsRepository, LocalRoomSetting
 use crate::domain::settings::services::SyncedRoomSettingsService;
 use crate::domain::sidebar::services::{BookmarksService, SidebarDomainService};
 use crate::domain::uploads::services::UploadService;
-use crate::domain::user_info::repos::{AvatarRepository, UserInfoRepository};
-use crate::domain::user_info::services::UserInfoService;
-use crate::domain::user_profiles::repos::UserProfileRepository;
-use crate::domain::user_profiles::services::UserProfileService;
+use crate::domain::user_info::repos::{
+    AvatarRepository, UserInfoRepository, UserProfileRepository,
+};
+use crate::domain::user_info::services::{UserInfoService, UserProfileService};
 use crate::infra::general::RngProvider;
 
 pub type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;

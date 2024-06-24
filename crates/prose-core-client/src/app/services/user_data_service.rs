@@ -12,8 +12,7 @@ use crate::app::deps::{
     DynUserInfoRepository, DynUserProfileRepository, DynUserProfileService,
 };
 use crate::domain::shared::models::UserId;
-use crate::domain::user_info::models::{PlatformImage, UserMetadata};
-use crate::domain::user_profiles::models::UserProfile;
+use crate::domain::user_info::models::{PlatformImage, UserMetadata, UserProfile};
 use crate::dtos::DeviceInfo;
 
 #[derive(InjectDependencies)]

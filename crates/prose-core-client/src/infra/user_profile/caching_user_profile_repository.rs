@@ -14,8 +14,8 @@ use prose_store::prelude::*;
 
 use crate::app::deps::DynUserProfileService;
 use crate::domain::shared::models::{AccountId, UserId};
-use crate::domain::user_profiles::models::UserProfile;
-use crate::domain::user_profiles::repos::UserProfileRepository;
+use crate::domain::user_info::models::UserProfile;
+use crate::domain::user_info::repos::UserProfileRepository;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UserProfileRecord {

@@ -56,10 +56,10 @@ use crate::domain::shared::models::{AccountId, ConnectionState};
 use crate::domain::sidebar::services::impls::SidebarDomainServiceDependencies;
 use crate::domain::sidebar::services::mocks::{MockBookmarksService, MockSidebarDomainService};
 use crate::domain::uploads::services::mocks::MockUploadService;
-use crate::domain::user_info::repos::mocks::{MockAvatarRepository, MockUserInfoRepository};
-use crate::domain::user_info::services::mocks::MockUserInfoService;
-use crate::domain::user_profiles::repos::mocks::MockUserProfileRepository;
-use crate::domain::user_profiles::services::mocks::MockUserProfileService;
+use crate::domain::user_info::repos::mocks::{
+    MockAvatarRepository, MockUserInfoRepository, MockUserProfileRepository,
+};
+use crate::domain::user_info::services::mocks::{MockUserInfoService, MockUserProfileService};
 use crate::dtos::{DecryptionContext, UserResourceId};
 use crate::infra::general::mocks::StepRngProvider;
 use crate::infra::general::OsRngProvider;

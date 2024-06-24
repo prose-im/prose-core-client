@@ -12,8 +12,8 @@ use tracing::warn;
 use prose_xmpp::mods;
 
 use crate::domain::shared::models::{UserId, UserResourceId};
-use crate::domain::user_info::models::{LastActivity, UserMetadata};
-use crate::domain::user_profiles::{models::UserProfile, services::UserProfileService};
+use crate::domain::user_info::models::{LastActivity, UserMetadata, UserProfile};
+use crate::domain::user_info::services::UserProfileService;
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
