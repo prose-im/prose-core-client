@@ -155,18 +155,15 @@ async fn test_joins_room() -> Result<()> {
             })
         });
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .times(3)
-        .with(
-            predicate::always(),
-            predicate::in_iter([
-                user_id!("user1@prose.org"),
-                user_id!("user2@prose.org"),
-                user_id!("user3@prose.org"),
-            ]),
-        )
-        .returning(|_, user_id| {
+        .with(predicate::in_iter([
+            user_id!("user1@prose.org"),
+            user_id!("user2@prose.org"),
+            user_id!("user3@prose.org"),
+        ]))
+        .returning(|user_id| {
             let username = user_id.formatted_username();
             Box::pin(async move { Ok(Some(username)) })
         });
@@ -342,11 +339,11 @@ async fn test_creates_group() -> Result<()> {
 
     {
         let account_node = account_node.clone();
-        deps.user_profile_repo
-            .expect_get()
+        deps.user_info_domain_service
+            .expect_get_user_profile()
             .times(4)
             .in_sequence(&mut seq)
-            .returning(move |_, jid| {
+            .returning(move |jid| {
                 let jid = jid.clone();
                 let account_node = account_node.clone();
 
@@ -433,11 +430,11 @@ async fn test_creates_group() -> Result<()> {
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .times(4)
         .in_sequence(&mut seq)
-        .returning(move |_, jid| {
+        .returning(move |jid| {
             let jid = jid.clone();
             let account_node = account_node.clone();
 
@@ -587,25 +584,19 @@ async fn test_joins_direct_message() -> Result<()> {
         .with(predicate::always(), predicate::eq(bare!("user2@prose.org")))
         .return_once(|_, _| None);
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .once()
         .in_sequence(&mut seq)
-        .with(
-            predicate::always(),
-            predicate::eq(user_id!("user2@prose.org")),
-        )
-        .return_once(|_, _| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
+        .with(predicate::eq(user_id!("user2@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
 
-    deps.user_info_repo
+    deps.user_info_domain_service
         .expect_get_user_info()
         .once()
         .in_sequence(&mut seq)
-        .with(
-            predicate::always(),
-            predicate::eq(user_id!("user2@prose.org")),
-        )
-        .return_once(|_, _| {
+        .with(predicate::eq(user_id!("user2@prose.org")))
+        .return_once(|_| {
             Box::pin(async {
                 Ok(Some(UserInfo {
                     avatar: None,
@@ -1169,25 +1160,19 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             .return_once(|_, _| Some(pending_room));
     }
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .once()
         .in_sequence(&mut seq)
-        .with(
-            predicate::always(),
-            predicate::eq(user_id!("user2@prose.org")),
-        )
-        .return_once(|_, _| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
+        .with(predicate::eq(user_id!("user2@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
 
-    deps.user_info_repo
+    deps.user_info_domain_service
         .expect_get_user_info()
         .once()
         .in_sequence(&mut seq)
-        .with(
-            predicate::always(),
-            predicate::eq(user_id!("user2@prose.org")),
-        )
-        .return_once(|_, _| {
+        .with(predicate::eq(user_id!("user2@prose.org")))
+        .return_once(|_| {
             Box::pin(async {
                 Ok(Some(UserInfo {
                     avatar: None,
@@ -1342,15 +1327,15 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             })
         });
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .times(2)
         .in_sequence(&mut seq)
-        .with(
-            predicate::always(),
-            predicate::in_iter([user_id!("user1@prose.org"), user_id!("user2@prose.org")]),
-        )
-        .returning(|_, user_id| {
+        .with(predicate::in_iter([
+            user_id!("user1@prose.org"),
+            user_id!("user2@prose.org"),
+        ]))
+        .returning(|user_id| {
             let username = user_id.formatted_username();
             Box::pin(async move { Ok(Some(username)) })
         });

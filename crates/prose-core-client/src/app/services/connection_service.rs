@@ -15,7 +15,7 @@ use crate::app::deps::{
     DynClientEventDispatcher, DynConnectionService, DynContactListDomainService,
     DynEncryptionDomainService, DynIDProvider, DynOfflineMessagesRepository,
     DynServerEventHandlerQueue, DynSidebarDomainService, DynTimeProvider, DynUserAccountService,
-    DynUserProfileRepository,
+    DynUserInfoDomainService,
 };
 use crate::app::event_handlers::ServerEvent;
 use crate::client_event::ConnectionEvent;
@@ -45,7 +45,7 @@ pub struct ConnectionService {
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
     #[inject]
-    user_profile_repo: DynUserProfileRepository,
+    user_info_domain_service: DynUserInfoDomainService,
     #[inject]
     sidebar_domain_service: DynSidebarDomainService,
     #[inject]
@@ -155,7 +155,7 @@ impl ConnectionService {
                 msg: err.to_string(),
             })?;
 
-        self.reset_services_before_reconnect(&account).await;
+        self.reset_services_before_reconnect().await;
 
         if let Err(error) = self.block_list_domain_service.load_block_list().await {
             error!("Failed to load block list. {}", error.to_string());
@@ -201,10 +201,10 @@ impl ConnectionService {
 }
 
 impl ConnectionService {
-    async fn reset_services_before_reconnect(&self, account: &AccountId) {
+    async fn reset_services_before_reconnect(&self) {
         _ = self
-            .user_profile_repo
-            .reset_before_reconnect(&account)
+            .user_info_domain_service
+            .reset_before_reconnect()
             .await
             .inspect_err(|err| {
                 warn!(

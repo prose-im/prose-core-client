@@ -18,7 +18,7 @@ use crate::app::deps::{
     DynDraftsRepository, DynEncryptionDomainService, DynIDProvider, DynMessageArchiveService,
     DynMessagesRepository, DynMessagingService, DynRngProvider, DynRoomAttributesService,
     DynRoomParticipationService, DynSidebarDomainService, DynSyncedRoomSettingsService,
-    DynTimeProvider, DynUserProfileRepository,
+    DynTimeProvider, DynUserInfoDomainService,
 };
 use crate::app::event_handlers::{MockClientEventDispatcherTrait, ServerEventHandlerQueue};
 use crate::app::services::RoomInner;
@@ -59,7 +59,10 @@ use crate::domain::uploads::services::mocks::MockUploadService;
 use crate::domain::user_info::repos::mocks::{
     MockAvatarRepository, MockUserInfoRepository, MockUserProfileRepository,
 };
-use crate::domain::user_info::services::mocks::{MockUserInfoService, MockUserProfileService};
+use crate::domain::user_info::services::impls::UserInfoDomainServiceDependencies;
+use crate::domain::user_info::services::mocks::{
+    MockUserInfoDomainService, MockUserProfileService,
+};
 use crate::dtos::{DecryptionContext, UserResourceId};
 use crate::infra::general::mocks::StepRngProvider;
 use crate::infra::general::OsRngProvider;
@@ -142,10 +145,7 @@ pub struct MockAppDependencies {
     pub upload_service: MockUploadService,
     pub user_account_service: MockUserAccountService,
     pub user_device_repo: MockUserDeviceRepository,
-    pub user_info_repo: MockUserInfoRepository,
-    pub user_info_service: MockUserInfoService,
-    pub user_profile_repo: MockUserProfileRepository,
-    pub user_profile_service: MockUserProfileService,
+    pub user_info_domain_service: MockUserInfoDomainService,
 }
 
 impl MockAppDependencies {
@@ -168,7 +168,7 @@ impl From<MockAppDependencies> for AppDependencies {
         let room_participation_service = Arc::new(mock.room_participation_service);
         let room_attributes_service = Arc::new(mock.room_attributes_service);
         let sidebar_domain_service = Arc::new(mock.sidebar_domain_service);
-        let user_profile_repo = Arc::new(mock.user_profile_repo);
+        let user_info_domain_service = Arc::new(mock.user_info_domain_service);
         let synced_room_settings_service = Arc::new(mock.synced_room_settings_service);
 
         let room_factory = {
@@ -184,7 +184,7 @@ impl From<MockAppDependencies> for AppDependencies {
             let sidebar_domain_service = sidebar_domain_service.clone();
             let time_provider = mock.time_provider.clone();
             let topic_service = room_attributes_service.clone();
-            let user_profile_repo = user_profile_repo.clone();
+            let user_info_domain_service = user_info_domain_service.clone();
             let synced_room_settings_service = synced_room_settings_service.clone();
 
             RoomFactory::new(Arc::new(move |data| {
@@ -203,7 +203,7 @@ impl From<MockAppDependencies> for AppDependencies {
                     synced_room_settings_service: synced_room_settings_service.clone(),
                     sidebar_domain_service: sidebar_domain_service.clone(),
                     time_provider: time_provider.clone(),
-                    user_profile_repo: user_profile_repo.clone(),
+                    user_info_domain_service: user_info_domain_service.clone(),
                 }
                 .into()
             }))
@@ -238,10 +238,7 @@ impl From<MockAppDependencies> for AppDependencies {
             upload_service: Arc::new(mock.upload_service),
             user_account_service: Arc::new(mock.user_account_service),
             user_device_repo: Arc::new(mock.user_device_repo),
-            user_info_repo: Arc::new(mock.user_info_repo),
-            user_info_service: Arc::new(mock.user_info_service),
-            user_profile_repo,
-            user_profile_service: Arc::new(mock.user_profile_service),
+            user_info_domain_service,
             contact_list_domain_service: Arc::new(mock.contact_list_domain_service),
             rng_provider: Arc::new(OsRngProvider),
         }
@@ -293,8 +290,7 @@ pub struct MockRoomsDomainServiceDependencies {
     pub room_management_service: MockRoomManagementService,
     pub room_participation_service: MockRoomParticipationService,
     pub synced_room_settings_service: MockSyncedRoomSettingsService,
-    pub user_info_repo: MockUserInfoRepository,
-    pub user_profile_repo: MockUserProfileRepository,
+    pub user_info_domain_service: MockUserInfoDomainService,
 }
 
 impl MockRoomsDomainServiceDependencies {
@@ -317,9 +313,41 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
             room_management_service: Arc::new(value.room_management_service),
             room_participation_service: Arc::new(value.room_participation_service),
             synced_room_settings_service: Arc::new(value.synced_room_settings_service),
+            user_info_domain_service: Arc::new(value.user_info_domain_service),
+            message_archive_domain_service: Arc::new(value.message_archive_domain_service),
+        }
+    }
+}
+
+#[derive(Derivative)]
+#[derivative(Default)]
+pub struct MockUserInfoDomainServiceDependencies {
+    pub avatar_repo: MockAvatarRepository,
+    pub client_event_dispatcher: MockClientEventDispatcherTrait,
+    pub ctx: AppContext,
+    #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
+    pub time_provider: DynTimeProvider,
+    pub user_info_repo: MockUserInfoRepository,
+    pub user_profile_repo: MockUserProfileRepository,
+    pub user_profile_service: MockUserProfileService,
+}
+
+impl MockUserInfoDomainServiceDependencies {
+    pub fn into_deps(self) -> UserInfoDomainServiceDependencies {
+        UserInfoDomainServiceDependencies::from(self)
+    }
+}
+
+impl From<MockUserInfoDomainServiceDependencies> for UserInfoDomainServiceDependencies {
+    fn from(value: MockUserInfoDomainServiceDependencies) -> Self {
+        Self {
+            avatar_repo: Arc::new(value.avatar_repo),
+            client_event_dispatcher: Arc::new(value.client_event_dispatcher),
+            ctx: Arc::new(value.ctx),
+            time_provider: Arc::new(value.time_provider),
             user_info_repo: Arc::new(value.user_info_repo),
             user_profile_repo: Arc::new(value.user_profile_repo),
-            message_archive_domain_service: Arc::new(value.message_archive_domain_service),
+            user_profile_service: Arc::new(value.user_profile_service),
         }
     }
 }
@@ -343,7 +371,7 @@ pub struct MockRoomFactoryDependencies {
     pub sidebar_domain_service: MockSidebarDomainService,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
-    pub user_profile_repo: MockUserProfileRepository,
+    pub user_info_domain_service: MockUserInfoDomainService,
 }
 
 pub struct MockSealedRoomFactoryDependencies {
@@ -361,7 +389,7 @@ pub struct MockSealedRoomFactoryDependencies {
     pub sidebar_domain_service: DynSidebarDomainService,
     pub time_provider: DynTimeProvider,
     pub topic_service: DynRoomAttributesService,
-    pub user_profile_repo: DynUserProfileRepository,
+    pub user_info_domain_service: DynUserInfoDomainService,
 }
 
 impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
@@ -381,7 +409,7 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
             sidebar_domain_service: Arc::new(value.sidebar_domain_service),
             time_provider: Arc::new(value.time_provider),
             topic_service: Arc::new(value.attributes_service),
-            user_profile_repo: Arc::new(value.user_profile_repo),
+            user_info_domain_service: Arc::new(value.user_info_domain_service),
         }
     }
 }
@@ -404,7 +432,7 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
                 synced_room_settings_service: value.synced_room_settings_service.clone(),
                 sidebar_domain_service: value.sidebar_domain_service.clone(),
                 time_provider: value.time_provider.clone(),
-                user_profile_repo: value.user_profile_repo.clone(),
+                user_info_domain_service: value.user_info_domain_service.clone(),
             }
             .into()
         }))

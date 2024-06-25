@@ -21,7 +21,7 @@ use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynDraftsRepository, DynEncryptionDomainService,
     DynIDProvider, DynMessageArchiveService, DynMessagesRepository, DynMessagingService,
     DynRoomAttributesService, DynRoomParticipationService, DynSidebarDomainService,
-    DynSyncedRoomSettingsService, DynTimeProvider, DynUserProfileRepository,
+    DynSyncedRoomSettingsService, DynTimeProvider, DynUserInfoDomainService,
 };
 use crate::domain::messaging::models::{
     send_message_request, ArchivedMessageRef, Emoji, Message, MessageId, MessageLike,
@@ -92,7 +92,7 @@ pub struct RoomInner {
     pub(crate) synced_room_settings_service: DynSyncedRoomSettingsService,
     pub(crate) sidebar_domain_service: DynSidebarDomainService,
     pub(crate) time_provider: DynTimeProvider,
-    pub(crate) user_profile_repo: DynUserProfileRepository,
+    pub(crate) user_info_domain_service: DynUserInfoDomainService,
 }
 
 impl<Kind> From<Arc<RoomInner>> for Room<Kind> {
@@ -354,9 +354,7 @@ impl<Kind> Room<Kind> {
             .message_repo
             .get_all(&account, &self.data.room_id, ids)
             .await?;
-        Ok(self
-            .reduce_messages_and_add_sender(&account, messages)
-            .await)
+        Ok(self.reduce_messages_and_add_sender(messages).await)
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
@@ -411,9 +409,7 @@ impl<Kind> Room<Kind> {
             .await?;
 
         Ok(MessageResultSet {
-            messages: self
-                .reduce_messages_and_add_sender(&account, messages)
-                .await,
+            messages: self.reduce_messages_and_add_sender(messages).await,
             last_message_id: None,
         })
     }
@@ -597,7 +593,6 @@ impl<Kind> Room<Kind> {
         let result_set = MessageResultSet {
             messages: self
                 .reduce_messages_and_add_sender(
-                    &account,
                     messages
                         .into_iter()
                         .rev()
@@ -612,7 +607,6 @@ impl<Kind> Room<Kind> {
 
     async fn reduce_messages_and_add_sender(
         &self,
-        account: &AccountId,
         messages: impl IntoIterator<Item = MessageLike>,
     ) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
@@ -626,7 +620,6 @@ impl<Kind> Room<Kind> {
             .map(|msg| msg.stanza_id.clone());
 
         async fn resolve_message_sender<'a, Kind>(
-            account: &AccountId,
             room: &Room<Kind>,
             id: Cow<'a, ParticipantId>,
             map: &mut HashMap<ParticipantId, MessageSender>,
@@ -634,19 +627,15 @@ impl<Kind> Room<Kind> {
             if let Some(sender) = map.get(id.as_ref()) {
                 return sender.clone();
             };
-            let sender = room.resolve_message_sender(account, id.as_ref()).await;
+            let sender = room.resolve_message_sender(id.as_ref()).await;
             map.insert(id.into_owned(), sender.clone());
             sender
         }
 
         for message in messages {
-            let from = resolve_message_sender(
-                account,
-                self,
-                Cow::Borrowed(&message.from),
-                &mut message_senders,
-            )
-            .await;
+            let from =
+                resolve_message_sender(self, Cow::Borrowed(&message.from), &mut message_senders)
+                    .await;
 
             let mut reactions = vec![];
             for reaction in message.reactions {
@@ -654,13 +643,8 @@ impl<Kind> Room<Kind> {
 
                 for sender in reaction.from {
                     from.push(
-                        resolve_message_sender(
-                            account,
-                            self,
-                            Cow::Owned(sender),
-                            &mut message_senders,
-                        )
-                        .await,
+                        resolve_message_sender(self, Cow::Owned(sender), &mut message_senders)
+                            .await,
                     );
                 }
 
@@ -694,11 +678,7 @@ impl<Kind> Room<Kind> {
         message_dtos
     }
 
-    async fn resolve_message_sender(
-        &self,
-        account: &AccountId,
-        id: &ParticipantId,
-    ) -> MessageSender {
+    async fn resolve_message_sender(&self, id: &ParticipantId) -> MessageSender {
         let (name, mut real_id) = self
             .data
             .participants()
@@ -722,8 +702,8 @@ impl<Kind> Room<Kind> {
 
         if let Some(real_id) = real_id {
             if let Some(name) = self
-                .user_profile_repo
-                .get_display_name(account, &real_id)
+                .user_info_domain_service
+                .get_display_name(&real_id)
                 .await
                 .unwrap_or_default()
             {

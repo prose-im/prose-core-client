@@ -65,11 +65,7 @@ impl CachingUserInfoRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserInfoRepository for CachingUserInfoRepository {
-    fn resolve_user_id_to_user_resource_id(
-        &self,
-        _account: &AccountId,
-        user_id: &UserId,
-    ) -> Option<UserResourceId> {
+    fn resolve_user_id(&self, _account: &AccountId, user_id: &UserId) -> Option<UserResourceId> {
         let presences = self.presences.read();
         let Some(resource) = presences
             .get_highest_presence(user_id)
@@ -131,10 +127,10 @@ impl UserInfoRepository for CachingUserInfoRepository {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        metadata: &AvatarMetadata,
+        metadata: Option<&AvatarMetadata>,
     ) -> Result<()> {
         self.upsert_user_info(account, user_id, |record| {
-            record.payload.avatar = Some(metadata.to_info())
+            record.payload.avatar = metadata.map(|md| md.to_info())
         })
         .await
     }

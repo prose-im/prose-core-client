@@ -13,7 +13,7 @@ pub use constant_time_provider::ConstantTimeProvider;
 pub use message_builder::MessageBuilder;
 pub use mock_app_dependencies::{
     MockAppDependencies, MockRoomFactoryDependencies, MockRoomsDomainServiceDependencies,
-    MockSidebarDomainServiceDependencies,
+    MockSidebarDomainServiceDependencies, MockUserInfoDomainServiceDependencies,
 };
 use prose_xmpp::test::BareJidTestAdditions;
 use prose_xmpp::Client;

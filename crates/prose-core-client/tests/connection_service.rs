@@ -33,10 +33,10 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .once()
         .return_once(|| Box::pin(async { Ok(()) }));
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_reset_before_reconnect()
         .once()
-        .return_once(|_| Box::pin(async { Ok(()) }));
+        .return_once(|| Box::pin(async { Ok(()) }));
     deps.contact_list_domain_service
         .expect_reset_before_reconnect()
         .once()
@@ -163,10 +163,10 @@ async fn test_restores_availability_and_resource() -> Result<()> {
         .once()
         .return_once(|| Box::pin(async { Ok(()) }));
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_reset_before_reconnect()
         .once()
-        .return_once(|_| Box::pin(async { Ok(()) }));
+        .return_once(|| Box::pin(async { Ok(()) }));
     deps.contact_list_domain_service
         .expect_reset_before_reconnect()
         .once()

@@ -12,7 +12,7 @@ use prose_xmpp::TimeProvider;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynSidebarDomainService, DynTimeProvider, DynUserInfoRepository, DynUserProfileRepository,
+    DynSidebarDomainService, DynTimeProvider, DynUserInfoDomainService,
 };
 use crate::app::event_handlers::ServerEventHandler;
 use crate::app::event_handlers::{
@@ -42,9 +42,7 @@ pub struct RoomsEventHandler {
     #[inject]
     time_provider: DynTimeProvider,
     #[inject]
-    user_profile_repo: DynUserProfileRepository,
-    #[inject]
-    user_info_repo: DynUserInfoRepository,
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -118,8 +116,8 @@ impl RoomsEventHandler {
                 }
 
                 let name = self
-                    .user_profile_repo
-                    .get_display_name(&self.ctx.connected_account()?, &real_id)
+                    .user_info_domain_service
+                    .get_display_name(&real_id)
                     .await?;
                 room.participants_mut().set_ids_and_name(
                     &participant_id,
@@ -229,8 +227,8 @@ impl RoomsEventHandler {
                 let room = self.get_room(&RoomId::Muc(event.room_id))?;
 
                 let name = self
-                    .user_profile_repo
-                    .get_display_name(&self.ctx.connected_account()?, &user_id)
+                    .user_info_domain_service
+                    .get_display_name(&user_id)
                     .await?;
                 room.participants_mut()
                     .add_user(&user_id, false, &affiliation, name.as_deref());
@@ -295,9 +293,8 @@ impl RoomsEventHandler {
                     return Ok(());
                 };
 
-                self.user_info_repo
-                    .set_user_presence(
-                        &account,
+                self.user_info_domain_service
+                    .handle_user_presence_changed(
                         &id,
                         &Presence {
                             priority,

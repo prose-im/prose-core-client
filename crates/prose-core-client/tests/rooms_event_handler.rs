@@ -52,14 +52,11 @@ async fn test_adds_participant() -> Result<()> {
             .returning(move |_, _| Some(room.clone()));
     }
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .once()
-        .with(
-            predicate::always(),
-            predicate::eq(user_id!("real-jid@prose.org")),
-        )
-        .return_once(|_, _| Box::pin(async { Ok(Some("George Washington".to_string())) }));
+        .with(predicate::eq(user_id!("real-jid@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("George Washington".to_string())) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -136,14 +133,11 @@ async fn test_adds_invited_participant() -> Result<()> {
             .return_once(move |_, _| Some(room.clone()));
     }
 
-    deps.user_profile_repo
+    deps.user_info_domain_service
         .expect_get_display_name()
         .once()
-        .with(
-            predicate::always(),
-            predicate::eq(user_id!("user@prose.org")),
-        )
-        .return_once(|_, _| Box::pin(async { Ok(Some("John Doe".to_string())) }));
+        .with(predicate::eq(user_id!("user@prose.org")))
+        .return_once(|_| Box::pin(async { Ok(Some("John Doe".to_string())) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -589,11 +583,10 @@ async fn test_handles_user_presence() -> Result<()> {
         )
         .returning(move |_, _| Some(room.clone()));
 
-    deps.user_info_repo
-        .expect_set_user_presence()
+    deps.user_info_domain_service
+        .expect_handle_user_presence_changed()
         .once()
         .with(
-            predicate::always(),
             predicate::eq(UserOrResourceId::from(user_resource_id!(
                 "sender@prose.org/resource"
             ))),
@@ -603,7 +596,7 @@ async fn test_handles_user_presence() -> Result<()> {
                 status: None,
             }),
         )
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -713,11 +706,10 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
         )
         .returning(move |_, _| None);
 
-    deps.user_info_repo
-        .expect_set_user_presence()
+    deps.user_info_domain_service
+        .expect_handle_user_presence_changed()
         .once()
         .with(
-            predicate::always(),
             predicate::eq(UserOrResourceId::from(user_resource_id!(
                 "sender@prose.org/resource"
             ))),
@@ -727,7 +719,7 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
                 status: None,
             }),
         )
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -782,18 +774,17 @@ async fn test_swallows_self_presence() -> Result<()> {
         .with(predicate::always(), predicate::eq(bare!("us@prose.org")))
         .returning(move |_, _| Some(room.clone()));
 
-    deps.user_info_repo
-        .expect_set_user_presence()
+    deps.user_info_domain_service
+        .expect_handle_user_presence_changed()
         .once()
         .with(
-            predicate::always(),
             predicate::eq(UserOrResourceId::from(user_id!("us@prose.org"))),
             predicate::eq(Presence {
                 availability: Availability::Available,
                 ..Default::default()
             }),
         )
-        .return_once(|_, _, _| Box::pin(async { Ok(()) }));
+        .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
     assert!(event_handler

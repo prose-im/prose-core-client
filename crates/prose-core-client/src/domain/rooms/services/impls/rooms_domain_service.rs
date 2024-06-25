@@ -21,7 +21,7 @@ use crate::app::deps::{
     DynConnectedRoomsRepository, DynEncryptionDomainService, DynIDProvider,
     DynMessageArchiveDomainService, DynMessageMigrationDomainService, DynRoomAttributesService,
     DynRoomManagementService, DynRoomParticipationService, DynSyncedRoomSettingsService,
-    DynUserInfoRepository, DynUserProfileRepository,
+    DynUserInfoDomainService,
 };
 use crate::domain::general::models::Capabilities;
 use crate::domain::rooms::models::{
@@ -57,8 +57,7 @@ pub struct RoomsDomainService {
     room_management_service: DynRoomManagementService,
     room_participation_service: DynRoomParticipationService,
     synced_room_settings_service: DynSyncedRoomSettingsService,
-    user_info_repo: DynUserInfoRepository,
-    user_profile_repo: DynUserProfileRepository,
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 /// Represents the outcome of attempting to fetch or create a Room in the `ConnectedRoomsRepository`.
@@ -655,12 +654,12 @@ impl RoomsDomainService {
         };
 
         let contact_name = self
-            .user_profile_repo
-            .get_display_name(&account, participant)
+            .user_info_domain_service
+            .get_display_name(participant)
             .await;
         let user_info = self
-            .user_info_repo
-            .get_user_info(&account, participant)
+            .user_info_domain_service
+            .get_user_info(participant)
             .await;
 
         // Let's ignore potential errors here since the information we're gathering is optional…
@@ -816,8 +815,8 @@ impl RoomsDomainService {
 
         for jid in participants_including_self.iter() {
             let participant_name = self
-                .user_profile_repo
-                .get(account, jid)
+                .user_info_domain_service
+                .get_user_profile(jid)
                 .await?
                 .and_then(|profile| profile.first_name.or(profile.nickname))
                 .unwrap_or_else(|| jid.username().to_uppercase_first_letter());
@@ -1040,8 +1039,8 @@ impl RoomsDomainService {
         let mut members = Vec::with_capacity(info.members.len());
         for member in info.members {
             let name = self
-                .user_profile_repo
-                .get_display_name(account, &member.id)
+                .user_info_domain_service
+                .get_display_name(&member.id)
                 .await
                 .unwrap_or_default();
             let is_self = member.id == current_user_id;

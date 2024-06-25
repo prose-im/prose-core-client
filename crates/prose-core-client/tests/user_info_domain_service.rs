@@ -10,18 +10,19 @@ use chrono::{TimeZone, Utc};
 use mockall::predicate;
 
 use prose_core_client::domain::shared::models::{UserId, UserResourceId};
-use prose_core_client::services::UserDataService;
-use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
+use prose_core_client::domain::user_info::services::impls::UserInfoDomainService;
+use prose_core_client::domain::user_info::services::UserInfoDomainService as UserInfoDomainServiceTrait;
+use prose_core_client::test::{ConstantTimeProvider, MockUserInfoDomainServiceDependencies};
 use prose_core_client::{user_id, user_resource_id};
 
 #[tokio::test]
 async fn test_load_user_metadata_resolves_full_jid() -> Result<()> {
-    let mut deps = MockAppDependencies::default();
+    let mut deps = MockUserInfoDomainServiceDependencies::default();
 
     deps.time_provider = Arc::new(ConstantTimeProvider::ymd(2023, 09, 11));
 
     deps.user_info_repo
-        .expect_resolve_user_id_to_user_resource_id()
+        .expect_resolve_user_id()
         .once()
         .with(
             predicate::always(),
@@ -38,9 +39,9 @@ async fn test_load_user_metadata_resolves_full_jid() -> Result<()> {
         )
         .return_once(|_, _| Box::pin(async { Ok(None) }));
 
-    let service = UserDataService::from(&deps.into_deps());
+    let service = UserInfoDomainService::from(deps.into_deps());
     service
-        .load_user_metadata(&user_id!("request@prose.org"))
+        .get_user_metadata(&user_id!("request@prose.org"))
         .await?;
 
     Ok(())

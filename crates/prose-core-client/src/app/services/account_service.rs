@@ -32,9 +32,7 @@ pub struct AccountService {
     #[inject]
     user_account_service: DynUserAccountService,
     #[inject]
-    user_info_repo: DynUserInfoRepository,
-    #[inject]
-    user_profile_repo: DynUserProfileRepository,
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 impl AccountService {
@@ -43,13 +41,13 @@ impl AccountService {
         let user_id = account.to_user_id();
 
         let user_info = self
-            .user_info_repo
-            .get_user_info(&account, &user_id)
+            .user_info_domain_service
+            .get_user_info(&user_id)
             .await?;
         let account_settings = self.account_settings_repo.get(&account).await?;
         let name = self
-            .user_profile_repo
-            .get_display_name(&account, &user_id)
+            .user_info_domain_service
+            .get_display_name(&user_id)
             .await?
             .unwrap_or_else(|| user_id.formatted_username());
 
@@ -66,8 +64,8 @@ impl AccountService {
         let user_id = account.to_user_id();
 
         self.user_account_service.set_profile(&user_profile).await?;
-        self.user_profile_repo
-            .set(&account, &user_id, user_profile)
+        self.user_info_domain_service
+            .handle_user_profile_changed(&user_id, Some(user_profile))
             .await?;
 
         Ok(())
@@ -78,7 +76,9 @@ impl AccountService {
         let user_id = account.to_user_id();
 
         self.user_account_service.delete_profile().await?;
-        self.user_profile_repo.delete(&account, &user_id).await?;
+        self.user_info_domain_service
+            .handle_user_profile_changed(&user_id, None)
+            .await?;
 
         Ok(())
     }
@@ -119,8 +119,8 @@ impl AccountService {
         self.user_account_service
             .set_user_activity(user_activity.as_ref())
             .await?;
-        self.user_info_repo
-            .set_user_activity(&account, &user_id, user_activity.as_ref())
+        self.user_info_domain_service
+            .handle_user_status_changed(&user_id, user_activity.as_ref())
             .await?;
         Ok(())
     }
@@ -156,14 +156,19 @@ impl AccountService {
             .set_avatar_metadata(&metadata)
             .await?;
 
-        debug!("Caching avatar metadata");
-        self.user_info_repo
-            .set_avatar_metadata(&account, &user_id, &metadata)
-            .await?;
-
         debug!("Caching image locally…");
         self.avatar_repo
-            .set(&account, &user_id, &metadata.into_info(), &image_data)
+            .set(
+                &account,
+                &user_id,
+                &metadata.clone().into_info(),
+                &image_data,
+            )
+            .await?;
+
+        debug!("Caching avatar metadata");
+        self.user_info_domain_service
+            .handle_avatar_changed(&user_id, Some(&metadata))
             .await?;
 
         Ok(())

@@ -39,10 +39,10 @@ async fn test_assembles_contact_dto() -> Result<()> {
             })
         });
 
-    deps.user_info_repo
+    deps.user_info_domain_service
         .expect_get_user_info()
         .times(3)
-        .returning(|_, jid| {
+        .returning(|jid| {
             let info = match &jid {
                 _ if jid == &user_id!("a@prose.org") => Some(UserInfo {
                     avatar: None,
@@ -61,10 +61,10 @@ async fn test_assembles_contact_dto() -> Result<()> {
             Box::pin(async move { Ok(info) })
         });
 
-    deps.user_profile_repo
-        .expect_get()
+    deps.user_info_domain_service
+        .expect_get_user_profile()
         .times(3)
-        .returning(|_, jid| {
+        .returning(|jid| {
             let mut profile = UserProfile::default();
 
             match &jid {

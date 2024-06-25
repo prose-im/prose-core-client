@@ -8,27 +8,15 @@ use async_trait::async_trait;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::{
-    DynAppContext, DynAvatarRepository, DynClientEventDispatcher, DynUserInfoRepository,
-    DynUserProfileRepository,
-};
+use crate::app::deps::DynUserInfoDomainService;
 use crate::app::event_handlers::{
     ServerEvent, ServerEventHandler, UserInfoEvent, UserInfoEventType,
 };
-use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
 pub struct UserStateEventHandler {
     #[inject]
-    ctx: DynAppContext,
-    #[inject]
-    client_event_dispatcher: DynClientEventDispatcher,
-    #[inject]
-    avatar_repo: DynAvatarRepository,
-    #[inject]
-    user_info_repo: DynUserInfoRepository,
-    #[inject]
-    user_profile_repo: DynUserProfileRepository,
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -51,45 +39,22 @@ impl ServerEventHandler for UserStateEventHandler {
 
 impl UserStateEventHandler {
     async fn handle_user_info_event(&self, event: UserInfoEvent) -> Result<()> {
-        let account = self.ctx.connected_account()?;
-        let is_self_event = account == event.user_id;
-
         match event.r#type {
             UserInfoEventType::AvatarChanged { metadata } => {
-                self.user_info_repo
-                    .set_avatar_metadata(&account, &event.user_id, &metadata)
+                self.user_info_domain_service
+                    .handle_avatar_changed(&event.user_id, Some(&metadata))
                     .await?;
-                self.avatar_repo
-                    .precache_avatar_image(&account, &event.user_id, &metadata.to_info())
-                    .await?;
-                self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::AvatarChanged {
-                        ids: vec![event.user_id],
-                    });
             }
             UserInfoEventType::ProfileChanged { profile } => {
-                self.user_profile_repo
-                    .set(&account, &event.user_id, &profile)
+                self.user_info_domain_service
+                    .handle_user_profile_changed(&event.user_id, Some(&profile))
                     .await?;
-                self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::ContactChanged {
-                        ids: vec![event.user_id],
-                    });
             }
             UserInfoEventType::StatusChanged { status } => {
-                self.user_info_repo
-                    .set_user_activity(&account, &event.user_id, status.as_ref())
+                self.user_info_domain_service
+                    .handle_user_status_changed(&event.user_id, status.as_ref())
                     .await?;
-                self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::ContactChanged {
-                        ids: vec![event.user_id],
-                    });
             }
-        }
-
-        if is_self_event {
-            self.client_event_dispatcher
-                .dispatch_event(ClientEvent::AccountInfoChanged)
         }
 
         Ok(())

@@ -43,7 +43,9 @@ use crate::domain::uploads::services::UploadService;
 use crate::domain::user_info::repos::{
     AvatarRepository, UserInfoRepository, UserProfileRepository,
 };
-use crate::domain::user_info::services::{UserInfoService, UserProfileService};
+use crate::domain::user_info::services::{
+    UserInfoDomainService, UserInfoService, UserProfileService,
+};
 use crate::infra::general::RngProvider;
 
 pub type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
@@ -90,6 +92,7 @@ pub type DynUserAccountService = Arc<dyn UserAccountService>;
 pub type DynUserDeviceIdProvider = Arc<dyn UserDeviceIdProvider>;
 pub type DynUserDeviceRepository = Arc<dyn UserDeviceRepository>;
 pub type DynUserDeviceService = Arc<dyn UserDeviceService>;
+pub type DynUserInfoDomainService = Arc<dyn UserInfoDomainService>;
 pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
@@ -126,8 +129,5 @@ pub struct AppDependencies {
     pub upload_service: DynUploadService,
     pub user_account_service: DynUserAccountService,
     pub user_device_repo: DynUserDeviceRepository,
-    pub user_info_repo: DynUserInfoRepository,
-    pub user_info_service: DynUserInfoService,
-    pub user_profile_repo: DynUserProfileRepository,
-    pub user_profile_service: DynUserProfileService,
+    pub user_info_domain_service: DynUserInfoDomainService,
 }

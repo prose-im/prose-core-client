@@ -23,9 +23,7 @@ pub struct ContactListService {
     #[inject]
     ctx: DynAppContext,
     #[inject]
-    user_info_repo: DynUserInfoRepository,
-    #[inject]
-    user_profile_repo: DynUserProfileRepository,
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 impl ContactListService {
@@ -60,7 +58,6 @@ impl ContactListService {
     }
 
     pub async fn load_presence_sub_requests(&self) -> Result<Vec<PresenceSubRequest>> {
-        let account = self.ctx.connected_account()?;
         let requesting_user_ids = self
             .contact_list_domain_service
             .load_presence_sub_requests()
@@ -69,7 +66,7 @@ impl ContactListService {
         let requests = join_all(
             requesting_user_ids
                 .into_iter()
-                .map(|id| self.enrich_presence_sub_request(&account, id)),
+                .map(|id| self.enrich_presence_sub_request(id)),
         )
         .await;
 
@@ -97,8 +94,8 @@ impl ContactListService {
     /// return something than nothing.
     async fn enrich_domain_contact(&self, account: &AccountId, contact: Contact) -> ContactDTO {
         let (profile, user_info) = join!(
-            self.user_profile_repo.get(account, &contact.id),
-            self.user_info_repo.get_user_info(account, &contact.id)
+            self.user_info_domain_service.get_user_profile(&contact.id),
+            self.user_info_domain_service.get_user_info(&contact.id)
         );
 
         // We'll march on even in the event of a failure…
@@ -121,14 +118,10 @@ impl ContactListService {
         }
     }
 
-    async fn enrich_presence_sub_request(
-        &self,
-        account: &AccountId,
-        user_id: UserId,
-    ) -> PresenceSubRequest {
+    async fn enrich_presence_sub_request(&self, user_id: UserId) -> PresenceSubRequest {
         let profile = self
-            .user_profile_repo
-            .get(account, &user_id)
+            .user_info_domain_service
+            .get_user_profile(&user_id)
             .await
             .unwrap_or_default()
             .unwrap_or_default();

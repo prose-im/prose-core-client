@@ -17,11 +17,7 @@ use crate::domain::user_info::models::{AvatarMetadata, Presence, UserInfo, UserS
 pub trait UserInfoRepository: SendUnlessWasm + SyncUnlessWasm {
     /// Tries to resolve `jid` to a FullJid by appending the available resource with the highest
     /// priority. If no available resource is found, returns `jid` as a `Jid`.
-    fn resolve_user_id_to_user_resource_id(
-        &self,
-        account: &AccountId,
-        user_id: &UserId,
-    ) -> Option<UserResourceId>;
+    fn resolve_user_id(&self, account: &AccountId, user_id: &UserId) -> Option<UserResourceId>;
 
     async fn get_user_info(
         &self,
@@ -33,7 +29,7 @@ pub trait UserInfoRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        metadata: &AvatarMetadata,
+        metadata: Option<&AvatarMetadata>,
     ) -> Result<()>;
     async fn set_user_activity(
         &self,

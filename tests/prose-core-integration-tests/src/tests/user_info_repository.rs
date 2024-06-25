@@ -82,7 +82,7 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
     repo.set_avatar_metadata(
         &account_id!("user@prose.org"),
         &user_id!("a@prose.org"),
-        &metadata,
+        Some(&metadata),
     )
     .await?;
 
@@ -127,7 +127,7 @@ async fn test_persists_metadata_and_user_activity() -> Result<()> {
     repo.set_avatar_metadata(
         &account_id!("user@prose.org"),
         &user_id!("a@prose.org"),
-        &metadata,
+        Some(&metadata),
     )
     .await?;
     repo.set_user_activity(
@@ -245,10 +245,7 @@ async fn test_uses_highest_presence() -> Result<()> {
     .await?;
 
     assert_eq!(
-        repo.resolve_user_id_to_user_resource_id(
-            &account_id!("user@prose.org"),
-            &user_id!("a@prose.org")
-        ),
+        repo.resolve_user_id(&account_id!("user@prose.org"), &user_id!("a@prose.org")),
         user_resource_id!("a@prose.org/b").into()
     );
     assert_eq!(

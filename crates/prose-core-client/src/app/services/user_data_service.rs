@@ -8,8 +8,7 @@ use anyhow::Result;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAppContext, DynAvatarRepository, DynEncryptionDomainService, DynTimeProvider,
-    DynUserInfoRepository, DynUserProfileRepository, DynUserProfileService,
+    DynAppContext, DynAvatarRepository, DynEncryptionDomainService, DynUserInfoDomainService,
 };
 use crate::domain::shared::models::UserId;
 use crate::domain::user_info::models::{PlatformImage, UserMetadata, UserProfile};
@@ -20,25 +19,19 @@ pub struct UserDataService {
     #[inject]
     ctx: DynAppContext,
     #[inject]
-    time_provider: DynTimeProvider,
-    #[inject]
-    user_profile_service: DynUserProfileService,
+    user_info_domain_service: DynUserInfoDomainService,
     #[inject]
     avatar_repo: DynAvatarRepository,
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
-    #[inject]
-    user_info_repo: DynUserInfoRepository,
-    #[inject]
-    user_profile_repo: DynUserProfileRepository,
 }
 
 impl UserDataService {
     pub async fn load_avatar(&self, user_id: &UserId) -> Result<Option<PlatformImage>> {
         let account = self.ctx.connected_account()?;
         let Some(avatar_metadata) = self
-            .user_info_repo
-            .get_user_info(&account, user_id)
+            .user_info_domain_service
+            .get_user_info(user_id)
             .await?
             .and_then(|info| info.avatar)
         else {
@@ -52,23 +45,15 @@ impl UserDataService {
     }
 
     pub async fn load_user_profile(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
-        self.user_profile_repo
-            .get(&self.ctx.connected_account()?, user_id)
+        self.user_info_domain_service
+            .get_user_profile(user_id)
             .await
     }
 
     pub async fn load_user_metadata(&self, user_id: &UserId) -> Result<Option<UserMetadata>> {
-        let Some(resource_id) = self
-            .user_info_repo
-            .resolve_user_id_to_user_resource_id(&self.ctx.connected_account()?, user_id)
-        else {
-            return Ok(None);
-        };
-        let metadata = self
-            .user_profile_service
-            .load_user_metadata(&resource_id, self.time_provider.now())
-            .await?;
-        Ok(metadata)
+        self.user_info_domain_service
+            .get_user_metadata(&user_id)
+            .await
     }
 
     pub async fn load_user_device_infos(&self, user_id: &UserId) -> Result<Vec<DeviceInfo>> {
