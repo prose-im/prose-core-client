@@ -129,6 +129,12 @@ impl ConnectionService for XMPPClient {
                             }),
                     )
                 }
+                ns::VCARD4 => {
+                    server_features.vcard4 = true;
+                }
+                ns::AVATAR_PEP_VCARD_CONVERSION => {
+                    server_features.avatar_pep_vcard_conversion = true;
+                }
                 _ => (),
             }
         }
