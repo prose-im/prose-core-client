@@ -678,6 +678,8 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
             muc_service: Some(bare!("conference.prose.org")),
             http_upload_service: None,
             mam_version: None,
+            vcard4: false,
+            avatar_pep_vcard_conversion: false,
             server_time_offset: Default::default(),
         },
         rooms_caught_up: false,
