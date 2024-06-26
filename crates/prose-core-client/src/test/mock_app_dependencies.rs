@@ -95,6 +95,8 @@ impl Default for AppContext {
                     muc_service: Some(mock_muc_service()),
                     http_upload_service: None,
                     mam_version: None,
+                    vcard4: false,
+                    avatar_pep_vcard_conversion: false,
                     server_time_offset: Default::default(),
                 },
                 rooms_caught_up: false,
