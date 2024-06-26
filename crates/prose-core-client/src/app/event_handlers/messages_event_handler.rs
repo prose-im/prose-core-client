@@ -218,7 +218,12 @@ impl MessagesEventHandler {
             + room
                 .as_ref()
                 .map(|room| room.features.server_time_offset)
-                .or_else(|| self.ctx.server_time_offset())
+                .or_else(|| {
+                    self.ctx
+                        .server_features()
+                        .map(|f| f.server_time_offset)
+                        .ok()
+                })
                 .unwrap_or_else(|| TimeDelta::zero());
 
         let parser = MessageParser::new(

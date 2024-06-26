@@ -676,15 +676,17 @@ impl RoomsDomainService {
             .unwrap_or_default()
             .unwrap_or_else(|| SyncedRoomSettings::new(room_id));
 
+        let features = self.ctx.server_features()?;
+
         let room = Room::for_direct_message(
             &participant,
             &contact_name,
             user_info.availability,
             sidebar_state,
             RoomFeatures {
-                mam_version: self.ctx.mam_version(),
-                server_time_offset: self.ctx.server_time_offset().unwrap_or_default(),
-                supports_self_ping_optimization: false,
+                mam_version: features.mam_version,
+                server_time_offset: features.server_time_offset,
+                self_ping_optimization: false,
             },
             settings,
         );
@@ -1059,7 +1061,12 @@ impl RoomsDomainService {
         let server_time_offset = self
             .ctx
             .is_muc_room_on_connected_server(&info.room_id)
-            .then(|| self.ctx.server_time_offset().unwrap_or_default())
+            .then(|| {
+                self.ctx
+                    .server_features()
+                    .map(|f| f.server_time_offset)
+                    .unwrap_or_default()
+            })
             .unwrap_or_default();
 
         let room_info = RoomInfo {
@@ -1069,7 +1076,7 @@ impl RoomsDomainService {
             features: RoomFeatures {
                 mam_version: info.config.mam_version,
                 server_time_offset,
-                supports_self_ping_optimization: info.config.supports_self_ping_optimization,
+                self_ping_optimization: info.config.supports_self_ping_optimization,
             },
         };
 

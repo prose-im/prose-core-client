@@ -4,13 +4,13 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use jid::BareJid;
-use parking_lot::RwLock;
+use parking_lot::{MappedRwLockReadGuard, RwLock, RwLockReadGuard};
 
-use crate::domain::connection::models::{ConnectionProperties, HttpUploadService};
+use crate::domain::connection::models::{ConnectionProperties, HttpUploadService, ServerFeatures};
 use crate::domain::general::models::{Capabilities, SoftwareVersion};
-use crate::domain::shared::models::{AccountId, ConnectionState, MamVersion};
+use crate::domain::shared::models::{AccountId, ConnectionState};
 use crate::dtos::{DecryptionContext, MucId, UserResourceId};
 
 #[derive(Debug, Clone)]
@@ -89,35 +89,33 @@ impl AppContext {
     }
 
     pub fn muc_service(&self) -> Result<BareJid> {
-        self.connection_properties
-            .read()
+        self.server_features()?
+            .muc_service
             .as_ref()
-            .and_then(|p| p.server_features.muc_service.clone())
-            .ok_or(anyhow::anyhow!("Server does not support MUC (XEP-0045)"))
+            .ok_or_else(|| anyhow::anyhow!("Server does not support MUC (XEP-0045)"))
+            .cloned()
     }
 
     pub fn http_upload_service(&self) -> Result<HttpUploadService> {
-        self.connection_properties
-            .read()
+        self.server_features()?
+            .http_upload_service
             .as_ref()
-            .and_then(|p| p.server_features.http_upload_service.clone())
-            .ok_or(anyhow::anyhow!(
-                "Server does not support HTTP uploads (XEP-0363)"
-            ))
+            .ok_or_else(|| anyhow::anyhow!("Server does not support HTTP uploads (XEP-0363)"))
+            .cloned()
     }
 
-    pub fn mam_version(&self) -> Option<MamVersion> {
-        self.connection_properties
-            .read()
-            .as_ref()
-            .and_then(|p| p.server_features.mam_version.clone())
-    }
-
-    pub fn server_time_offset(&self) -> Option<TimeDelta> {
-        self.connection_properties
-            .read()
-            .as_ref()
-            .map(|p| p.server_features.server_time_offset.clone())
+    pub fn server_features(&self) -> Result<MappedRwLockReadGuard<ServerFeatures>> {
+        let read_guard = self.connection_properties.read();
+        if read_guard.is_none() {
+            return Err(anyhow::anyhow!(
+                "Failed to read the server features since the client is not connected."
+            ));
+        }
+        return Ok(RwLockReadGuard::map(
+            self.connection_properties.read(),
+            // We can safely unwrap the Option here since we've checked that it's not empty above.
+            |s| &s.as_ref().unwrap().server_features,
+        ));
     }
 
     /// Have we loaded the unread messages for the rooms in our sidebar?
