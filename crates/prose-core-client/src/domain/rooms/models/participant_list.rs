@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use crate::domain::shared::models::{
     AnonOccupantId, Availability, ParticipantId, UserBasicInfo, UserId,
 };
+use crate::domain::user_info::models::Avatar;
 
 use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
 
@@ -28,6 +29,7 @@ pub struct Participant {
     pub is_self: bool,
     pub affiliation: RoomAffiliation,
     pub availability: Availability,
+    pub avatar: Option<Avatar>,
     pub compose_state: ComposeState,
     pub compose_state_updated: DateTime<Utc>,
 }
@@ -45,6 +47,7 @@ impl ParticipantList {
         contact_id: &UserId,
         contact_name: &str,
         availability: Availability,
+        avatar: Option<Avatar>,
     ) -> Self {
         Self {
             anon_occupant_id_to_participant_id_map: Default::default(),
@@ -57,6 +60,7 @@ impl ParticipantList {
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability,
+                    avatar,
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 },
@@ -90,6 +94,7 @@ impl ParticipantList {
                 is_self: p.is_self,
                 affiliation: p.affiliation,
                 availability: p.availability,
+                avatar: p.avatar,
                 compose_state: ComposeState::Idle,
                 compose_state_updated: Default::default(),
             };
@@ -114,6 +119,7 @@ impl ParticipantList {
                     is_self: member.is_self,
                     affiliation: member.affiliation,
                     availability: Availability::Unavailable,
+                    avatar: None,
                     compose_state: ComposeState::Idle,
                     compose_state_updated: Default::default(),
                 });
@@ -131,14 +137,14 @@ impl ParticipantList {
         &mut self,
         id: &ParticipantId,
         is_self: bool,
-        availability: &Availability,
+        availability: Availability,
     ) {
         self.participants_map
             .entry(id.clone())
             .and_modify(|participant| {
                 participant.availability = availability.clone();
                 participant.is_self = is_self;
-                if availability == &Availability::Unavailable {
+                if availability == Availability::Unavailable {
                     participant.compose_state = ComposeState::Idle;
                 }
             })
@@ -149,22 +155,24 @@ impl ParticipantList {
                 is_self,
                 affiliation: RoomAffiliation::None,
                 availability: availability.clone(),
+                avatar: None,
                 compose_state: ComposeState::Idle,
                 compose_state_updated: DateTime::default(),
             });
     }
 
-    /// Sets the participant's affiliation. Does nothing if the participant doesn't exist.
+    /// Modifies the participant's affiliation or inserts a new participant with the affiliation
+    /// if it didn't exist.
     pub fn set_affiliation(
         &mut self,
         id: &ParticipantId,
         is_self: bool,
-        affiliation: &RoomAffiliation,
+        affiliation: RoomAffiliation,
     ) {
         self.participants_map
             .entry(id.clone())
             .and_modify(|participant| {
-                participant.affiliation = affiliation.clone();
+                participant.affiliation = affiliation;
                 participant.is_self = is_self;
             })
             .or_insert_with(|| Participant {
@@ -172,8 +180,31 @@ impl ParticipantList {
                 anon_occupant_id: None,
                 name: None,
                 is_self,
-                affiliation: affiliation.clone(),
+                affiliation,
                 availability: Availability::Unavailable,
+                avatar: None,
+                compose_state: ComposeState::Idle,
+                compose_state_updated: DateTime::default(),
+            });
+    }
+
+    /// Modifies the participant's avatar or inserts a new participant with the avatar
+    /// if it didn't exist.
+    pub fn set_avatar(&mut self, id: &ParticipantId, is_self: bool, avatar: Option<&Avatar>) {
+        self.participants_map
+            .entry(id.clone())
+            .and_modify(|participant| {
+                participant.avatar = avatar.cloned();
+                participant.is_self = is_self;
+            })
+            .or_insert_with(|| Participant {
+                real_id: None,
+                anon_occupant_id: None,
+                name: None,
+                is_self,
+                affiliation: RoomAffiliation::None,
+                availability: Availability::Unavailable,
+                avatar: avatar.cloned(),
                 compose_state: ComposeState::Idle,
                 compose_state_updated: DateTime::default(),
             });
@@ -224,6 +255,7 @@ impl ParticipantList {
                 is_self,
                 affiliation: affiliation.clone(),
                 availability: Availability::Unavailable,
+                avatar: None,
                 compose_state: ComposeState::Idle,
                 compose_state_updated: DateTime::default(),
             });
@@ -363,12 +395,12 @@ mod tests {
         state.set_availability(
             &occupant_id!("room@prose.org/a").into(),
             false,
-            &Availability::Unavailable,
+            Availability::Unavailable,
         );
         state.set_affiliation(
             &occupant_id!("room@prose.org/a").into(),
             false,
-            &RoomAffiliation::Owner,
+            RoomAffiliation::Owner,
         );
         state.set_ids_and_name(
             &occupant_id!("room@prose.org/a").into(),
@@ -380,12 +412,12 @@ mod tests {
         state.set_availability(
             &user_id!("b@prose.org").into(),
             false,
-            &Availability::Unavailable,
+            Availability::Unavailable,
         );
         state.set_affiliation(
             &user_id!("b@prose.org").into(),
             false,
-            &RoomAffiliation::Member,
+            RoomAffiliation::Member,
         );
 
         assert_eq!(state.participants_map.len(), 2);
@@ -419,7 +451,7 @@ mod tests {
         state.set_availability(
             &occupant_id!("room@prose.org/a").into(),
             false,
-            &Availability::Unavailable,
+            Availability::Unavailable,
         );
 
         state.set_compose_state(
@@ -530,6 +562,7 @@ mod tests {
                 real_id: Some(user_id!("a@prose.org")),
                 affiliation: RoomAffiliation::Member,
                 availability: Availability::Available,
+                avatar: None,
             }],
         );
 
@@ -545,6 +578,7 @@ mod tests {
                         is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
+                        avatar: None,
                         compose_state: Default::default(),
                         compose_state_updated: Default::default(),
                     }
@@ -558,6 +592,7 @@ mod tests {
                         is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Unavailable,
+                        avatar: None,
                         compose_state: Default::default(),
                         compose_state_updated: Default::default(),
                     }
@@ -569,12 +604,12 @@ mod tests {
         list.set_availability(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
             false,
-            &Availability::Available,
+            Availability::Available,
         );
         list.set_affiliation(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
             false,
-            &RoomAffiliation::Member,
+            RoomAffiliation::Member,
         );
         list.set_ids_and_name(
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
@@ -595,6 +630,7 @@ mod tests {
                         is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
+                        avatar: None,
                         compose_state: Default::default(),
                         compose_state_updated: Default::default(),
                     }
@@ -608,6 +644,7 @@ mod tests {
                         is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
+                        avatar: None,
                         compose_state: Default::default(),
                         compose_state_updated: Default::default(),
                     }
@@ -623,6 +660,7 @@ mod tests {
             &user_id!("a@prose.org"),
             "User A",
             Availability::Unavailable,
+            None,
         );
 
         assert_eq!(
@@ -636,6 +674,7 @@ mod tests {
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability: Availability::Unavailable,
+                    avatar: None,
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 }
@@ -646,7 +685,7 @@ mod tests {
         list.set_availability(
             &ParticipantId::User(user_id!("a@prose.org")),
             false,
-            &Availability::Available,
+            Availability::Available,
         );
 
         assert_eq!(
@@ -660,6 +699,7 @@ mod tests {
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability: Availability::Available,
+                    avatar: None,
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 }

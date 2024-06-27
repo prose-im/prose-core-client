@@ -140,6 +140,7 @@ async fn test_joins_room() -> Result<()> {
                             real_id: Some(user_id!("user1@prose.org")),
                             affiliation: RoomAffiliation::Owner,
                             availability: Availability::Available,
+                            avatar: None,
                         },
                         RoomSessionParticipant {
                             id: occupant_id!("room@conf.prose.org/user2#fdbda94"),
@@ -148,6 +149,7 @@ async fn test_joins_room() -> Result<()> {
                             real_id: Some(user_id!("user2@prose.org")),
                             affiliation: RoomAffiliation::Member,
                             availability: Availability::Available,
+                            avatar: None,
                         },
                     ],
                     room_has_been_created: false,
@@ -220,21 +222,24 @@ async fn test_joins_room() -> Result<()> {
                 name: "User1".to_string(),
                 is_self: true,
                 availability: Availability::Available,
-                affiliation: RoomAffiliation::Owner
+                affiliation: RoomAffiliation::Owner,
+                avatar: None,
             },
             ParticipantInfo {
                 id: Some(user_id!("user2@prose.org")),
                 name: "User2".to_string(),
                 is_self: false,
                 availability: Availability::Available,
-                affiliation: RoomAffiliation::Member
+                affiliation: RoomAffiliation::Member,
+                avatar: None,
             },
             ParticipantInfo {
                 id: Some(user_id!("user3@prose.org")),
                 name: "User3".to_string(),
                 is_self: false,
                 availability: Availability::Unavailable,
-                affiliation: RoomAffiliation::Member
+                affiliation: RoomAffiliation::Member,
+                avatar: None,
             }
         ],
         participants
@@ -478,43 +483,28 @@ async fn test_creates_group() -> Result<()> {
                     vec![
                         Participant {
                             real_id: Some(user_id!("a@prose.org")),
-                            anon_occupant_id: None,
                             name: Some("Tick".to_string()),
-                            is_self: false,
                             affiliation: RoomAffiliation::Owner,
-                            availability: Default::default(),
-                            compose_state: Default::default(),
-                            compose_state_updated: Default::default(),
+                            ..Default::default()
                         },
                         Participant {
                             real_id: Some(user_id!("b@prose.org")),
-                            anon_occupant_id: None,
                             name: Some("Trick".to_string()),
-                            is_self: false,
                             affiliation: RoomAffiliation::Owner,
-                            availability: Default::default(),
-                            compose_state: Default::default(),
-                            compose_state_updated: Default::default(),
+                            ..Default::default()
                         },
                         Participant {
                             real_id: Some(user_id!("c@prose.org")),
-                            anon_occupant_id: None,
                             name: Some("Track".to_string()),
-                            is_self: false,
                             affiliation: RoomAffiliation::Owner,
-                            availability: Default::default(),
-                            compose_state: Default::default(),
-                            compose_state_updated: Default::default(),
+                            ..Default::default()
                         },
                         Participant {
                             real_id: Some(user_id!("jane.doe@prose.org")),
-                            anon_occupant_id: None,
                             name: Some("Jane".to_string()),
                             is_self: true,
                             affiliation: RoomAffiliation::Owner,
-                            availability: Default::default(),
-                            compose_state: Default::default(),
-                            compose_state_updated: Default::default(),
+                            ..Default::default()
                         }
                     ]
                 );
@@ -620,6 +610,7 @@ async fn test_joins_direct_message() -> Result<()> {
                 &user_id!("user2@prose.org"),
                 "Jennifer Doe",
                 Availability::Available,
+                None,
                 RoomSidebarState::InSidebar,
                 Default::default(),
                 SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -647,9 +638,9 @@ async fn test_joins_direct_message() -> Result<()> {
         vec![ParticipantInfo {
             id: Some(user_id!("user2@prose.org")),
             name: "Jennifer Doe".to_string(),
-            is_self: false,
             availability: Availability::Available,
-            affiliation: RoomAffiliation::Owner
+            affiliation: RoomAffiliation::Owner,
+            ..Default::default()
         },]
     );
 
@@ -1195,6 +1186,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
                 &user_id!("user2@prose.org"),
                 "Jennifer Doe",
                 Availability::Available,
+                None,
                 RoomSidebarState::InSidebar,
                 Default::default(),
                 SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -1222,9 +1214,9 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         vec![ParticipantInfo {
             id: Some(user_id!("user2@prose.org")),
             name: "Jennifer Doe".to_string(),
-            is_self: false,
             availability: Availability::Available,
-            affiliation: RoomAffiliation::Owner
+            affiliation: RoomAffiliation::Owner,
+            ..Default::default()
         },]
     );
 

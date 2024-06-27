@@ -36,7 +36,10 @@ pub use crate::domain::{
         UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index,
     },
     uploads::models::UploadHeader,
-    user_info::models::{Address, LastActivity, UserInfo, UserMetadata, UserProfile, UserStatus},
+    user_info::models::{
+        Address, Avatar, AvatarSource, LastActivity, UserInfo, UserMetadata, UserProfile,
+        UserStatus,
+    },
 };
 
 mod account_info;

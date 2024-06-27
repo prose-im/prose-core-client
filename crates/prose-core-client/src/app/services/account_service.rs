@@ -10,7 +10,7 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::*;
-use crate::domain::shared::models::Availability;
+use crate::domain::shared::models::{Availability, AvatarId};
 use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::{AccountInfo, DeviceId, DeviceInfo};
 use crate::ClientEvent;
@@ -140,7 +140,7 @@ impl AccountService {
         let metadata = AvatarMetadata {
             bytes: image_data_len,
             mime_type: mime_type.as_ref().to_string(),
-            checksum: image_data.generate_sha1_checksum()?.as_ref().into(),
+            checksum: AvatarId::from_str_unchecked(image_data.generate_sha1_checksum()?.as_ref()),
             width,
             height,
             url: None,

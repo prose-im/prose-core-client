@@ -10,7 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
 use crate::domain::shared::models::{AccountId, UserId};
-use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
+use crate::domain::user_info::models::{Avatar, AvatarInfo, PlatformImage};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -21,7 +21,7 @@ pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        metadata: &AvatarInfo,
+        metadata: &Avatar,
     ) -> Result<()>;
 
     /// Returns the avatar for `user_jid` and `metadata` from cache or loads it from the server.
@@ -29,7 +29,7 @@ pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        metadata: &AvatarInfo,
+        metadata: &Avatar,
     ) -> Result<Option<PlatformImage>>;
 
     /// Saves the avatar to the local cache.

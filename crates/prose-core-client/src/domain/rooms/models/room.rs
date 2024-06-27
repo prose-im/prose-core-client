@@ -18,6 +18,7 @@ use crate::domain::rooms::models::{
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{AccountId, Availability, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
+use crate::domain::user_info::models::Avatar;
 use crate::dtos::{OccupantId, ParticipantId};
 
 /// Contains information about a connected room and its state.
@@ -284,6 +285,7 @@ impl Room {
                 user_id,
                 user_id.username(),
                 Availability::Unavailable,
+                None,
             ),
             RoomId::Muc(_) => Default::default(),
         };
@@ -378,6 +380,7 @@ impl Room {
         contact_id: &UserId,
         contact_name: &str,
         availability: Availability,
+        avatar: Option<Avatar>,
         sidebar_state: RoomSidebarState,
         features: RoomFeatures,
         settings: SyncedRoomSettings,
@@ -397,6 +400,7 @@ impl Room {
                     contact_id,
                     contact_name,
                     availability,
+                    avatar,
                 ),
                 sidebar_state,
                 state: RoomState::Connected,
@@ -465,6 +469,7 @@ mod tests {
             &user_id!("contact@prose.org"),
             "Jane Doe",
             Availability::Available,
+            None,
             RoomSidebarState::Favorite,
             Default::default(),
             SyncedRoomSettings::new(user_id!("contact@prose.org").into()),
@@ -486,7 +491,8 @@ mod tests {
                     participants: ParticipantList::for_direct_message(
                         &user_id!("contact@prose.org"),
                         "Jane Doe",
-                        Availability::Available
+                        Availability::Available,
+                        None
                     ),
                     sidebar_state: RoomSidebarState::Favorite,
                     state: RoomState::Connected,
