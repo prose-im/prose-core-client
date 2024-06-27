@@ -6,14 +6,14 @@
 use std::str::FromStr;
 
 use anyhow::Result;
+use pretty_assertions::assert_eq;
 
 use prose_core_client::app::event_handlers::{
-    ServerEvent, UserInfoEvent, UserInfoEventType, UserResourceEvent, UserResourceEventType,
-    UserStatusEvent, UserStatusEventType,
+    ServerEvent, UserInfoEvent, UserInfoEventType, UserStatusEvent, UserStatusEventType,
 };
 use prose_core_client::domain::rooms::models::ComposeState;
 use prose_core_client::domain::shared::models::{AvatarId, CapabilitiesId};
-use prose_core_client::domain::user_info::models::AvatarMetadata;
+use prose_core_client::domain::user_info::models::{AvatarMetadata, Presence};
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
 use prose_core_client::{occupant_id, user_id, user_resource_id};
@@ -33,9 +33,11 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
         events,
         vec![ServerEvent::UserStatus(UserStatusEvent {
             user_id: user_id!("user@prose.org").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable,
-                priority: 0
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Unavailable,
+                    ..Default::default()
+                }
             },
         })]
     );
@@ -59,21 +61,25 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
 
     assert_eq!(
         events,
-        vec![
-            ServerEvent::UserStatus(UserStatusEvent {
-                user_id: user_resource_id!("user@prose.org/res").into(),
-                r#type: UserStatusEventType::AvailabilityChanged {
+        vec![ServerEvent::UserStatus(UserStatusEvent {
+            user_id: user_resource_id!("user@prose.org/res").into(),
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
                     availability: Availability::Available,
-                    priority: 5
-                },
-            }),
-            ServerEvent::UserResource(UserResourceEvent {
-                user_id: user_resource_id!("user@prose.org/res"),
-                r#type: UserResourceEventType::CapabilitiesChanged {
-                    id: CapabilitiesId::from("https://prose.org#ImujI7nqf7pn4YqcjefXE3o5P1k=")
-                },
-            })
-        ]
+                    priority: 5,
+                    caps: Some(CapabilitiesId::from(
+                        "https://prose.org#ImujI7nqf7pn4YqcjefXE3o5P1k="
+                    )),
+                    avatar: Some(Avatar {
+                        id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
+                        source: AvatarSource::Vcard,
+                        owner: user_id!("user@prose.org").into(),
+                    }),
+                    client: Some("https://prose.org".parse()?),
+                    ..Default::default()
+                }
+            },
+        })]
     );
 
     // Exiting a Room (https://xmpp.org/extensions/xep-0045.html#exit)
@@ -92,9 +98,11 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
         events,
         vec![ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@prose.org/nick").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable,
-                priority: 0
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Unavailable,
+                    ..Default::default()
+                }
             },
         })]
     );

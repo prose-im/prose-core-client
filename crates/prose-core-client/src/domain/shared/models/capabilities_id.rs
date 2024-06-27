@@ -5,10 +5,17 @@
 
 use std::fmt::{Display, Formatter};
 
-/// This is the combination "{node}#{ver}" of a "<c/>" element.
+/// `CapabilitiesId` represents an XMPP capabilities node identifier, concatenating a 'node' URL
+/// and a 'ver' version string, separated by '#'.
 /// https://xmpp.org/extensions/xep-0115.html
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CapabilitiesId(String);
+
+impl CapabilitiesId {
+    pub fn new(node: impl AsRef<str>, ver: impl AsRef<str>) -> Self {
+        Self(format!("{}#{}", node.as_ref(), ver.as_ref()))
+    }
+}
 
 impl<T> From<T> for CapabilitiesId
 where
@@ -19,8 +26,14 @@ where
     }
 }
 
+impl AsRef<str> for CapabilitiesId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Display for CapabilitiesId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        f.write_str(self.as_ref())
     }
 }

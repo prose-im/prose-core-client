@@ -254,6 +254,7 @@ mod tests {
             priority,
             availability: Availability::Available,
             status: None,
+            ..Default::default()
         }
     }
 }

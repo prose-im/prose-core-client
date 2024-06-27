@@ -10,3 +10,4 @@ mod muc_omemo;
 mod omemo;
 mod reactions;
 mod reconnect;
+mod user_info;

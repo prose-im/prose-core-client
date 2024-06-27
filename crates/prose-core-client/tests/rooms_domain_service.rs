@@ -27,6 +27,7 @@ use prose_core_client::domain::shared::models::{
     MucId, OccupantId, RoomId, RoomType, UserResourceId,
 };
 use prose_core_client::domain::sidebar::models::BookmarkType;
+use prose_core_client::domain::user_info::models::Presence;
 use prose_core_client::dtos::{
     Availability, Bookmark, Participant, ParticipantInfo, PublicRoomInfo, RoomState, UserId,
     UserInfo, UserProfile,
@@ -139,8 +140,10 @@ async fn test_joins_room() -> Result<()> {
                             anon_id: None,
                             real_id: Some(user_id!("user1@prose.org")),
                             affiliation: RoomAffiliation::Owner,
-                            availability: Availability::Available,
-                            avatar: None,
+                            presence: Presence {
+                                availability: Availability::Available,
+                                ..Default::default()
+                            },
                         },
                         RoomSessionParticipant {
                             id: occupant_id!("room@conf.prose.org/user2#fdbda94"),
@@ -148,8 +151,10 @@ async fn test_joins_room() -> Result<()> {
                             anon_id: None,
                             real_id: Some(user_id!("user2@prose.org")),
                             affiliation: RoomAffiliation::Member,
-                            availability: Availability::Available,
-                            avatar: None,
+                            presence: Presence {
+                                availability: Availability::Available,
+                                ..Default::default()
+                            },
                         },
                     ],
                     room_has_been_created: false,
@@ -587,9 +592,8 @@ async fn test_joins_direct_message() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(Some(UserInfo {
-                    avatar: None,
-                    activity: None,
                     availability: Availability::Available,
+                    ..Default::default()
                 }))
             })
         });
@@ -609,8 +613,10 @@ async fn test_joins_direct_message() -> Result<()> {
             predicate::eq(Room::for_direct_message(
                 &user_id!("user2@prose.org"),
                 "Jennifer Doe",
-                Availability::Available,
-                None,
+                Presence {
+                    availability: Availability::Available,
+                    ..Default::default()
+                },
                 RoomSidebarState::InSidebar,
                 Default::default(),
                 SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -1163,9 +1169,8 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         .return_once(|_| {
             Box::pin(async {
                 Ok(Some(UserInfo {
-                    avatar: None,
-                    activity: None,
                     availability: Availability::Available,
+                    ..Default::default()
                 }))
             })
         });
@@ -1185,8 +1190,10 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             predicate::eq(Room::for_direct_message(
                 &user_id!("user2@prose.org"),
                 "Jennifer Doe",
-                Availability::Available,
-                None,
+                Presence {
+                    availability: Availability::Available,
+                    ..Default::default()
+                },
                 RoomSidebarState::InSidebar,
                 Default::default(),
                 SyncedRoomSettings::new(user_id!("user2@prose.org").into()),

@@ -13,7 +13,7 @@ use prose_store::prelude::*;
 use crate::app::deps::DynUserInfoService;
 use crate::domain::shared::models::{AccountId, UserId, UserOrResourceId, UserResourceId};
 use crate::domain::user_info::models::{
-    Avatar, AvatarMetadata, AvatarSource, Presence, UserInfo, UserStatus,
+    Avatar, AvatarMetadata, AvatarSource, JabberClient, Presence, UserInfo, UserStatus,
 };
 use crate::domain::user_info::repos::UserInfoRepository;
 
@@ -24,7 +24,14 @@ pub struct UserInfoRecord {
     id: String,
     account: AccountId,
     user_id: UserId,
-    payload: UserInfo,
+    payload: UserInfoRecordPayload,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct UserInfoRecordPayload {
+    avatar: Option<Avatar>,
+    activity: Option<UserStatus>,
+    client: Option<JabberClient>,
 }
 
 impl UserInfoRecord {
@@ -33,7 +40,11 @@ impl UserInfoRecord {
             id: format!("{}.{}", account, user_id),
             account: account.clone(),
             user_id: user_id.clone(),
-            payload,
+            payload: UserInfoRecordPayload {
+                avatar: payload.avatar,
+                activity: payload.activity,
+                client: payload.client,
+            },
         }
     }
 }
@@ -102,8 +113,6 @@ impl UserInfoRepository for CachingUserInfoRepository {
             .map(|entry| entry.presence.clone())
             .unwrap_or_default();
 
-        record.payload.availability = presence.availability;
-
         if record.payload.avatar.is_none() {
             let metadata = self
                 .user_info_service
@@ -129,7 +138,15 @@ impl UserInfoRepository for CachingUserInfoRepository {
             }
         }
 
-        Ok(Some(record.payload))
+        let user_info = UserInfo {
+            activity: record.payload.activity,
+            availability: presence.availability,
+            avatar: presence.avatar.or(record.payload.avatar),
+            caps: presence.caps,
+            client: presence.client.or(record.payload.client),
+        };
+
+        Ok(Some(user_info))
     }
 
     async fn set_avatar_metadata(

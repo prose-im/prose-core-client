@@ -24,6 +24,7 @@ use crate::app::services::{
 use crate::client::ClientInner;
 use crate::domain::encryption::services::{RandUserDeviceIdProvider, UserDeviceIdProvider};
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
+use crate::domain::user_info::models::PROSE_IM_NODE;
 use crate::infra::avatars::AvatarCache;
 use crate::infra::general::{NanoIDProvider, OsRngProvider, RngProvider};
 use crate::infra::platform_dependencies::PlatformDependencies;
@@ -188,7 +189,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
     pub fn build(self) -> Client {
         let capabilities = Capabilities::new(
             self.software_version.name.clone(),
-            "https://prose.org",
+            PROSE_IM_NODE,
             vec![
                 Feature::Name(ns::AVATAR_DATA),
                 Feature::Name(ns::AVATAR_METADATA),

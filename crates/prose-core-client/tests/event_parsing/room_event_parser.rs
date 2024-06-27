@@ -4,12 +4,14 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
+use pretty_assertions::assert_eq;
 
 use prose_core_client::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, ServerEvent, UserStatusEvent,
     UserStatusEventType,
 };
-use prose_core_client::domain::shared::models::AnonOccupantId;
+use prose_core_client::domain::shared::models::{AnonOccupantId, CapabilitiesId};
+use prose_core_client::domain::user_info::models::Presence;
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
 use prose_core_client::{muc_id, occupant_id, user_id, user_resource_id};
@@ -170,9 +172,11 @@ async fn test_user_was_permanently_removed() -> Result<()> {
         vec![
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
-                r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Unavailable,
-                    priority: 0
+                r#type: UserStatusEventType::PresenceChanged {
+                    presence: Presence {
+                        availability: Availability::Unavailable,
+                        ..Default::default()
+                    }
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -209,9 +213,11 @@ async fn test_user_was_disconnected_by_server() -> Result<()> {
         vec![
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
-                r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Unavailable,
-                    priority: 0
+                r#type: UserStatusEventType::PresenceChanged {
+                    presence: Presence {
+                        availability: Availability::Unavailable,
+                        ..Default::default()
+                    }
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -236,6 +242,8 @@ async fn test_user_entered_room() -> Result<()> {
             <x xmlns="vcard-temp:x:update">
                 <photo>cdc05cb9c48d5e817a36d462fe0470a0579e570a</photo>
             </x>
+            <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://cheogram.com" ver="hAx0qhppW5/ZjrpXmbXW0F2SJVM=" />
+            <nick xmlns="http://jabber.org/protocol/nick">Jane</nick>
             <occupant-id xmlns="urn:xmpp:occupant-id:0" id="gk6wmXJJ58Thj95cbfEX1Tzr0ONoOuZyU6SyMAvREXw=" />
             <x xmlns="http://jabber.org/protocol/muc#user">
                 <item affiliation="none" jid="user@prose.org/res" role="participant" />
@@ -250,9 +258,21 @@ async fn test_user_entered_room() -> Result<()> {
         vec![
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
-                r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Available,
-                    priority: 0
+                r#type: UserStatusEventType::PresenceChanged {
+                    presence: Presence {
+                        availability: Availability::Available,
+                        avatar: Some(Avatar {
+                            id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
+                            source: AvatarSource::Vcard,
+                            owner: user_id!("user@prose.org").into(),
+                        }),
+                        client: Some("https://cheogram.com".parse()?),
+                        caps: Some(CapabilitiesId::from(
+                            "https://cheogram.com#hAx0qhppW5/ZjrpXmbXW0F2SJVM="
+                        )),
+                        nickname: Some("Jane".to_string()),
+                        ..Default::default()
+                    }
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -303,9 +323,16 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
         vec![
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
-                r#type: UserStatusEventType::AvailabilityChanged {
-                    availability: Availability::Available,
-                    priority: 0
+                r#type: UserStatusEventType::PresenceChanged {
+                    presence: Presence {
+                        availability: Availability::Available,
+                        avatar: Some(Avatar {
+                            id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
+                            source: AvatarSource::Vcard,
+                            owner: user_id!("user@prose.org").into(),
+                        }),
+                        ..Default::default()
+                    }
                 },
             }),
             ServerEvent::Occupant(OccupantEvent {
@@ -345,9 +372,12 @@ async fn test_user_exited_room() -> Result<()> {
         events,
         vec![ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@prose.org/nick").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable,
-                priority: 0
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Unavailable,
+                    status: Some("Disconnected: closed".to_string()),
+                    ..Default::default()
+                }
             },
         })]
     );
