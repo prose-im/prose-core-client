@@ -6,6 +6,7 @@
 pub use account_id::AccountId;
 pub use anon_occupant_id::AnonOccupantId;
 pub use availability::Availability;
+pub use avatar_id::AvatarId;
 pub use capabilities_id::CapabilitiesId;
 pub use connection_state::ConnectionState;
 pub use mam_version::MamVersion;
@@ -28,6 +29,7 @@ pub use user_resource_id::UserResourceId;
 mod account_id;
 mod anon_occupant_id;
 mod availability;
+mod avatar_id;
 mod capabilities_id;
 mod connection_state;
 mod mam_version;

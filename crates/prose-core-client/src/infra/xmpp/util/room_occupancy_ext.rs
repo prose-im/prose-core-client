@@ -12,7 +12,8 @@ use prose_xmpp::mods::muc::RoomOccupancy;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::rooms::models::RoomSessionParticipant;
-use crate::dtos::{OccupantId, UserId};
+use crate::domain::user_info::models::{Avatar, AvatarSource};
+use crate::dtos::{OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::util::PresenceExt;
 
 pub trait RoomOccupancyExt {
@@ -52,13 +53,21 @@ fn self_participant(presence: &Presence, muc_user: &MucUser) -> Result<RoomSessi
         bail!("Missing 'item' element in MUC user");
     };
 
+    let occupant_id = OccupantId::from(from.clone());
+    let avatar = presence.avatar_id().map(|id| Avatar {
+        id,
+        source: AvatarSource::Vcard,
+        owner: ParticipantId::Occupant(occupant_id.clone()),
+    });
+
     Ok(RoomSessionParticipant {
-        id: OccupantId::from(from.clone()),
+        id: occupant_id,
         is_self: muc_user.status.contains(&Status::SelfPresence),
         anon_id: presence.anon_occupant_id(),
         real_id: item.jid.clone().map(|jid| UserId::from(jid.into_bare())),
         affiliation: item.affiliation.clone().into(),
         availability: presence.availability(),
+        avatar,
     })
 }
 
@@ -129,6 +138,7 @@ mod tests {
                     real_id: Some(user_id!("user_a@prose.org")),
                     affiliation: RoomAffiliation::Member,
                     availability: Availability::Available,
+                    avatar: None,
                 },
                 RoomSessionParticipant {
                     id: occupant_id!("room@conf.prose.org/user_b"),
@@ -137,6 +147,7 @@ mod tests {
                     real_id: Some(user_id!("user_b@prose.org")),
                     affiliation: RoomAffiliation::Member,
                     availability: Availability::Available,
+                    avatar: None,
                 },
                 RoomSessionParticipant {
                     id: occupant_id!("room@conf.prose.org/me"),
@@ -145,6 +156,7 @@ mod tests {
                     real_id: Some(user_id!("me@prose.org")),
                     affiliation: RoomAffiliation::Member,
                     availability: Availability::Available,
+                    avatar: None,
                 }
             ]
         );

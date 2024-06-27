@@ -13,7 +13,7 @@ use crate::app::deps::{
     DynUserInfoRepository, DynUserProfileRepository, DynUserProfileService,
 };
 use crate::domain::shared::models::UserOrResourceId;
-use crate::domain::user_info::models::{AvatarMetadata, Presence};
+use crate::domain::user_info::models::{Avatar, AvatarMetadata, AvatarSource, Presence};
 use crate::domain::user_info::services::UserInfoDomainService as UserInfoDomainServiceTrait;
 use crate::dtos::{UserId, UserInfo, UserMetadata, UserProfile, UserStatus};
 use crate::ClientEvent;
@@ -110,7 +110,17 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
 
         if let Some(metadata) = metadata {
             self.avatar_repo
-                .precache_avatar_image(&account, user_id, &metadata.to_info())
+                .precache_avatar_image(
+                    &account,
+                    user_id,
+                    &Avatar {
+                        id: metadata.checksum.clone(),
+                        source: AvatarSource::Pep {
+                            mime_type: metadata.mime_type.clone(),
+                        },
+                        owner: user_id.clone().into(),
+                    },
+                )
                 .await?;
         }
 

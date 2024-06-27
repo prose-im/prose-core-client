@@ -5,15 +5,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use prose_utils::id_string;
-
-id_string!(AvatarImageId);
+use crate::domain::shared::models::AvatarId;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct AvatarMetadata {
     pub bytes: usize,
     pub mime_type: String,
-    pub checksum: AvatarImageId,
+    pub checksum: AvatarId,
     pub width: Option<u32>,
     pub height: Option<u32>,
     pub url: Option<String>,
@@ -21,7 +19,7 @@ pub struct AvatarMetadata {
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct AvatarInfo {
-    pub checksum: AvatarImageId,
+    pub checksum: AvatarId,
     pub mime_type: String,
 }
 

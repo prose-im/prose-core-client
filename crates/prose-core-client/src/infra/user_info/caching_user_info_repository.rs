@@ -12,7 +12,9 @@ use prose_store::prelude::*;
 
 use crate::app::deps::DynUserInfoService;
 use crate::domain::shared::models::{AccountId, UserId, UserOrResourceId, UserResourceId};
-use crate::domain::user_info::models::{AvatarMetadata, Presence, UserInfo, UserStatus};
+use crate::domain::user_info::models::{
+    Avatar, AvatarMetadata, AvatarSource, Presence, UserInfo, UserStatus,
+};
 use crate::domain::user_info::repos::UserInfoRepository;
 
 use super::PresenceMap;
@@ -103,11 +105,18 @@ impl UserInfoRepository for CachingUserInfoRepository {
         record.payload.availability = presence.availability;
 
         if record.payload.avatar.is_none() {
-            record.payload.avatar = self
+            let metadata = self
                 .user_info_service
                 .load_latest_avatar_metadata(user_id)
-                .await?
-                .map(|metadata| metadata.into_info());
+                .await?;
+
+            record.payload.avatar = metadata.map(|metadata| Avatar {
+                id: metadata.checksum,
+                source: AvatarSource::Pep {
+                    mime_type: metadata.mime_type,
+                },
+                owner: user_id.clone().into(),
+            });
 
             if record.payload.avatar.is_some() {
                 let tx = self
@@ -130,7 +139,13 @@ impl UserInfoRepository for CachingUserInfoRepository {
         metadata: Option<&AvatarMetadata>,
     ) -> Result<()> {
         self.upsert_user_info(account, user_id, |record| {
-            record.payload.avatar = metadata.map(|md| md.to_info())
+            record.payload.avatar = metadata.map(|md| Avatar {
+                id: md.checksum.clone(),
+                source: AvatarSource::Pep {
+                    mime_type: md.mime_type.clone(),
+                },
+                owner: user_id.clone().into(),
+            })
         })
         .await
     }

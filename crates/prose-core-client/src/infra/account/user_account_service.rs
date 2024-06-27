@@ -12,8 +12,8 @@ use prose_xmpp::stanza::VCard4;
 
 use crate::domain::account::services::UserAccountService;
 use crate::domain::general::models::Capabilities;
-use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserProfile, UserStatus};
+use crate::domain::shared::models::{Availability, AvatarId};
+use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::OccupantId;
 use crate::infra::xmpp::XMPPClient;
 
@@ -25,7 +25,7 @@ impl UserAccountService for XMPPClient {
         profile
             .set_avatar_metadata(
                 metadata.bytes,
-                &metadata.checksum.as_ref().into(),
+                &metadata.checksum.to_string().into(),
                 &metadata.mime_type,
                 metadata.width,
                 metadata.height,
@@ -34,14 +34,10 @@ impl UserAccountService for XMPPClient {
         Ok(())
     }
 
-    async fn set_avatar_image(
-        &self,
-        checksum: &AvatarImageId,
-        base64_image_data: String,
-    ) -> Result<()> {
+    async fn set_avatar_image(&self, checksum: &AvatarId, base64_image_data: String) -> Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile
-            .set_avatar_image(&checksum.as_ref().into(), base64_image_data)
+            .set_avatar_image(&checksum.to_string().into(), base64_image_data)
             .await?;
         Ok(())
     }

@@ -6,11 +6,11 @@
 use crate::domain::shared::models::Availability;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::user_info::models::{AvatarInfo, UserStatus};
+use crate::domain::user_info::models::{Avatar, UserStatus};
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug, Default)]
 pub struct UserInfo {
-    pub avatar: Option<AvatarInfo>,
+    pub avatar: Option<Avatar>,
     pub activity: Option<UserStatus>,
     #[serde(skip_serializing, default)]
     pub availability: Availability,

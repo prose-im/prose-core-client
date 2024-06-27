@@ -9,8 +9,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::UserId;
-use crate::domain::user_info::models::AvatarImageId;
+use crate::domain::shared::models::{AvatarId, UserId};
 use crate::domain::user_info::models::AvatarMetadata;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -21,6 +20,6 @@ pub trait UserInfoService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_avatar_image(
         &self,
         from: &UserId,
-        image_id: &AvatarImageId,
+        image_id: &AvatarId,
     ) -> Result<Option<AvatarData>>;
 }

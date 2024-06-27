@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::general::models::Capabilities;
-use crate::domain::shared::models::Availability;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata, UserProfile, UserStatus};
+use crate::domain::shared::models::{Availability, AvatarId};
+use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::OccupantId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -18,11 +18,7 @@ use crate::dtos::OccupantId;
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
     async fn set_avatar_metadata(&self, metadata: &AvatarMetadata) -> Result<()>;
-    async fn set_avatar_image(
-        &self,
-        checksum: &AvatarImageId,
-        base64_image_data: String,
-    ) -> Result<()>;
+    async fn set_avatar_image(&self, checksum: &AvatarId, base64_image_data: String) -> Result<()>;
 
     async fn set_availability(
         &self,

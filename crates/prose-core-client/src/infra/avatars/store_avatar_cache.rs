@@ -11,8 +11,8 @@ use prose_store::prelude::*;
 use prose_store::{define_entity, RawKey};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::AccountId;
-use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{AccountId, AvatarId};
+use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 use crate::dtos::UserId;
 use crate::infra::avatars::AvatarCache;
 
@@ -31,7 +31,7 @@ pub struct AvatarRecord {
     id: String,
     account: AccountId,
     user_id: UserId,
-    avatar_id: AvatarImageId,
+    avatar_id: AvatarId,
     mime_type: String,
     base64_data: String,
 }
@@ -67,7 +67,7 @@ define_entity!(AvatarRecord, "avatar",
     avatar_idx => { columns: [columns::ACCOUNT, columns::USER_ID, columns::AVATAR_ID], unique: true }
 );
 
-impl KeyType for AvatarImageId {
+impl KeyType for AvatarId {
     fn to_raw_key(&self) -> RawKey {
         RawKey::Text(self.to_string())
     }
@@ -97,7 +97,7 @@ impl AvatarCache for StoreAvatarCache {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        image_checksum: &AvatarImageId,
+        image_checksum: &AvatarId,
     ) -> Result<bool> {
         let tx = self
             .store
@@ -115,7 +115,7 @@ impl AvatarCache for StoreAvatarCache {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        image_checksum: &AvatarImageId,
+        image_checksum: &AvatarId,
     ) -> Result<Option<PlatformImage>> {
         let tx = self
             .store

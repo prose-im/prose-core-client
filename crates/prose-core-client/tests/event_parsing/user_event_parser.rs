@@ -3,6 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::str::FromStr;
+
 use anyhow::Result;
 
 use prose_core_client::app::event_handlers::{
@@ -10,8 +12,8 @@ use prose_core_client::app::event_handlers::{
     UserStatusEvent, UserStatusEventType,
 };
 use prose_core_client::domain::rooms::models::ComposeState;
-use prose_core_client::domain::shared::models::CapabilitiesId;
-use prose_core_client::domain::user_info::models::{AvatarImageId, AvatarMetadata};
+use prose_core_client::domain::shared::models::{AvatarId, CapabilitiesId};
+use prose_core_client::domain::user_info::models::AvatarMetadata;
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
 use prose_core_client::{occupant_id, user_id, user_resource_id};
@@ -175,7 +177,8 @@ async fn test_avatar_changed() -> Result<()> {
                 metadata: AvatarMetadata {
                     bytes: 61501,
                     mime_type: "image/jpeg".to_string(),
-                    checksum: AvatarImageId::from("fa3c5706e27f6a0093981bb315015c2bd93e094e"),
+                    checksum: AvatarId::from_str("fa3c5706e27f6a0093981bb315015c2bd93e094e")
+                        .unwrap(),
                     width: None,
                     height: None,
                     url: None,

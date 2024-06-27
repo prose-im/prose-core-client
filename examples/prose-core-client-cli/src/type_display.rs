@@ -8,8 +8,8 @@ use std::fmt::{Display, Formatter};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    Bookmark, Contact, DeviceInfo, DeviceTrust, Message, ParticipantInfo, PublicRoomInfo,
-    RoomEnvelope, SidebarItem, UserBasicInfo,
+    Avatar, AvatarSource, Bookmark, Contact, DeviceInfo, DeviceTrust, Message, ParticipantInfo,
+    PublicRoomInfo, RoomEnvelope, SidebarItem, UserBasicInfo,
 };
 use prose_xmpp::mods::muc;
 
@@ -117,17 +117,36 @@ impl Display for ParticipantEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{:<20} {:<20} {:<10} {}",
-            self.0
+            "{real_id:<20} {name:<20} {aff:<10} {avatar} {avail}",
+            real_id = self
+                .0
                 .id
                 .as_ref()
                 .map(|jid| jid.to_string())
                 .unwrap_or("<unknown real jid>".to_string())
                 .truncate_to(20),
-            self.0.name,
-            self.0.affiliation,
-            self.0.availability
+            name = self.0.name.truncate_to(20),
+            aff = self.0.affiliation,
+            avatar = self
+                .0
+                .avatar
+                .as_ref()
+                .map(|avatar| AvatarEnvelope(avatar.clone()).to_string())
+                .unwrap_or_else(|| "<no avatar>".to_string()),
+            avail = self.0.availability
         )
+    }
+}
+
+pub struct AvatarEnvelope(pub Avatar);
+
+impl Display for AvatarEnvelope {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let kind = match self.0.source {
+            AvatarSource::Pep { .. } => "PEP",
+            AvatarSource::Vcard => "vCard",
+        };
+        write!(f, "{id} ({kind})", id = self.0.id)
     }
 }
 

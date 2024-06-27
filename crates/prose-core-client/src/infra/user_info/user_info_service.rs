@@ -15,8 +15,8 @@ use prose_xmpp::mods;
 use prose_xmpp::mods::AvatarData;
 use prose_xmpp::stanza::avatar;
 
-use crate::domain::shared::models::UserId;
-use crate::domain::user_info::models::{AvatarImageId, AvatarMetadata};
+use crate::domain::shared::models::{AvatarId, UserId};
+use crate::domain::user_info::models::AvatarMetadata;
 use crate::domain::user_info::services::UserInfoService;
 use crate::infra::xmpp::XMPPClient;
 
@@ -42,14 +42,14 @@ impl UserInfoService for XMPPClient {
     async fn load_avatar_image(
         &self,
         from: &UserId,
-        image_id: &AvatarImageId,
+        image_id: &AvatarId,
     ) -> Result<Option<AvatarData>> {
         let profile = self.client.get_mod::<mods::Profile>();
 
         match profile
             .load_avatar_image(
                 Jid::from(from.clone().into_inner()),
-                &Sha1HexAttribute::from_str(&image_id.as_ref())?,
+                &Sha1HexAttribute::from_str(&image_id.to_string())?,
             )
             .await
         {
@@ -68,7 +68,7 @@ impl From<avatar::Info> for AvatarMetadata {
         AvatarMetadata {
             bytes: value.bytes as usize,
             mime_type: value.r#type,
-            checksum: value.id.as_ref().into(),
+            checksum: AvatarId::from_str_unchecked(value.id.as_ref()),
             width: value.width.map(u32::from),
             height: value.height.map(u32::from),
             url: value.url,

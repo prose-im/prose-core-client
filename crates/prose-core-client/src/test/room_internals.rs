@@ -22,6 +22,7 @@ impl Room {
             &jid,
             &jid.formatted_username(),
             availability,
+            None,
             RoomSidebarState::InSidebar,
             Default::default(),
             SyncedRoomSettings::new(RoomId::User(jid.clone())),
@@ -130,6 +131,7 @@ impl Participant {
             compose_state_updated: Default::default(),
             availability: Availability::Unavailable,
             anon_occupant_id: None,
+            avatar: None,
         }
     }
 
@@ -143,6 +145,7 @@ impl Participant {
             compose_state: Default::default(),
             compose_state_updated: Default::default(),
             availability: Availability::Unavailable,
+            avatar: None,
         }
     }
 

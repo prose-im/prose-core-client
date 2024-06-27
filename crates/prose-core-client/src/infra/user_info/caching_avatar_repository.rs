@@ -5,12 +5,13 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
+use tracing::warn;
 
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::DynUserInfoService;
 use crate::domain::shared::models::{AccountId, UserId};
-use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
+use crate::domain::user_info::models::{Avatar, AvatarInfo, PlatformImage};
 use crate::domain::user_info::repos::AvatarRepository as DomainAvatarRepository;
 use crate::infra::avatars::AvatarCache;
 
@@ -35,11 +36,16 @@ impl DomainAvatarRepository for CachingAvatarRepository {
         &self,
         account: &AccountId,
         user_jid: &UserId,
-        info: &AvatarInfo,
+        avatar: &Avatar,
     ) -> anyhow::Result<()> {
+        let Some(info) = avatar.info() else {
+            warn!("Cannot precache vCard avatars yet.");
+            return Ok(());
+        };
+
         if self
             .avatar_cache
-            .has_cached_avatar_image(account, user_jid, &info.checksum)
+            .has_cached_avatar_image(account, user_jid, &avatar.id)
             .await?
         {
             return Ok(());
@@ -47,14 +53,14 @@ impl DomainAvatarRepository for CachingAvatarRepository {
 
         let Some(avatar_data) = self
             .user_info_service
-            .load_avatar_image(user_jid, &info.checksum)
+            .load_avatar_image(user_jid, &avatar.id)
             .await?
         else {
             return Ok(());
         };
 
         self.avatar_cache
-            .cache_avatar_image(account, user_jid, &avatar_data, info)
+            .cache_avatar_image(account, user_jid, &avatar_data, &info)
             .await?;
         Ok(())
     }
@@ -63,12 +69,12 @@ impl DomainAvatarRepository for CachingAvatarRepository {
         &self,
         account: &AccountId,
         user_id: &UserId,
-        info: &AvatarInfo,
+        avatar: &Avatar,
     ) -> Result<Option<PlatformImage>> {
-        self.precache_avatar_image(account, user_id, info).await?;
+        self.precache_avatar_image(account, user_id, avatar).await?;
         let image = self
             .avatar_cache
-            .cached_avatar_image(account, user_id, &info.checksum)
+            .cached_avatar_image(account, user_id, &avatar.id)
             .await?;
         Ok(image)
     }

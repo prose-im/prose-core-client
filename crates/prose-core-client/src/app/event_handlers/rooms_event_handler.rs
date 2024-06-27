@@ -97,7 +97,7 @@ impl RoomsEventHandler {
                         != Some(&affiliation)
                     {
                         participants_changed = true;
-                        participants.set_affiliation(&participant_id, event.is_self, &affiliation);
+                        participants.set_affiliation(&participant_id, event.is_self, affiliation);
                     }
                 }
 
@@ -132,7 +132,7 @@ impl RoomsEventHandler {
                 room.participants_mut().set_availability(
                     &participant_id,
                     event.is_self,
-                    &Availability::Unavailable,
+                    Availability::Unavailable,
                 );
 
                 if event.is_self {
@@ -268,7 +268,7 @@ impl RoomsEventHandler {
                     room.participants_mut().set_availability(
                         &participant_id,
                         is_self_event,
-                        &availability,
+                        availability,
                     );
 
                     if room.sidebar_state().is_in_sidebar() {

@@ -11,17 +11,18 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::rooms::models::RoomSessionParticipant;
-use crate::dtos::{OccupantId, UserId};
+use crate::domain::user_info::models::{Avatar, AvatarSource};
+use crate::dtos::{OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::util::PresenceExt;
 
 impl TryFrom<Presence> for RoomSessionParticipant {
     type Error = anyhow::Error;
 
-    fn try_from(value: Presence) -> Result<Self, Self::Error> {
+    fn try_from(mut value: Presence) -> Result<Self, Self::Error> {
         let anon_occupant_id = value.anon_occupant_id();
         let availability = value.availability();
 
-        let Some(from) = value.from.and_then(|from| from.try_into_full().ok()) else {
+        let Some(from) = value.from.take().and_then(|from| from.try_into_full().ok()) else {
             bail!("Expected FullJid in MUC presence.")
         };
 
@@ -45,6 +46,12 @@ impl TryFrom<Presence> for RoomSessionParticipant {
 
         let is_self = muc_user.status.contains(&Status::SelfPresence);
 
+        let avatar = value.avatar_id().map(|avatar_id| Avatar {
+            id: avatar_id,
+            source: AvatarSource::Vcard,
+            owner: ParticipantId::Occupant(occupant_id.clone()),
+        });
+
         Ok(RoomSessionParticipant {
             id: occupant_id,
             is_self,
@@ -52,6 +59,7 @@ impl TryFrom<Presence> for RoomSessionParticipant {
             real_id,
             affiliation: item.affiliation.clone().into(),
             availability,
+            avatar,
         })
     }
 }

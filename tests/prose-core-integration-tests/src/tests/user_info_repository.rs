@@ -10,10 +10,11 @@ use anyhow::Result;
 use prose_core_client::app::dtos::Availability;
 use prose_core_client::domain::shared::models::{AccountId, UserId, UserResourceId};
 use prose_core_client::domain::user_info::models::{
-    AvatarInfo, AvatarMetadata, Presence, UserInfo, UserStatus,
+    AvatarMetadata, Presence, UserInfo, UserStatus,
 };
 use prose_core_client::domain::user_info::repos::UserInfoRepository;
 use prose_core_client::domain::user_info::services::mocks::MockUserInfoService;
+use prose_core_client::dtos::{Avatar, AvatarSource};
 use prose_core_client::infra::user_info::CachingUserInfoRepository;
 use prose_core_client::{account_id, user_id, user_resource_id};
 
@@ -24,7 +25,7 @@ async fn test_caches_loaded_avatar_metadata() -> Result<()> {
     let metadata = AvatarMetadata {
         bytes: 1001,
         mime_type: "image/jpg".to_string(),
-        checksum: "my-checksum".into(),
+        checksum: "fa3c5706e27f6a0093981bb315015c2bd93e094e".parse().unwrap(),
         width: None,
         height: None,
         url: None,
@@ -43,9 +44,12 @@ async fn test_caches_loaded_avatar_metadata() -> Result<()> {
     let repo = CachingUserInfoRepository::new(store().await?, Arc::new(service));
 
     let expected_user_info = UserInfo {
-        avatar: Some(AvatarInfo {
-            checksum: "my-checksum".into(),
-            mime_type: "image/jpg".to_string(),
+        avatar: Some(Avatar {
+            id: "fa3c5706e27f6a0093981bb315015c2bd93e094e".parse().unwrap(),
+            source: AvatarSource::Pep {
+                mime_type: "image/jpg".to_string(),
+            },
+            owner: user_id!("a@prose.org").into(),
         }),
         activity: None,
         availability: Availability::Unavailable,
@@ -72,7 +76,7 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
     let metadata = AvatarMetadata {
         bytes: 1001,
         mime_type: "image/jpg".to_string(),
-        checksum: "my-checksum".into(),
+        checksum: "fa3c5706e27f6a0093981bb315015c2bd93e094e".parse().unwrap(),
         width: None,
         height: None,
         url: None,
@@ -87,9 +91,12 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
     .await?;
 
     let expected_user_info = UserInfo {
-        avatar: Some(AvatarInfo {
-            checksum: "my-checksum".into(),
-            mime_type: "image/jpg".to_string(),
+        avatar: Some(Avatar {
+            id: "fa3c5706e27f6a0093981bb315015c2bd93e094e".parse().unwrap(),
+            source: AvatarSource::Pep {
+                mime_type: "image/jpg".to_string(),
+            },
+            owner: user_id!("a@prose.org").into(),
         }),
         activity: None,
         availability: Availability::Unavailable,
@@ -110,7 +117,7 @@ async fn test_persists_metadata_and_user_activity() -> Result<()> {
     let metadata = AvatarMetadata {
         bytes: 1001,
         mime_type: "image/jpg".to_string(),
-        checksum: "my-checksum".into(),
+        checksum: "fa3c5706e27f6a0093981bb315015c2bd93e094e".parse().unwrap(),
         width: None,
         height: None,
         url: None,
@@ -138,9 +145,12 @@ async fn test_persists_metadata_and_user_activity() -> Result<()> {
     .await?;
 
     let expected_user_info = UserInfo {
-        avatar: Some(AvatarInfo {
-            checksum: "my-checksum".into(),
-            mime_type: "image/jpg".to_string(),
+        avatar: Some(Avatar {
+            id: "fa3c5706e27f6a0093981bb315015c2bd93e094e".parse().unwrap(),
+            source: AvatarSource::Pep {
+                mime_type: "image/jpg".to_string(),
+            },
+            owner: user_id!("a@prose.org").into(),
         }),
         activity: Some(activity),
         availability: Availability::Unavailable,
