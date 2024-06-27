@@ -682,6 +682,7 @@ impl RoomsDomainService {
             &participant,
             &contact_name,
             user_info.availability,
+            user_info.avatar,
             sidebar_state,
             RoomFeatures {
                 mam_version: features.mam_version,

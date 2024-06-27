@@ -14,8 +14,8 @@ use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, UserId};
-use crate::domain::user_info::models::{AvatarImageId, AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{AccountId, AvatarId, UserId};
+use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 use crate::infra::avatars::{AvatarCache, MAX_IMAGE_DIMENSIONS};
 
 pub const IMAGE_OUTPUT_FORMAT: ImageOutputFormat = ImageOutputFormat::Jpeg(94);
@@ -78,7 +78,7 @@ impl AvatarCache for FsAvatarCache {
         &self,
         _account: &AccountId,
         user_id: &UserId,
-        image_checksum: &AvatarImageId,
+        image_checksum: &AvatarId,
     ) -> Result<bool> {
         let path = self.filename_for(user_id, image_checksum);
         Ok(path.exists())
@@ -88,7 +88,7 @@ impl AvatarCache for FsAvatarCache {
         &self,
         _account: &AccountId,
         user_id: &UserId,
-        image_checksum: &AvatarImageId,
+        image_checksum: &AvatarId,
     ) -> Result<Option<PlatformImage>> {
         let path = self.filename_for(user_id, image_checksum);
         if path.exists() {
@@ -115,11 +115,8 @@ impl AvatarCache for FsAvatarCache {
 }
 
 impl FsAvatarCache {
-    fn filename_for(&self, jid: &UserId, image_checksum: &AvatarImageId) -> PathBuf {
-        self.path.join(format!(
-            "{}-{}.jpg",
-            jid.to_string(),
-            image_checksum.as_ref()
-        ))
+    fn filename_for(&self, jid: &UserId, image_checksum: &AvatarId) -> PathBuf {
+        self.path
+            .join(format!("{}-{}.jpg", jid.to_string(), image_checksum))
     }
 }

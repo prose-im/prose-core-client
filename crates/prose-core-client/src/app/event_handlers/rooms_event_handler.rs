@@ -93,7 +93,7 @@ impl RoomsEventHandler {
                     if participants.get(&participant_id).map(|p| &p.affiliation)
                         != Some(&affiliation)
                     {
-                        participants.set_affiliation(&participant_id, event.is_self, &affiliation);
+                        participants.set_affiliation(&participant_id, event.is_self, affiliation);
                         true
                     } else {
                         false
@@ -134,7 +134,7 @@ impl RoomsEventHandler {
                     participants.set_availability(
                         &participant_id,
                         event.is_self,
-                        &Availability::Unavailable,
+                        Availability::Unavailable,
                     );
                 });
 
@@ -273,7 +273,7 @@ impl RoomsEventHandler {
                 if let Ok(room) = self.get_room(&event.user_id.to_room_id()) {
                     let participant_id = event.user_id.to_participant_id();
                     room.with_participants_mut(|participants| {
-                        participants.set_availability(&participant_id, is_self_event, &availability)
+                        participants.set_availability(&participant_id, is_self_event, availability)
                     });
 
                     if room.sidebar_state().is_in_sidebar() {

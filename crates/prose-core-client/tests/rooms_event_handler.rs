@@ -108,6 +108,7 @@ async fn test_adds_participant() -> Result<()> {
             is_self: false,
             affiliation: RoomAffiliation::Member,
             availability: Availability::Available,
+            avatar: None,
             compose_state: ComposeState::Idle,
             compose_state_updated: Default::default(),
             anon_occupant_id: None,
@@ -171,6 +172,7 @@ async fn test_adds_invited_participant() -> Result<()> {
             is_self: false,
             availability: Availability::Unavailable,
             affiliation: RoomAffiliation::Member,
+            avatar: None,
         }]
     );
 
@@ -191,6 +193,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
                 is_self: false,
                 affiliation: RoomAffiliation::Admin,
                 availability: Availability::Available,
+                avatar: None,
                 compose_state: ComposeState::Composing,
                 compose_state_updated: Default::default(),
             },
@@ -249,6 +252,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
             is_self: false,
             affiliation: RoomAffiliation::Member,
             availability: Availability::Unavailable,
+            avatar: None,
             compose_state: ComposeState::Idle,
             compose_state_updated: Default::default(),
         }]
@@ -459,6 +463,7 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         &user_id!("contact@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
+        None,
         RoomSidebarState::InSidebar,
         Default::default(),
         SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -567,6 +572,7 @@ async fn test_handles_user_presence() -> Result<()> {
         &user_id!("sender@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
+        None,
         RoomSidebarState::InSidebar,
         Default::default(),
         SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -761,6 +767,7 @@ async fn test_swallows_self_presence() -> Result<()> {
         &user_id!("them@prose.org"),
         "Janice Doe",
         Availability::Unavailable,
+        None,
         RoomSidebarState::InSidebar,
         Default::default(),
         SyncedRoomSettings::new(user_id!("user2@prose.org").into()),

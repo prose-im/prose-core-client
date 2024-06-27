@@ -3,7 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use avatar_metadata::{AvatarImageId, AvatarInfo, AvatarMetadata};
+pub use avatar::{Avatar, AvatarSource};
+pub use avatar_metadata::{AvatarInfo, AvatarMetadata};
 pub use platform_image::PlatformImage;
 pub use presence::Presence;
 pub use user_info::UserInfo;
@@ -11,6 +12,7 @@ pub use user_metadata::{LastActivity, UserMetadata};
 pub use user_profile::{Address, UserProfile};
 pub use user_status::UserStatus;
 
+mod avatar;
 mod avatar_metadata;
 mod platform_image;
 mod presence;
