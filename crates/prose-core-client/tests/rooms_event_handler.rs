@@ -72,9 +72,11 @@ async fn test_adds_participant() -> Result<()> {
     event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@conference.prose.org/nick").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 0,
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Available,
+                    ..Default::default()
+                },
             },
         }))
         .await?;
@@ -103,13 +105,9 @@ async fn test_adds_participant() -> Result<()> {
         Participant {
             real_id: Some(user_id!("real-jid@prose.org")),
             name: Some("George Washington".to_string()),
-            is_self: false,
             affiliation: RoomAffiliation::Member,
             availability: Availability::Available,
-            avatar: None,
-            compose_state: ComposeState::Idle,
-            compose_state_updated: Default::default(),
-            anon_occupant_id: None,
+            ..Default::default()
         }
     );
 
@@ -188,15 +186,10 @@ async fn test_handles_disconnected_participant() -> Result<()> {
         Room::private_channel(muc_id!("room@conference.prose.org")).with_participants(vec![(
             occupant_id!("room@conference.prose.org/a"),
             Participant {
-                real_id: None,
-                anon_occupant_id: None,
-                name: None,
-                is_self: false,
                 affiliation: RoomAffiliation::Admin,
                 availability: Availability::Available,
-                avatar: None,
                 compose_state: ComposeState::Composing,
-                compose_state_updated: Default::default(),
+                ..Default::default()
             },
         )]);
 
@@ -226,9 +219,11 @@ async fn test_handles_disconnected_participant() -> Result<()> {
     event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@conference.prose.org/a").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Unavailable,
-                priority: 0,
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Unavailable,
+                    ..Default::default()
+                },
             },
         }))
         .await?;
@@ -247,15 +242,9 @@ async fn test_handles_disconnected_participant() -> Result<()> {
     assert_eq!(
         room.participants().values().cloned().collect::<Vec<_>>(),
         vec![Participant {
-            real_id: None,
-            anon_occupant_id: None,
-            name: None,
-            is_self: false,
             affiliation: RoomAffiliation::Member,
             availability: Availability::Unavailable,
-            avatar: None,
-            compose_state: ComposeState::Idle,
-            compose_state_updated: Default::default(),
+            ..Default::default()
         }]
     );
 
@@ -463,8 +452,10 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
     let room = Room::for_direct_message(
         &user_id!("contact@prose.org"),
         "Janice Doe",
-        Availability::Unavailable,
-        None,
+        Presence {
+            availability: Availability::Unavailable,
+            ..Default::default()
+        },
         RoomSidebarState::InSidebar,
         Default::default(),
         SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -572,8 +563,10 @@ async fn test_handles_user_presence() -> Result<()> {
     let room = Room::for_direct_message(
         &user_id!("sender@prose.org"),
         "Janice Doe",
-        Availability::Unavailable,
-        None,
+        Presence {
+            availability: Availability::Unavailable,
+            ..Default::default()
+        },
         RoomSidebarState::InSidebar,
         Default::default(),
         SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -600,6 +593,7 @@ async fn test_handles_user_presence() -> Result<()> {
                 priority: 1,
                 availability: Availability::Available,
                 status: None,
+                ..Default::default()
             }),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
@@ -623,9 +617,12 @@ async fn test_handles_user_presence() -> Result<()> {
     event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
             user_id: user_resource_id!("sender@prose.org/resource").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 1,
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Available,
+                    priority: 1,
+                    ..Default::default()
+                },
             },
         }))
         .await?;
@@ -681,9 +678,12 @@ async fn test_handles_occupant_presence() -> Result<()> {
     event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
             user_id: occupant_id!("room@muc.prose.org/nick").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::DoNotDisturb,
-                priority: 1,
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::DoNotDisturb,
+                    priority: 1,
+                    ..Default::default()
+                },
             },
         }))
         .await?;
@@ -722,7 +722,7 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
             predicate::eq(Presence {
                 priority: 1,
                 availability: Availability::Available,
-                status: None,
+                ..Default::default()
             }),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
@@ -740,9 +740,12 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
     event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
             user_id: user_resource_id!("sender@prose.org/resource").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 1,
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Available,
+                    priority: 1,
+                    ..Default::default()
+                },
             },
         }))
         .await?;
@@ -767,8 +770,10 @@ async fn test_swallows_self_presence() -> Result<()> {
     let room = Room::for_direct_message(
         &user_id!("them@prose.org"),
         "Janice Doe",
-        Availability::Unavailable,
-        None,
+        Presence {
+            availability: Availability::Unavailable,
+            ..Default::default()
+        },
         RoomSidebarState::InSidebar,
         Default::default(),
         SyncedRoomSettings::new(user_id!("user2@prose.org").into()),
@@ -797,9 +802,11 @@ async fn test_swallows_self_presence() -> Result<()> {
     assert!(event_handler
         .handle_event(ServerEvent::UserStatus(UserStatusEvent {
             user_id: user_id!("us@prose.org").into(),
-            r#type: UserStatusEventType::AvailabilityChanged {
-                availability: Availability::Available,
-                priority: 0
+            r#type: UserStatusEventType::PresenceChanged {
+                presence: Presence {
+                    availability: Availability::Available,
+                    ..Default::default()
+                }
             }
         }))
         .await?

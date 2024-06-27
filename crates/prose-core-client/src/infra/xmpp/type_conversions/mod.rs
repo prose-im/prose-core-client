@@ -13,7 +13,6 @@ pub(crate) mod device_bundle;
 pub(crate) mod encrypted_payload;
 pub(crate) mod mention;
 pub(crate) mod message_ref;
-pub(crate) mod presence;
 pub(crate) mod room_affiliation;
 pub(crate) mod room_info;
 pub(crate) mod room_session_participant;

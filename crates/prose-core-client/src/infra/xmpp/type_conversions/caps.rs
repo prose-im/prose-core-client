@@ -25,6 +25,7 @@ mod tests {
     use prose_xmpp::ns;
 
     use crate::domain::general::models::Feature;
+    use crate::domain::user_info::models::PROSE_IM_NODE;
 
     use super::*;
 
@@ -48,7 +49,7 @@ mod tests {
     fn test_ver_string_prose() {
         let caps = Capabilities::new(
             "Prose",
-            "https://prose.org",
+            PROSE_IM_NODE,
             vec![
                 Feature::Name(ns::JABBER_CLIENT),
                 Feature::Name(ns::AVATAR_DATA),

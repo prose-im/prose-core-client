@@ -25,7 +25,6 @@ use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
 };
 use crate::domain::shared::models::{ParticipantId, RoomId};
-use crate::domain::user_info::models::Presence;
 use crate::dtos::Availability;
 use crate::ClientEvent;
 
@@ -256,10 +255,7 @@ impl RoomsEventHandler {
             })?;
 
         match event.r#type {
-            UserStatusEventType::AvailabilityChanged {
-                availability,
-                priority,
-            } => {
+            UserStatusEventType::PresenceChanged { presence } => {
                 let mut room_changed = false;
 
                 // If we have a room, update it…
@@ -268,7 +264,7 @@ impl RoomsEventHandler {
                     room.participants_mut().set_availability(
                         &participant_id,
                         is_self_event,
-                        availability,
+                        presence.availability,
                     );
 
                     if room.sidebar_state().is_in_sidebar() {
@@ -294,14 +290,7 @@ impl RoomsEventHandler {
                 };
 
                 self.user_info_domain_service
-                    .handle_user_presence_changed(
-                        &id,
-                        &Presence {
-                            priority,
-                            availability,
-                            status: None,
-                        },
-                    )
+                    .handle_user_presence_changed(&id, &presence)
                     .await?;
 
                 // We won't send an event for our own availability…

@@ -5,6 +5,7 @@
 
 pub use avatar::{Avatar, AvatarSource};
 pub use avatar_metadata::{AvatarInfo, AvatarMetadata};
+pub use jabber_client::{JabberClient, PROSE_IM_NODE};
 pub use platform_image::PlatformImage;
 pub use presence::Presence;
 pub use user_info::UserInfo;
@@ -14,6 +15,7 @@ pub use user_status::UserStatus;
 
 mod avatar;
 mod avatar_metadata;
+mod jabber_client;
 mod platform_image;
 mod presence;
 mod user_info;

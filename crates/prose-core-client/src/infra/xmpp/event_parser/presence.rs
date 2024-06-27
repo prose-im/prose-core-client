@@ -8,7 +8,6 @@ use jid::Jid;
 use xmpp_parsers::muc::user::Status;
 use xmpp_parsers::presence::Presence;
 
-use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::app::event_handlers::{
@@ -16,7 +15,7 @@ use crate::app::event_handlers::{
     UserStatusEventType,
 };
 use crate::domain::shared::models::{MucId, OccupantId, UserEndpointId};
-use crate::dtos::{Availability, UserId, UserResourceId};
+use crate::dtos::{Availability, ParticipantId, UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::{missing_attribute, missing_element, Context};
 use crate::infra::xmpp::util::PresenceExt;
 
@@ -25,27 +24,20 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
         return missing_attribute(ctx, "from", presence);
     };
 
-    let availability = presence.availability();
-
-    if let Some(muc_user) = presence
-        .payloads
-        .iter()
-        .find(|p| p.is("x", ns::MUC_USER))
-        .cloned()
-    {
-        return parse_muc_presence(ctx, from, availability, presence, muc_user.try_into()?);
+    if let Some(muc_user) = presence.muc_user() {
+        return parse_muc_presence(ctx, from, presence, muc_user);
     }
 
-    let user_id = match from.try_into_full() {
+    let user_id = UserId::from(from.to_bare());
+    let endpoint_id = match from.try_into_full() {
         Ok(full) => UserResourceId::from(full).into(),
         Err(bare) => UserId::from(bare).into(),
     };
 
     ctx.push_event(UserStatusEvent {
-        user_id,
-        r#type: UserStatusEventType::AvailabilityChanged {
-            availability,
-            priority: presence.priority,
+        user_id: endpoint_id,
+        r#type: UserStatusEventType::PresenceChanged {
+            presence: presence.to_domain_presence(user_id),
         },
     });
 
@@ -55,14 +47,13 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
 fn parse_muc_presence(
     ctx: &mut Context,
     from: Jid,
-    availability: Availability,
     presence: Presence,
     mut muc_user: MucUser,
 ) -> Result<()> {
     let from = from
         .try_into_full()
         .map_err(|_| anyhow!("Expected FullJid in MUC presence."))?;
-
+    let availability = presence.availability();
     let occupant_id = OccupantId::from(from);
 
     let Some(item) = muc_user.items.first() else {
@@ -83,12 +74,15 @@ fn parse_muc_presence(
 
     let anon_occupant_id = presence.anon_occupant_id();
     let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
+    let avatar_id = real_id
+        .clone()
+        .map(ParticipantId::from)
+        .unwrap_or_else(|| occupant_id.clone().into());
 
     ctx.push_event(UserStatusEvent {
         user_id: UserEndpointId::Occupant(occupant_id.clone()),
-        r#type: UserStatusEventType::AvailabilityChanged {
-            availability: availability.clone(),
-            priority: presence.priority,
+        r#type: UserStatusEventType::PresenceChanged {
+            presence: presence.to_domain_presence(avatar_id),
         },
     });
 

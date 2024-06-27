@@ -18,9 +18,9 @@ use crate::domain::rooms::models::{
     ParticipantList, RegisteredMember, RoomFeatures, RoomSessionParticipant,
 };
 use crate::domain::settings::models::SyncedRoomSettings;
-use crate::domain::shared::models::{AccountId, Availability, RoomId, RoomType, UserId};
+use crate::domain::shared::models::{AccountId, RoomId, RoomType, UserId};
 use crate::domain::sidebar::models::Bookmark;
-use crate::domain::user_info::models::Avatar;
+use crate::domain::user_info::models::Presence;
 use crate::dtos::{OccupantId, ParticipantId};
 
 /// Contains information about a connected room and its state.
@@ -286,8 +286,7 @@ impl Room {
             RoomId::User(user_id) => ParticipantList::for_direct_message(
                 user_id,
                 user_id.username(),
-                Availability::Unavailable,
-                None,
+                Presence::default(),
             ),
             RoomId::Muc(_) => Default::default(),
         };
@@ -381,8 +380,7 @@ impl Room {
     pub fn for_direct_message(
         contact_id: &UserId,
         contact_name: &str,
-        availability: Availability,
-        avatar: Option<Avatar>,
+        presence: Presence,
         sidebar_state: RoomSidebarState,
         features: RoomFeatures,
         settings: SyncedRoomSettings,
@@ -401,8 +399,7 @@ impl Room {
                 participants: ParticipantList::for_direct_message(
                     contact_id,
                     contact_name,
-                    availability,
-                    avatar,
+                    presence,
                 ),
                 sidebar_state,
                 state: RoomState::Connected,
@@ -461,6 +458,7 @@ impl PartialEq for Room {
 
 #[cfg(test)]
 mod tests {
+    use crate::domain::shared::models::Availability;
     use crate::user_id;
 
     use super::*;
@@ -470,8 +468,10 @@ mod tests {
         let internals = Room::for_direct_message(
             &user_id!("contact@prose.org"),
             "Jane Doe",
-            Availability::Available,
-            None,
+            Presence {
+                availability: Availability::Available,
+                ..Default::default()
+            },
             RoomSidebarState::Favorite,
             Default::default(),
             SyncedRoomSettings::new(user_id!("contact@prose.org").into()),
@@ -493,8 +493,10 @@ mod tests {
                     participants: ParticipantList::for_direct_message(
                         &user_id!("contact@prose.org"),
                         "Jane Doe",
-                        Availability::Available,
-                        None
+                        Presence {
+                            availability: Availability::Available,
+                            ..Default::default()
+                        },
                     ),
                     sidebar_state: RoomSidebarState::Favorite,
                     state: RoomState::Connected,

@@ -45,14 +45,12 @@ async fn test_assembles_contact_dto() -> Result<()> {
         .returning(|jid| {
             let info = match &jid {
                 _ if jid == &user_id!("a@prose.org") => Some(UserInfo {
-                    avatar: None,
-                    activity: None,
                     availability: Availability::Available,
+                    ..Default::default()
                 }),
                 _ if jid == &user_id!("b@prose.org") => Some(UserInfo {
-                    avatar: None,
-                    activity: None,
                     availability: Availability::Available,
+                    ..Default::default()
                 }),
                 _ if jid == &user_id!("john.doe@prose.org") => None,
                 _ => unreachable!(),

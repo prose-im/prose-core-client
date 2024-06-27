@@ -22,8 +22,7 @@ use crate::app::event_handlers::{
     BlockListEvent, BlockListEventType, ConnectionEvent, ContactListEvent, ContactListEventType,
     MessageEvent, MessageEventType, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
     RoomEventType, ServerEvent, SyncedRoomSettingsEvent, UserDeviceEvent, UserInfoEvent,
-    UserInfoEventType, UserResourceEvent, UserResourceEventType, UserStatusEvent,
-    UserStatusEventType,
+    UserInfoEventType, UserStatusEvent, UserStatusEventType,
 };
 use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
 use crate::domain::contacts::models::PresenceSubscription;
@@ -202,18 +201,6 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
                 },
             })
         }
-        XMPPCapsEvent::Caps { from, caps } => {
-            let from = from.try_into_full().map_err(|bare| {
-                anyhow!("Expected FullJid in caps element. Found '{bare}' instead.")
-            })?;
-
-            ctx.push_event(UserResourceEvent {
-                user_id: UserResourceId::from(from),
-                r#type: UserResourceEventType::CapabilitiesChanged {
-                    id: CapabilitiesId::from(format!("{}#{}", caps.node, caps.hash.to_base64())),
-                },
-            })
-        }
     }
 
     Ok(())
@@ -353,11 +340,6 @@ impl From<UserStatusEvent> for ServerEvent {
 impl From<UserInfoEvent> for ServerEvent {
     fn from(value: UserInfoEvent) -> Self {
         Self::UserInfo(value)
-    }
-}
-impl From<UserResourceEvent> for ServerEvent {
-    fn from(value: UserResourceEvent) -> Self {
-        Self::UserResource(value)
     }
 }
 impl From<RoomEvent> for ServerEvent {

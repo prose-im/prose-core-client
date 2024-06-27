@@ -8,9 +8,9 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 use crate::domain::shared::models::{
-    AnonOccupantId, Availability, ParticipantId, UserBasicInfo, UserId,
+    AnonOccupantId, Availability, CapabilitiesId, ParticipantId, UserBasicInfo, UserId,
 };
-use crate::domain::user_info::models::Avatar;
+use crate::domain::user_info::models::{Avatar, JabberClient, Presence};
 
 use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
 
@@ -30,6 +30,8 @@ pub struct Participant {
     pub affiliation: RoomAffiliation,
     pub availability: Availability,
     pub avatar: Option<Avatar>,
+    pub client: Option<JabberClient>,
+    pub caps: Option<CapabilitiesId>,
     pub compose_state: ComposeState,
     pub compose_state_updated: DateTime<Utc>,
 }
@@ -43,12 +45,7 @@ pub struct RegisteredMember {
 }
 
 impl ParticipantList {
-    pub fn for_direct_message(
-        contact_id: &UserId,
-        contact_name: &str,
-        availability: Availability,
-        avatar: Option<Avatar>,
-    ) -> Self {
+    pub fn for_direct_message(contact_id: &UserId, contact_name: &str, presence: Presence) -> Self {
         Self {
             anon_occupant_id_to_participant_id_map: Default::default(),
             participants_map: HashMap::from([(
@@ -59,8 +56,10 @@ impl ParticipantList {
                     name: Some(contact_name.to_string()),
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
-                    availability,
-                    avatar,
+                    availability: presence.availability,
+                    avatar: presence.avatar,
+                    client: presence.client,
+                    caps: presence.caps,
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 },
@@ -90,11 +89,13 @@ impl ParticipantList {
             let participant = Participant {
                 real_id: p.real_id,
                 anon_occupant_id: p.anon_id,
-                name: None,
+                name: p.presence.nickname,
                 is_self: p.is_self,
                 affiliation: p.affiliation,
-                availability: p.availability,
-                avatar: p.avatar,
+                availability: p.presence.availability,
+                avatar: p.presence.avatar,
+                client: p.presence.client,
+                caps: p.presence.caps,
                 compose_state: ComposeState::Idle,
                 compose_state_updated: Default::default(),
             };
@@ -114,14 +115,10 @@ impl ParticipantList {
                 .and_modify(|p| p.name = member.name.clone())
                 .or_insert_with(|| Participant {
                     real_id: Some(member.user_id),
-                    anon_occupant_id: None,
                     name: member.name,
                     is_self: member.is_self,
                     affiliation: member.affiliation,
-                    availability: Availability::Unavailable,
-                    avatar: None,
-                    compose_state: ComposeState::Idle,
-                    compose_state_updated: Default::default(),
+                    ..Default::default()
                 });
         }
 
@@ -149,15 +146,9 @@ impl ParticipantList {
                 }
             })
             .or_insert_with(|| Participant {
-                real_id: None,
-                anon_occupant_id: None,
-                name: None,
                 is_self,
-                affiliation: RoomAffiliation::None,
                 availability: availability.clone(),
-                avatar: None,
-                compose_state: ComposeState::Idle,
-                compose_state_updated: DateTime::default(),
+                ..Default::default()
             });
     }
 
@@ -176,15 +167,9 @@ impl ParticipantList {
                 participant.is_self = is_self;
             })
             .or_insert_with(|| Participant {
-                real_id: None,
-                anon_occupant_id: None,
-                name: None,
                 is_self,
                 affiliation,
-                availability: Availability::Unavailable,
-                avatar: None,
-                compose_state: ComposeState::Idle,
-                compose_state_updated: DateTime::default(),
+                ..Default::default()
             });
     }
 
@@ -198,15 +183,9 @@ impl ParticipantList {
                 participant.is_self = is_self;
             })
             .or_insert_with(|| Participant {
-                real_id: None,
-                anon_occupant_id: None,
-                name: None,
                 is_self,
-                affiliation: RoomAffiliation::None,
-                availability: Availability::Unavailable,
                 avatar: avatar.cloned(),
-                compose_state: ComposeState::Idle,
-                compose_state_updated: DateTime::default(),
+                ..Default::default()
             });
     }
 
@@ -250,14 +229,10 @@ impl ParticipantList {
             })
             .or_insert_with(|| Participant {
                 real_id: Some(real_id.clone()),
-                anon_occupant_id: None,
                 name: name.map(ToString::to_string),
                 is_self,
                 affiliation: affiliation.clone(),
-                availability: Availability::Unavailable,
-                avatar: None,
-                compose_state: ComposeState::Idle,
-                compose_state_updated: DateTime::default(),
+                ..Default::default()
             });
     }
 
@@ -561,8 +536,10 @@ mod tests {
                 anon_id: None,
                 real_id: Some(user_id!("a@prose.org")),
                 affiliation: RoomAffiliation::Member,
-                availability: Availability::Available,
-                avatar: None,
+                presence: Presence {
+                    availability: Availability::Available,
+                    ..Default::default()
+                },
             }],
         );
 
@@ -573,28 +550,19 @@ mod tests {
                     ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
                     Participant {
                         real_id: Some(user_id!("a@prose.org")),
-                        anon_occupant_id: None,
                         name: Some("User A".to_string()),
-                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
-                        avatar: None,
-                        compose_state: Default::default(),
-                        compose_state_updated: Default::default(),
+                        ..Default::default()
                     }
                 ),
                 (
                     ParticipantId::User(user_id!("b@prose.org")),
                     Participant {
                         real_id: Some(user_id!("b@prose.org")),
-                        anon_occupant_id: None,
                         name: Some("User B".to_string()),
-                        is_self: false,
                         affiliation: RoomAffiliation::Member,
-                        availability: Availability::Unavailable,
-                        avatar: None,
-                        compose_state: Default::default(),
-                        compose_state_updated: Default::default(),
+                        ..Default::default()
                     }
                 )
             ])
@@ -625,28 +593,20 @@ mod tests {
                     ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
                     Participant {
                         real_id: Some(user_id!("a@prose.org")),
-                        anon_occupant_id: None,
                         name: Some("User A".to_string()),
-                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
-                        avatar: None,
-                        compose_state: Default::default(),
-                        compose_state_updated: Default::default(),
+                        ..Default::default()
                     }
                 ),
                 (
                     ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
                     Participant {
                         real_id: Some(user_id!("b@prose.org")),
-                        anon_occupant_id: None,
                         name: Some("User B New Name".to_string()),
-                        is_self: false,
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
-                        avatar: None,
-                        compose_state: Default::default(),
-                        compose_state_updated: Default::default(),
+                        ..Default::default()
                     }
                 )
             ])
@@ -659,8 +619,10 @@ mod tests {
         let mut list = ParticipantList::for_direct_message(
             &user_id!("a@prose.org"),
             "User A",
-            Availability::Unavailable,
-            None,
+            Presence {
+                availability: Availability::Unavailable,
+                ..Default::default()
+            },
         );
 
         assert_eq!(
@@ -669,16 +631,11 @@ mod tests {
                 ParticipantId::User(user_id!("a@prose.org")),
                 Participant {
                     real_id: Some(user_id!("a@prose.org")),
-                    anon_occupant_id: None,
                     name: Some("User A".to_string()),
-                    is_self: false,
                     affiliation: RoomAffiliation::Owner,
-                    availability: Availability::Unavailable,
-                    avatar: None,
-                    compose_state: Default::default(),
-                    compose_state_updated: Default::default(),
+                    ..Default::default()
                 }
-            ),])
+            )])
         );
 
         // Now the user comes online…
@@ -694,16 +651,12 @@ mod tests {
                 ParticipantId::User(user_id!("a@prose.org")),
                 Participant {
                     real_id: Some(user_id!("a@prose.org")),
-                    anon_occupant_id: None,
                     name: Some("User A".to_string()),
-                    is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability: Availability::Available,
-                    avatar: None,
-                    compose_state: Default::default(),
-                    compose_state_updated: Default::default(),
+                    ..Default::default()
                 }
-            ),])
+            )])
         );
     }
 }

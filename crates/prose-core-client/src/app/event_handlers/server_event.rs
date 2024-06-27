@@ -12,11 +12,12 @@ use crate::domain::encryption::models::DeviceList;
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::MucId;
 use crate::domain::sidebar::models::Bookmark;
+use crate::domain::user_info::models::Presence;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
     shared::models::{
-        AnonOccupantId, Availability, CapabilitiesId, OccupantId, RequestId, SenderId,
-        UserEndpointId, UserId, UserResourceId,
+        AnonOccupantId, CapabilitiesId, OccupantId, RequestId, SenderId, UserEndpointId, UserId,
+        UserResourceId,
     },
     user_info::models::{AvatarMetadata, UserProfile, UserStatus},
 };
@@ -34,8 +35,6 @@ pub enum ServerEvent {
     UserStatus(UserStatusEvent),
     /// Events that affect the information about the user globally.
     UserInfo(UserInfoEvent),
-    /// Events that affect a specific resource of a user.
-    UserResource(UserResourceEvent),
     /// Events about changes to a MUC room.
     Room(RoomEvent),
     /// Events about changes to an occupant of a MUC room.
@@ -68,13 +67,8 @@ pub struct UserStatusEvent {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum UserStatusEventType {
-    AvailabilityChanged {
-        availability: Availability,
-        priority: i8,
-    },
-    ComposeStateChanged {
-        state: ComposeState,
-    },
+    PresenceChanged { presence: Presence },
+    ComposeStateChanged { state: ComposeState },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -89,18 +83,6 @@ pub enum UserInfoEventType {
     AvatarChanged { metadata: AvatarMetadata },
     ProfileChanged { profile: UserProfile },
     StatusChanged { status: Option<UserStatus> },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-// Events that affect a specific resource of a user.
-pub struct UserResourceEvent {
-    pub user_id: UserResourceId,
-    pub r#type: UserResourceEventType,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum UserResourceEventType {
-    CapabilitiesChanged { id: CapabilitiesId },
 }
 
 #[derive(Debug, Clone, PartialEq)]
