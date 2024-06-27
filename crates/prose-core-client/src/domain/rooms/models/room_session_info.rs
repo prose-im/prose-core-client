@@ -5,9 +5,9 @@
 
 use crate::domain::rooms::models::RoomAffiliation;
 use crate::domain::shared::models::{
-    AnonOccupantId, Availability, MamVersion, MucId, OccupantId, RoomType, UserId,
+    AnonOccupantId, MamVersion, MucId, OccupantId, RoomType, UserId,
 };
-use crate::domain::user_info::models::Avatar;
+use crate::domain::user_info::models::Presence;
 
 /// Contains information about a room after creating or joining it.
 #[derive(Debug, PartialEq, Clone)]
@@ -43,6 +43,5 @@ pub struct RoomSessionParticipant {
     pub anon_id: Option<AnonOccupantId>,
     pub real_id: Option<UserId>,
     pub affiliation: RoomAffiliation,
-    pub availability: Availability,
-    pub avatar: Option<Avatar>,
+    pub presence: Presence,
 }

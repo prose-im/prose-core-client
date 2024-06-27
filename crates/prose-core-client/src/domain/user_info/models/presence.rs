@@ -3,12 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::domain::shared::models::Availability;
+use crate::domain::shared::models::{Availability, CapabilitiesId};
+use crate::domain::user_info::models::JabberClient;
+use crate::dtos::Avatar;
 
 #[derive(Clone, PartialEq, Debug, Default)]
 pub struct Presence {
-    pub priority: i8,
     pub availability: Availability,
+    pub avatar: Option<Avatar>,
+    pub caps: Option<CapabilitiesId>,
+    pub client: Option<JabberClient>,
+    pub nickname: Option<String>,
+    pub priority: i8,
     pub status: Option<String>,
 }
 
@@ -21,8 +27,12 @@ mod tests {
         assert_eq!(
             Presence::default(),
             Presence {
-                priority: 0,
                 availability: Availability::Unavailable,
+                avatar: None,
+                caps: None,
+                client: None,
+                nickname: None,
+                priority: 0,
                 status: None,
             }
         )

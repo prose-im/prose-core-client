@@ -6,13 +6,12 @@
 use anyhow::{bail, Result};
 use tracing::error;
 use xmpp_parsers::muc::user::Status;
-use xmpp_parsers::presence::Presence;
+use xmpp_parsers::presence;
 
 use prose_xmpp::mods::muc::RoomOccupancy;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::rooms::models::RoomSessionParticipant;
-use crate::domain::user_info::models::{Avatar, AvatarSource};
 use crate::dtos::{OccupantId, ParticipantId, UserId};
 use crate::infra::xmpp::util::PresenceExt;
 
@@ -40,7 +39,10 @@ impl RoomOccupancyExt for RoomOccupancy {
     }
 }
 
-fn self_participant(presence: &Presence, muc_user: &MucUser) -> Result<RoomSessionParticipant> {
+fn self_participant(
+    presence: &presence::Presence,
+    muc_user: &MucUser,
+) -> Result<RoomSessionParticipant> {
     let Some(from) = presence
         .from
         .as_ref()
@@ -54,20 +56,19 @@ fn self_participant(presence: &Presence, muc_user: &MucUser) -> Result<RoomSessi
     };
 
     let occupant_id = OccupantId::from(from.clone());
-    let avatar = presence.avatar_id().map(|id| Avatar {
-        id,
-        source: AvatarSource::Vcard,
-        owner: ParticipantId::Occupant(occupant_id.clone()),
-    });
+    let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
+    let avatar_id = real_id
+        .clone()
+        .map(ParticipantId::from)
+        .unwrap_or_else(|| occupant_id.clone().into());
 
     Ok(RoomSessionParticipant {
-        id: occupant_id,
+        id: occupant_id.clone(),
         is_self: muc_user.status.contains(&Status::SelfPresence),
         anon_id: presence.anon_occupant_id(),
-        real_id: item.jid.clone().map(|jid| UserId::from(jid.into_bare())),
+        real_id,
         affiliation: item.affiliation.clone().into(),
-        availability: presence.availability(),
-        avatar,
+        presence: presence.to_domain_presence(avatar_id),
     })
 }
 
@@ -80,6 +81,7 @@ mod tests {
     use prose_xmpp::{bare, full};
 
     use crate::domain::shared::models::AnonOccupantId;
+    use crate::domain::user_info::models::Presence;
     use crate::dtos::{Availability, RoomAffiliation};
     use crate::{occupant_id, user_id};
 
@@ -94,14 +96,14 @@ mod tests {
                         .with_jid(full!("me@prose.org/res")),
                 )
                 .with_status(vec![Status::SelfPresence]),
-            self_presence: Presence::new(Default::default())
+            self_presence: presence::Presence::new(Default::default())
                 .with_from(full!("room@conf.prose.org/me"))
                 .with_to(bare!("user@prose.org"))
                 .with_payload(XMPPOccupantId {
                     id: "occ_3".to_string(),
                 }),
             presences: vec![
-                Presence::new(Default::default())
+                presence::Presence::new(Default::default())
                     .with_from(full!("room@conf.prose.org/user_a"))
                     .with_payload(XMPPOccupantId {
                         id: "occ_1".to_string(),
@@ -112,7 +114,7 @@ mod tests {
                                 .with_jid(full!("user_a@prose.org/res")),
                         ),
                     ),
-                Presence::new(Default::default())
+                presence::Presence::new(Default::default())
                     .with_from(full!("room@conf.prose.org/user_b"))
                     .with_payload(XMPPOccupantId {
                         id: "occ_2".to_string(),
@@ -137,8 +139,10 @@ mod tests {
                     anon_id: Some(AnonOccupantId::from("occ_1")),
                     real_id: Some(user_id!("user_a@prose.org")),
                     affiliation: RoomAffiliation::Member,
-                    availability: Availability::Available,
-                    avatar: None,
+                    presence: Presence {
+                        availability: Availability::Available,
+                        ..Default::default()
+                    }
                 },
                 RoomSessionParticipant {
                     id: occupant_id!("room@conf.prose.org/user_b"),
@@ -146,8 +150,10 @@ mod tests {
                     anon_id: Some(AnonOccupantId::from("occ_2")),
                     real_id: Some(user_id!("user_b@prose.org")),
                     affiliation: RoomAffiliation::Member,
-                    availability: Availability::Available,
-                    avatar: None,
+                    presence: Presence {
+                        availability: Availability::Available,
+                        ..Default::default()
+                    }
                 },
                 RoomSessionParticipant {
                     id: occupant_id!("room@conf.prose.org/me"),
@@ -155,8 +161,10 @@ mod tests {
                     anon_id: Some(AnonOccupantId::from("occ_3")),
                     real_id: Some(user_id!("me@prose.org")),
                     affiliation: RoomAffiliation::Member,
-                    availability: Availability::Available,
-                    avatar: None,
+                    presence: Presence {
+                        availability: Availability::Available,
+                        ..Default::default()
+                    }
                 }
             ]
         );

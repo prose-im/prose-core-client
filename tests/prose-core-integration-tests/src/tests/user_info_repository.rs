@@ -53,6 +53,7 @@ async fn test_caches_loaded_avatar_metadata() -> Result<()> {
         }),
         activity: None,
         availability: Availability::Unavailable,
+        ..Default::default()
     };
 
     assert_eq!(
@@ -100,6 +101,7 @@ async fn test_caches_received_avatar_metadata() -> Result<()> {
         }),
         activity: None,
         availability: Availability::Unavailable,
+        ..Default::default()
     };
 
     assert_eq!(
@@ -154,6 +156,7 @@ async fn test_persists_metadata_and_user_activity() -> Result<()> {
         }),
         activity: Some(activity),
         availability: Availability::Unavailable,
+        ..Default::default()
     };
 
     assert_eq!(
@@ -193,6 +196,7 @@ async fn test_does_not_persist_availability() -> Result<()> {
             priority: 1,
             availability: Availability::Available,
             status: None,
+            ..Default::default()
         },
     )
     .await?;
@@ -201,6 +205,7 @@ async fn test_does_not_persist_availability() -> Result<()> {
         avatar: None,
         activity: None,
         availability: Availability::Available,
+        ..Default::default()
     };
 
     assert_eq!(
@@ -239,6 +244,7 @@ async fn test_uses_highest_presence() -> Result<()> {
             priority: 2,
             availability: Availability::Away,
             status: None,
+            ..Default::default()
         },
     )
     .await?;
@@ -250,6 +256,7 @@ async fn test_uses_highest_presence() -> Result<()> {
             priority: 1,
             availability: Availability::Available,
             status: None,
+            ..Default::default()
         },
     )
     .await?;
@@ -266,6 +273,7 @@ async fn test_uses_highest_presence() -> Result<()> {
             avatar: None,
             activity: None,
             availability: Availability::Away,
+            ..Default::default()
         })
     );
 

@@ -16,6 +16,8 @@ use xmpp_parsers::stanza_error::DefinedCondition;
 use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::{IDProvider, RequestError};
 
+use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
+use super::{build_nickname, ParticipantsVecExt};
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
     DynConnectedRoomsRepository, DynEncryptionDomainService, DynIDProvider,
@@ -34,12 +36,10 @@ use crate::domain::rooms::services::rooms_domain_service::{
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{AccountId, MucId, RoomId, RoomType, UserId};
+use crate::domain::user_info::models::Presence;
 use crate::dtos::{Availability, RoomState};
 use crate::util::StringExt;
 use crate::{ClientEvent, ClientRoomEventType};
-
-use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
-use super::{build_nickname, ParticipantsVecExt};
 
 const CHANNEL_PREFIX: &str = "org.prose.channel";
 
@@ -681,8 +681,15 @@ impl RoomsDomainService {
         let room = Room::for_direct_message(
             &participant,
             &contact_name,
-            user_info.availability,
-            user_info.avatar,
+            Presence {
+                availability: user_info.availability,
+                avatar: user_info.avatar,
+                caps: user_info.caps,
+                client: user_info.client,
+                nickname: None,
+                priority: 0,
+                status: None,
+            },
             sidebar_state,
             RoomFeatures {
                 mam_version: features.mam_version,

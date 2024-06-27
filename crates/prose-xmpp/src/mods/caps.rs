@@ -22,61 +22,18 @@ pub struct Caps {
     ctx: ModuleContext,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Event {
     DiscoInfoQuery {
         from: Jid,
         id: String,
         node: Option<String>,
     },
-    Caps {
-        from: Jid,
-        caps: xmpp_parsers::caps::Caps,
-    },
-}
-
-impl PartialEq for Event {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                Event::DiscoInfoQuery {
-                    from: f1,
-                    id: i1,
-                    node: n1,
-                },
-                Event::DiscoInfoQuery {
-                    from: f2,
-                    id: i2,
-                    node: n2,
-                },
-            ) => f1 == f2 && i1 == i2 && n1 == n2,
-            (Event::Caps { from: f1, caps: c1 }, Event::Caps { from: f2, caps: c2 }) => {
-                f1 == f2 && c1.ext == c2.ext && c1.node == c2.node && c1.hash == c2.hash
-            }
-            (Event::DiscoInfoQuery { .. }, _) => false,
-            (Event::Caps { .. }, _) => false,
-        }
-    }
 }
 
 impl Module for Caps {
     fn register_with(&mut self, context: ModuleContext) {
         self.ctx = context
-    }
-
-    fn handle_presence_stanza(&self, stanza: &Presence) -> Result<()> {
-        let (Some(from), Some(caps)) = (
-            &stanza.from,
-            stanza.payloads.iter().find(|p| p.is("c", ns::CAPS)),
-        ) else {
-            return Ok(());
-        };
-
-        self.ctx.schedule_event(ClientEvent::Caps(Event::Caps {
-            from: from.clone(),
-            caps: xmpp_parsers::caps::Caps::try_from(caps.clone())?,
-        }));
-        Ok(())
     }
 
     fn handle_iq_stanza(&self, stanza: &Iq) -> Result<()> {

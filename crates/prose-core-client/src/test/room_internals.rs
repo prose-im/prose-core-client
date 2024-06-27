@@ -11,6 +11,7 @@ use crate::domain::rooms::models::{
 };
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{ParticipantId, RoomId, RoomType};
+use crate::domain::user_info::models::Presence;
 use crate::dtos::{Availability, Participant, RoomState, UserId};
 use crate::test::mock_data;
 
@@ -21,8 +22,10 @@ impl Room {
         Self::for_direct_message(
             &jid,
             &jid.formatted_username(),
-            availability,
-            None,
+            Presence {
+                availability,
+                ..Default::default()
+            },
             RoomSidebarState::InSidebar,
             Default::default(),
             SyncedRoomSettings::new(RoomId::User(jid.clone())),
@@ -135,6 +138,8 @@ impl Participant {
             availability: Availability::Unavailable,
             anon_occupant_id: None,
             avatar: None,
+            client: None,
+            caps: None,
         }
     }
 
@@ -149,6 +154,8 @@ impl Participant {
             compose_state_updated: Default::default(),
             availability: Availability::Unavailable,
             avatar: None,
+            client: None,
+            caps: None,
         }
     }
 
