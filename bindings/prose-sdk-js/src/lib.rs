@@ -16,10 +16,11 @@ mod connector;
 mod delegate;
 mod encryption;
 mod error;
+mod error_hook;
 mod log;
 mod types;
 
 #[wasm_bindgen(start)]
 pub fn start() {
-    console_error_panic_hook::set_once();
+    error_hook::set_once();
 }

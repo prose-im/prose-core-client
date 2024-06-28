@@ -17,8 +17,8 @@ crate-type = ["cdylib"]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 base64 = { workspace = true }
+cfg-if = "1.0"
 chrono = { workspace = true }
-console_error_panic_hook = "0.1"
 jid = { workspace = true }
 js-sys = { workspace = true }
 mime = { workspace = true }
