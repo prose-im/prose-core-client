@@ -34,7 +34,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
         }])
         .by_adding_participants([(
             occupant_id!("room@conference.prose.org/b"),
-            Participant::owner().set_name("Bernhard Doe"),
+            Participant::owner().set_vcard_name("Bernhard Doe"),
         )]);
 
     deps.user_info_domain_service
@@ -110,7 +110,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         }])
         .by_adding_participants([(
             occupant_id!("room@conference.prose.org/b"),
-            Participant::owner().set_name("Bernhard Doe"),
+            Participant::owner().set_vcard_name("Bernhard Doe"),
         )]);
 
     deps.user_info_domain_service

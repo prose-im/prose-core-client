@@ -14,8 +14,8 @@ use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::connection::models::{ConnectionProperties, ServerFeatures};
 use prose_core_client::domain::rooms::models::{
-    RegisteredMember, Room, RoomAffiliation, RoomConfig, RoomError, RoomInfo, RoomSessionInfo,
-    RoomSessionMember, RoomSessionParticipant, RoomSidebarState, RoomSpec,
+    ParticipantName, RegisteredMember, Room, RoomAffiliation, RoomConfig, RoomError, RoomInfo,
+    RoomSessionInfo, RoomSessionMember, RoomSessionParticipant, RoomSidebarState, RoomSpec,
 };
 use prose_core_client::domain::rooms::services::impls::RoomsDomainService;
 use prose_core_client::domain::rooms::services::{
@@ -229,6 +229,7 @@ async fn test_joins_room() -> Result<()> {
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Owner,
                 avatar: None,
+                client: None,
             },
             ParticipantInfo {
                 id: Some(user_id!("user2@prose.org")),
@@ -237,6 +238,7 @@ async fn test_joins_room() -> Result<()> {
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Member,
                 avatar: None,
+                client: None,
             },
             ParticipantInfo {
                 id: Some(user_id!("user3@prose.org")),
@@ -245,6 +247,7 @@ async fn test_joins_room() -> Result<()> {
                 availability: Availability::Unavailable,
                 affiliation: RoomAffiliation::Member,
                 avatar: None,
+                client: None,
             }
         ],
         participants
@@ -488,25 +491,25 @@ async fn test_creates_group() -> Result<()> {
                     vec![
                         Participant {
                             real_id: Some(user_id!("a@prose.org")),
-                            name: Some("Tick".to_string()),
+                            name: ParticipantName::from_vcard("Tick"),
                             affiliation: RoomAffiliation::Owner,
                             ..Default::default()
                         },
                         Participant {
                             real_id: Some(user_id!("b@prose.org")),
-                            name: Some("Trick".to_string()),
+                            name: ParticipantName::from_vcard("Trick"),
                             affiliation: RoomAffiliation::Owner,
                             ..Default::default()
                         },
                         Participant {
                             real_id: Some(user_id!("c@prose.org")),
-                            name: Some("Track".to_string()),
+                            name: ParticipantName::from_vcard("Track"),
                             affiliation: RoomAffiliation::Owner,
                             ..Default::default()
                         },
                         Participant {
                             real_id: Some(user_id!("jane.doe@prose.org")),
-                            name: Some("Jane".to_string()),
+                            name: ParticipantName::from_vcard("Jane"),
                             is_self: true,
                             affiliation: RoomAffiliation::Owner,
                             ..Default::default()

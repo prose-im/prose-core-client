@@ -235,7 +235,7 @@ impl RoomsEventHandler {
                     .get_display_name(&user_id)
                     .await?;
                 room.with_participants_mut(|participants| {
-                    participants.add_user(&user_id, false, &affiliation, name.as_deref());
+                    participants.add_user(&user_id, false, affiliation, name.as_deref());
                 });
 
                 self.client_event_dispatcher
@@ -269,11 +269,7 @@ impl RoomsEventHandler {
                 if let Ok(room) = self.get_room(&event.user_id.to_room_id()) {
                     let participant_id = event.user_id.to_participant_id();
                     room.with_participants_mut(|participants| {
-                        participants.set_availability(
-                            &participant_id,
-                            is_self_event,
-                            presence.availability,
-                        )
+                        participants.set_presence(&participant_id, is_self_event, presence.clone())
                     });
 
                     if room.sidebar_state().is_in_sidebar() {

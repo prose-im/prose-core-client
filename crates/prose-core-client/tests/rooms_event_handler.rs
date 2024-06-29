@@ -8,6 +8,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
 use mockall::{predicate, Sequence};
+use pretty_assertions::assert_eq;
 
 use prose_core_client::app::event_handlers::{
     OccupantEvent, OccupantEventType, RoomEvent, RoomEventType, RoomsEventHandler, ServerEvent,
@@ -15,7 +16,7 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::rooms::models::{
-    ComposeState, Room, RoomAffiliation, RoomSidebarState,
+    ComposeState, ParticipantName, Room, RoomAffiliation, RoomSidebarState,
 };
 use prose_core_client::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, RoomFactory,
@@ -106,7 +107,7 @@ async fn test_adds_participant() -> Result<()> {
         occupant,
         Participant {
             real_id: Some(user_id!("real-jid@prose.org")),
-            name: Some("George Washington".to_string()),
+            name: ParticipantName::from_vcard("George Washington"),
             affiliation: RoomAffiliation::Member,
             availability: Availability::Available,
             ..Default::default()
@@ -171,6 +172,7 @@ async fn test_adds_invited_participant() -> Result<()> {
             availability: Availability::Unavailable,
             affiliation: RoomAffiliation::Member,
             avatar: None,
+            client: None,
         }]
     );
 
@@ -239,12 +241,12 @@ async fn test_handles_disconnected_participant() -> Result<()> {
         .await?;
 
     assert_eq!(
-        room.with_participants(|p| p.values().cloned().collect::<Vec<_>>()),
         vec![Participant {
             affiliation: RoomAffiliation::Member,
             availability: Availability::Unavailable,
             ..Default::default()
-        }]
+        }],
+        room.with_participants(|p| p.values().cloned().collect::<Vec<_>>()),
     );
 
     Ok(())
@@ -376,7 +378,7 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
         occupant_id!("room@conference.prose.org/nickname"),
         Participant::owner()
             .set_real_id(&user_id!("nickname@prose.org"))
-            .set_name("Janice Doe"),
+            .set_vcard_name("Janice Doe"),
     )]);
 
     {

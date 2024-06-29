@@ -3,16 +3,87 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::collections::HashMap;
-
-use chrono::{DateTime, Utc};
-
+use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
 use crate::domain::shared::models::{
     AnonOccupantId, Availability, CapabilitiesId, ParticipantId, UserBasicInfo, UserId,
 };
 use crate::domain::user_info::models::{Avatar, JabberClient, Presence};
+use chrono::{DateTime, Utc};
+use itertools::Itertools;
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::marker::PhantomData;
 
-use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ParticipantName {
+    /// The name derived from the participant's vCard.
+    pub vcard: Option<String>,
+    /// The (nick)name from the participants' presence.
+    pub presence: Option<String>,
+}
+
+impl ParticipantName {
+    fn name(&self) -> ParticipantNameBuilder<Option<Cow<String>>> {
+        ParticipantNameBuilder::new(self)
+    }
+
+    pub fn from_vcard(name: impl Into<String>) -> Self {
+        Self {
+            vcard: Some(name.into()),
+            presence: None,
+        }
+    }
+}
+
+pub struct ParticipantNameBuilder<'a, T> {
+    phantom_data: PhantomData<&'a T>,
+    name: T,
+}
+
+impl<'a> ParticipantNameBuilder<'a, Option<Cow<'a, String>>> {
+    // Adjust the constructor to return a builder with the specific type 'Option<Cow<'a, String>>'
+    fn new(name: &'a ParticipantName) -> Self {
+        Self {
+            phantom_data: PhantomData,
+            name: name
+                .vcard
+                .as_ref()
+                .map(Cow::Borrowed)
+                .or_else(|| name.presence.as_ref().map(Cow::Borrowed)),
+        }
+    }
+
+    fn or_real_id(
+        self,
+        real_id: Option<&UserId>,
+    ) -> ParticipantNameBuilder<'a, Option<Cow<'a, String>>> {
+        ParticipantNameBuilder {
+            phantom_data: PhantomData,
+            name: self
+                .name
+                .or_else(|| real_id.map(|id| Cow::Owned(id.formatted_username()))),
+        }
+    }
+
+    pub fn or_participant_id(
+        self,
+        participant_id: &ParticipantId,
+    ) -> ParticipantNameBuilder<'a, Cow<'a, String>> {
+        ParticipantNameBuilder {
+            phantom_data: PhantomData,
+            name: self.name.unwrap_or_else(|| match participant_id {
+                ParticipantId::User(id) => Cow::Owned(id.formatted_username()),
+                ParticipantId::Occupant(id) => Cow::Owned(id.formatted_nickname()),
+            }),
+        }
+    }
+}
+
+impl<'a> ParticipantNameBuilder<'a, Cow<'a, String>> {
+    pub fn into_string(self) -> String {
+        self.name.into_owned()
+    }
+}
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ParticipantList {
@@ -25,7 +96,7 @@ pub struct Participant {
     /// The real JID of the occupant. Only available in non-anonymous rooms.
     pub real_id: Option<UserId>,
     pub anon_occupant_id: Option<AnonOccupantId>,
-    pub name: Option<String>,
+    pub name: ParticipantName,
     pub is_self: bool,
     pub affiliation: RoomAffiliation,
     pub availability: Availability,
@@ -34,6 +105,12 @@ pub struct Participant {
     pub caps: Option<CapabilitiesId>,
     pub compose_state: ComposeState,
     pub compose_state_updated: DateTime<Utc>,
+}
+
+impl Participant {
+    pub fn name(&self) -> ParticipantNameBuilder<Option<Cow<String>>> {
+        self.name.name().or_real_id(self.real_id.as_ref())
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,7 +130,10 @@ impl ParticipantList {
                 Participant {
                     real_id: Some(contact_id.clone()),
                     anon_occupant_id: None,
-                    name: Some(contact_name.to_string()),
+                    name: ParticipantName {
+                        vcard: Some(contact_name.to_string()),
+                        presence: None,
+                    },
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
                     availability: presence.availability,
@@ -89,7 +169,10 @@ impl ParticipantList {
             let participant = Participant {
                 real_id: p.real_id,
                 anon_occupant_id: p.anon_id,
-                name: p.presence.nickname,
+                name: ParticipantName {
+                    vcard: None,
+                    presence: p.presence.nickname,
+                },
                 is_self: p.is_self,
                 affiliation: p.affiliation,
                 availability: p.presence.availability,
@@ -110,16 +193,17 @@ impl ParticipantList {
                 .map(ParticipantId::Occupant)
                 .unwrap_or_else(|| ParticipantId::User(member.user_id.clone()));
 
-            participants_map
-                .entry(participant_id)
-                .and_modify(|p| p.name = member.name.clone())
-                .or_insert_with(|| Participant {
-                    real_id: Some(member.user_id),
-                    name: member.name,
-                    is_self: member.is_self,
-                    affiliation: member.affiliation,
-                    ..Default::default()
-                });
+            let participant =
+                participants_map
+                    .entry(participant_id)
+                    .or_insert_with(|| Participant {
+                        real_id: Some(member.user_id),
+                        is_self: member.is_self,
+                        affiliation: member.affiliation,
+                        ..Default::default()
+                    });
+
+            participant.name.vcard = member.name;
         }
 
         Self {
@@ -136,20 +220,25 @@ impl ParticipantList {
         is_self: bool,
         availability: Availability,
     ) {
-        self.participants_map
-            .entry(id.clone())
-            .and_modify(|participant| {
-                participant.availability = availability.clone();
-                participant.is_self = is_self;
-                if availability == Availability::Unavailable {
-                    participant.compose_state = ComposeState::Idle;
-                }
-            })
-            .or_insert_with(|| Participant {
-                is_self,
-                availability: availability.clone(),
-                ..Default::default()
-            });
+        let participant = self.participants_map.entry(id.clone()).or_default();
+        participant.is_self = is_self;
+        participant.availability = availability;
+
+        if availability == Availability::Unavailable {
+            participant.compose_state = ComposeState::Idle;
+        }
+    }
+
+    /// Modifies the participant's presence or inserts a new participant with the presence
+    /// if it didn't exist.
+    pub fn set_presence(&mut self, id: &ParticipantId, is_self: bool, presence: Presence) {
+        self.set_availability(id, is_self, presence.availability);
+
+        let participant = self.participants_map.entry(id.clone()).or_default();
+        participant.name.presence = presence.nickname;
+        participant.avatar = presence.avatar;
+        participant.client = presence.client;
+        participant.caps = presence.caps;
     }
 
     /// Modifies the participant's affiliation or inserts a new participant with the affiliation
@@ -160,33 +249,17 @@ impl ParticipantList {
         is_self: bool,
         affiliation: RoomAffiliation,
     ) {
-        self.participants_map
-            .entry(id.clone())
-            .and_modify(|participant| {
-                participant.affiliation = affiliation;
-                participant.is_self = is_self;
-            })
-            .or_insert_with(|| Participant {
-                is_self,
-                affiliation,
-                ..Default::default()
-            });
+        let participant = self.participants_map.entry(id.clone()).or_default();
+        participant.affiliation = affiliation;
+        participant.is_self = is_self;
     }
 
     /// Modifies the participant's avatar or inserts a new participant with the avatar
     /// if it didn't exist.
     pub fn set_avatar(&mut self, id: &ParticipantId, is_self: bool, avatar: Option<&Avatar>) {
-        self.participants_map
-            .entry(id.clone())
-            .and_modify(|participant| {
-                participant.avatar = avatar.cloned();
-                participant.is_self = is_self;
-            })
-            .or_insert_with(|| Participant {
-                is_self,
-                avatar: avatar.cloned(),
-                ..Default::default()
-            });
+        let participant = self.participants_map.entry(id.clone()).or_default();
+        participant.avatar = avatar.cloned();
+        participant.is_self = is_self;
     }
 
     /// Sets the participant's compose state. Does nothing if the participant doesn't exist.
@@ -208,7 +281,7 @@ impl ParticipantList {
         &mut self,
         real_id: &UserId,
         is_self: bool,
-        affiliation: &RoomAffiliation,
+        affiliation: RoomAffiliation,
         name: Option<&str>,
     ) {
         if self
@@ -220,20 +293,15 @@ impl ParticipantList {
             return;
         }
 
-        self.participants_map
+        let participant = self
+            .participants_map
             .entry(ParticipantId::User(real_id.clone()))
-            .and_modify(|participant| {
-                participant.affiliation = affiliation.clone();
-                participant.name = name.map(ToString::to_string);
-                participant.is_self = is_self;
-            })
-            .or_insert_with(|| Participant {
-                real_id: Some(real_id.clone()),
-                name: name.map(ToString::to_string),
-                is_self,
-                affiliation: affiliation.clone(),
-                ..Default::default()
-            });
+            .or_default();
+
+        participant.real_id = Some(real_id.clone());
+        participant.affiliation = affiliation;
+        participant.is_self = is_self;
+        participant.name.vcard = name.map(ToString::to_string);
     }
 
     /// Sets the participant's real id, anonymous occupant id and name. Does nothing if the
@@ -251,7 +319,7 @@ impl ParticipantList {
 
         participant.real_id = real_id.cloned();
         participant.anon_occupant_id = anon_occupant_id.cloned();
-        participant.name = name.map(ToString::to_string);
+        participant.name.vcard = name.map(ToString::to_string);
 
         // Remove registered user matching the real id…
         if let Some(real_id) = real_id {
@@ -311,38 +379,35 @@ impl ParticipantList {
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
     /// If we don't have a real JID for a composing user they are excluded from the list.
     pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<UserBasicInfo> {
-        let mut composing_occupants = self
-            .participants_map
-            .values()
-            .filter_map(|occupant| {
+        self.participants_map
+            .iter()
+            .filter_map(|(id, occupant)| {
                 if occupant.compose_state != ComposeState::Composing
                     || occupant.compose_state_updated <= started_after
                     || occupant.real_id.is_none()
                 {
                     return None;
                 }
-                Some(occupant.clone())
+                Some((id, occupant))
             })
-            .collect::<Vec<_>>();
+            .sorted_by_key(|o| o.1.compose_state_updated)
+            .filter_map(|(id, occupant)| {
+                // TODO: Support compose states of MUC users?
 
-        composing_occupants.sort_by_key(|o| o.compose_state_updated);
-
-        composing_occupants
-            .into_iter()
-            .filter_map(|occupant| {
-                let Some(real_id) = &occupant.real_id else {
+                let Some(real_id) = occupant.real_id.clone() else {
                     return None;
                 };
 
                 Some(UserBasicInfo {
                     name: occupant
-                        .name
-                        .clone()
-                        .unwrap_or_else(|| real_id.formatted_username()),
-                    id: real_id.clone(),
+                        .name()
+                        .or_real_id(occupant.real_id.as_ref())
+                        .or_participant_id(id)
+                        .into_string(),
+                    id: real_id,
                 })
             })
-            .collect()
+            .collect::<Vec<_>>()
     }
 }
 
@@ -479,7 +544,7 @@ mod tests {
             occupant_id!("room@prose.org/c").into(),
             Participant {
                 real_id: Some(user_id!("c@prose.org")),
-                name: Some("Jonathan Doe".to_string()),
+                name: ParticipantName::from_vcard("Jonathan Doe"),
                 compose_state: ComposeState::Composing,
                 compose_state_updated: Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 20).unwrap(),
                 ..Default::default()
@@ -550,7 +615,7 @@ mod tests {
                     ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
                     Participant {
                         real_id: Some(user_id!("a@prose.org")),
-                        name: Some("User A".to_string()),
+                        name: ParticipantName::from_vcard("User A"),
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
                         ..Default::default()
@@ -560,7 +625,7 @@ mod tests {
                     ParticipantId::User(user_id!("b@prose.org")),
                     Participant {
                         real_id: Some(user_id!("b@prose.org")),
-                        name: Some("User B".to_string()),
+                        name: ParticipantName::from_vcard("User B"),
                         affiliation: RoomAffiliation::Member,
                         ..Default::default()
                     }
@@ -593,7 +658,7 @@ mod tests {
                     ParticipantId::Occupant(occupant_id!("room@conference.prose.org/a")),
                     Participant {
                         real_id: Some(user_id!("a@prose.org")),
-                        name: Some("User A".to_string()),
+                        name: ParticipantName::from_vcard("User A"),
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
                         ..Default::default()
@@ -603,7 +668,7 @@ mod tests {
                     ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
                     Participant {
                         real_id: Some(user_id!("b@prose.org")),
-                        name: Some("User B New Name".to_string()),
+                        name: ParticipantName::from_vcard("User B New Name"),
                         affiliation: RoomAffiliation::Member,
                         availability: Availability::Available,
                         ..Default::default()
@@ -631,7 +696,7 @@ mod tests {
                 ParticipantId::User(user_id!("a@prose.org")),
                 Participant {
                     real_id: Some(user_id!("a@prose.org")),
-                    name: Some("User A".to_string()),
+                    name: ParticipantName::from_vcard("User A"),
                     affiliation: RoomAffiliation::Owner,
                     ..Default::default()
                 }
@@ -651,7 +716,7 @@ mod tests {
                 ParticipantId::User(user_id!("a@prose.org")),
                 Participant {
                     real_id: Some(user_id!("a@prose.org")),
-                    name: Some("User A".to_string()),
+                    name: ParticipantName::from_vcard("User A"),
                     affiliation: RoomAffiliation::Owner,
                     availability: Availability::Available,
                     ..Default::default()
