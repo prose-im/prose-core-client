@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use compose_state::ComposeState;
-pub use participant_list::{Participant, ParticipantList, RegisteredMember};
+pub use participant_list::{Participant, ParticipantList, ParticipantName, RegisteredMember};
 pub use public_room_info::PublicRoomInfo;
 pub use room::{Room, RoomInfo, RoomSidebarState, RoomState};
 pub use room_affiliation::RoomAffiliation;

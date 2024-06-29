@@ -12,7 +12,7 @@ use prose_core_client::domain::rooms::services::impls::build_nickname;
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::{AnonOccupantId, RoomType};
 use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::dtos::{MucId, OccupantId, RoomEnvelope, RoomId, UserId};
+use prose_core_client::dtos::{MucId, OccupantId, RoomAffiliation, RoomEnvelope, RoomId, UserId};
 use prose_core_client::ClientEvent;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::Message;
@@ -26,6 +26,11 @@ pub struct JoinRoomStrategy {
     pub room_name: String,
     pub room_type: RoomType,
     pub room_settings: Option<SyncedRoomSettings>,
+    pub owners: Vec<UserId>,
+    pub members: Vec<UserId>,
+    pub admins: Vec<UserId>,
+    pub user_affiliation: RoomAffiliation,
+    pub receive_occupant_presences: Box<dyn FnOnce(&TestClient, &MucId)>,
     pub expect_catchup: Box<dyn FnOnce(&TestClient, &MucId)>,
     pub expect_load_vcard: Box<dyn FnOnce(&TestClient, &MucId, &UserId)>,
 }
@@ -36,6 +41,11 @@ impl Default for JoinRoomStrategy {
             room_name: "general".to_string(),
             room_type: RoomType::PublicChannel,
             room_settings: None,
+            owners: vec![],
+            members: vec![],
+            admins: vec![],
+            user_affiliation: RoomAffiliation::Owner,
+            receive_occupant_presences: Box::new(|_, _| {}),
             expect_catchup: Box::new(|client, room_id| client.expect_muc_catchup(room_id)),
             expect_load_vcard: Box::new(|client, _room_id, user_id| {
                 client.expect_load_vcard(&user_id);
@@ -83,6 +93,29 @@ impl JoinRoomStrategy {
         handler: impl FnOnce(&TestClient, &MucId, &UserId) + 'static,
     ) -> Self {
         self.expect_load_vcard = Box::new(handler);
+        self
+    }
+
+    pub fn with_occupant_presences_handler(
+        mut self,
+        handler: impl FnOnce(&TestClient, &MucId) + 'static,
+    ) -> Self {
+        self.receive_occupant_presences = Box::new(handler);
+        self
+    }
+
+    pub fn with_owners(mut self, owners: impl IntoIterator<Item = UserId>) -> Self {
+        self.owners = owners.into_iter().collect();
+        self
+    }
+
+    pub fn with_admins(mut self, admins: impl IntoIterator<Item = UserId>) -> Self {
+        self.admins = admins.into_iter().collect();
+        self
+    }
+
+    pub fn with_members(mut self, members: impl IntoIterator<Item = UserId>) -> Self {
+        self.members = members.into_iter().collect();
         self
     }
 }
@@ -215,6 +248,8 @@ impl TestClient {
         "#
         );
 
+        (strategy.receive_occupant_presences)(self, &room_id);
+
         recv!(
             self,
             r#"
@@ -248,63 +283,75 @@ impl TestClient {
         );
         recv!(self, strategy.room_type.get_response());
 
-        send!(
+        fn expect_load_affiliations(
+            client: &TestClient,
+            affiliation: RoomAffiliation,
+            users: impl IntoIterator<Item = UserId>,
+        ) {
+            let users = users
+                .into_iter()
+                .map(|user| format!(r#"<item affiliation="{affiliation}" jid="{user}" />"#))
+                .collect::<Vec<_>>();
+
+            client.push_ctx(
+                [
+                    ("AFFILIATION".into(), affiliation.to_string()),
+                    ("USERS".into(), users.join("\n")),
+                ]
+                .into(),
+            );
+
+            send!(
+                client,
+                r#"
+                <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
+                    <query xmlns='http://jabber.org/protocol/muc#admin'>
+                      <item xmlns='http://jabber.org/protocol/muc#user' affiliation="{{AFFILIATION}}"/>
+                    </query>
+                </iq>
+                "#
+            );
+            recv!(
+                client,
+                r#"
+                <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
+                  <query xmlns="http://jabber.org/protocol/muc#admin">
+                    {{USERS}}
+                  </query>
+                </iq>
+                "#
+            );
+
+            client.pop_ctx();
+        }
+
+        let current_user_id = self.connected_user_id().unwrap().to_user_id();
+
+        expect_load_affiliations(
             self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
-            <query xmlns='http://jabber.org/protocol/muc#admin'>
-              <item xmlns='http://jabber.org/protocol/muc#user' affiliation="owner"/>
-            </query>
-        </iq>
-        "#
-        );
-        recv!(
-            self,
-            r#"
-        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
-          <query xmlns="http://jabber.org/protocol/muc#admin">
-            <item affiliation="owner" jid="user@prose.org" />
-          </query>
-        </iq>
-        "#
+            RoomAffiliation::Owner,
+            strategy.owners.into_iter().chain(
+                (strategy.user_affiliation == RoomAffiliation::Owner)
+                    .then_some(current_user_id.clone()),
+            ),
         );
 
-        send!(
+        expect_load_affiliations(
             self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
-            <query xmlns='http://jabber.org/protocol/muc#admin'>
-                <item xmlns='http://jabber.org/protocol/muc#user' affiliation="member"/>
-            </query>
-        </iq>
-        "#
-        );
-        recv!(
-            self,
-            r#"
-        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
-            <query xmlns="http://jabber.org/protocol/muc#admin" />
-        </iq>
-        "#
+            RoomAffiliation::Member,
+            strategy.members.into_iter().chain(
+                (strategy.user_affiliation == RoomAffiliation::Member)
+                    .then_some(current_user_id.clone()),
+            ),
         );
 
-        send!(
+        expect_load_affiliations(
             self,
-            r#"
-        <iq xmlns='jabber:client' id="{{ID}}" to="{{ROOM_ID}}" type="get">
-            <query xmlns='http://jabber.org/protocol/muc#admin'>
-                <item xmlns='http://jabber.org/protocol/muc#user' affiliation="admin"/>
-            </query>
-        </iq>
-        "#
-        );
-        recv!(
-            self,
-            r#"
-        <iq xmlns="jabber:client" from="{{ROOM_ID}}" id="{{ID}}" type="result">
-            <query xmlns="http://jabber.org/protocol/muc#admin" />
-        </iq>
-        "#
+            RoomAffiliation::Admin,
+            strategy.admins.into_iter().chain(
+                (strategy.user_affiliation == RoomAffiliation::Admin)
+                    .then_some(current_user_id.clone()),
+            ),
         );
 
         (strategy.expect_load_vcard)(

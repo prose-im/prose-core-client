@@ -130,7 +130,7 @@ impl Participant {
     pub fn owner() -> Self {
         Participant {
             real_id: None,
-            name: None,
+            name: Default::default(),
             is_self: false,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
@@ -147,7 +147,7 @@ impl Participant {
         Participant {
             real_id: None,
             anon_occupant_id: None,
-            name: None,
+            name: Default::default(),
             is_self: false,
             affiliation: RoomAffiliation::Owner,
             compose_state: Default::default(),
@@ -169,8 +169,8 @@ impl Participant {
         self
     }
 
-    pub fn set_name(mut self, name: impl Into<String>) -> Self {
-        self.name = Some(name.into());
+    pub fn set_vcard_name(mut self, name: impl Into<String>) -> Self {
+        self.name.vcard = Some(name.into());
         self
     }
 

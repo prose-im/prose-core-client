@@ -1046,6 +1046,7 @@ impl RoomsDomainService {
         let room_topic = info.topic;
         let current_user_id = self.ctx.connected_id()?.into_user_id();
 
+        // Enrich the room members with vCard data…
         let mut members = Vec::with_capacity(info.members.len());
         for member in info.members {
             let name = self

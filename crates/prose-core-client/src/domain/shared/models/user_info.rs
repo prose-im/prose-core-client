@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::domain::rooms::models::{Participant, RoomAffiliation};
-use crate::domain::user_info::models::Avatar;
+use crate::domain::user_info::models::{Avatar, JabberClient};
 
 use super::{Availability, ParticipantId, UserId};
 
@@ -30,28 +30,21 @@ pub struct ParticipantInfo {
     pub availability: Availability,
     pub affiliation: RoomAffiliation,
     pub avatar: Option<Avatar>,
+    pub client: Option<JabberClient>,
 }
 
 impl From<(&ParticipantId, &Participant)> for ParticipantInfo {
     fn from(value: (&ParticipantId, &Participant)) -> Self {
         let (id, participant) = value;
 
-        let name = participant.name.clone().unwrap_or_else(|| match id {
-            ParticipantId::User(id) => id.formatted_username(),
-            ParticipantId::Occupant(id) => participant
-                .real_id
-                .as_ref()
-                .map(|real_id| real_id.formatted_username())
-                .unwrap_or_else(|| id.formatted_nickname()),
-        });
-
         ParticipantInfo {
             id: participant.real_id.clone(),
-            name,
+            name: participant.name().or_participant_id(id).into_string(),
             is_self: participant.is_self,
             availability: participant.availability,
             affiliation: participant.affiliation,
             avatar: participant.avatar.clone(),
+            client: participant.client.clone(),
         }
     }
 }

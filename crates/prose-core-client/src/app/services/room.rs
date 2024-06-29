@@ -681,8 +681,12 @@ impl<Kind> Room<Kind> {
         let (name, mut real_id) = self
             .data
             .with_participants(|p| {
-                p.get(&id.clone().into())
-                    .map(|p| (p.name.clone(), p.real_id.clone()))
+                p.get(&id.clone().into()).map(|p| {
+                    (
+                        Some(p.name().or_participant_id(id).into_string()),
+                        p.real_id.clone(),
+                    )
+                })
             })
             .unwrap_or_else(|| (None, None));
 
@@ -699,6 +703,8 @@ impl<Kind> Room<Kind> {
                 name,
             };
         }
+
+        // TODO: Prevent performing a request here
 
         if let Some(real_id) = real_id {
             if let Some(name) = self
