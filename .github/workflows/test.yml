@@ -6,6 +6,7 @@ on:
       - 'bindings/prose-sdk-js/Cargo.toml'
       - 'CHANGELOG.md'
       - 'xtask/**'
+      - '.github/**'
   pull_request:
     branches:
       - '**'
