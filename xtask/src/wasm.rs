@@ -320,12 +320,12 @@ async fn bump_patch(sh: &Shell) -> Result<()> {
     let changelog_path = cwd.join("CHANGELOG.md");
     cmd!(
         sh,
-        "git cliff --workdir {cwd} --output {changelog_path} --tag 2.0.0"
+        "git cliff --workdir {cwd} --output {changelog_path} --tag {version}"
     )
     .run()?;
 
     // Commit changelog
-    let commit_message = "chore: Update changelog";
+    let commit_message = format!("chore: Update changelog for {version}");
     cmd!(sh, "git add {changelog_path}").run()?;
     cmd!(sh, "git commit -m {commit_message}").run()?;
 
