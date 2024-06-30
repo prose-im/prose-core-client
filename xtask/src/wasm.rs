@@ -159,8 +159,6 @@ async fn run_release_github(
     )?;
     let release_notes = output.trim();
 
-    println!(">> Release notes: {release_notes}");
-
     // Read archive metas & contents
     let file_size = std::fs::metadata(file_path)?.len();
     let file = tokio::fs::File::open(file_path).await?;
@@ -289,7 +287,7 @@ async fn publish(sh: &Shell) -> Result<()> {
     run_release_github(sh, &github_token, &version, &filename, &file_path).await?;
 
     // Upload release archive to NPM
-    // run_release_npm(sh, &npm_token, &file_path)?;
+    run_release_npm(sh, &npm_token, &file_path)?;
 
     Ok(())
 }
