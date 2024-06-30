@@ -146,13 +146,7 @@ async fn run_release_github(
 ) -> Result<()> {
     println!("Uploading release to GitHub…");
 
-    // Read archive metas & contents
-    let file_size = std::fs::metadata(file_path)?.len();
-    let file = tokio::fs::File::open(file_path).await?;
-    let stream = tokio_util::codec::FramedRead::new(file, tokio_util::codec::BytesCodec::new());
-    let body = reqwest::Body::wrap_stream(stream);
-    let client = reqwest::Client::builder().build()?;
-
+    // Collect release notes
     let cwd = env::current_dir()?;
     let config_file = cwd.join("cliff-release-notes.toml");
     let output = String::from_utf8(
@@ -164,6 +158,13 @@ async fn run_release_github(
         .stdout,
     )?;
     let release_notes = output.trim();
+
+    // Read archive metas & contents
+    let file_size = std::fs::metadata(file_path)?.len();
+    let file = tokio::fs::File::open(file_path).await?;
+    let stream = tokio_util::codec::FramedRead::new(file, tokio_util::codec::BytesCodec::new());
+    let body = reqwest::Body::wrap_stream(stream);
+    let client = reqwest::Client::builder().build()?;
 
     // Create GitHub release
     let github_release = Octocrab::builder()
