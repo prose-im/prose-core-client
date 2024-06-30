@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use octocrab::Octocrab;
 use serde::{Deserialize, Serialize};
 use url::Url;
@@ -138,6 +138,7 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
 }
 
 async fn run_release_github(
+    sh: &Shell,
     github_token: &str,
     version: &str,
     filename: &str,
@@ -152,6 +153,18 @@ async fn run_release_github(
     let body = reqwest::Body::wrap_stream(stream);
     let client = reqwest::Client::builder().build()?;
 
+    let cwd = env::current_dir()?;
+    let config_file = cwd.join("cliff-release-notes.toml");
+    let output = String::from_utf8(
+        cmd!(
+            sh,
+            "git cliff --workdir {cwd} --config {config_file} --latest"
+        )
+        .output()?
+        .stdout,
+    )?;
+    let release_notes = output.trim();
+
     // Create GitHub release
     let github_release = Octocrab::builder()
         .personal_token(github_token.to_string())
@@ -163,6 +176,7 @@ async fn run_release_github(
         .name(&format!("Version {}", version))
         .draft(false)
         .prerelease(true)
+        .body(release_notes)
         .send()
         .await?;
 
@@ -231,9 +245,10 @@ fn run_release_npm(sh: &Shell, npm_token: &str, file_path: &PathBuf) -> Result<(
 }
 
 async fn publish(sh: &Shell) -> Result<()> {
+    ensure_git_cliff_installed(sh)?;
+
     // Read tokens from environment
-    let github_token =
-        std::env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
+    let github_token = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
     let npm_token = std::env::var("NPM_TOKEN").expect("NPM_TOKEN env variable is required");
 
     // Build & pack archive contents
@@ -268,7 +283,7 @@ async fn publish(sh: &Shell) -> Result<()> {
         .join(&filename);
 
     // Upload release archive to GitHub
-    run_release_github(&github_token, &version, &filename, &file_path).await?;
+    run_release_github(sh, &github_token, &version, &filename, &file_path).await?;
 
     // Upload release archive to NPM
     run_release_npm(sh, &npm_token, &file_path)?;
@@ -277,7 +292,11 @@ async fn publish(sh: &Shell) -> Result<()> {
 }
 
 async fn bump_patch(sh: &Shell) -> Result<()> {
-    let manifest_path = env::current_dir()?
+    ensure_git_cliff_installed(sh)?;
+
+    let cwd = env::current_dir()?;
+
+    let manifest_path = cwd
         .join(paths::BINDINGS)
         .join(paths::bindings::WASM)
         .join("Cargo.toml");
@@ -295,20 +314,51 @@ async fn bump_patch(sh: &Shell) -> Result<()> {
     // Increment patch version
     version.patch += 1;
 
+    let version = version.to_string();
+
+    // Update changelog
+    let changelog_path = cwd.join("CHANGELOG.md");
+    cmd!(
+        sh,
+        "git cliff --workdir {cwd} --output {changelog_path} --tag 2.0.0"
+    )
+    .run()?;
+
+    // Commit changelog
+    let commit_message = "chore: Update changelog";
+    cmd!(sh, "git add {changelog_path}").run()?;
+    cmd!(sh, "git commit -m {commit_message}").run()?;
+
     // Update the version in the manifest
-    manifest["package"]["version"] = toml_edit::value(version.to_string());
+    manifest["package"]["version"] = toml_edit::value(&version);
     fs::write(&manifest_path, manifest.to_string())?;
 
-    let version = version.to_string();
+    // Commit manifest
     let manifest_path = manifest_path.display().to_string();
     let commit_message = format!("chore(sdk-js): Bump version to {version}");
-
-    // Commit changes
     cmd!(sh, "git add {manifest_path}").run()?;
     cmd!(sh, "git commit -m {commit_message}").run()?;
 
     // Create a Git tag
     cmd!(sh, "git tag {version}").run()?;
+
+    Ok(())
+}
+
+fn ensure_git_cliff_installed(sh: &Shell) -> Result<()> {
+    let git_cliff_installed = cmd!(sh, "git cliff --version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false);
+
+    if !git_cliff_installed {
+        bail!(
+            r#"git-cliff is not installed.
+        
+            Install by running `cargo install git-cliff or see other options at https://git-cliff.org/docs/installation/crates-io.
+            "#
+        )
+    }
 
     Ok(())
 }

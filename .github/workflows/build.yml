@@ -36,6 +36,9 @@ jobs:
         with:
           version: latest
 
+      - name: Install git-cliff
+        run: cargo install git-cliff
+
       - name: Verify versions
         run: rustc --version && rustup --version && cargo --version && wasm-pack --version && node --version && npm --version && node -p process.versions.v8
 

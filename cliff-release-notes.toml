@@ -7,14 +7,9 @@ repo = "prose-core-client"
 token = ""
 
 [changelog]
-# template for the changelog body
+# template for the release notes
 # https://keats.github.io/tera/docs/#introduction
 body = """
-{%- if version %}
-## What's Changed
-{%- if version %} in {{ version }}{%- endif -%}
-{% raw %}\n{% endraw %}
-{%- endif -%}
 {% for commit in commits %}
   {% if commit.github.pr_title -%}
     {%- set commit_message = commit.github.pr_title -%}
@@ -27,26 +22,6 @@ body = """
       [#{{ commit.github.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.github.pr_number }}) \
     {%- endif %}
 {%- endfor -%}
-
-{% if github.contributors | filter(attribute="is_first_time", value=true) | length != 0 %}
-  {% raw %}\n{% endraw -%}
-  ## New Contributors
-{%- endif %}\
-{% for contributor in github.contributors | filter(attribute="is_first_time", value=true) %}
-  * @{{ contributor.username }} made their first contribution
-    {%- if contributor.pr_number %} in \
-      [#{{ contributor.pr_number }}]({{ self::remote_url() }}/pull/{{ contributor.pr_number }}) \
-    {%- endif %}
-{%- endfor -%}
-
-{% if version %}
-    {% if previous.version %}
-      [Full Changelog]({{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }})
-    {% endif %}
-{% else -%}
-  {% raw %}\n{% endraw %}
-{% endif %}
-
 {%- macro remote_url() -%}
   https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
 {%- endmacro -%}
