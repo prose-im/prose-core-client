@@ -5,6 +5,7 @@ on:
     paths-ignore:
       - 'bindings/prose-sdk-js/Cargo.toml'
       - 'CHANGELOG.md'
+      - 'xtask/**'
   pull_request:
     branches:
       - '**'
