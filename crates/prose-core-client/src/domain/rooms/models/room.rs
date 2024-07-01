@@ -8,9 +8,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
-use parking_lot::{
-    MappedRwLockReadGuard, MappedRwLockWriteGuard, RwLock, RwLockReadGuard, RwLockWriteGuard,
-};
+use parking_lot::RwLock;
 
 use crate::app::deps::DynMessagesRepository;
 use crate::domain::messaging::models::MessageLikePayload;
@@ -171,12 +169,12 @@ impl Room {
         self.inner.details.write().topic = topic
     }
 
-    pub fn participants(&self) -> MappedRwLockReadGuard<ParticipantList> {
-        RwLockReadGuard::map(self.inner.details.read(), |s| &s.participants)
+    pub fn with_participants<T>(&self, f: impl FnOnce(&ParticipantList) -> T) -> T {
+        f(&self.inner.details.read().participants)
     }
 
-    pub fn participants_mut(&self) -> MappedRwLockWriteGuard<ParticipantList> {
-        RwLockWriteGuard::map(self.inner.details.write(), |s| &mut s.participants)
+    pub fn with_participants_mut<T>(&self, f: impl FnOnce(&mut ParticipantList) -> T) -> T {
+        f(&mut self.inner.details.write().participants)
     }
 
     pub fn sidebar_state(&self) -> RoomSidebarState {
@@ -270,12 +268,12 @@ impl Room {
         Ok(stats)
     }
 
-    pub fn settings(&self) -> MappedRwLockReadGuard<SyncedRoomSettings> {
-        RwLockReadGuard::map(self.inner.details.read(), |s| &s.settings)
+    pub fn settings(&self) -> SyncedRoomSettings {
+        self.inner.details.read().settings.clone()
     }
 
-    pub fn settings_mut(&self) -> MappedRwLockWriteGuard<SyncedRoomSettings> {
-        RwLockWriteGuard::map(self.inner.details.write(), |s| &mut s.settings)
+    pub fn with_settings_mut<T>(&self, f: impl FnOnce(&mut SyncedRoomSettings) -> T) -> T {
+        f(&mut self.inner.details.write().settings)
     }
 }
 

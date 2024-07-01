@@ -126,7 +126,7 @@ impl<Kind> Debug for Room<Kind> {
             .field("description", &self.data.description())
             .field("user_nickname", &self.data.user_nickname)
             .field("subject", &self.data.topic())
-            .field("occupants", &self.data.participants())
+            .field("occupants", &self.data.with_participants(|p| p.clone()))
             .finish_non_exhaustive()
     }
 }
@@ -170,10 +170,7 @@ impl<Kind> Room<Kind> {
 
     pub fn participants(&self) -> Vec<ParticipantInfo> {
         self.data
-            .participants()
-            .iter()
-            .map(ParticipantInfo::from)
-            .collect()
+            .with_participants(|p| p.iter().map(ParticipantInfo::from).collect())
     }
 }
 
@@ -367,7 +364,9 @@ impl<Kind> Room<Kind> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
         let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
-        Ok(self.data.participants().composing_users(thirty_secs_ago))
+        Ok(self
+            .data
+            .with_participants(|p| p.composing_users(thirty_secs_ago)))
     }
 
     pub async fn save_draft(&self, text: Option<&str>) -> Result<()> {
@@ -681,9 +680,10 @@ impl<Kind> Room<Kind> {
     async fn resolve_message_sender(&self, id: &ParticipantId) -> MessageSender {
         let (name, mut real_id) = self
             .data
-            .participants()
-            .get(&id.clone().into())
-            .map(|p| (p.name.clone(), p.real_id.clone()))
+            .with_participants(|p| {
+                p.get(&id.clone().into())
+                    .map(|p| (p.name.clone(), p.real_id.clone()))
+            })
             .unwrap_or_else(|| (None, None));
 
         real_id = real_id.or_else(|| id.to_user_id());
@@ -775,18 +775,17 @@ impl<Kind> Room<Kind> {
             RoomType::DirectMessage | RoomType::Group | RoomType::PrivateChannel
                 if self.data.settings().encryption_enabled =>
             {
-                let user_ids = self
-                    .data
-                    .participants()
-                    .iter()
-                    .filter_map(|(_, participant)| {
-                        if participant.is_self {
-                            return None;
-                        }
-                        participant.real_id.clone()
-                    })
-                    .sorted()
-                    .collect::<Vec<_>>();
+                let user_ids = self.data.with_participants(|p| {
+                    p.iter()
+                        .filter_map(|(_, participant)| {
+                            if participant.is_self {
+                                return None;
+                            }
+                            participant.real_id.clone()
+                        })
+                        .sorted()
+                        .collect::<Vec<_>>()
+                });
 
                 send_message_request::Payload::Encrypted(
                     self.encryption_domain_service
@@ -809,15 +808,18 @@ impl<Kind> Room<Kind> {
 
     async fn update_synced_settings(&self, handler: impl FnOnce(&mut SyncedRoomSettings)) {
         let updated_settings = {
-            let mut settings = self.data.settings_mut();
-            let mut updated_settings = settings.clone();
-            handler(&mut updated_settings);
+            let (settings_changed, updated_settings) = self.data.with_settings_mut(|settings| {
+                let mut updated_settings = settings.clone();
+                handler(&mut updated_settings);
+                let settings_changed = &updated_settings != settings;
+                *settings = updated_settings.clone();
+                (settings_changed, updated_settings)
+            });
 
-            if updated_settings == *settings {
+            if !settings_changed {
                 return;
             }
 
-            *settings = updated_settings.clone();
             updated_settings
         };
 
@@ -897,18 +899,17 @@ impl Room<Group> {
     pub async fn resend_invites_to_members(&self) -> Result<()> {
         info!("Sending invites to group members…");
 
-        let member_jids = self
-            .data
-            .participants()
-            .values()
-            .filter_map(|p| {
-                if p.affiliation >= RoomAffiliation::Member {
-                    p.real_id.clone()
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
+        let member_jids = self.data.with_participants(|p| {
+            p.values()
+                .filter_map(|p| {
+                    if p.affiliation >= RoomAffiliation::Member {
+                        p.real_id.clone()
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>()
+        });
 
         self.participation_service
             .invite_users_to_room(self.muc_id(), member_jids.as_slice())

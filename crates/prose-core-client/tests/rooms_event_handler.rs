@@ -90,11 +90,13 @@ async fn test_adds_participant() -> Result<()> {
         }))
         .await?;
 
-    assert_eq!(room.participants().len(), 1);
+    assert_eq!(room.with_participants(|p| p.len()), 1);
 
     let occupant = room
-        .participants()
-        .get(&occupant_id!("room@conference.prose.org/nick").into())
+        .with_participants(|p| {
+            p.get(&occupant_id!("room@conference.prose.org/nick").into())
+                .cloned()
+        })
         .unwrap()
         .clone();
 
@@ -162,10 +164,7 @@ async fn test_adds_invited_participant() -> Result<()> {
         .await?;
 
     assert_eq!(
-        room.participants()
-            .iter()
-            .map(ParticipantInfo::from)
-            .collect::<Vec<_>>(),
+        room.with_participants(|p| p.iter().map(ParticipantInfo::from).collect::<Vec<_>>()),
         vec![ParticipantInfo {
             id: Some(user_id!("user@prose.org")),
             name: "John Doe".to_string(),
@@ -183,7 +182,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
     let room =
-        Room::private_channel(muc_id!("room@conference.prose.org")).with_participants(vec![(
+        Room::private_channel(muc_id!("room@conference.prose.org")).by_adding_participants(vec![(
             occupant_id!("room@conference.prose.org/a"),
             Participant {
                 real_id: None,
@@ -242,7 +241,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
         .await?;
 
     assert_eq!(
-        room.participants().values().cloned().collect::<Vec<_>>(),
+        room.with_participants(|p| p.values().cloned().collect::<Vec<_>>()),
         vec![Participant {
             real_id: None,
             anon_occupant_id: None,
@@ -262,7 +261,7 @@ async fn test_handles_disconnected_participant() -> Result<()> {
 async fn test_handles_kicked_user() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(muc_id!("room@conference.prose.org")).with_participants([(
+    let room = Room::group(muc_id!("room@conference.prose.org")).by_adding_participants([(
         occupant_id!("room@conference.prose.org/nickname"),
         Participant::owner().set_real_id(&user_id!("nickname@prose.org")),
     )]);
@@ -290,7 +289,7 @@ async fn test_handles_kicked_user() -> Result<()> {
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
-    assert_eq!(room.participants().len(), 1);
+    assert_eq!(room.with_participants(|p| p.len()), 1);
 
     event_handler
         .handle_event(ServerEvent::Occupant(OccupantEvent {
@@ -302,7 +301,7 @@ async fn test_handles_kicked_user() -> Result<()> {
         }))
         .await?;
 
-    assert_eq!(room.participants().len(), 0);
+    assert_eq!(room.with_participants(|p| p.len()), 0);
 
     Ok(())
 }
@@ -380,7 +379,7 @@ async fn test_handles_destroyed_room() -> Result<()> {
 async fn test_handles_compose_state_for_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(muc_id!("room@conference.prose.org")).with_participants([(
+    let room = Room::group(muc_id!("room@conference.prose.org")).by_adding_participants([(
         occupant_id!("room@conference.prose.org/nickname"),
         Participant::owner()
             .set_real_id(&user_id!("nickname@prose.org"))
@@ -419,11 +418,11 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
         }))
         .await?;
 
-    let occupant = room
-        .participants()
-        .get(&occupant_id!("room@conference.prose.org/nickname").into())
-        .unwrap()
-        .clone();
+    let occupant = room.with_participants(|p| {
+        p.get(&occupant_id!("room@conference.prose.org/nickname").into())
+            .unwrap()
+            .clone()
+    });
 
     assert_eq!(occupant.compose_state, ComposeState::Composing);
     assert_eq!(
@@ -497,11 +496,11 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
         }))
         .await?;
 
-    let occupant = room
-        .participants()
-        .get(&user_id!("contact@prose.org").into())
-        .unwrap()
-        .clone();
+    let occupant = room.with_participants(|p| {
+        p.get(&user_id!("contact@prose.org").into())
+            .unwrap()
+            .clone()
+    });
 
     assert_eq!(occupant.compose_state, ComposeState::Composing);
     assert_eq!(
@@ -631,7 +630,7 @@ async fn test_handles_user_presence() -> Result<()> {
 async fn test_handles_occupant_presence() -> Result<()> {
     let mut deps = MockAppDependencies::default();
 
-    let room = Room::group(muc_id!("room@muc.prose.org")).with_participants([(
+    let room = Room::group(muc_id!("room@muc.prose.org")).by_adding_participants([(
         occupant_id!("room@muc.prose.org/nick"),
         Participant::owner()
             .set_real_id(&user_id!("nick@prose.org"))
@@ -665,10 +664,10 @@ async fn test_handles_occupant_presence() -> Result<()> {
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 
     assert_eq!(
-        room.participants()
+        room.with_participants(|p| p
             .get(&occupant_id!("room@muc.prose.org/nick").into())
             .unwrap()
-            .availability,
+            .availability),
         Availability::Available
     );
 
@@ -683,10 +682,10 @@ async fn test_handles_occupant_presence() -> Result<()> {
         .await?;
 
     assert_eq!(
-        room.participants()
+        room.with_participants(|p| p
             .get(&occupant_id!("room@muc.prose.org/nick").into())
             .unwrap()
-            .availability,
+            .availability),
         Availability::DoNotDisturb
     );
 

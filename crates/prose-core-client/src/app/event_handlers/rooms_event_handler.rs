@@ -89,23 +89,22 @@ impl RoomsEventHandler {
 
         let participants_changed = match event.r#type {
             OccupantEventType::AffiliationChanged { affiliation } => 'outer: {
-                let mut participants_changed = false;
-
-                {
-                    let mut participants = room.participants_mut();
+                let participants_changed = room.with_participants_mut(|participants| {
                     if participants.get(&participant_id).map(|p| &p.affiliation)
                         != Some(&affiliation)
                     {
-                        participants_changed = true;
                         participants.set_affiliation(&participant_id, event.is_self, &affiliation);
+                        true
+                    } else {
+                        false
                     }
-                }
+                });
 
                 // Let's see if we knew the real id of the participant already, if not let's
                 // look up their name…
                 let (Some(real_id), Some(participant)) = (
                     event.real_id,
-                    room.participants().get(&participant_id).cloned(),
+                    room.with_participants(|p| p.get(&participant_id).cloned()),
                 ) else {
                     break 'outer participants_changed;
                 };
@@ -119,21 +118,25 @@ impl RoomsEventHandler {
                     .user_info_domain_service
                     .get_display_name(&real_id)
                     .await?;
-                room.participants_mut().set_ids_and_name(
-                    &participant_id,
-                    Some(&real_id),
-                    event.anon_occupant_id.as_ref(),
-                    name.as_deref(),
-                );
+                room.with_participants_mut(|participants| {
+                    participants.set_ids_and_name(
+                        &participant_id,
+                        Some(&real_id),
+                        event.anon_occupant_id.as_ref(),
+                        name.as_deref(),
+                    );
+                });
 
                 true
             }
             OccupantEventType::DisconnectedByServer => {
-                room.participants_mut().set_availability(
-                    &participant_id,
-                    event.is_self,
-                    &Availability::Unavailable,
-                );
+                room.with_participants_mut(|participants| {
+                    participants.set_availability(
+                        &participant_id,
+                        event.is_self,
+                        &Availability::Unavailable,
+                    );
+                });
 
                 if event.is_self {
                     self.sidebar_domain_service
@@ -144,7 +147,9 @@ impl RoomsEventHandler {
                 true
             }
             OccupantEventType::PermanentlyRemoved => 'outer: {
-                room.participants_mut().remove(&participant_id);
+                room.with_participants_mut(|participants| {
+                    participants.remove(&participant_id);
+                });
 
                 if event.is_self {
                     self.sidebar_domain_service
@@ -230,8 +235,9 @@ impl RoomsEventHandler {
                     .user_info_domain_service
                     .get_display_name(&user_id)
                     .await?;
-                room.participants_mut()
-                    .add_user(&user_id, false, &affiliation, name.as_deref());
+                room.with_participants_mut(|participants| {
+                    participants.add_user(&user_id, false, &affiliation, name.as_deref());
+                });
 
                 self.client_event_dispatcher
                     .dispatch_room_event(room, ClientRoomEventType::ParticipantsChanged);
@@ -247,9 +253,10 @@ impl RoomsEventHandler {
 
         let is_self_event = room
             .and_then(|room| {
-                room.participants()
-                    .get(&event.user_id.to_participant_id())
-                    .map(|participant| Ok(participant.is_self))
+                room.with_participants(|p| {
+                    p.get(&event.user_id.to_participant_id())
+                        .map(|participant| Ok(participant.is_self))
+                })
             })
             .unwrap_or_else(|| -> Result<bool> {
                 Ok(event.user_id.to_user_id().as_ref() == Some(account.as_ref()))
@@ -265,11 +272,9 @@ impl RoomsEventHandler {
                 // If we have a room, update it…
                 if let Ok(room) = self.get_room(&event.user_id.to_room_id()) {
                     let participant_id = event.user_id.to_participant_id();
-                    room.participants_mut().set_availability(
-                        &participant_id,
-                        is_self_event,
-                        &availability,
-                    );
+                    room.with_participants_mut(|participants| {
+                        participants.set_availability(&participant_id, is_self_event, &availability)
+                    });
 
                     if room.sidebar_state().is_in_sidebar() {
                         if event.user_id.is_occupant_id() {
@@ -325,11 +330,13 @@ impl RoomsEventHandler {
                 };
                 let participant_id = event.user_id.to_participant_id();
 
-                room.participants_mut().set_compose_state(
-                    &participant_id,
-                    &self.time_provider.now(),
-                    state,
-                );
+                room.with_participants_mut(|participants| {
+                    participants.set_compose_state(
+                        &participant_id,
+                        &self.time_provider.now(),
+                        state,
+                    );
+                });
 
                 // We won't send an event for our own compose state…
                 if is_self_event {

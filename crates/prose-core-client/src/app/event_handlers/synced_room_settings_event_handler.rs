@@ -62,7 +62,7 @@ impl SyncedRoomSettingsEventHandler {
                     };
 
                     info!("Applying updated room settings in {}", room.room_id);
-                    *room.settings_mut() = setting;
+                    room.with_settings_mut(|settings| *settings = setting);
                     room.set_needs_update_statistics();
                 }
                 self.client_event_dispatcher

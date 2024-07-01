@@ -74,16 +74,19 @@ impl Room {
     }
 
     pub fn with_members(self, members: impl IntoIterator<Item = RegisteredMember>) -> Self {
-        *self.participants_mut() = ParticipantList::new(members, []);
+        self.with_participants_mut(|p| {
+            *p = ParticipantList::new(members, []);
+        });
         self
     }
 
-    pub fn with_participants<Id: Into<ParticipantId>>(
+    pub fn by_adding_participants<Id: Into<ParticipantId>>(
         self,
         occupant: impl IntoIterator<Item = (Id, Participant)>,
     ) -> Self {
-        self.participants_mut()
-            .extend_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect());
+        self.with_participants_mut(|p| {
+            p.extend_participants(occupant.into_iter().map(|(id, p)| (id.into(), p)).collect())
+        });
         self
     }
 

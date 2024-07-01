@@ -210,10 +210,7 @@ async fn test_joins_room() -> Result<()> {
 
     let mut participants = room
         .lock()
-        .participants()
-        .iter()
-        .map(ParticipantInfo::from)
-        .collect::<Vec<_>>();
+        .with_participants(|p| p.iter().map(ParticipantInfo::from).collect::<Vec<_>>());
     participants.sort_by_key(|p| p.name.clone());
 
     assert_eq!(
@@ -472,7 +469,8 @@ async fn test_creates_group() -> Result<()> {
                 let room = Room::mock_connecting_room(group_jid.clone(), "hash-1");
 
                 let room = handler(room.clone());
-                let mut members = room.participants().values().cloned().collect::<Vec<_>>();
+                let mut members =
+                    room.with_participants(|p| p.values().cloned().collect::<Vec<_>>());
                 members.sort_by_key(|p| p.real_id.as_ref().unwrap().clone());
 
                 assert_eq!(
@@ -640,11 +638,8 @@ async fn test_joins_direct_message() -> Result<()> {
         )
         .await?;
 
-    let mut participants = room
-        .participants()
-        .iter()
-        .map(ParticipantInfo::from)
-        .collect::<Vec<_>>();
+    let mut participants =
+        room.with_participants(|p| p.iter().map(ParticipantInfo::from).collect::<Vec<_>>());
     participants.sort_by_key(|p| p.name.clone());
 
     assert_eq!(
@@ -1216,11 +1211,8 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
         )
         .await?;
 
-    let participants = room
-        .participants()
-        .iter()
-        .map(ParticipantInfo::from)
-        .collect::<Vec<_>>();
+    let participants =
+        room.with_participants(|p| p.iter().map(ParticipantInfo::from).collect::<Vec<_>>());
 
     assert_eq!(room.state(), RoomState::Connected);
     assert_eq!(
@@ -1379,7 +1371,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
 
     let room = pending_room.lock();
     assert_eq!(room.name(), Some("Updated Channel Name".to_string()));
-    assert_eq!(room.participants().len(), 2);
+    std::assert_eq!(room.with_participants(|p| p.len()), 2);
     assert_eq!(room.state(), RoomState::Connected);
 
     Ok(())

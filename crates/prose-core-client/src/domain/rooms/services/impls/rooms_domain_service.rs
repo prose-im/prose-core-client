@@ -420,16 +420,16 @@ impl RoomsDomainServiceTrait for RoomsDomainService {
                 }
 
                 let current_user = self.ctx.connected_id()?.to_user_id();
-                let member_ids = room
-                    .participants()
-                    .values()
-                    .filter_map(|p| {
-                        if p.affiliation >= RoomAffiliation::Member {
-                            return p.real_id.clone();
-                        }
-                        None
-                    })
-                    .collect::<Vec<_>>();
+                let member_ids = room.with_participants(|p| {
+                    p.values()
+                        .filter_map(|p| {
+                            if p.affiliation >= RoomAffiliation::Member {
+                                return p.real_id.clone();
+                            }
+                            None
+                        })
+                        .collect::<Vec<_>>()
+                });
 
                 // Now grant the members of the original group access to the new channel…
                 debug!("Granting membership to members of new room {}…", new_name);

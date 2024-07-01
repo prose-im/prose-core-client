@@ -140,8 +140,9 @@ impl MessageParser {
                             message.occupant_id().map(|occupant_id| (room, occupant_id))
                         })
                         .and_then(|(room, occupant_id)| {
-                            room.participants()
-                                .get_user_id(&AnonOccupantId::from(occupant_id.id.clone()))
+                            room.with_participants(|p| {
+                                p.get_user_id(&AnonOccupantId::from(occupant_id.id.clone()))
+                            })
                         })
                 });
 
