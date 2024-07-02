@@ -85,6 +85,7 @@ impl UserProfileRepository for CachingUserProfileRepository {
         let collection = tx.writeable_collection(UserProfileRecord::collection())?;
         collection.put_entity(&UserProfileRecord::new(account, user_id, profile.clone()))?;
         tx.commit().await?;
+        self.requested_user_profiles.lock().insert(user_id.clone());
         Ok(())
     }
 
@@ -98,19 +99,6 @@ impl UserProfileRepository for CachingUserProfileRepository {
         idx.delete(&(account, user_id)).await?;
         tx.commit().await?;
         Ok(())
-    }
-
-    async fn get_display_name(
-        &self,
-        account: &AccountId,
-        user_id: &UserId,
-    ) -> Result<Option<String>> {
-        // This is a bit heavy-handed right now to load the full contact. prose-store should
-        // support multi-column indexes instead so that we can just pull out the required fields.
-        Ok(self
-            .get(account, user_id)
-            .await?
-            .and_then(|p| p.full_name().or(p.nickname)))
     }
 
     async fn reset_before_reconnect(&self, _account: &AccountId) -> Result<()> {

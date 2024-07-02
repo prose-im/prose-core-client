@@ -13,6 +13,7 @@ use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::muc::user::{Affiliation, Status};
+use xmpp_parsers::nick::Nick;
 use xmpp_parsers::presence;
 use xmpp_parsers::presence::{Presence, Show};
 use xmpp_parsers::stanza_error::StanzaError;
@@ -141,10 +142,11 @@ impl MUC {
         &self,
         room_jid: &FullJid,
         password: Option<&str>,
+        nick: Option<String>,
         show: Option<Show>,
         caps: Option<xmpp_parsers::caps::Caps>,
     ) -> Result<RoomOccupancy, RequestError> {
-        self.send_presence_to_room(&room_jid, password, show, caps)
+        self.send_presence_to_room(&room_jid, password, nick.map(Nick), show, caps)
             .await
     }
 
@@ -161,12 +163,13 @@ impl MUC {
     pub async fn create_instant_room(
         &self,
         room_jid: &FullJid,
+        nick: Option<String>,
         show: Option<Show>,
         caps: Option<xmpp_parsers::caps::Caps>,
     ) -> Result<RoomOccupancy, RequestError> {
         // https://xmpp.org/extensions/xep-0045.html#createroom
         let occupancy = self
-            .send_presence_to_room(&room_jid, None, show, caps)
+            .send_presence_to_room(&room_jid, None, nick.map(Nick), show, caps)
             .await?;
 
         // If the room existed already we don't need to proceed…
@@ -195,6 +198,7 @@ impl MUC {
     pub async fn create_reserved_room<T>(
         &self,
         room_jid: &FullJid,
+        nick: Option<String>,
         show: Option<Show>,
         caps: Option<xmpp_parsers::caps::Caps>,
         handler: impl FnOnce(DataForm) -> T,
@@ -204,7 +208,7 @@ impl MUC {
     {
         // https://xmpp.org/extensions/xep-0045.html#createroom
         let occupancy = self
-            .send_presence_to_room(&room_jid, None, show, caps)
+            .send_presence_to_room(&room_jid, None, nick.map(Nick), show, caps)
             .await?;
 
         // If the room existed already we don't need to proceed…
@@ -415,6 +419,7 @@ impl MUC {
         &self,
         room_jid: &FullJid,
         password: Option<&str>,
+        nick: Option<Nick>,
         show: Option<Show>,
         caps: Option<xmpp_parsers::caps::Caps>,
     ) -> Result<RoomOccupancy, RequestError> {
@@ -434,6 +439,10 @@ impl MUC {
 
         if let Some(caps) = caps {
             presence.add_payload(caps)
+        }
+
+        if let Some(nick) = nick {
+            presence.payloads.push(nick.into())
         }
 
         let (mut self_presence, presences, message_history, subject) = self

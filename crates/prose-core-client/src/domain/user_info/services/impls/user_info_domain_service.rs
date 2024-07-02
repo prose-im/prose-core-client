@@ -33,9 +33,11 @@ pub struct UserInfoDomainService {
 #[async_trait]
 impl UserInfoDomainServiceTrait for UserInfoDomainService {
     async fn get_display_name(&self, user_id: &UserId) -> Result<Option<String>> {
-        self.user_profile_repo
-            .get_display_name(&self.ctx.connected_account()?, user_id)
-            .await
+        Ok(self
+            .user_profile_repo
+            .get(&self.ctx.connected_account()?, user_id)
+            .await?
+            .and_then(|p| p.full_name().or(p.nickname)))
     }
 
     async fn get_user_info(&self, user_id: &UserId) -> Result<Option<UserInfo>> {

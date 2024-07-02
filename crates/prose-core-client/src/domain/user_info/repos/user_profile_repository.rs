@@ -21,14 +21,6 @@ pub trait UserProfileRepository: SendUnlessWasm + SyncUnlessWasm {
         -> Result<()>;
     async fn delete(&self, account: &AccountId, user_id: &UserId) -> Result<()>;
 
-    /// Returns the display name for `user_id`. Display name is a cascade of first_name, last_name
-    /// and nickname;
-    async fn get_display_name(
-        &self,
-        account: &AccountId,
-        user_id: &UserId,
-    ) -> Result<Option<String>>;
-
     async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()>;
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

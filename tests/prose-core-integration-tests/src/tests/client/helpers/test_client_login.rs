@@ -8,18 +8,19 @@ use jid::BareJid;
 use minidom::Element;
 use xmpp_parsers::pubsub;
 
-use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId};
-use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
-use prose_xmpp::IDProvider;
-
-use crate::{event, recv, send};
-
 use super::TestClient;
+use crate::{event, recv, send};
+use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId, UserProfile};
+use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
+use prose_xmpp::stanza::vcard4::Name;
+use prose_xmpp::stanza::VCard4;
+use prose_xmpp::IDProvider;
 
 pub struct LoginStrategy {
     pub device_bundles: Vec<(DeviceId, DeviceBundle)>,
     pub offline_messages: Vec<prose_xmpp::stanza::Message>,
     pub bookmarks_handler: Box<dyn FnOnce(&TestClient)>,
+    pub user_vcard: Option<VCard4>,
 }
 
 impl Default for LoginStrategy {
@@ -28,6 +29,24 @@ impl Default for LoginStrategy {
             device_bundles: vec![],
             offline_messages: vec![],
             bookmarks_handler: Box::new(|client| client.expect_load_bookmarks(None)),
+            user_vcard: Some(VCard4 {
+                adr: vec![],
+                email: vec![],
+                fn_: vec![],
+                n: vec![Name {
+                    surname: Some("Doe".to_string()),
+                    given: Some("Jane".to_string()),
+                    additional: None,
+                }],
+                impp: vec![],
+                nickname: vec![],
+                note: vec![],
+                org: vec![],
+                role: vec![],
+                tel: vec![],
+                title: vec![],
+                url: vec![],
+            }),
         }
     }
 }
@@ -67,10 +86,19 @@ impl TestClient {
         password: impl AsRef<str>,
         config: LoginStrategy,
     ) -> Result<()> {
+        let nickname = config
+            .user_vcard
+            .clone()
+            .and_then(|vcard| {
+                let profile = UserProfile::try_from(vcard).unwrap();
+                profile.full_name().or(profile.nickname)
+            })
+            .unwrap_or_else(|| "You forgot to set a nickname".to_string());
+
         self.push_ctx([
             ("USER_ID", user.to_string()),
             (
-                "USER_RESOURCE_ID".into(),
+                "USER_RESOURCE_ID",
                 format!("{}/{}", user.to_string(), self.short_id_provider.new_id()),
             ),
             (
@@ -78,6 +106,7 @@ impl TestClient {
                 BareJid::from_parts(None, &user.as_ref().domain()).to_string(),
             ),
             ("CAPS_HASH", "zQudvh/0QdfUMrrQBB1ZR3NMyTY=".to_string()),
+            ("USER_NICKNAME", nickname),
         ]);
 
         self.expect_load_roster();
@@ -157,6 +186,35 @@ impl TestClient {
 
         self.connect(&user, Secret::new(password.as_ref().to_string()))
             .await?;
+
+        if let Some(vcard) = config.user_vcard {
+            self.push_ctx([("VCARD", String::from(&Element::from(vcard)))]);
+            recv!(
+                self,
+                r#"
+                <message xmlns="jabber:client" from="{{USER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="headline">
+                  <event xmlns="http://jabber.org/protocol/pubsub#event">
+                    <items node="urn:ietf:params:xml:ns:vcard-4.0">
+                      <item id="{{USER_ID}}" publisher="{{USER_ID}}">
+                        {{VCARD}}
+                      </item>
+                    </items>
+                  </event>
+                </message>
+                "#
+            );
+
+            event!(
+                self,
+                ClientEvent::ContactChanged {
+                    ids: vec![self.connected_user_id().unwrap().into_user_id()]
+                }
+            );
+            event!(self, ClientEvent::AccountInfoChanged);
+
+            self.receive_next().await;
+            self.pop_ctx();
+        }
 
         (config.bookmarks_handler)(self);
 

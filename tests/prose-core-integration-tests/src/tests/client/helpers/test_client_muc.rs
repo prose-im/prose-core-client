@@ -47,24 +47,7 @@ impl Default for JoinRoomStrategy {
             user_affiliation: RoomAffiliation::Owner,
             receive_occupant_presences: Box::new(|_, _| {}),
             expect_catchup: Box::new(|client, room_id| client.expect_muc_catchup(room_id)),
-            expect_load_vcard: Box::new(|client, _room_id, user_id| {
-                client.expect_load_vcard(&user_id);
-                recv!(
-                    client,
-                    r#"
-                    <iq xmlns='jabber:client' id="{{ID}}" type="result">
-                      <vcard xmlns='urn:ietf:params:xml:ns:vcard-4.0'>
-                        <adr>
-                          <country>Germany</country>
-                          <locality>Berlin</locality>
-                        </adr>
-                        <email><text>user@prose.org</text></email>
-                        <nickname><text>Joe</text></nickname>
-                      </vcard>
-                    </iq>
-                    "#
-                );
-            }),
+            expect_load_vcard: Box::new(|_, _, _| {}),
         }
     }
 }
@@ -241,6 +224,7 @@ impl TestClient {
               <history maxstanzas="0" />
             </x>
             <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}"/>
+            <nick xmlns="http://jabber.org/protocol/nick">{{USER_NICKNAME}}</nick>
         </presence>
         "#
         );

@@ -49,6 +49,7 @@ impl RoomManagementService for XMPPClient {
         &self,
         occupant_id: &OccupantId,
         room_name: &str,
+        nickname: &str,
         spec: RoomSpec,
         capabilities: &Capabilities,
         availability: Availability,
@@ -59,6 +60,7 @@ impl RoomManagementService for XMPPClient {
         let occupancy = muc_mod
             .create_reserved_room(
                 occupant_id.as_ref(),
+                Some(nickname.to_string()),
                 Some(availability.try_into()?),
                 Some(capabilities.into()),
                 Box::new(|form| {
@@ -115,6 +117,7 @@ impl RoomManagementService for XMPPClient {
         &self,
         occupant_id: &OccupantId,
         password: Option<&str>,
+        nickname: &str,
         capabilities: &Capabilities,
         availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError> {
@@ -123,6 +126,7 @@ impl RoomManagementService for XMPPClient {
             .enter_room(
                 occupant_id.as_ref(),
                 password,
+                Some(nickname.to_string()),
                 Some(availability.try_into()?),
                 Some(capabilities.into()),
             )
