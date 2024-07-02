@@ -90,7 +90,7 @@ async fn test_joins_room() -> Result<()> {
 
     assert_eq!(vec![jane.clone(), user.clone()], participants);
 
-    client.push_ctx([("ROOM_ID".into(), room_id.to_string())].into());
+    client.push_ctx([("ROOM_ID", room_id.to_string())]);
 
     recv!(
         client,

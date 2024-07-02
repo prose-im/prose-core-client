@@ -127,7 +127,7 @@ async fn test_rounds_timestamps() -> Result<()> {
         .await;
     client.expect_login(account.to_user_id(), "secret").await?;
 
-    client.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+    client.push_ctx([("OTHER_USER_ID", user_id.to_string())]);
 
     // We receive a message at 2024-04-05 10:00:00.550…
     {
@@ -617,22 +617,19 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
     assert_eq!(3, sidebar_item.unread_count);
     assert_eq!(2, sidebar_item.mentions_count);
 
-    client.push_ctx(
-        [
-            ("OTHER_USER_ID".into(), user_id.to_string()),
-            (
-                "MSG_STANZA_ID".into(),
-                MessageBuilder::stanza_id_for_index(2).to_string(),
-            ),
-            (
-                "MSG_TIMESTAMP".into(),
-                Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00)
-                    .unwrap()
-                    .to_rfc3339(),
-            ),
-        ]
-        .into(),
-    );
+    client.push_ctx([
+        ("OTHER_USER_ID", user_id.to_string()),
+        (
+            "MSG_STANZA_ID",
+            MessageBuilder::stanza_id_for_index(2).to_string(),
+        ),
+        (
+            "MSG_TIMESTAMP",
+            Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00)
+                .unwrap()
+                .to_rfc3339(),
+        ),
+    ]);
     recv!(
         client,
         r#"

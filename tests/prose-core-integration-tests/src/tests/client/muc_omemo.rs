@@ -29,15 +29,12 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
     let room_name = "omemo-private-channel";
     let occupant_id = client.build_occupant_id(&room_id);
 
-    client.push_ctx(
-        [
-            ("OCCUPANT_ID".into(), occupant_id.to_string()),
-            ("ANON_OCCUPANT_ID".into(), "some-weird-id".to_string()),
-            ("ROOM_ID".into(), room_id.to_string()),
-            ("ROOM_NAME".into(), room_name.to_string()),
-        ]
-        .into(),
-    );
+    client.push_ctx([
+        ("OCCUPANT_ID", occupant_id.to_string()),
+        ("ANON_OCCUPANT_ID", "some-weird-id".to_string()),
+        ("ROOM_ID", room_id.to_string()),
+        ("ROOM_NAME", room_name.to_string()),
+    ]);
 
     send!(
         client,
@@ -251,15 +248,12 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
         )
         .await?;
 
-    client.push_ctx(
-        [(
-            "ENCRYPTED_PAYLOAD".into(),
-            String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
-                encrypted_payload,
-            ))),
-        )]
-        .into(),
-    );
+    client.push_ctx([(
+        "ENCRYPTED_PAYLOAD",
+        String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
+            encrypted_payload,
+        ))),
+    )]);
 
     recv!(
         client,
@@ -329,15 +323,12 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
     let room_name = "omemo-private-channel";
     let occupant_id = client.build_occupant_id(&room_id);
 
-    client.push_ctx(
-        [
-            ("OCCUPANT_ID".into(), occupant_id.to_string()),
-            ("ANON_OCCUPANT_ID".into(), "some-weird-id".to_string()),
-            ("ROOM_ID".into(), room_id.to_string()),
-            ("ROOM_NAME".into(), room_name.to_string()),
-        ]
-        .into(),
-    );
+    client.push_ctx([
+        ("OCCUPANT_ID", occupant_id.to_string()),
+        ("ANON_OCCUPANT_ID", "some-weird-id".to_string()),
+        ("ROOM_ID", room_id.to_string()),
+        ("ROOM_NAME", room_name.to_string()),
+    ]);
 
     send!(
         client,

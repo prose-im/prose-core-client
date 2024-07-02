@@ -137,7 +137,7 @@ impl TestClientBuilder {
             app_config: self.app_config,
         };
 
-        client.push_ctx([("USER_DEVICE_ID".into(), format!("{}", device_id.as_ref()))].into());
+        client.push_ctx([("USER_DEVICE_ID", format!("{}", device_id.as_ref()))]);
 
         client
     }
@@ -290,8 +290,14 @@ impl TestClient {
 }
 
 impl TestClient {
-    pub fn push_ctx(&self, ctx: HashMap<String, String>) {
-        self.context.lock().push(ctx);
+    pub fn push_ctx<T, U>(&self, ctx: impl IntoIterator<Item = (T, U)>)
+    where
+        T: Into<String>,
+        U: Into<String>,
+    {
+        self.context
+            .lock()
+            .push(ctx.into_iter().map(|(k, v)| (k.into(), v.into())).collect());
     }
 
     pub fn pop_ctx(&self) {
@@ -338,7 +344,7 @@ impl TestClient {
 
 impl TestClient {
     pub fn expect_load_vcard(&self, user_id: &UserId) {
-        self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+        self.push_ctx([("OTHER_USER_ID", user_id.to_string())]);
         send!(
             self,
             r#"
@@ -351,7 +357,7 @@ impl TestClient {
     }
 
     pub fn expect_load_avatar_metadata(&self, user_id: &UserId) {
-        self.push_ctx([("OTHER_USER_ID".into(), user_id.to_string())].into());
+        self.push_ctx([("OTHER_USER_ID", user_id.to_string())]);
         send!(
             self,
             r#"

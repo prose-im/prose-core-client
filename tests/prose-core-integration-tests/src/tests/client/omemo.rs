@@ -870,15 +870,12 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         )
         .await?;
 
-    client.push_ctx(
-        [(
-            "ENCRYPTED_PAYLOAD".into(),
-            String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
-                encrypted_payload,
-            ))),
-        )]
-        .into(),
-    );
+    client.push_ctx([(
+        "ENCRYPTED_PAYLOAD",
+        String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
+            encrypted_payload,
+        ))),
+    )]);
 
     recv!(
         client,
@@ -957,15 +954,12 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         )
         .await?;
 
-    client.push_ctx(
-        [(
-            "ENCRYPTED_PAYLOAD".into(),
-            String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
-                encrypted_payload,
-            ))),
-        )]
-        .into(),
-    );
+    client.push_ctx([(
+        "ENCRYPTED_PAYLOAD",
+        String::from(&Element::from(xmpp_parsers::legacy_omemo::Encrypted::from(
+            encrypted_payload,
+        ))),
+    )]);
 
     recv!(
         client,

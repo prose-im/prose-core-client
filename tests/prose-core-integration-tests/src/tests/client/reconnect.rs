@@ -204,7 +204,7 @@ async fn test_reconnects_muc_room_after_failed_self_ping() -> anyhow::Result<()>
     );
 
     let occupant_id = client.build_occupant_id(&muc_id!("group@conf.prose.org"));
-    client.push_ctx([("OCCUPANT_ID".into(), occupant_id.to_string())].into());
+    client.push_ctx([("OCCUPANT_ID", occupant_id.to_string())]);
 
     send!(
         client,

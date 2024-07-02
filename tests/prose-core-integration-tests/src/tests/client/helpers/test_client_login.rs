@@ -67,24 +67,18 @@ impl TestClient {
         password: impl AsRef<str>,
         config: LoginStrategy,
     ) -> Result<()> {
-        self.push_ctx(
-            [
-                ("USER_ID".into(), user.to_string()),
-                (
-                    "USER_RESOURCE_ID".into(),
-                    format!("{}/{}", user.to_string(), self.short_id_provider.new_id()),
-                ),
-                (
-                    "SERVER_ID".into(),
-                    BareJid::from_parts(None, &user.as_ref().domain()).to_string(),
-                ),
-                (
-                    "CAPS_HASH".into(),
-                    "zQudvh/0QdfUMrrQBB1ZR3NMyTY=".to_string(),
-                ),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("USER_ID", user.to_string()),
+            (
+                "USER_RESOURCE_ID".into(),
+                format!("{}/{}", user.to_string(), self.short_id_provider.new_id()),
+            ),
+            (
+                "SERVER_ID",
+                BareJid::from_parts(None, &user.as_ref().domain()).to_string(),
+            ),
+            ("CAPS_HASH", "zQudvh/0QdfUMrrQBB1ZR3NMyTY=".to_string()),
+        ]);
 
         self.expect_load_roster();
 
@@ -395,7 +389,7 @@ impl TestClient {
             .collect::<Vec<_>>()
             .join("\n");
 
-        self.push_ctx([("BOOKMARKS".into(), bookmarks)].into());
+        self.push_ctx([("BOOKMARKS", bookmarks)]);
 
         recv!(
             self,
@@ -418,7 +412,7 @@ impl TestClient {
             .collect::<Vec<_>>()
             .join("\n");
 
-        self.push_ctx([("EXISTING_DEVICES".into(), devices)].into());
+        self.push_ctx([("EXISTING_DEVICES", devices)]);
 
         send!(
             self,
