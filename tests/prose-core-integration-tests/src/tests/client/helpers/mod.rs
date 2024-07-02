@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-pub(self) use element_ext::ElementExt;
+pub use element_ext::ElementExt;
 use prose_core_client::domain::encryption::repos::mocks::{
     MockEncryptionKeysRepository, MockSessionRepository,
 };
