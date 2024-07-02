@@ -44,18 +44,15 @@ async fn test_creates_public_channel() -> Result<()> {
     let occupant_id = client.build_occupant_id(&room_id);
     let room_name = "My Public Channel";
 
-    client.push_ctx(
-        [
-            (
-                "MUC_SERVICE_ID".into(),
-                BareJid::from_parts(None, &room_id.as_ref().domain()).to_string(),
-            ),
-            ("OCCUPANT_ID".into(), occupant_id.to_string()),
-            ("ROOM_ID".into(), room_id.to_string()),
-            ("ROOM_NAME".into(), room_name.into()),
-        ]
-        .into(),
-    );
+    client.push_ctx([
+        (
+            "MUC_SERVICE_ID",
+            BareJid::from_parts(None, &room_id.as_ref().domain()).to_string(),
+        ),
+        ("OCCUPANT_ID", occupant_id.to_string()),
+        ("ROOM_ID", room_id.to_string()),
+        ("ROOM_NAME", room_name.into()),
+    ]);
 
     send!(
         client,
@@ -476,20 +473,17 @@ async fn test_receives_chat_states() -> Result<()> {
 
     let room = client.get_room(room_id.clone()).await.to_generic_room();
 
-    client.push_ctx(
-        [
-            ("OCCUPANT_ID".into(), occupant_id.to_string()),
-            ("OTHER_OCCUPANT_ID".into(), format!("{room_id}/their-nick")),
-            ("OTHER_ANON_OCCUPANT_ID".into(), "their-anon-id".to_string()),
-            (
-                "OTHER_USER_RESOURCE_ID".into(),
-                "user2@prose.org/resource".to_string(),
-            ),
-            ("ROOM_ID".into(), room_id.to_string()),
-            ("STANZA_ID".into(), "stanza-id".to_string()),
-        ]
-        .into(),
-    );
+    client.push_ctx([
+        ("OCCUPANT_ID", occupant_id.to_string()),
+        ("OTHER_OCCUPANT_ID", format!("{room_id}/their-nick")),
+        ("OTHER_ANON_OCCUPANT_ID", "their-anon-id".to_string()),
+        (
+            "OTHER_USER_RESOURCE_ID",
+            "user2@prose.org/resource".to_string(),
+        ),
+        ("ROOM_ID", room_id.to_string()),
+        ("STANZA_ID", "stanza-id".to_string()),
+    ]);
 
     recv!(
         client,
@@ -601,14 +595,11 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         .join_room(room_id.clone(), anon_occupant_id.clone())
         .await?;
 
-    client.push_ctx(
-        [
-            ("OCCUPANT_ID".into(), occupant_id.to_string()),
-            ("ROOM_ID".into(), room_id.to_string()),
-            ("ANON_OCCUPANT_ID".into(), anon_occupant_id.to_string()),
-        ]
-        .into(),
-    );
+    client.push_ctx([
+        ("OCCUPANT_ID", occupant_id.to_string()),
+        ("ROOM_ID", room_id.to_string()),
+        ("ANON_OCCUPANT_ID", anon_occupant_id.to_string()),
+    ]);
 
     let message_id = client.get_next_id();
 
@@ -676,7 +667,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         messages[0].stanza_id,
     );
 
-    client.push_ctx([("INITIAL_MESSAGE_ID".into(), message_id.to_string())].into());
+    client.push_ctx([("INITIAL_MESSAGE_ID", message_id.to_string())]);
 
     send!(
         client,

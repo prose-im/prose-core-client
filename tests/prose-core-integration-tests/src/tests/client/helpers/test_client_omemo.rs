@@ -44,13 +44,7 @@ impl TestClient {
             .collect::<Vec<_>>()
             .join("\n");
 
-        self.push_ctx(
-            [
-                ("USER_ID".into(), user_id.to_string()),
-                ("DEVICES".into(), devices),
-            ]
-            .into(),
-        );
+        self.push_ctx([("USER_ID", user_id.to_string()), ("DEVICES", devices)]);
 
         send!(
             self,
@@ -88,13 +82,10 @@ impl TestClient {
         device_id: &DeviceId,
         bundle: Option<DeviceBundle>,
     ) {
-        self.push_ctx(
-            [
-                ("USER_ID".into(), user_id.to_string()),
-                ("DEVICE_ID".into(), device_id.as_ref().to_string()),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("USER_ID", user_id.to_string()),
+            ("DEVICE_ID", device_id.as_ref().to_string()),
+        ]);
 
         send!(
             self,
@@ -108,15 +99,12 @@ impl TestClient {
         );
 
         if let Some(bundle) = bundle {
-            self.push_ctx(
-                [(
-                    "BUNDLE".into(),
-                    String::from(&Element::from(xmpp_parsers::legacy_omemo::Bundle::from(
-                        bundle,
-                    ))),
-                )]
-                .into(),
-            );
+            self.push_ctx([(
+                "BUNDLE",
+                String::from(&Element::from(xmpp_parsers::legacy_omemo::Bundle::from(
+                    bundle,
+                ))),
+            )]);
 
             recv!(
                 self,
@@ -176,7 +164,7 @@ impl TestClient {
     }
 
     pub fn expect_publish_device_bundle(&self, bundle_xml: impl Into<String>) {
-        self.push_ctx([("DEVICE_BUNDLE".into(), bundle_xml.into())].into());
+        self.push_ctx([("DEVICE_BUNDLE", bundle_xml)]);
 
         send!(
             self,

@@ -225,15 +225,12 @@ impl TestClient {
         let occupant_id = self.build_occupant_id(&room_id);
         let anon_occupant_id = anon_occupant_id.into();
 
-        self.push_ctx(
-            [
-                ("OCCUPANT_ID".into(), occupant_id.to_string()),
-                ("ROOM_ID".into(), room_id.to_string()),
-                ("ROOM_NAME".into(), strategy.room_name.into()),
-                ("ANON_OCCUPANT_ID".into(), anon_occupant_id.to_string()),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("OCCUPANT_ID", occupant_id.to_string()),
+            ("ROOM_ID", room_id.to_string()),
+            ("ROOM_NAME", strategy.room_name.into()),
+            ("ANON_OCCUPANT_ID", anon_occupant_id.to_string()),
+        ]);
 
         send!(
             self,
@@ -293,13 +290,10 @@ impl TestClient {
                 .map(|user| format!(r#"<item affiliation="{affiliation}" jid="{user}" />"#))
                 .collect::<Vec<_>>();
 
-            client.push_ctx(
-                [
-                    ("AFFILIATION".into(), affiliation.to_string()),
-                    ("USERS".into(), users.join("\n")),
-                ]
-                .into(),
-            );
+            client.push_ctx([
+                ("AFFILIATION", affiliation.to_string()),
+                ("USERS", users.join("\n")),
+            ]);
 
             send!(
                 client,
@@ -402,14 +396,11 @@ impl TestClient {
         name: impl Into<String>,
         kind: BookmarkType,
     ) {
-        self.push_ctx(
-            [
-                ("ROOM_ID".into(), room_id.into().to_string()),
-                ("BOOKMARK_NAME".into(), name.into()),
-                ("BOOKMARK_TYPE".into(), kind.into_attribute_value().unwrap()),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("ROOM_ID", room_id.into().to_string()),
+            ("BOOKMARK_NAME", name.into()),
+            ("BOOKMARK_TYPE", kind.into_attribute_value().unwrap()),
+        ]);
 
         send!(
             self,
@@ -462,16 +453,10 @@ impl TestClient {
     }
 
     pub fn expect_publish_settings(&self, settings: SyncedRoomSettings) {
-        self.push_ctx(
-            [
-                ("ROOM_ID".into(), settings.room_id.to_string()),
-                (
-                    "ROOM_SETTINGS".into(),
-                    String::from(&Element::from(settings)),
-                ),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("ROOM_ID", settings.room_id.to_string()),
+            ("ROOM_SETTINGS", String::from(&Element::from(settings))),
+        ]);
 
         send!(
             self,
@@ -535,13 +520,10 @@ impl TestClient {
         start: DateTime<Utc>,
         messages: impl IntoIterator<Item = ArchivedMessage>,
     ) {
-        self.push_ctx(
-            [
-                ("ROOM_ID".into(), room_id.to_string()),
-                ("CATCHUP_START".into(), start.to_rfc3339()),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("ROOM_ID", room_id.to_string()),
+            ("CATCHUP_START", start.to_rfc3339()),
+        ]);
 
         send!(
             self,
@@ -588,16 +570,10 @@ impl TestClient {
     }
 
     pub fn expect_save_synced_room_settings(&self, settings: SyncedRoomSettings) {
-        self.push_ctx(
-            [
-                ("ROOM_ID".into(), settings.room_id.to_string()),
-                (
-                    "ROOM_SETTINGS".into(),
-                    String::from(&Element::from(settings)),
-                ),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("ROOM_ID", settings.room_id.to_string()),
+            ("ROOM_SETTINGS", String::from(&Element::from(settings))),
+        ]);
 
         send!(
             self,
@@ -654,7 +630,7 @@ impl TestClient {
         room_id: impl Into<RoomId>,
         settings: Option<SyncedRoomSettings>,
     ) {
-        self.push_ctx([("ROOM_ID".into(), room_id.into().to_string())].into());
+        self.push_ctx([("ROOM_ID", room_id.into().to_string())]);
 
         send!(
             self,
@@ -670,13 +646,7 @@ impl TestClient {
         );
 
         if let Some(settings) = settings {
-            self.push_ctx(
-                [(
-                    "ROOM_SETTINGS".into(),
-                    String::from(&Element::from(settings)),
-                )]
-                .into(),
-            );
+            self.push_ctx([("ROOM_SETTINGS", String::from(&Element::from(settings)))]);
 
             recv!(
                 self,
@@ -729,13 +699,10 @@ impl TestClient {
         start: DateTime<Utc>,
         messages: impl IntoIterator<Item = ArchivedMessage>,
     ) {
-        self.push_ctx(
-            [
-                ("ROOM_ID".into(), room_id.to_string()),
-                ("CATCHUP_START".into(), start.to_rfc3339()),
-            ]
-            .into(),
-        );
+        self.push_ctx([
+            ("ROOM_ID", room_id.to_string()),
+            ("CATCHUP_START", start.to_rfc3339()),
+        ]);
 
         send!(
             self,
