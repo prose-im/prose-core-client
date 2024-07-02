@@ -30,29 +30,27 @@ async fn test_joins_room() -> Result<()> {
 
     let room_id = muc_id!("room@conference.prose.org");
 
-    let strategy = JoinRoomStrategy::default().with_occupant_presences_handler(|client, room| {
+    let strategy = JoinRoomStrategy::default().with_occupant_presences_handler(|client, _room| {
         recv!(
             client,
             r#"
             <presence xmlns="jabber:client" from="{{ROOM_ID}}/user1" to="{{USER_RESOURCE_ID}}" xml:lang="en">
-              <nick xmlns="http://jabber.org/protocol/nick">Jane Doe</nick>
+              <nick xmlns="http://jabber.org/protocol/nick">John Shmoe</nick>
               <c xmlns="http://jabber.org/protocol/caps" hash="sha-1" node="https://cheogram.com" ver="hAx0qhppW5/ZjrpXmbXW0F2SJVM=" />
               <x xmlns="vcard-temp:x:update">
                 <photo>ff04ffad2762376b8de08504ced6260553b15eed</photo>
               </x>
               <x xmlns="http://jabber.org/protocol/muc#user">
-                <item affiliation="member" jid="jane@prose.org/res" role="participant" />
+                <item affiliation="member" jid="john@prose.org/res" role="participant" />
               </x>
               <show>away</show>
             </presence>
             "#
         )
     }).with_members(
-        [user_id!("jane@prose.org")]
-    ).with_vcard_handler(|client, room_id, user_id| {
-        (JoinRoomStrategy::default().expect_load_vcard)(client, room_id, user_id);
-
-        client.expect_load_vcard(&user_id!("jane@prose.org"));
+        [user_id!("john@prose.org")]
+    ).with_vcard_handler(|client, _room_id, _user_id| {
+        client.expect_load_vcard(&user_id!("john@prose.org"));
         client.receive_not_found_iq_response();
     });
 
@@ -65,22 +63,22 @@ async fn test_joins_room() -> Result<()> {
     let mut participants = room.participants();
     participants.sort_by(|p1, p2| p1.name.cmp(&p2.name));
 
-    let jane = ParticipantInfo {
-        id: Some(user_id!("jane@prose.org")),
-        name: "Jane Doe".to_string(),
+    let john = ParticipantInfo {
+        id: Some(user_id!("john@prose.org")),
+        name: "John Shmoe".to_string(),
         is_self: false,
         availability: Availability::Away,
         affiliation: RoomAffiliation::Member,
         avatar: Some(Avatar {
             id: "ff04ffad2762376b8de08504ced6260553b15eed".parse()?,
             source: AvatarSource::Vcard,
-            owner: user_id!("jane@prose.org").into(),
+            owner: user_id!("john@prose.org").into(),
         }),
         client: Some("https://cheogram.com".parse()?),
     };
     let user = ParticipantInfo {
         id: Some(user_id!("user@prose.org")),
-        name: "Joe".to_string(),
+        name: "Jane Doe".to_string(),
         is_self: true,
         availability: Availability::Available,
         affiliation: RoomAffiliation::Owner,
@@ -88,7 +86,7 @@ async fn test_joins_room() -> Result<()> {
         client: Some("https://prose.org".parse()?),
     };
 
-    assert_eq!(vec![jane.clone(), user.clone()], participants);
+    assert_eq!(vec![user.clone(), john.clone()], participants);
 
     client.push_ctx([("ROOM_ID", room_id.to_string())]);
 
@@ -130,7 +128,7 @@ async fn test_joins_room() -> Result<()> {
 
     assert_eq!(
         vec![
-            jane,
+            user,
             ParticipantInfo {
                 id: Some(user_id!("jim@prose.org")),
                 name: "Jim Doe".to_string(),
@@ -144,7 +142,7 @@ async fn test_joins_room() -> Result<()> {
                 }),
                 client: Some("http://conversations.im".parse()?),
             },
-            user
+            john,
         ],
         participants
     );

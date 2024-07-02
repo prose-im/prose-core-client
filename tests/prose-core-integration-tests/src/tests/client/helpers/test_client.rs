@@ -23,6 +23,7 @@ use prose_core_client::{
     Client, ClientEvent, ClientRoomEventType, FsAvatarCache, SignalServiceHandle,
 };
 use prose_store::prelude::Store;
+use prose_xmpp::stanza::VCard4;
 use prose_xmpp::test::IncrementingIDProvider;
 
 use crate::tests::client::helpers::delegate::Delegate;
@@ -350,6 +351,19 @@ impl TestClient {
             r#"
             <iq xmlns="jabber:client" id="{{ID}}" to="{{OTHER_USER_ID}}" type="get">
               <vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0" />
+            </iq>
+            "#
+        );
+        self.pop_ctx();
+    }
+
+    pub fn expect_receive_vcard(&self, vcard4: VCard4) {
+        self.push_ctx([("VCARD", String::from(&Element::from(vcard4)))]);
+        recv!(
+            self,
+            r#"
+            <iq xmlns='jabber:client' id="{{ID}}" type="result">
+              {{VCARD}}
             </iq>
             "#
         );

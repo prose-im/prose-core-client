@@ -29,6 +29,7 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         occupant_id: &OccupantId,
         room_name: &str,
+        nickname: &str,
         spec: RoomSpec,
         capabilities: &Capabilities,
         availability: Availability,
@@ -38,6 +39,7 @@ pub trait RoomManagementService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         occupant_id: &OccupantId,
         password: Option<&str>,
+        nickname: &str,
         capabilities: &Capabilities,
         availability: Availability,
     ) -> Result<RoomSessionInfo, RoomError>;

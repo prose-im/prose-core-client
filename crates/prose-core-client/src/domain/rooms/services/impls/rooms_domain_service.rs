@@ -590,6 +590,12 @@ impl RoomsDomainService {
                 }),
             };
 
+        let display_name = self
+            .user_info_domain_service
+            .get_display_name(account.as_ref())
+            .await?
+            .unwrap_or_else(|| account.as_ref().username().to_string());
+
         let nickname = build_nickname(account.as_ref());
         let mut room_id = room_id.clone();
         let availability = self.account_settings_repo.get(&account).await?.availability;
@@ -604,7 +610,13 @@ impl RoomsDomainService {
 
             match self
                 .room_management_service
-                .join_room(&full_room_jid, password, capabilities, availability)
+                .join_room(
+                    &full_room_jid,
+                    password,
+                    &display_name,
+                    capabilities,
+                    availability,
+                )
                 .await
             {
                 Ok(info) => {
@@ -918,6 +930,11 @@ impl RoomsDomainService {
         perform_additional_config: impl FnOnce(&MucId, &mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomInfoStatus, RoomError> {
         let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
+        let display_name = self
+            .user_info_domain_service
+            .get_display_name(account.as_ref())
+            .await?
+            .unwrap_or_else(|| account.as_ref().username().to_string());
 
         let mut attempt = 0;
         let mut unique_room_id = room_id.to_string();
@@ -941,6 +958,7 @@ impl RoomsDomainService {
                 .create_or_join_room(
                     &full_room_jid,
                     room_name,
+                    &display_name,
                     spec.clone(),
                     capabilities,
                     availability,
