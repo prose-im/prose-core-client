@@ -107,6 +107,8 @@ impl ConnectionService {
         self.ctx
             .set_connection_properties(connection_properties.clone());
 
+        self.reset_services_before_reconnect().await;
+
         // https://xmpp.org/rfcs/rfc6121.html#roster-login
         if let Err(error) = self.contact_list_domain_service.load_contacts().await {
             error!("Failed to load contact list. {}", error.to_string());
@@ -154,8 +156,6 @@ impl ConnectionService {
             .map_err(|err| ConnectionError::Generic {
                 msg: err.to_string(),
             })?;
-
-        self.reset_services_before_reconnect().await;
 
         if let Err(error) = self.block_list_domain_service.load_block_list().await {
             error!("Failed to load block list. {}", error.to_string());
