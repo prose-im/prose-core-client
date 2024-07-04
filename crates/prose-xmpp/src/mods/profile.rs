@@ -22,9 +22,9 @@ use xmpp_parsers::version::{VersionQuery, VersionResult};
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
 use crate::mods::Module;
-use crate::stanza::avatar;
 use crate::stanza::avatar::ImageId;
 use crate::stanza::last_activity::LastActivityResponse;
+use crate::stanza::{avatar, VCard};
 use crate::stanza::{LastActivityRequest, VCard4};
 use crate::util::{PubSubItemsExt, PubSubQuery, RequestError};
 use crate::{ns, ParseError};
@@ -186,6 +186,29 @@ impl Profile {
         let vcard = match self.ctx.send_iq(iq).await {
             Ok(Some(payload)) => {
                 VCard4::try_from(payload).map_err(|e| ParseError::Generic { msg: e.to_string() })?
+            }
+            Ok(None) => return Err(RequestError::UnexpectedResponse.into()),
+            Err(e) if e.is_item_not_found_err() => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+
+        Ok(Some(vcard))
+    }
+
+    pub async fn load_vcard_temp(
+        &self,
+        from: impl Into<BareJid>,
+    ) -> Result<Option<VCard>, RequestError> {
+        let iq = Iq {
+            from: None,
+            to: Some(Jid::from(from.into())),
+            id: self.ctx.generate_id(),
+            payload: IqType::Get(Element::builder("vCard", ns::VCARD).build()),
+        };
+
+        let vcard = match self.ctx.send_iq(iq).await {
+            Ok(Some(payload)) => {
+                VCard::try_from(&payload).map_err(|e| ParseError::Generic { msg: e.to_string() })?
             }
             Ok(None) => return Err(RequestError::UnexpectedResponse.into()),
             Err(e) if e.is_item_not_found_err() => return Ok(None),
