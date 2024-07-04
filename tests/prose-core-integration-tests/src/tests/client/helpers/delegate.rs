@@ -36,7 +36,7 @@ impl ClientDelegate for Delegate {
                 };
 
                 panic_message.push_str(&format!(
-                    "\n\nNext expected message is:\n\n{element}\n\nScheduled at:\n{file}:{line}",
+                    "\n\nNext expected message is:\n\n{element}\n\nScheduled at:\n{file}:{line}\n",
                 ))
             } else {
                 panic_message.push_str("\n\nThere were no further messages scheduled.")

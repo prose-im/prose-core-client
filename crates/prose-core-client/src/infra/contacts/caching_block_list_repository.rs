@@ -31,6 +31,16 @@ impl CachingBlockListRepository {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl BlockListRepository for CachingBlockListRepository {
+    async fn contains(&self, _account: &AccountId, user_id: &UserId) -> Result<bool> {
+        self.load_block_list_if_needed().await?;
+        Ok(self
+            .blocked_users
+            .read()
+            .as_ref()
+            .map(|set| set.contains(user_id))
+            .unwrap_or_default())
+    }
+
     async fn get_all(&self, _account: &AccountId) -> Result<Vec<UserId>> {
         self.load_block_list_if_needed().await?;
         Ok(self

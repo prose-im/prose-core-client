@@ -9,8 +9,8 @@ use futures::future::join_all;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{DynBlockListDomainService, DynUserInfoDomainService};
-use crate::domain::shared::utils::build_contact_name;
-use crate::dtos::{UserBasicInfo, UserId};
+use crate::domain::shared::models::{CachePolicy, UserBasicInfo, UserId};
+use crate::domain::user_info::models::UserInfoOptExt;
 
 #[derive(InjectDependencies)]
 pub struct BlockListService {
@@ -23,11 +23,13 @@ pub struct BlockListService {
 impl BlockListService {
     pub async fn load_block_list(&self) -> Result<Vec<UserBasicInfo>> {
         let blocked_user_ids = self.block_list_domain_service.load_block_list().await?;
-        let blocked_users = join_all(
-            blocked_user_ids
-                .into_iter()
-                .map(|id| self.enrich_blocked_user(id)),
-        )
+        let blocked_users = join_all(blocked_user_ids.into_iter().map(|id| async move {
+            self.user_info_domain_service
+                .get_user_info(&id, CachePolicy::ReturnCacheDataDontLoad)
+                .await
+                .unwrap_or_default()
+                .into_user_basic_info_or_fallback(id)
+        }))
         .await;
 
         Ok(blocked_users)
@@ -46,21 +48,5 @@ impl BlockListService {
     pub async fn clear_block_list(&self) -> Result<()> {
         self.block_list_domain_service.clear_block_list().await?;
         Ok(())
-    }
-}
-
-impl BlockListService {
-    async fn enrich_blocked_user(&self, user_id: UserId) -> UserBasicInfo {
-        let profile = self
-            .user_info_domain_service
-            .get_user_profile(&user_id)
-            .await
-            .unwrap_or_default()
-            .unwrap_or_default();
-        let name = build_contact_name(&user_id, &profile);
-        UserBasicInfo {
-            id: user_id.into(),
-            name,
-        }
     }
 }

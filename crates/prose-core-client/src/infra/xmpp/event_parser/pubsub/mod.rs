@@ -9,11 +9,10 @@ use std::sync::OnceLock;
 use anyhow::Result;
 use jid::BareJid;
 use tracing::{error, warn};
+use xmpp_parsers::nick::Nick;
 use xmpp_parsers::pubsub;
 
-use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
-use prose_xmpp::ns;
-
+use crate::app::event_handlers::{PubSubEventType, UserInfoEvent, UserInfoEventType};
 use crate::domain::encryption::models::DeviceList;
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::sidebar::models::Bookmark;
@@ -21,6 +20,8 @@ use crate::dtos::{RoomId, UserId};
 use crate::infra::xmpp::event_parser::pubsub::generic_pub_sub_parser::GenericPubSubParser;
 use crate::infra::xmpp::event_parser::Context;
 use crate::infra::xmpp::type_conversions::{bookmark, synced_room_settings};
+use prose_xmpp::mods::pubsub::Event as XMPPPubSubEvent;
+use prose_xmpp::ns;
 
 mod generic_pub_sub_parser;
 
@@ -62,6 +63,24 @@ fn get_parser(ns: &str) -> Option<&Box<dyn PubSubParser>> {
                     Box::new(GenericPubSubParser::<RoomId, SyncedRoomSettings>::new(
                         Into::into,
                     )) as Box<dyn PubSubParser>,
+                ),
+                (
+                    ns::NICK.to_string(),
+                    Box::new(GenericPubSubParser::<String, Nick>::new(|item| {
+                        let nickname = match item.r#type {
+                            PubSubEventType::AddedOrUpdated { mut items } => {
+                                items.pop().map(|nick| nick.0)
+                            }
+                            PubSubEventType::Deleted { .. } => None,
+                            PubSubEventType::Purged => None,
+                        };
+
+                        UserInfoEvent {
+                            user_id: item.user_id,
+                            r#type: UserInfoEventType::NicknameChanged { nickname },
+                        }
+                        .into()
+                    })) as Box<dyn PubSubParser>,
                 ),
             ]
             .into_iter()

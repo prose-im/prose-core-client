@@ -3,16 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
-use crate::domain::shared::models::{
-    AnonOccupantId, Availability, CapabilitiesId, ParticipantId, UserBasicInfo, UserId,
-};
-use crate::domain::user_info::models::{Avatar, JabberClient, Presence};
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use std::borrow::Cow;
-use std::collections::HashMap;
-use std::marker::PhantomData;
+
+use crate::domain::shared::models::{
+    AnonOccupantId, Availability, CapabilitiesId, ParticipantBasicInfo, ParticipantId, UserId,
+};
+use crate::domain::shared::utils::ContactNameBuilder;
+use crate::domain::user_info::models::{Avatar, JabberClient, Presence};
+
+use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
 
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ParticipantName {
@@ -23,65 +25,11 @@ pub struct ParticipantName {
 }
 
 impl ParticipantName {
-    fn name(&self) -> ParticipantNameBuilder<Option<Cow<String>>> {
-        ParticipantNameBuilder::new(self)
-    }
-
     pub fn from_vcard(name: impl Into<String>) -> Self {
         Self {
             vcard: Some(name.into()),
             presence: None,
         }
-    }
-}
-
-pub struct ParticipantNameBuilder<'a, T> {
-    phantom_data: PhantomData<&'a T>,
-    name: T,
-}
-
-impl<'a> ParticipantNameBuilder<'a, Option<Cow<'a, String>>> {
-    // Adjust the constructor to return a builder with the specific type 'Option<Cow<'a, String>>'
-    fn new(name: &'a ParticipantName) -> Self {
-        Self {
-            phantom_data: PhantomData,
-            name: name
-                .vcard
-                .as_ref()
-                .map(Cow::Borrowed)
-                .or_else(|| name.presence.as_ref().map(Cow::Borrowed)),
-        }
-    }
-
-    fn or_real_id(
-        self,
-        real_id: Option<&UserId>,
-    ) -> ParticipantNameBuilder<'a, Option<Cow<'a, String>>> {
-        ParticipantNameBuilder {
-            phantom_data: PhantomData,
-            name: self
-                .name
-                .or_else(|| real_id.map(|id| Cow::Owned(id.formatted_username()))),
-        }
-    }
-
-    pub fn or_participant_id(
-        self,
-        participant_id: &ParticipantId,
-    ) -> ParticipantNameBuilder<'a, Cow<'a, String>> {
-        ParticipantNameBuilder {
-            phantom_data: PhantomData,
-            name: self.name.unwrap_or_else(|| match participant_id {
-                ParticipantId::User(id) => Cow::Owned(id.formatted_username()),
-                ParticipantId::Occupant(id) => Cow::Owned(id.formatted_nickname()),
-            }),
-        }
-    }
-}
-
-impl<'a> ParticipantNameBuilder<'a, Cow<'a, String>> {
-    pub fn into_string(self) -> String {
-        self.name.into_owned()
     }
 }
 
@@ -103,13 +51,16 @@ pub struct Participant {
     pub avatar: Option<Avatar>,
     pub client: Option<JabberClient>,
     pub caps: Option<CapabilitiesId>,
+    pub status: Option<String>,
     pub compose_state: ComposeState,
     pub compose_state_updated: DateTime<Utc>,
 }
 
 impl Participant {
-    pub fn name(&self) -> ParticipantNameBuilder<Option<Cow<String>>> {
-        self.name.name().or_real_id(self.real_id.as_ref())
+    pub fn name(&self) -> ContactNameBuilder {
+        ContactNameBuilder::new()
+            .or_nickname(self.name.presence.as_ref())
+            .or_nickname(self.name.vcard.as_ref())
     }
 }
 
@@ -132,7 +83,7 @@ impl ParticipantList {
                     anon_occupant_id: None,
                     name: ParticipantName {
                         vcard: Some(contact_name.to_string()),
-                        presence: None,
+                        presence: presence.nickname,
                     },
                     is_self: false,
                     affiliation: RoomAffiliation::Owner,
@@ -140,6 +91,7 @@ impl ParticipantList {
                     avatar: presence.avatar,
                     client: presence.client,
                     caps: presence.caps,
+                    status: presence.status,
                     compose_state: Default::default(),
                     compose_state_updated: Default::default(),
                 },
@@ -179,6 +131,7 @@ impl ParticipantList {
                 avatar: p.presence.avatar,
                 client: p.presence.client,
                 caps: p.presence.caps,
+                status: p.presence.status,
                 compose_state: ComposeState::Idle,
                 compose_state_updated: Default::default(),
             };
@@ -239,6 +192,7 @@ impl ParticipantList {
         participant.avatar = presence.avatar;
         participant.client = presence.client;
         participant.caps = presence.caps;
+        participant.status = presence.status;
     }
 
     /// Modifies the participant's affiliation or inserts a new participant with the affiliation
@@ -282,7 +236,7 @@ impl ParticipantList {
         real_id: &UserId,
         is_self: bool,
         affiliation: RoomAffiliation,
-        name: Option<&str>,
+        name: Option<String>,
     ) {
         if self
             .participants_map
@@ -301,7 +255,7 @@ impl ParticipantList {
         participant.real_id = Some(real_id.clone());
         participant.affiliation = affiliation;
         participant.is_self = is_self;
-        participant.name.vcard = name.map(ToString::to_string);
+        participant.name.vcard = name;
     }
 
     /// Sets the participant's real id, anonymous occupant id and name. Does nothing if the
@@ -311,7 +265,7 @@ impl ParticipantList {
         id: &ParticipantId,
         real_id: Option<&UserId>,
         anon_occupant_id: Option<&AnonOccupantId>,
-        name: Option<&str>,
+        name: Option<String>,
     ) {
         let Some(participant) = self.participants_map.get_mut(id) else {
             return;
@@ -319,7 +273,7 @@ impl ParticipantList {
 
         participant.real_id = real_id.cloned();
         participant.anon_occupant_id = anon_occupant_id.cloned();
-        participant.name.vcard = name.map(ToString::to_string);
+        participant.name.vcard = name;
 
         // Remove registered user matching the real id…
         if let Some(real_id) = real_id {
@@ -378,34 +332,22 @@ impl ParticipantList {
 impl ParticipantList {
     /// Returns the real JIDs of all composing users that started composing after `started_after`.
     /// If we don't have a real JID for a composing user they are excluded from the list.
-    pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<UserBasicInfo> {
+    pub fn composing_users(&self, started_after: DateTime<Utc>) -> Vec<ParticipantBasicInfo> {
         self.participants_map
             .iter()
             .filter_map(|(id, occupant)| {
                 if occupant.compose_state != ComposeState::Composing
                     || occupant.compose_state_updated <= started_after
-                    || occupant.real_id.is_none()
                 {
                     return None;
                 }
                 Some((id, occupant))
             })
             .sorted_by_key(|o| o.1.compose_state_updated)
-            .filter_map(|(id, occupant)| {
-                // TODO: Support compose states of MUC users?
-
-                let Some(real_id) = occupant.real_id.clone() else {
-                    return None;
-                };
-
-                Some(UserBasicInfo {
-                    name: occupant
-                        .name()
-                        .or_real_id(occupant.real_id.as_ref())
-                        .or_participant_id(id)
-                        .into_string(),
-                    id: real_id,
-                })
+            .map(|(id, occupant)| ParticipantBasicInfo {
+                name: occupant.name().unwrap_or_participant_id(id),
+                id: id.clone(),
+                avatar: occupant.avatar.clone(),
             })
             .collect::<Vec<_>>()
     }
@@ -421,6 +363,7 @@ impl ParticipantList {
 #[cfg(test)]
 mod tests {
     use chrono::TimeZone;
+    use pretty_assertions::assert_eq;
 
     use crate::domain::shared::models::OccupantId;
     use crate::{occupant_id, user_id};
@@ -561,17 +504,19 @@ mod tests {
         );
 
         assert_eq!(
-            state.composing_users(Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap()),
             vec![
-                UserBasicInfo {
+                ParticipantBasicInfo {
                     name: "Jonathan Doe".to_string(),
-                    id: user_id!("c@prose.org")
+                    id: occupant_id!("room@prose.org/c").into(),
+                    avatar: None,
                 },
-                UserBasicInfo {
+                ParticipantBasicInfo {
                     name: "A".to_string(),
-                    id: user_id!("a@prose.org")
+                    id: occupant_id!("room@prose.org/a").into(),
+                    avatar: None,
                 },
-            ]
+            ],
+            state.composing_users(Utc.with_ymd_and_hms(2023, 01, 03, 0, 0, 10).unwrap()),
         );
     }
 
@@ -648,7 +593,7 @@ mod tests {
             &ParticipantId::Occupant(occupant_id!("room@conference.prose.org/b")),
             Some(&user_id!("b@prose.org")),
             None,
-            Some("User B New Name"),
+            Some("User B New Name".to_string()),
         );
 
         assert_eq!(

@@ -16,7 +16,7 @@ use wasm_bindgen::prelude::*;
 use prose_core_client::dtos::{MucId, SoftwareVersion, UserStatus};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::{
-    open_store, Client as ProseClient, PlatformDriver, Secret, StoreAvatarCache,
+    open_store, Client as ProseClient, PlatformDriver, Secret, StoreAvatarRepository,
 };
 
 use crate::connector::{Connector, ProseConnectionProvider};
@@ -25,8 +25,8 @@ use crate::encryption::{EncryptionService, JsEncryptionService};
 use crate::error::{Result, WasmError};
 use crate::log::{JSLogger, MakeJSLogWriter};
 use crate::types::{
-    try_user_id_vec_from_string_array, AccountInfo, Availability, BareJid, Channel, ChannelsArray,
-    ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
+    try_user_id_vec_from_string_array, AccountInfo, Availability, Avatar, BareJid, Channel,
+    ChannelsArray, ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
     PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UploadSlot,
     UserBasicInfo, UserBasicInfoArray, UserMetadata, UserProfile,
 };
@@ -167,7 +167,7 @@ impl Client {
             client: ProseClient::builder()
                 .set_connector_provider(Connector::provider(connection_provider, config))
                 .set_store(store.clone())
-                .set_avatar_cache(StoreAvatarCache::new(store.clone()))
+                .set_avatar_repository(StoreAvatarRepository::new(store.clone()))
                 .set_encryption_service(Arc::new(EncryptionService::new(
                     encryption_service,
                     Arc::new(EncryptionKeysRepository::new(store.clone())),
@@ -456,11 +456,11 @@ impl Client {
     /// XEP-0084: User Avatar
     /// https://xmpp.org/extensions/xep-0084.html
     #[wasm_bindgen(js_name = "loadAvatarDataURL")]
-    pub async fn load_avatar_data_url(&self, jid: &BareJid) -> Result<Option<String>> {
+    pub async fn load_avatar_data_url(&self, avatar: &Avatar) -> Result<Option<String>> {
         let avatar = self
             .client
             .user_data
-            .load_avatar(&jid.into())
+            .load_avatar(&avatar.clone().into())
             .await
             .map_err(WasmError::from)?;
         Ok(avatar)
@@ -504,7 +504,7 @@ impl Client {
     pub async fn save_user_profile(&self, profile: &UserProfile) -> Result<()> {
         self.client
             .account
-            .set_profile(&(profile.clone()).into())
+            .set_profile(profile.clone().into())
             .await
             .map_err(WasmError::from)?;
         Ok(())

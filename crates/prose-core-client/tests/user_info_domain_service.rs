@@ -30,7 +30,16 @@ async fn test_load_user_metadata_resolves_full_jid() -> Result<()> {
         )
         .return_once(|_, _| Some(user_resource_id!("request@prose.org/resource")));
 
-    deps.user_profile_service
+    deps.block_list_repo
+        .expect_contains()
+        .once()
+        .with(
+            predicate::always(),
+            predicate::eq(user_id!("request@prose.org")),
+        )
+        .return_once(|_, _| Box::pin(async { Ok(false) }));
+
+    deps.user_info_service
         .expect_load_user_metadata()
         .once()
         .with(

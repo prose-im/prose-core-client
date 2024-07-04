@@ -23,10 +23,12 @@ use prose_core_client::domain::rooms::services::{
 };
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::{
-    MucId, OccupantId, UserId, UserOrResourceId, UserResourceId,
+    CachePolicy, MucId, OccupantId, UserId, UserOrResourceId, UserResourceId,
 };
-use prose_core_client::domain::user_info::models::Presence;
-use prose_core_client::dtos::{Availability, Participant, ParticipantInfo, UserBasicInfo};
+use prose_core_client::domain::user_info::models::{Presence, UserName};
+use prose_core_client::dtos::{
+    Availability, Participant, ParticipantBasicInfo, ParticipantInfo, UserInfo,
+};
 use prose_core_client::test::{
     ConstantTimeProvider, MockAppDependencies, MockRoomFactoryDependencies,
 };
@@ -54,10 +56,23 @@ async fn test_adds_participant() -> Result<()> {
     }
 
     deps.user_info_domain_service
-        .expect_get_display_name()
+        .expect_get_user_info()
         .once()
-        .with(predicate::eq(user_id!("real-jid@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("George Washington".to_string())) }));
+        .with(
+            predicate::eq(user_id!("real-jid@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .return_once(|_, _| {
+            Box::pin(async {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some("George Washington".to_string()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
+        });
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -136,10 +151,23 @@ async fn test_adds_invited_participant() -> Result<()> {
     }
 
     deps.user_info_domain_service
-        .expect_get_display_name()
+        .expect_get_user_info()
         .once()
-        .with(predicate::eq(user_id!("user@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("John Doe".to_string())) }));
+        .with(
+            predicate::eq(user_id!("user@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .return_once(|_, _| {
+            Box::pin(async {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some("John Doe".to_string()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
+        });
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -166,13 +194,15 @@ async fn test_adds_invited_participant() -> Result<()> {
     assert_eq!(
         room.with_participants(|p| p.iter().map(ParticipantInfo::from).collect::<Vec<_>>()),
         vec![ParticipantInfo {
-            id: Some(user_id!("user@prose.org")),
+            id: user_id!("user@prose.org").into(),
+            user_id: Some(user_id!("user@prose.org")),
             name: "John Doe".to_string(),
             is_self: false,
             availability: Availability::Unavailable,
             affiliation: RoomAffiliation::Member,
             avatar: None,
             client: None,
+            status: None,
         }]
     );
 
@@ -433,11 +463,12 @@ async fn test_handles_compose_state_for_muc_room() -> Result<()> {
     let room_factory = RoomFactory::from(factory_deps);
     let room = room_factory.build(room.clone()).to_generic_room();
     assert_eq!(
-        room.load_composing_users().await?,
-        vec![UserBasicInfo {
+        vec![ParticipantBasicInfo {
             name: "Janice Doe".to_string(),
-            id: user_id!("nickname@prose.org")
-        }]
+            id: occupant_id!("room@conference.prose.org/nickname").into(),
+            avatar: None,
+        }],
+        room.load_composing_users().await?,
     );
 
     time_provider.set_ymd_hms(2023, 01, 04, 00, 00, 31);
@@ -515,9 +546,10 @@ async fn test_handles_compose_state_for_direct_message_room() -> Result<()> {
     let room = room_factory.build(room.clone()).to_generic_room();
     assert_eq!(
         room.load_composing_users().await?,
-        vec![UserBasicInfo {
+        vec![ParticipantBasicInfo {
             name: "Janice Doe".to_string(),
-            id: user_id!("contact@prose.org")
+            id: user_id!("contact@prose.org").into(),
+            avatar: None,
         }]
     );
 
@@ -598,14 +630,6 @@ async fn test_handles_user_presence() -> Result<()> {
             }),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
-
-    deps.client_event_dispatcher
-        .expect_dispatch_event()
-        .once()
-        .with(predicate::eq(ClientEvent::ContactChanged {
-            ids: vec![user_id!("sender@prose.org")],
-        }))
-        .return_once(|_| ());
 
     deps.client_event_dispatcher
         .expect_dispatch_event()
@@ -727,14 +751,6 @@ async fn test_handles_contact_presence_with_no_room() -> Result<()> {
             }),
         )
         .return_once(|_, _| Box::pin(async { Ok(()) }));
-
-    deps.client_event_dispatcher
-        .expect_dispatch_event()
-        .once()
-        .with(predicate::eq(ClientEvent::ContactChanged {
-            ids: vec![user_id!("sender@prose.org")],
-        }))
-        .return_once(|_| ());
 
     let event_handler = RoomsEventHandler::from(&deps.into_deps());
 

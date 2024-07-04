@@ -25,6 +25,7 @@ use crate::app::services::RoomInner;
 use crate::domain::account::services::mocks::MockUserAccountService;
 use crate::domain::connection::models::{ConnectionProperties, ServerFeatures};
 use crate::domain::connection::services::mocks::MockConnectionService;
+use crate::domain::contacts::repos::mocks::MockBlockListRepository;
 use crate::domain::contacts::services::mocks::{
     MockBlockListDomainService, MockContactListDomainService,
 };
@@ -60,9 +61,7 @@ use crate::domain::user_info::repos::mocks::{
     MockAvatarRepository, MockUserInfoRepository, MockUserProfileRepository,
 };
 use crate::domain::user_info::services::impls::UserInfoDomainServiceDependencies;
-use crate::domain::user_info::services::mocks::{
-    MockUserInfoDomainService, MockUserProfileService,
-};
+use crate::domain::user_info::services::mocks::{MockUserInfoDomainService, MockUserInfoService};
 use crate::dtos::{DecryptionContext, UserResourceId};
 use crate::infra::general::mocks::StepRngProvider;
 use crate::infra::general::OsRngProvider;
@@ -325,13 +324,14 @@ impl From<MockRoomsDomainServiceDependencies> for RoomsDomainServiceDependencies
 #[derivative(Default)]
 pub struct MockUserInfoDomainServiceDependencies {
     pub avatar_repo: MockAvatarRepository,
+    pub block_list_repo: MockBlockListRepository,
     pub client_event_dispatcher: MockClientEventDispatcherTrait,
     pub ctx: AppContext,
     #[derivative(Default(value = "Arc::new(ConstantTimeProvider::new(mock_reference_date()))"))]
     pub time_provider: DynTimeProvider,
     pub user_info_repo: MockUserInfoRepository,
+    pub user_info_service: MockUserInfoService,
     pub user_profile_repo: MockUserProfileRepository,
-    pub user_profile_service: MockUserProfileService,
 }
 
 impl MockUserInfoDomainServiceDependencies {
@@ -344,12 +344,13 @@ impl From<MockUserInfoDomainServiceDependencies> for UserInfoDomainServiceDepend
     fn from(value: MockUserInfoDomainServiceDependencies) -> Self {
         Self {
             avatar_repo: Arc::new(value.avatar_repo),
+            block_list_repo: Arc::new(value.block_list_repo),
             client_event_dispatcher: Arc::new(value.client_event_dispatcher),
             ctx: Arc::new(value.ctx),
             time_provider: Arc::new(value.time_provider),
             user_info_repo: Arc::new(value.user_info_repo),
+            user_info_service: Arc::new(value.user_info_service),
             user_profile_repo: Arc::new(value.user_profile_repo),
-            user_profile_service: Arc::new(value.user_profile_service),
         }
     }
 }

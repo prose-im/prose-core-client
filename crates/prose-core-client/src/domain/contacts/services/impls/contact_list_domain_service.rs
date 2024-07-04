@@ -12,7 +12,7 @@ use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynContactListRepository, DynContactListService,
     DynPresenceSubRequestsRepository,
 };
-use crate::domain::contacts::models::{Contact, PresenceSubscription};
+use crate::domain::contacts::models::{Contact, PresenceSubRequest, PresenceSubscription};
 use crate::dtos::UserId;
 use crate::ClientEvent;
 
@@ -86,7 +86,7 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
         Ok(())
     }
 
-    async fn load_presence_sub_requests(&self) -> Result<Vec<UserId>> {
+    async fn load_presence_sub_requests(&self) -> Result<Vec<PresenceSubRequest>> {
         self.presence_sub_requests_repo
             .get_all(&self.ctx.connected_account()?)
             .await
@@ -156,10 +156,20 @@ impl ContactListDomainServiceTrait for ContactListDomainService {
         Ok(())
     }
 
-    async fn handle_presence_sub_request(&self, from: &UserId) -> Result<()> {
+    async fn handle_presence_sub_request(
+        &self,
+        from: &UserId,
+        nickname: Option<String>,
+    ) -> Result<()> {
         if self
             .presence_sub_requests_repo
-            .set(&self.ctx.connected_account()?, from)
+            .set(
+                &self.ctx.connected_account()?,
+                PresenceSubRequest {
+                    user_id: from.clone(),
+                    name: nickname,
+                },
+            )
             .await?
         {
             self.client_event_dispatcher

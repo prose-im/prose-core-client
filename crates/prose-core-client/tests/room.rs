@@ -14,7 +14,8 @@ use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTa
 use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
-use prose_core_client::domain::shared::models::{MucId, OccupantId, RoomId, UserId};
+use prose_core_client::domain::shared::models::{CachePolicy, MucId, OccupantId, RoomId, UserId};
+use prose_core_client::domain::user_info::models::{UserInfo, UserName};
 use prose_core_client::dtos::{Availability, MessageResultSet, Participant, StanzaId};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id};
@@ -38,10 +39,23 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
         )]);
 
     deps.user_info_domain_service
-        .expect_get_display_name()
+        .expect_get_user_info()
         .once()
-        .with(predicate::eq(user_id!("c@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
+        .with(
+            predicate::eq(user_id!("c@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataDontLoad),
+        )
+        .return_once(|_, _| {
+            Box::pin(async {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some("Carl Doe".to_string()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
+        });
 
     deps.message_repo
         .expect_get_all()
@@ -114,10 +128,23 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         )]);
 
     deps.user_info_domain_service
-        .expect_get_display_name()
+        .expect_get_user_info()
         .once()
-        .with(predicate::eq(user_id!("c@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Carl Doe".to_string())) }));
+        .with(
+            predicate::eq(user_id!("c@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataDontLoad),
+        )
+        .return_once(|_, _| {
+            Box::pin(async {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some("Carl Doe".to_string()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
+        });
 
     deps.message_archive_service
         .expect_load_messages_before()
@@ -455,8 +482,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
         });
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .expect_get_user_info()
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
@@ -626,8 +653,8 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
         });
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .expect_get_user_info()
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
@@ -704,8 +731,8 @@ async fn test_stops_at_last_page() -> Result<()> {
         });
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .expect_get_user_info()
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()
@@ -828,8 +855,8 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         });
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .returning(|_| Box::pin(async { Ok(None) }));
+        .expect_get_user_info()
+        .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
         .expect_append()

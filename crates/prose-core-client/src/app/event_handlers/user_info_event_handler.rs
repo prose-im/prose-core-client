@@ -14,14 +14,14 @@ use crate::app::event_handlers::{
 };
 
 #[derive(InjectDependencies)]
-pub struct UserStateEventHandler {
+pub struct UserInfoEventHandler {
     #[inject]
     user_info_domain_service: DynUserInfoDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
-impl ServerEventHandler for UserStateEventHandler {
+impl ServerEventHandler for UserInfoEventHandler {
     fn name(&self) -> &'static str {
         "user_state"
     }
@@ -37,22 +37,27 @@ impl ServerEventHandler for UserStateEventHandler {
     }
 }
 
-impl UserStateEventHandler {
+impl UserInfoEventHandler {
     async fn handle_user_info_event(&self, event: UserInfoEvent) -> Result<()> {
         match event.r#type {
             UserInfoEventType::AvatarChanged { metadata } => {
                 self.user_info_domain_service
-                    .handle_avatar_changed(&event.user_id, Some(&metadata))
+                    .handle_avatar_changed(&event.user_id, Some(metadata))
                     .await?;
             }
             UserInfoEventType::ProfileChanged { profile } => {
                 self.user_info_domain_service
-                    .handle_user_profile_changed(&event.user_id, Some(&profile))
+                    .handle_user_profile_changed(&event.user_id, Some(profile))
                     .await?;
             }
             UserInfoEventType::StatusChanged { status } => {
                 self.user_info_domain_service
-                    .handle_user_status_changed(&event.user_id, status.as_ref())
+                    .handle_user_status_changed(&event.user_id, status)
+                    .await?;
+            }
+            UserInfoEventType::NicknameChanged { nickname } => {
+                self.user_info_domain_service
+                    .handle_nickname_changed(&event.user_id, nickname)
                     .await?;
             }
         }

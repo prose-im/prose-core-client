@@ -8,16 +8,20 @@ use async_trait::async_trait;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::DynContactListDomainService;
+use crate::app::deps::{DynContactListDomainService, DynUserInfoDomainService};
 use crate::app::event_handlers::{
     ContactListEvent, ContactListEventType, ServerEvent, ServerEventHandler,
 };
+use crate::domain::contacts::models::Contact;
+use crate::dtos::PresenceSubscription;
 
 /// Handles contact list related events.
 #[derive(InjectDependencies)]
 pub struct ContactListEventHandler {
     #[inject]
     contact_list_domain_service: DynContactListDomainService,
+    #[inject]
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -51,9 +55,16 @@ impl ContactListEventHandler {
                     .handle_updated_contact(&event.contact_id, subscription)
                     .await?;
             }
-            ContactListEventType::PresenceSubscriptionRequested => {
+            ContactListEventType::PresenceSubscriptionRequested { nickname } => {
                 self.contact_list_domain_service
-                    .handle_presence_sub_request(&event.contact_id)
+                    .handle_presence_sub_request(&event.contact_id, nickname.clone())
+                    .await?;
+                self.user_info_domain_service
+                    .handle_contacts_changed(vec![Contact {
+                        id: event.contact_id,
+                        name: nickname,
+                        presence_subscription: PresenceSubscription::Requested,
+                    }])
                     .await?;
             }
         }

@@ -9,8 +9,9 @@ use std::sync::Arc;
 use prose_store::prelude::*;
 
 use crate::app::deps::{
-    AppContext, AppDependencies, DynClientEventDispatcher, DynEncryptionService, DynIDProvider,
-    DynRngProvider, DynServerEventHandlerQueue, DynTimeProvider, DynUserDeviceIdProvider,
+    AppContext, AppDependencies, DynAvatarRepository, DynClientEventDispatcher,
+    DynEncryptionService, DynIDProvider, DynRngProvider, DynServerEventHandlerQueue,
+    DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::services::RoomInner;
 use crate::domain::contacts::services::impls::{
@@ -32,7 +33,6 @@ use crate::domain::sidebar::services::impls::{
 use crate::domain::user_info::services::impls::{
     UserInfoDomainService, UserInfoDomainServiceDependencies,
 };
-use crate::infra::avatars::AvatarCache;
 use crate::infra::contacts::{
     CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
 };
@@ -50,13 +50,13 @@ use crate::infra::settings::{
     AccountSettingsRecord, AccountSettingsRepository, LocalRoomSettingsRecord,
     LocalRoomSettingsRepository,
 };
-use crate::infra::user_info::caching_avatar_repository::CachingAvatarRepository;
-use crate::infra::user_info::{CachingUserInfoRepository, UserInfoRecord};
-use crate::infra::user_profile::{CachingUserProfileRepository, UserProfileRecord};
+use crate::infra::user_info::{
+    InMemoryUserInfoRepository, UserProfileRecord, UserProfileRepository,
+};
 use crate::infra::xmpp::XMPPClient;
 
 pub(crate) struct PlatformDependencies {
-    pub avatar_cache: Box<dyn AvatarCache>,
+    pub avatar_repository: DynAvatarRepository,
     pub client_event_dispatcher: DynClientEventDispatcher,
     pub ctx: AppContext,
     pub encryption_service: DynEncryptionService,
@@ -85,10 +85,10 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, AccountSettingsRecord>(&tx)?;
             create_collection::<D, DraftsRecord>(&tx)?;
             create_collection::<D, MessageRecord>(&tx)?;
-            create_collection::<D, UserInfoRecord>(&tx)?;
+            tx.create_collection("user_info")?;
             create_collection::<D, UserProfileRecord>(&tx)?;
             #[cfg(target_arch = "wasm32")]
-            create_collection::<D, crate::infra::avatars::AvatarRecord>(&tx)?;
+            create_collection::<D, crate::infra::user_info::AvatarRecord>(&tx)?;
         }
 
         if event.old_version < 13 {
@@ -173,37 +173,33 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, SignedPreKeyRecord>(&tx)?;
             create_collection::<D, KyberPreKeyRecord>(&tx)?;
 
-            tx.delete_collection(UserInfoRecord::collection())?;
+            tx.delete_collection("user_info")?;
             tx.delete_collection(UserProfileRecord::collection())?;
             tx.delete_collection(DraftsRecord::collection())?;
             tx.delete_collection(UserDeviceRecord::collection())?;
 
-            create_collection::<D, UserInfoRecord>(&tx)?;
+            tx.create_collection("user_info")?;
             create_collection::<D, UserProfileRecord>(&tx)?;
             create_collection::<D, DraftsRecord>(&tx)?;
             create_collection::<D, UserDeviceRecord>(&tx)?;
         }
 
         if event.old_version < 28 {
-            tx.delete_collection(UserInfoRecord::collection())?;
-            create_collection::<D, UserInfoRecord>(&tx)?;
+            tx.delete_collection("user_info")?;
+            tx.delete_collection(UserProfileRecord::collection())?;
+
+            #[cfg(target_arch = "wasm32")]
+            {
+                tx.delete_collection(crate::infra::user_info::AvatarRecord::collection())?;
+                create_collection::<D, crate::infra::user_info::AvatarRecord>(&tx)?;
+            }
+
+            create_collection::<D, UserProfileRecord>(&tx)?;
         }
 
         Ok(())
     })
     .await?;
-
-    if versions_changed.load(Ordering::Acquire) {
-        store
-            .truncate_collections(&[
-                MessageRecord::collection(),
-                UserInfoRecord::collection(),
-                UserProfileRecord::collection(),
-                #[cfg(target_arch = "wasm32")]
-                crate::infra::avatars::AvatarRecord::collection(),
-            ])
-            .await?;
-    }
 
     Ok(store)
 }
@@ -219,7 +215,7 @@ fn create_collection<D: Driver, E: Entity>(tx: &D::UpgradeTransaction<'_>) -> Re
 impl From<PlatformDependencies> for AppDependencies {
     fn from(d: PlatformDependencies) -> Self {
         let account_settings_repo = Arc::new(AccountSettingsRepository::new(d.store.clone()));
-        let avatar_repo = Arc::new(CachingAvatarRepository::new(d.xmpp.clone(), d.avatar_cache));
+        let avatar_repo = d.avatar_repository;
         let client_event_dispatcher = d.client_event_dispatcher;
         let connected_rooms_repo = Arc::new(InMemoryConnectedRoomsRepository::new());
         let ctx = Arc::new(d.ctx);
@@ -232,21 +228,17 @@ impl From<PlatformDependencies> for AppDependencies {
             d.xmpp.clone(),
         ));
         let local_room_settings_repo = Arc::new(LocalRoomSettingsRepository::new(d.store.clone()));
+        let block_list_repo = Arc::new(CachingBlockListRepository::new(d.xmpp.clone()));
 
         let user_info_domain_service_dependencies = UserInfoDomainServiceDependencies {
             avatar_repo: avatar_repo.clone(),
             ctx: ctx.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
             time_provider: time_provider.clone(),
-            user_info_repo: Arc::new(CachingUserInfoRepository::new(
-                d.store.clone(),
-                d.xmpp.clone(),
-            )),
-            user_profile_repo: Arc::new(CachingUserProfileRepository::new(
-                d.store.clone(),
-                d.xmpp.clone(),
-            )),
-            user_profile_service: d.xmpp.clone(),
+            user_info_repo: Arc::new(InMemoryUserInfoRepository::new()),
+            user_profile_repo: Arc::new(UserProfileRepository::new(d.store.clone())),
+            user_info_service: d.xmpp.clone(),
+            block_list_repo: block_list_repo.clone(),
         };
 
         let user_info_domain_service = Arc::new(UserInfoDomainService::from(
@@ -339,7 +331,7 @@ impl From<PlatformDependencies> for AppDependencies {
 
         let block_list_domain_service_dependencies = BlockListDomainServiceDependencies {
             ctx: ctx.clone(),
-            block_list_repo: Arc::new(CachingBlockListRepository::new(d.xmpp.clone())),
+            block_list_repo: block_list_repo.clone(),
             block_list_service: d.xmpp.clone(),
             client_event_dispatcher: client_event_dispatcher.clone(),
         };

@@ -22,10 +22,12 @@ async fn test_loads_and_caches_contacts() -> Result<()> {
     let contacts = vec![
         Contact {
             id: user_id!("a@prose.org"),
+            name: Some("User A".to_string()),
             presence_subscription: PresenceSubscription::Requested,
         },
         Contact {
             id: user_id!("b@prose.org"),
+            name: None,
             presence_subscription: PresenceSubscription::Requested,
         },
     ];

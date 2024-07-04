@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 mod catchup_unread;
+mod contact_list;
 mod helpers;
 mod muc;
 mod muc_omemo;

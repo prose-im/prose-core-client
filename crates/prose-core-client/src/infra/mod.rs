@@ -4,7 +4,6 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub mod account;
-pub mod avatars;
 pub mod connection;
 pub mod contacts;
 pub mod encryption;
@@ -17,12 +16,11 @@ pub mod settings;
 pub mod sidebar;
 pub mod uploads;
 pub mod user_info;
-pub mod user_profile;
 pub mod xmpp;
 
 pub(crate) mod constants {
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) use super::avatars::{
+    pub(crate) use super::user_info::{
         IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
     };
 }

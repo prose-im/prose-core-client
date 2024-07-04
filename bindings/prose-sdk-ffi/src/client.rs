@@ -14,7 +14,7 @@ use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
-    open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarCache,
+    open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarRepository,
     PlatformDriver, Secret, SignalServiceHandle,
 };
 use prose_xmpp::{connector, ConnectionError};
@@ -111,32 +111,29 @@ impl Client {
     }
 
     pub async fn save_profile(&self, profile: UserProfile) -> Result<(), ClientError> {
-        let profile = self.client().await?.account.set_profile(&profile).await?;
+        let profile = self.client().await?.account.set_profile(profile).await?;
         Ok(profile)
     }
 
-    pub async fn delete_profile(&self) -> Result<(), ClientError> {
-        self.client().await?.account.delete_profile().await?;
-        Ok(())
-    }
-
     pub async fn load_avatar(&self, from: JID) -> Result<Option<PathBuf>, ClientError> {
-        let path = self
-            .client()
-            .await?
-            .user_data
-            .load_avatar(&from.to_bare().unwrap().into())
-            .await?;
-        Ok(path)
+        todo!()
+        // let path = self
+        //     .client()
+        //     .await?
+        //     .user_data
+        //     .load_avatar(&from.to_bare().unwrap().into())
+        //     .await?;
+        // Ok(path)
     }
 
     pub async fn save_avatar(&self, image_path: PathBuf) -> Result<(), ClientError> {
-        self.client()
-            .await?
-            .account
-            .set_avatar_from_url(&image_path)
-            .await?;
-        Ok(())
+        todo!()
+        // self.client()
+        //     .await?
+        //     .account
+        //     .set_avatar_from_url(&image_path)
+        //     .await?;
+        // Ok(())
     }
 
     pub async fn load_latest_messages(
@@ -275,7 +272,7 @@ impl Client {
         let client = ProseClient::builder()
             .set_connector_provider(connector::xmpp_rs::Connector::provider())
             .set_store(store.clone())
-            .set_avatar_cache(FsAvatarCache::new(&self.cache_dir.join("Avatars"))?)
+            .set_avatar_repository(FsAvatarRepository::new(&self.cache_dir.join("Avatars"))?)
             .set_encryption_service(Arc::new(SignalServiceHandle::new(
                 Arc::new(EncryptionKeysRepository::new(store.clone())),
                 Arc::new(SessionRepository::new(store)),

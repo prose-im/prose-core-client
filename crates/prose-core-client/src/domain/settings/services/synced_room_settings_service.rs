@@ -17,5 +17,4 @@ use crate::domain::shared::models::RoomId;
 pub trait SyncedRoomSettingsService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_settings(&self, room_id: &RoomId) -> Result<Option<SyncedRoomSettings>>;
     async fn save_settings(&self, room_id: &RoomId, settings: &SyncedRoomSettings) -> Result<()>;
-    async fn delete_settings(&self, room_id: &RoomId) -> Result<()>;
 }

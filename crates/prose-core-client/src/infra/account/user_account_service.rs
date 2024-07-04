@@ -10,7 +10,7 @@ use jid::Jid;
 use prose_xmpp::mods;
 use prose_xmpp::stanza::VCard4;
 
-use crate::domain::account::services::UserAccountService;
+use crate::domain::account::services::{UserAccountService, UserProfileFormat};
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::{Availability, AvatarId};
 use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
@@ -65,11 +65,22 @@ impl UserAccountService for XMPPClient {
             .await
     }
 
-    async fn set_profile(&self, user_profile: &UserProfile) -> Result<()> {
+    async fn set_profile(
+        &self,
+        user_profile: UserProfile,
+        format: UserProfileFormat,
+    ) -> Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
-        let vcard = VCard4::from(user_profile.clone());
-        profile.set_vcard(vcard.clone()).await?;
-        profile.publish_vcard(vcard).await?;
+
+        match format {
+            UserProfileFormat::Vcard4 => {
+                profile.publish_vcard4(user_profile.into()).await?;
+            }
+            UserProfileFormat::VcardTemp => {
+                profile.publish_vcard_temp(user_profile.into()).await?;
+            }
+        }
+
         Ok(())
     }
 

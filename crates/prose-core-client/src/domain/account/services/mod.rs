@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use user_account_service::UserAccountService;
+pub use user_account_service::{UserAccountService, UserProfileFormat};
 
 mod user_account_service;
 

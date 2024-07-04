@@ -22,9 +22,9 @@ pub use prose_store::prelude::{PlatformDriver, Store};
 pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient};
 
 #[cfg(target_arch = "wasm32")]
-pub use crate::infra::avatars::StoreAvatarCache;
+pub use crate::infra::user_info::StoreAvatarRepository;
 #[cfg(not(target_arch = "wasm32"))]
-pub use crate::infra::avatars::{FsAvatarCache, FsAvatarCacheError};
+pub use crate::infra::user_info::{FsAvatarRepository, FsAvatarRepositoryError};
 
 #[cfg(feature = "test")]
 pub mod test;

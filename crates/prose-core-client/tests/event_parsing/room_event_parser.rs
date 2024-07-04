@@ -263,8 +263,9 @@ async fn test_user_entered_room() -> Result<()> {
                         availability: Availability::Available,
                         avatar: Some(Avatar {
                             id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
-                            source: AvatarSource::Vcard,
-                            owner: user_id!("user@prose.org").into(),
+                            source: AvatarSource::Vcard {
+                                owner: user_id!("user@prose.org").into()
+                            },
                         }),
                         client: Some("https://cheogram.com".parse()?),
                         caps: Some(CapabilitiesId::from(
@@ -328,8 +329,9 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
                         availability: Availability::Available,
                         avatar: Some(Avatar {
                             id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
-                            source: AvatarSource::Vcard,
-                            owner: user_id!("user@prose.org").into(),
+                            source: AvatarSource::Vcard {
+                                owner: user_id!("user@prose.org").into(),
+                            }
                         }),
                         ..Default::default()
                     }

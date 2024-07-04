@@ -8,9 +8,9 @@ pub use avatar_metadata::{AvatarInfo, AvatarMetadata};
 pub use jabber_client::{JabberClient, PROSE_IM_NODE};
 pub use platform_image::PlatformImage;
 pub use presence::Presence;
-pub use user_info::UserInfo;
+pub use user_info::{ProfileName, UserInfo, UserInfoOptExt, UserName};
 pub use user_metadata::{LastActivity, UserMetadata};
-pub use user_profile::{Address, UserProfile};
+pub use user_profile::{Address, Image, UserProfile};
 pub use user_status::UserStatus;
 
 mod avatar;

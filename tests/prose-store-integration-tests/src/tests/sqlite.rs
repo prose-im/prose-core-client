@@ -3,7 +3,6 @@ use anyhow::Result;
 use chrono::NaiveDate;
 use insta::assert_snapshot;
 use prose_store::prelude::*;
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::Semaphore;
@@ -137,12 +136,4 @@ async fn test_query_uses_multicolumn_index() -> Result<()> {
     assert_snapshot!(sql);
 
     Ok(())
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
-struct DeviceRecord {
-    account: String,
-    user_id: u32,
-    id: u32,
-    name: String,
 }

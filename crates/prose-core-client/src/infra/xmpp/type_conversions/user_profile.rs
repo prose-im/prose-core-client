@@ -6,8 +6,9 @@
 use url::Url;
 
 use prose_xmpp::stanza::{vcard, vcard4, VCard, VCard4};
+use prose_xmpp::RequestError;
 
-use crate::dtos::{Address, UserProfile};
+use crate::domain::user_info::models::{Address, Image, UserProfile};
 
 trait VecExt {
     type T;
@@ -27,9 +28,9 @@ impl<T> VecExt for Vec<T> {
 }
 
 impl TryFrom<VCard> for UserProfile {
-    type Error = anyhow::Error;
+    type Error = RequestError;
 
-    fn try_from(mut value: VCard) -> anyhow::Result<Self> {
+    fn try_from(mut value: VCard) -> Result<Self, Self::Error> {
         let (mut first_name, mut last_name): (Option<String>, Option<String>) = (None, None);
 
         if let Some(
@@ -53,6 +54,18 @@ impl TryFrom<VCard> for UserProfile {
         let title = value.title;
         let email = value.email.swap_remove_first().map(|v| v.userid);
         let tel = value.tel.swap_remove_first().map(|v| v.number);
+        let photo = value.photo.and_then(|img| match img {
+            vcard::Image::Binary(media_type, data) => {
+                let Some(data) = data.data().ok() else {
+                    return None;
+                };
+                Some(Image::Binary {
+                    media_type,
+                    data: data.into_owned(),
+                })
+            }
+            vcard::Image::External(url) => url.parse().ok().map(Image::External),
+        });
 
         Ok(UserProfile {
             first_name: trimmed_string(first_name),
@@ -68,14 +81,15 @@ impl TryFrom<VCard> for UserProfile {
                 locality: trimmed_string(adr.locality),
                 country: trimmed_string(adr.country),
             }),
+            photo,
         })
     }
 }
 
 impl TryFrom<VCard4> for UserProfile {
-    type Error = anyhow::Error;
+    type Error = RequestError;
 
-    fn try_from(mut value: VCard4) -> anyhow::Result<Self> {
+    fn try_from(mut value: VCard4) -> Result<Self, Self::Error> {
         let (mut first_name, mut last_name): (Option<String>, Option<String>) = (None, None);
 
         let name = value.n.swap_remove_first();
@@ -119,6 +133,7 @@ impl TryFrom<VCard4> for UserProfile {
                 locality: trimmed_string(adr.locality.swap_remove_first()),
                 country: trimmed_string(adr.country.swap_remove_first()),
             }),
+            photo: None,
         })
     }
 }
@@ -180,6 +195,71 @@ impl From<UserProfile> for VCard4 {
     }
 }
 
+impl From<UserProfile> for VCard {
+    fn from(mut value: UserProfile) -> Self {
+        let mut vcard = VCard::default();
+
+        let first_name = trimmed_string(value.first_name);
+        let last_name = trimmed_string(value.last_name);
+
+        if let (Some(first_name), Some(last_name)) = (&first_name, &last_name) {
+            vcard.fn_ = Some(format!("{} {}", first_name, last_name));
+        }
+
+        if first_name.is_some() || last_name.is_some() {
+            vcard.n = Some(vcard::Name {
+                family: last_name,
+                given: first_name,
+                middle: None,
+                prefix: None,
+                suffix: None,
+            });
+        }
+        if let Some(nickname) = trimmed_string(value.nickname.take()) {
+            vcard.nickname = Some(nickname);
+        }
+        if let Some(org) = trimmed_string(value.org.take()) {
+            vcard.org = Some(vcard::Organization {
+                name: org,
+                units: vec![],
+            });
+        }
+        if let Some(role) = trimmed_string(value.role.take()) {
+            vcard.role = Some(role);
+        }
+        if let Some(title) = trimmed_string(value.title.take()) {
+            vcard.title = Some(title);
+        }
+        if let Some(email) = trimmed_string(value.email.take()) {
+            vcard.email.push(vcard::Email {
+                types: vec![],
+                userid: email,
+            });
+        }
+        if let Some(tel) = trimmed_string(value.tel.take()) {
+            vcard.tel.push(vcard::Telephone {
+                types: vec![],
+                number: tel,
+            })
+        }
+        if let Some(url) = value.url.take() {
+            vcard.url = Some(url.to_string());
+        }
+        if let Some(mut address) = value.address.take() {
+            let mut adr = vcard::Address::default();
+
+            if let Some(locality) = trimmed_string(address.locality.take()) {
+                adr.locality = Some(locality);
+            }
+            if let Some(country) = trimmed_string(address.country.take()) {
+                adr.country = Some(country);
+            }
+            vcard.adr.push(adr)
+        }
+        vcard
+    }
+}
+
 fn trimmed_string(string: Option<String>) -> Option<String> {
     let Some(string) = string else {
         return None;
@@ -196,23 +276,6 @@ fn trimmed_string(string: Option<String>) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_full_name() -> anyhow::Result<()> {
-        let mut profile = UserProfile::default();
-        assert_eq!(profile.full_name(), None);
-
-        profile.first_name = Some("Jane".to_string());
-        assert_eq!(profile.full_name(), Some("Jane".to_string()));
-
-        profile.last_name = Some("Doe".to_string());
-        assert_eq!(profile.full_name(), Some("Jane Doe".to_string()));
-
-        profile.first_name = None;
-        assert_eq!(profile.full_name(), Some("Doe".to_string()));
-
-        Ok(())
-    }
 
     #[test]
     fn test_convert_to_vcard() -> anyhow::Result<()> {
@@ -269,6 +332,7 @@ mod tests {
                     locality: Some("Berlin".to_string()),
                     country: Some("Germany".to_string()),
                 }),
+                photo: None,
             }
         );
 

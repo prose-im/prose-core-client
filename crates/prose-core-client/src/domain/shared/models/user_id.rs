@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
@@ -85,6 +86,12 @@ impl UserId {
 
 impl AsRef<BareJid> for UserId {
     fn as_ref(&self) -> &BareJid {
+        &self.0
+    }
+}
+
+impl Borrow<Jid> for UserId {
+    fn borrow(&self) -> &Jid {
         &self.0
     }
 }

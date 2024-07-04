@@ -53,12 +53,4 @@ impl SyncedRoomSettingsService for XMPPClient {
             .await?;
         Ok(())
     }
-
-    async fn delete_settings(&self, room_id: &RoomId) -> Result<()> {
-        let pubsub = self.client.get_mod::<mods::PubSub>();
-        pubsub
-            .delete_items_with_ids(ns::PROSE_ROOM_SETTINGS, [room_id.to_string()], true)
-            .await?;
-        Ok(())
-    }
 }

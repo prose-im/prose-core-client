@@ -54,6 +54,10 @@ impl RequestError {
         self.defined_condition() == Some(DefinedCondition::Forbidden)
     }
 
+    pub fn is_feature_not_implemented_err(&self) -> bool {
+        self.defined_condition() == Some(DefinedCondition::FeatureNotImplemented)
+    }
+
     pub fn defined_condition(&self) -> Option<DefinedCondition> {
         let RequestError::XMPP {
             err: StanzaError {

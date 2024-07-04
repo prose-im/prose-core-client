@@ -64,13 +64,15 @@ pub enum Event {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AvatarData {
     Base64(String),
-    Data(Vec<u8>),
+    Data(Box<[u8]>),
 }
 
 impl AvatarData {
-    pub fn data(&self) -> std::result::Result<Cow<Vec<u8>>, DecodeError> {
+    pub fn data(&self) -> std::result::Result<Cow<Box<[u8]>>, DecodeError> {
         match self {
-            AvatarData::Base64(base64) => Ok(Cow::Owned(general_purpose::STANDARD.decode(base64)?)),
+            AvatarData::Base64(base64) => Ok(Cow::Owned(
+                general_purpose::STANDARD.decode(base64)?.into_boxed_slice(),
+            )),
             AvatarData::Data(data) => Ok(Cow::Borrowed(data)),
         }
     }
@@ -197,18 +199,18 @@ impl Profile {
 
     pub async fn load_vcard_temp(
         &self,
-        from: impl Into<BareJid>,
+        from: impl Into<Jid>,
     ) -> Result<Option<VCard>, RequestError> {
         let iq = Iq {
             from: None,
-            to: Some(Jid::from(from.into())),
+            to: Some(from.into()),
             id: self.ctx.generate_id(),
             payload: IqType::Get(Element::builder("vCard", ns::VCARD).build()),
         };
 
         let vcard = match self.ctx.send_iq(iq).await {
             Ok(Some(payload)) => {
-                VCard::try_from(&payload).map_err(|e| ParseError::Generic { msg: e.to_string() })?
+                VCard::try_from(payload).map_err(|e| ParseError::Generic { msg: e.to_string() })?
             }
             Ok(None) => return Err(RequestError::UnexpectedResponse.into()),
             Err(e) if e.is_item_not_found_err() => return Ok(None),
@@ -218,21 +220,14 @@ impl Profile {
         Ok(Some(vcard))
     }
 
-    pub async fn set_vcard(&self, vcard: VCard4) -> Result<()> {
+    pub async fn publish_vcard_temp(&self, vcard: VCard) -> Result<()> {
         let mut iq = Iq::from_set(self.ctx.generate_id(), vcard);
         iq.to = Some(self.ctx.bare_jid().into());
         self.ctx.send_iq(iq).await?;
         Ok(())
     }
 
-    pub async fn delete_vcard(&self) -> Result<()> {
-        let mut iq = Iq::from_set(self.ctx.generate_id(), VCard4::new());
-        iq.to = Some(self.ctx.bare_jid().into());
-        self.ctx.send_iq(iq).await?;
-        Ok(())
-    }
-
-    pub async fn publish_vcard(&self, vcard: VCard4) -> Result<()> {
+    pub async fn publish_vcard4(&self, vcard: VCard4) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             PubSub::Publish {
@@ -247,6 +242,13 @@ impl Profile {
                 publish_options: None,
             },
         );
+        self.ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
+    pub async fn delete_vcard(&self) -> Result<()> {
+        let mut iq = Iq::from_set(self.ctx.generate_id(), VCard4::new());
+        iq.to = Some(self.ctx.bare_jid().into());
         self.ctx.send_iq(iq).await?;
         Ok(())
     }
@@ -407,7 +409,10 @@ impl Profile {
 
     /// XEP-0202: Entity Time
     /// https://xmpp.org/extensions/xep-0202.html
-    pub async fn load_entity_time(&self, from: impl Into<Jid>) -> Result<DateTime<FixedOffset>> {
+    pub async fn load_entity_time(
+        &self,
+        from: impl Into<Jid>,
+    ) -> Result<DateTime<FixedOffset>, RequestError> {
         let response = self
             .ctx
             .send_iq(Iq::from_get(self.ctx.generate_id(), TimeQuery).with_to(from.into()))
@@ -440,7 +445,10 @@ impl Profile {
 
     /// XEP-0012: Last Activity
     /// https://xmpp.org/extensions/xep-0012.html
-    pub async fn load_last_activity(&self, from: impl Into<Jid>) -> Result<LastActivityResponse> {
+    pub async fn load_last_activity(
+        &self,
+        from: impl Into<Jid>,
+    ) -> Result<LastActivityResponse, RequestError> {
         let response = self
             .ctx
             .send_iq(Iq::from_get(self.ctx.generate_id(), LastActivityRequest).with_to(from.into()))

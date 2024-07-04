@@ -89,7 +89,7 @@ impl MessageParser {
             .map(|sid| StanzaId::from(sid.id.into_inner()));
         let (participant_id, user_id) = self.parse_sender(&message)?;
         // We're going to prefer the id of our associated room here, so that we'll even resolve
-        // the correct id for sent messages where the from might be our JID.
+        // the correct id for sent messages where the `from` might be our JID.
         let room_id = self
             .room
             .as_ref()

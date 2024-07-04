@@ -13,6 +13,12 @@ use crate::domain::shared::models::{Availability, AvatarId};
 use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::OccupantId;
 
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum UserProfileFormat {
+    Vcard4,
+    VcardTemp,
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
@@ -29,6 +35,6 @@ pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn set_user_activity(&self, user_activity: Option<&UserStatus>) -> Result<()>;
 
-    async fn set_profile(&self, profile: &UserProfile) -> Result<()>;
+    async fn set_profile(&self, profile: UserProfile, format: UserProfileFormat) -> Result<()>;
     async fn delete_profile(&self) -> Result<()>;
 }

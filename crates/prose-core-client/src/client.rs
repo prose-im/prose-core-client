@@ -14,7 +14,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
 
 use crate::client_builder::{
-    ClientBuilder, UndefinedAvatarCache, UndefinedEncryptionService, UndefinedStore,
+    ClientBuilder, UndefinedAvatarRepository, UndefinedEncryptionService, UndefinedStore,
 };
 use crate::domain::shared::models::UserId;
 use crate::dtos::UserResourceId;
@@ -35,7 +35,7 @@ pub trait ClientDelegate: SendUnlessWasm + SyncUnlessWasm {
 
 impl Client {
     pub fn builder(
-    ) -> ClientBuilder<UndefinedStore, UndefinedAvatarCache, UndefinedEncryptionService> {
+    ) -> ClientBuilder<UndefinedStore, UndefinedAvatarRepository, UndefinedEncryptionService> {
         ClientBuilder::new()
     }
 }
@@ -84,12 +84,5 @@ impl Client {
 
     pub fn connected_user_id(&self) -> Option<UserResourceId> {
         self.ctx.connected_id().ok()
-    }
-}
-
-#[cfg(feature = "debug")]
-impl Client {
-    pub async fn send_raw_stanza(&self, stanza: impl Into<minidom::Element>) -> Result<()> {
-        self.inner.connection.send_raw_stanza(stanza.into()).await
     }
 }

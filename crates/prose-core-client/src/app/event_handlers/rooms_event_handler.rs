@@ -24,7 +24,8 @@ use crate::domain::rooms::models::Room;
 use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, JoinRoomBehavior, JoinRoomFailureBehavior, JoinRoomRedirectBehavior,
 };
-use crate::domain::shared::models::{ParticipantId, RoomId};
+use crate::domain::shared::models::{CachePolicy, ParticipantId, RoomId};
+use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::Availability;
 use crate::ClientEvent;
 
@@ -115,14 +116,17 @@ impl RoomsEventHandler {
 
                 let name = self
                     .user_info_domain_service
-                    .get_display_name(&real_id)
-                    .await?;
+                    .get_user_info(&real_id, CachePolicy::ReturnCacheDataElseLoad)
+                    .await?
+                    .display_name()
+                    .build();
+
                 room.with_participants_mut(|participants| {
                     participants.set_ids_and_name(
                         &participant_id,
                         Some(&real_id),
                         event.anon_occupant_id.as_ref(),
-                        name.as_deref(),
+                        name,
                     );
                 });
 
@@ -232,10 +236,12 @@ impl RoomsEventHandler {
 
                 let name = self
                     .user_info_domain_service
-                    .get_display_name(&user_id)
-                    .await?;
+                    .get_user_info(&user_id, CachePolicy::ReturnCacheDataElseLoad)
+                    .await?
+                    .display_name()
+                    .build();
                 room.with_participants_mut(|participants| {
-                    participants.add_user(&user_id, false, affiliation, name.as_deref());
+                    participants.add_user(&user_id, false, affiliation, name);
                 });
 
                 self.client_event_dispatcher
@@ -295,18 +301,13 @@ impl RoomsEventHandler {
                 };
 
                 self.user_info_domain_service
-                    .handle_user_presence_changed(&id, &presence)
+                    .handle_user_presence_changed(&id, presence)
                     .await?;
 
                 // We won't send an event for our own availability…
                 if is_self_event {
                     return Ok(());
                 }
-
-                self.client_event_dispatcher
-                    .dispatch_event(ClientEvent::ContactChanged {
-                        ids: vec![id.to_user_id()],
-                    });
 
                 if room_changed {
                     self.client_event_dispatcher

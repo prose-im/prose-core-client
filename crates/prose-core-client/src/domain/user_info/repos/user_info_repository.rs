@@ -9,7 +9,9 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::shared::models::{AccountId, UserId, UserOrResourceId, UserResourceId};
-use crate::domain::user_info::models::{AvatarMetadata, Presence, UserInfo, UserStatus};
+use crate::domain::user_info::models::{Presence, UserInfo};
+
+pub type UpdateHandler = Box<dyn FnOnce(&mut UserInfo) + Send>;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -19,30 +21,23 @@ pub trait UserInfoRepository: SendUnlessWasm + SyncUnlessWasm {
     /// priority. If no available resource is found, returns `jid` as a `Jid`.
     fn resolve_user_id(&self, account: &AccountId, user_id: &UserId) -> Option<UserResourceId>;
 
-    async fn get_user_info(
-        &self,
-        account: &AccountId,
-        user_id: &UserId,
-    ) -> Result<Option<UserInfo>>;
-
-    async fn set_avatar_metadata(
-        &self,
-        account: &AccountId,
-        user_id: &UserId,
-        metadata: Option<&AvatarMetadata>,
-    ) -> Result<()>;
-    async fn set_user_activity(
-        &self,
-        account: &AccountId,
-        user_id: &UserId,
-        user_activity: Option<&UserStatus>,
-    ) -> Result<()>;
     async fn set_user_presence(
         &self,
         account: &AccountId,
         user_id: &UserOrResourceId,
         presence: &Presence,
     ) -> Result<()>;
+
+    async fn get(&self, account: &AccountId, user_id: &UserId) -> Result<Option<UserInfo>>;
+
+    // Upserts `UserInfo` identified by `user_id`. Returns `true` if the `UserInfo` was changed
+    // after executing `handler`.
+    async fn update(
+        &self,
+        account: &AccountId,
+        user_id: &UserId,
+        handler: UpdateHandler,
+    ) -> Result<bool>;
 
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 }

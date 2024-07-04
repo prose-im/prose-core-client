@@ -7,8 +7,8 @@ pub use account_info::AccountInfo;
 pub use attachment::{Attachment, Thumbnail};
 pub use channel::{Channel, ChannelsArray};
 pub use connection_error::{ConnectionError, ConnectionErrorType};
-pub use contact::{Availability, Contact};
-pub use jid::BareJid;
+pub use contact::{Availability, Contact, UserStatus};
+pub use jid::{BareJid, ParticipantId};
 pub use js_array::*;
 pub use mention::Mention;
 pub use message::Message;
@@ -18,7 +18,10 @@ pub use room::RoomEnvelopeExt;
 pub use send_message_request::SendMessageRequest;
 pub use sidebar_item::{SidebarItem, SidebarItemsArray};
 pub use upload_slot::UploadSlot;
-pub use user_info::{ParticipantInfo, ParticipantInfoArray, UserBasicInfo, UserBasicInfoArray};
+pub use user_info::{
+    Avatar, ParticipantBasicInfo, ParticipantBasicInfoArray, ParticipantInfo, ParticipantInfoArray,
+    UserBasicInfo, UserBasicInfoArray,
+};
 pub use user_metadata::UserMetadata;
 pub use user_profile::UserProfile;
 

@@ -27,7 +27,7 @@ async fn test_presence_subscription_request() -> Result<()> {
         events,
         vec![ServerEvent::ContactList(ContactListEvent {
             contact_id: user_id!("user@prose.org"),
-            r#type: ContactListEventType::PresenceSubscriptionRequested,
+            r#type: ContactListEventType::PresenceSubscriptionRequested { nickname: None },
         })]
     );
 

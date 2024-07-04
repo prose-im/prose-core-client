@@ -5,6 +5,7 @@
 
 pub(crate) mod attachment;
 pub(crate) mod availability;
+mod avatar_metadata;
 pub(crate) mod bookmark;
 pub(crate) mod caps;
 pub(crate) mod compose_state;

@@ -12,28 +12,25 @@ use dialoguer::{Input, MultiSelect, Select};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    DeviceId, Message, MessageId, PublicRoomInfo, RoomEnvelope, RoomId, SidebarItem, StanzaId,
-    UserId,
+    DeviceId, Message, MessageId, ParticipantInfo, PublicRoomInfo, RoomEnvelope, SidebarItem,
+    StanzaId, UserId,
 };
 use prose_core_client::services::{Generic, Room};
 use prose_core_client::Client;
 
 use crate::compare_room_envelopes;
 use crate::type_display::{
-    CompactMessageEnvelope, DeviceInfoEnvelope, JidWithName, MessageEnvelope,
+    CompactMessageEnvelope, DeviceInfoEnvelope, JidWithName, ParticipantEnvelope,
 };
 
 #[allow(dead_code)]
-pub async fn select_contact(client: &Client) -> Result<UserId> {
+pub async fn select_contact(client: &Client) -> Result<Option<UserId>> {
     let contacts = client.contact_list.load_contacts().await?.into_iter();
-    Ok(
-        select_item_from_list(contacts, |c| JidWithName::from(c.clone()))
-            .id
-            .clone(),
-    )
+    let contact = select_item_from_list(contacts, |c| JidWithName::from(c.clone())).map(|c| c.id);
+    Ok(contact)
 }
 
-pub async fn select_contact_or_self(client: &Client) -> Result<UserId> {
+pub async fn select_contact_or_self(client: &Client) -> Result<Option<UserId>> {
     let contacts = client
         .contact_list
         .load_contacts()
@@ -48,23 +45,23 @@ pub async fn select_contact_or_self(client: &Client) -> Result<UserId> {
         name: format!("{} (You)", current_user_id.formatted_username()),
     };
 
-    let jid = select_item_from_list(
+    let user_id = select_item_from_list(
         iter::once(current_user).chain(contacts),
         ToString::to_string,
     )
-    .jid;
+    .map(|c| c.jid.into());
 
-    Ok(UserId::from(jid))
+    Ok(user_id)
 }
 
-pub async fn select_device(client: &Client, user_id: &UserId) -> Result<DeviceId> {
+pub async fn select_device(client: &Client, user_id: &UserId) -> Result<Option<DeviceId>> {
     let devices = client
         .user_data
         .load_user_device_infos(&user_id)
         .await?
         .into_iter()
         .map(|d| DeviceInfoEnvelope(d));
-    let device_id = select_item_from_list(devices, ToString::to_string).0.id;
+    let device_id = select_item_from_list(devices, ToString::to_string).map(|d| d.0.id);
     Ok(device_id)
 }
 
@@ -104,9 +101,9 @@ pub async fn select_room(
         return Ok(None);
     }
 
-    Ok(Some(
-        select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone(),
-    ))
+    Ok(select_item_from_list(rooms, |room| {
+        JidWithName::from(room.clone())
+    }))
 }
 
 pub async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
@@ -119,16 +116,20 @@ pub async fn select_muc_room(client: &Client) -> Result<Option<RoomEnvelope>> {
     .await
 }
 
-pub async fn select_message(room: &Room<Generic>) -> Result<MessageId> {
+pub async fn select_participant<T>(room: &Room<T>) -> Option<ParticipantInfo> {
+    select_item_from_list(room.participants(), |p| ParticipantEnvelope(p.clone()))
+}
+
+pub async fn select_message(room: &Room<Generic>) -> Result<Option<MessageId>> {
     let messages = load_messages(room, 1).await?;
     let message =
         select_item_from_list(messages, |message| CompactMessageEnvelope(message.clone()));
     Ok(message
-        .id
-        .ok_or(anyhow!("Selected message does not have an ID"))?)
+        .map(|m| m.id.ok_or(anyhow!("Selected message does not have an ID")))
+        .transpose()?)
 }
 
-pub async fn select_public_channel(client: &Client) -> Result<PublicRoomInfo> {
+pub async fn select_public_channel(client: &Client) -> Result<Option<PublicRoomInfo>> {
     let rooms = client.rooms.load_public_rooms().await?;
     Ok(select_item_from_list(rooms, |room| JidWithName::from(room.clone())).clone())
 }
@@ -138,24 +139,25 @@ pub async fn select_sidebar_item(client: &Client) -> Result<Option<SidebarItem>>
     if items.is_empty() {
         return Ok(None);
     }
-    Ok(Some(
-        select_item_from_list(items, |item| JidWithName::from(item.clone())).clone(),
-    ))
+    Ok(select_item_from_list(items, |item| JidWithName::from(item.clone())).clone())
 }
 
 pub fn select_item_from_list<T, O: ToString>(
     iter: impl IntoIterator<Item = T>,
     format: impl Fn(&T) -> O,
-) -> T {
+) -> Option<T> {
     let mut list = iter.into_iter().collect::<Vec<_>>();
     let display_list = list.iter().map(format).collect::<Vec<_>>();
-    let selection = Select::with_theme(&ColorfulTheme::default())
+    let Some(selection) = Select::with_theme(&ColorfulTheme::default())
         .default(0)
         .items(display_list.as_slice())
-        .interact()
-        .unwrap();
+        .interact_opt()
+        .unwrap()
+    else {
+        return None;
+    };
     println!();
-    list.swap_remove(selection)
+    Some(list.swap_remove(selection))
 }
 
 pub fn select_multiple_jids_from_list(jids: impl IntoIterator<Item = JidWithName>) -> Vec<BareJid> {

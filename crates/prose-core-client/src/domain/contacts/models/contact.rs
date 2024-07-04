@@ -8,6 +8,7 @@ use crate::domain::shared::models::UserId;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Contact {
     pub id: UserId,
+    pub name: Option<String>,
     pub presence_subscription: PresenceSubscription,
 }
 

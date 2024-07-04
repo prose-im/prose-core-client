@@ -14,6 +14,7 @@ use crate::domain::shared::models::{AccountId, UserId};
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait BlockListRepository: SendUnlessWasm + SyncUnlessWasm {
+    async fn contains(&self, account: &AccountId, user_id: &UserId) -> Result<bool>;
     async fn get_all(&self, account: &AccountId) -> Result<Vec<UserId>>;
     async fn insert(&self, account: &AccountId, user_id: &UserId) -> Result<bool>;
     async fn delete(&self, account: &AccountId, user_id: &UserId) -> Result<bool>;

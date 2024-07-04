@@ -9,7 +9,9 @@ use pretty_assertions::assert_eq;
 
 use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::dtos::{MucId, SendMessageRequest, SendMessageRequestBody, UserId};
+use prose_core_client::dtos::{
+    MucId, ParticipantId, SendMessageRequest, SendMessageRequestBody, UserId,
+};
 use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
 
@@ -83,6 +85,7 @@ async fn test_creates_public_channel() -> Result<()> {
               <history maxstanzas="0" />
             </x>
             <c xmlns='http://jabber.org/protocol/caps' hash="sha-1" node="https://prose.org" ver="{{CAPS_HASH}}"/>
+            <nick xmlns="http://jabber.org/protocol/nick">Jane Doe</nick>
         </presence>
         "#
     );
@@ -441,9 +444,6 @@ async fn test_creates_public_channel() -> Result<()> {
 
     client.pop_ctx();
 
-    client.expect_load_vcard(&user_id!("user@prose.org"));
-    client.receive_not_found_iq_response();
-
     client.expect_load_synced_room_settings(room_id.clone(), None);
     client.expect_muc_catchup(&room_id);
     client.expect_set_bookmark(room_id.clone(), room_name, BookmarkType::PublicChannel);
@@ -504,9 +504,6 @@ async fn test_receives_chat_states() -> Result<()> {
         ClientRoomEventType::ParticipantsChanged
     );
 
-    client.expect_load_vcard(&user_id!("user2@prose.org"));
-    client.receive_not_found_iq_response();
-
     room_event!(
         client,
         room_id.clone(),
@@ -535,7 +532,10 @@ async fn test_receives_chat_states() -> Result<()> {
 
     let composing_users = room.load_composing_users().await?;
     assert_eq!(1, composing_users.len());
-    assert_eq!(user_id!("user2@prose.org"), composing_users[0].id);
+    assert_eq!(
+        ParticipantId::Occupant(room_id.occupant_id_with_nickname("their-nick")?),
+        composing_users[0].id
+    );
 
     recv!(
         client,

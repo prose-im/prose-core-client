@@ -272,10 +272,12 @@ fn parse_client_event(ctx: &mut Context, event: XMPPClientEvent) -> Result<()> {
 
 fn parse_roster_event(ctx: &mut Context, event: XMPPRosterEvent) -> Result<()> {
     match event {
-        XMPPRosterEvent::PresenceSubscriptionRequest { from } => ctx.push_event(ContactListEvent {
-            contact_id: UserId::from(from),
-            r#type: ContactListEventType::PresenceSubscriptionRequested,
-        }),
+        XMPPRosterEvent::PresenceSubscriptionRequest { from, nickname } => {
+            ctx.push_event(ContactListEvent {
+                contact_id: UserId::from(from),
+                r#type: ContactListEventType::PresenceSubscriptionRequested { nickname },
+            })
+        }
         XMPPRosterEvent::RosterItemChanged { item } => {
             let event_type = match &item.subscription {
                 Subscription::Remove => ContactListEventType::ContactRemoved,

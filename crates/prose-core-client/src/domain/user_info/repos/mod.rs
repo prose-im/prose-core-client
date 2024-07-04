@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 pub use avatar_repository::AvatarRepository;
-pub use user_info_repository::UserInfoRepository;
+pub use user_info_repository::{UpdateHandler, UserInfoRepository};
 pub use user_profile_repository::UserProfileRepository;
 
 mod avatar_repository;

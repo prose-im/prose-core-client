@@ -110,9 +110,18 @@ impl ConnectionService {
         self.reset_services_before_reconnect().await;
 
         // https://xmpp.org/rfcs/rfc6121.html#roster-login
-        if let Err(error) = self.contact_list_domain_service.load_contacts().await {
-            error!("Failed to load contact list. {}", error.to_string());
-        }
+        if let Ok(contacts) = self
+            .contact_list_domain_service
+            .load_contacts()
+            .await
+            .inspect_err(|error| error!("Failed to load contact list. {error}"))
+        {
+            _ = self
+                .user_info_domain_service
+                .handle_contacts_changed(contacts)
+                .await
+                .inspect_err(|error| error!("Failed to handle changed contacts. {error}"));
+        };
 
         self.user_account_service
             .set_availability(None, &self.ctx.capabilities, availability)
@@ -242,12 +251,5 @@ impl ConnectionService {
                     err.to_string()
                 )
             });
-    }
-}
-
-#[cfg(feature = "debug")]
-impl ConnectionService {
-    pub async fn send_raw_stanza(&self, stanza: minidom::Element) -> anyhow::Result<()> {
-        self.connection_service.send_raw_stanza(stanza).await
     }
 }

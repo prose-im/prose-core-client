@@ -5,16 +5,13 @@
 
 pub use user_info_domain_service::UserInfoDomainService;
 pub use user_info_service::UserInfoService;
-pub use user_profile_service::UserProfileService;
 
 pub mod impls;
 mod user_info_domain_service;
 mod user_info_service;
-mod user_profile_service;
 
 #[cfg(feature = "test")]
 pub mod mocks {
     pub use super::user_info_domain_service::MockUserInfoDomainService;
     pub use super::user_info_service::MockUserInfoService;
-    pub use super::user_profile_service::MockUserProfileService;
 }

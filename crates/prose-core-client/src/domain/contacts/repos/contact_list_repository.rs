@@ -17,7 +17,6 @@ use crate::domain::shared::models::{AccountId, UserId};
 pub trait ContactListRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get_all(&self, account: &AccountId) -> Result<Vec<Contact>>;
 
-    async fn get(&self, account: &AccountId, contact_id: &UserId) -> Result<Option<Contact>>;
     async fn set(
         &self,
         account: &AccountId,

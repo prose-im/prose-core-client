@@ -7,20 +7,25 @@ use anyhow::Result;
 use jid::BareJid;
 use minidom::Element;
 use xmpp_parsers::pubsub;
+use xmpp_parsers::roster::Item as RosterItem;
 
-use super::TestClient;
-use crate::{event, recv, send};
-use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId, UserProfile};
+use prose_core_client::domain::user_info::models::UserProfile;
+use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId};
 use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
-use prose_xmpp::stanza::vcard4::Name;
+use prose_xmpp::stanza::vcard4::Nickname;
 use prose_xmpp::stanza::VCard4;
 use prose_xmpp::IDProvider;
+
+use crate::{event, recv, send};
+
+use super::TestClient;
 
 pub struct LoginStrategy {
     pub device_bundles: Vec<(DeviceId, DeviceBundle)>,
     pub offline_messages: Vec<prose_xmpp::stanza::Message>,
     pub bookmarks_handler: Box<dyn FnOnce(&TestClient)>,
     pub user_vcard: Option<VCard4>,
+    pub roster_items: Vec<RosterItem>,
 }
 
 impl Default for LoginStrategy {
@@ -33,13 +38,11 @@ impl Default for LoginStrategy {
                 adr: vec![],
                 email: vec![],
                 fn_: vec![],
-                n: vec![Name {
-                    surname: Some("Doe".to_string()),
-                    given: Some("Jane".to_string()),
-                    additional: None,
-                }],
+                n: vec![],
                 impp: vec![],
-                nickname: vec![],
+                nickname: vec![Nickname {
+                    value: "Jane Doe".to_string(),
+                }],
                 note: vec![],
                 org: vec![],
                 role: vec![],
@@ -47,6 +50,7 @@ impl Default for LoginStrategy {
                 title: vec![],
                 url: vec![],
             }),
+            roster_items: vec![],
         }
     }
 }
@@ -72,6 +76,16 @@ impl LoginStrategy {
         self.bookmarks_handler = Box::new(handler);
         self
     }
+
+    pub fn with_roster_items(mut self, items: impl IntoIterator<Item = RosterItem>) -> Self {
+        self.roster_items = items.into_iter().collect();
+        self
+    }
+
+    pub fn with_user_vcard(mut self, vcard4: Option<VCard4>) -> Self {
+        self.user_vcard = vcard4;
+        self
+    }
 }
 
 impl TestClient {
@@ -84,15 +98,14 @@ impl TestClient {
         &self,
         user: UserId,
         password: impl AsRef<str>,
-        config: LoginStrategy,
+        strategy: LoginStrategy,
     ) -> Result<()> {
-        let nickname = config
+        let last_nickname = self.get_ctx("USER_NICKNAME");
+
+        let nickname = strategy
             .user_vcard
             .clone()
-            .and_then(|vcard| {
-                let profile = UserProfile::try_from(vcard).unwrap();
-                profile.full_name().or(profile.nickname)
-            })
+            .and_then(|vcard| UserProfile::try_from(vcard).unwrap().nickname)
             .unwrap_or_else(|| "You forgot to set a nickname".to_string());
 
         self.push_ctx([
@@ -105,11 +118,11 @@ impl TestClient {
                 "SERVER_ID",
                 BareJid::from_parts(None, &user.as_ref().domain()).to_string(),
             ),
-            ("CAPS_HASH", "zQudvh/0QdfUMrrQBB1ZR3NMyTY=".to_string()),
-            ("USER_NICKNAME", nickname),
+            ("CAPS_HASH", "IypOfhCkiLIruAabdFj0jeESeqc=".to_string()),
+            ("USER_NICKNAME", nickname.clone()),
         ]);
 
-        self.expect_load_roster();
+        self.expect_load_roster(strategy.roster_items);
 
         // Initial presence
         send!(
@@ -134,8 +147,8 @@ impl TestClient {
             r#"<iq xmlns="jabber:client" id="{{ID}}" type="result" />"#
         );
 
-        if !config.offline_messages.is_empty() {
-            for message in config.offline_messages {
+        if !strategy.offline_messages.is_empty() {
+            for message in strategy.offline_messages {
                 self.receive_element(message, file!(), line!());
             }
             self.receive_next().await;
@@ -170,9 +183,13 @@ impl TestClient {
 
         self.expect_load_device_list(
             &user,
-            config.device_bundles.clone().into_iter().map(|(id, _)| id),
+            strategy
+                .device_bundles
+                .clone()
+                .into_iter()
+                .map(|(id, _)| id),
         );
-        self.expect_publish_device(config.device_bundles.into_iter().map(|(id, _)| id));
+        self.expect_publish_device(strategy.device_bundles.into_iter().map(|(id, _)| id));
         self.expect_publish_initial_device_bundle();
 
         event!(
@@ -187,7 +204,7 @@ impl TestClient {
         self.connect(&user, Secret::new(password.as_ref().to_string()))
             .await?;
 
-        if let Some(vcard) = config.user_vcard {
+        if let Some(vcard) = strategy.user_vcard {
             self.push_ctx([("VCARD", String::from(&Element::from(vcard)))]);
             recv!(
                 self,
@@ -204,19 +221,21 @@ impl TestClient {
                 "#
             );
 
-            event!(
-                self,
-                ClientEvent::ContactChanged {
-                    ids: vec![self.connected_user_id().unwrap().into_user_id()]
-                }
-            );
-            event!(self, ClientEvent::AccountInfoChanged);
+            if Some(nickname) != last_nickname {
+                event!(
+                    self,
+                    ClientEvent::ContactChanged {
+                        ids: vec![self.connected_user_id().unwrap().into_user_id()]
+                    }
+                );
+                event!(self, ClientEvent::AccountInfoChanged);
+            }
 
             self.receive_next().await;
             self.pop_ctx();
         }
 
-        (config.bookmarks_handler)(self);
+        (strategy.bookmarks_handler)(self);
 
         self.pop_ctx();
 
@@ -227,7 +246,14 @@ impl TestClient {
 }
 
 impl TestClient {
-    fn expect_load_roster(&self) {
+    fn expect_load_roster(&self, items: Vec<RosterItem>) {
+        let items = items
+            .into_iter()
+            .map(|item| String::from(&Element::from(item)))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        self.push_ctx([("ROSTER_ITEMS", items)]);
         send!(
             self,
             r#"
@@ -240,10 +266,13 @@ impl TestClient {
             self,
             r#"
         <iq xmlns="jabber:client" id="{{ID}}" type="result">
-            <query xmlns="jabber:iq:roster" ver="1" />
+            <query xmlns="jabber:iq:roster" ver="1">
+                {{ROSTER_ITEMS}}
+            </query>
         </iq>
         "#
         );
+        self.pop_ctx();
     }
 
     fn expect_request_server_capabilities(&self) {

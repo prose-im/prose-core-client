@@ -133,11 +133,11 @@ impl ConnectionTrait for Connection {
                     MessageType::Out(elem) => elem
                         .to_pretty_printed_xml()
                         .expect("Failed to convert cached stanza to XML"),
-                    MessageType::Event(_) => "An event".to_string(),
+                    MessageType::Event(matcher) => format!("An event of type {matcher:?}"),
                 };
 
                 panic_message.push_str(&format!(
-                    "\n\nNext expected message is:\n\n{element}\n\nScheduled at:\n{file}:{line}",
+                    "\n\nNext expected message is:\n\n{element}\n\nScheduled at:\n{file}:{line}\n",
                 ))
             } else {
                 panic_message.push_str("\n\nThere were no further messages scheduled.")
