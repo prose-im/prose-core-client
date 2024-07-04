@@ -92,7 +92,7 @@ async fn test_collects_presences_and_message_history() -> Result<()> {
 
     let muc = client.get_mod::<mods::MUC>();
     let occupancy = muc
-        .enter_room(&full!("room@conf.prose.org/me"), None, None, None)
+        .enter_room(&full!("room@conf.prose.org/me"), None, None, None, None)
         .await?;
 
     assert_eq!(
@@ -165,7 +165,7 @@ async fn test_handles_empty_subject() -> Result<()> {
 
     let muc = client.get_mod::<mods::MUC>();
     let occupancy = muc
-        .enter_room(&full!("room@conf.prose.org/me"), None, None, None)
+        .enter_room(&full!("room@conf.prose.org/me"), None, None, None, None)
         .await?;
 
     assert_eq!(

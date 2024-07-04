@@ -6,7 +6,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
-use minidom::Element;
 use secrecy::Secret;
 use tracing::{info, warn};
 
@@ -161,9 +160,5 @@ impl ConnectionService for XMPPClient {
             .unwrap_or_default();
 
         Ok(server_features)
-    }
-
-    async fn send_raw_stanza(&self, stanza: Element) -> Result<()> {
-        Ok(self.client.send_raw_stanza(stanza)?)
     }
 }

@@ -3,13 +3,15 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::borrow::Borrow;
 use std::fmt::{Debug, Display, Formatter};
+use std::str::FromStr;
 
-use crate::domain::shared::models::MucId;
-use jid::FullJid;
+use jid::{FullJid, Jid};
 use minidom::IntoAttributeValue;
 use serde::{Deserialize, Serialize};
 
+use crate::domain::shared::models::MucId;
 use crate::dtos::RoomId;
 use crate::util::StringExt;
 
@@ -68,5 +70,19 @@ impl IntoAttributeValue for OccupantId {
 impl AsRef<FullJid> for OccupantId {
     fn as_ref(&self) -> &FullJid {
         &self.0
+    }
+}
+
+impl Borrow<Jid> for OccupantId {
+    fn borrow(&self) -> &Jid {
+        &self.0
+    }
+}
+
+impl FromStr for OccupantId {
+    type Err = jid::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(OccupantId(s.parse::<FullJid>()?))
     }
 }

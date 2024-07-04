@@ -8,7 +8,7 @@ use core::str::FromStr;
 
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::{MucId, UserId};
+use prose_core_client::dtos::{MucId, ParticipantId as SdkParticipantId, UserId};
 
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "JID")]
@@ -46,6 +46,23 @@ impl BareJid {
 impl BareJid {
     pub fn to_full_jid_with_resource(&self, resource: &jid::ResourcePart) -> jid::FullJid {
         jid::FullJid::from_parts(self.0.node(), &self.0.domain(), resource)
+    }
+}
+
+#[wasm_bindgen]
+pub struct ParticipantId(SdkParticipantId);
+
+#[wasm_bindgen]
+impl ParticipantId {
+    #[wasm_bindgen(js_name = "toString")]
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+}
+
+impl From<SdkParticipantId> for ParticipantId {
+    fn from(value: SdkParticipantId) -> Self {
+        Self(value)
     }
 }
 

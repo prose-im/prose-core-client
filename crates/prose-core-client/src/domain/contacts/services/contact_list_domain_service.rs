@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
-use crate::domain::contacts::models::{Contact, PresenceSubscription};
+use crate::domain::contacts::models::{Contact, PresenceSubRequest, PresenceSubscription};
 use crate::domain::shared::models::UserId;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -24,7 +24,7 @@ pub trait ContactListDomainService: SendUnlessWasm + SyncUnlessWasm {
     /// the presence subscription in case the contact hasn't reacted in a while.
     async fn request_presence_sub(&self, from: &UserId) -> Result<()>;
 
-    async fn load_presence_sub_requests(&self) -> Result<Vec<UserId>>;
+    async fn load_presence_sub_requests(&self) -> Result<Vec<PresenceSubRequest>>;
     async fn approve_presence_sub_request(&self, from: &UserId) -> Result<()>;
     async fn deny_presence_sub_request(&self, from: &UserId) -> Result<()>;
 
@@ -34,7 +34,11 @@ pub trait ContactListDomainService: SendUnlessWasm + SyncUnlessWasm {
         subscription: PresenceSubscription,
     ) -> Result<()>;
     async fn handle_removed_contact(&self, user_id: &UserId) -> Result<()>;
-    async fn handle_presence_sub_request(&self, from: &UserId) -> Result<()>;
+    async fn handle_presence_sub_request(
+        &self,
+        from: &UserId,
+        nickname: Option<String>,
+    ) -> Result<()>;
 
     async fn reset_before_reconnect(&self) -> Result<()>;
     async fn clear_cache(&self) -> Result<()>;

@@ -7,47 +7,32 @@ use anyhow::Result;
 
 use prose_proc_macros::InjectDependencies;
 
-use crate::app::deps::{
-    DynAppContext, DynAvatarRepository, DynEncryptionDomainService, DynUserInfoDomainService,
-};
-use crate::domain::shared::models::UserId;
-use crate::domain::user_info::models::{PlatformImage, UserMetadata, UserProfile};
-use crate::dtos::DeviceInfo;
+use crate::app::deps::{DynEncryptionDomainService, DynUserInfoDomainService};
+use crate::domain::shared::models::{CachePolicy, UserId};
+use crate::domain::user_info::models::PlatformImage;
+use crate::dtos::{Avatar, DeviceInfo, UserMetadata, UserProfile};
 
 #[derive(InjectDependencies)]
 pub struct UserDataService {
     #[inject]
-    ctx: DynAppContext,
-    #[inject]
     user_info_domain_service: DynUserInfoDomainService,
-    #[inject]
-    avatar_repo: DynAvatarRepository,
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
 }
 
 impl UserDataService {
-    pub async fn load_avatar(&self, user_id: &UserId) -> Result<Option<PlatformImage>> {
-        let account = self.ctx.connected_account()?;
-        let Some(avatar_metadata) = self
-            .user_info_domain_service
-            .get_user_info(user_id)
-            .await?
-            .and_then(|info| info.avatar)
-        else {
-            return Ok(None);
-        };
-        let image = self
-            .avatar_repo
-            .get(&account, user_id, &avatar_metadata)
-            .await?;
-        Ok(image)
+    pub async fn load_avatar(&self, avatar: &Avatar) -> Result<Option<PlatformImage>> {
+        self.user_info_domain_service
+            .load_avatar_image(avatar)
+            .await
     }
 
     pub async fn load_user_profile(&self, user_id: &UserId) -> Result<Option<UserProfile>> {
-        self.user_info_domain_service
-            .get_user_profile(user_id)
-            .await
+        Ok(self
+            .user_info_domain_service
+            .get_user_profile(user_id, CachePolicy::ReturnCacheDataElseLoad)
+            .await?
+            .map(Into::into))
     }
 
     pub async fn load_user_metadata(&self, user_id: &UserId) -> Result<Option<UserMetadata>> {

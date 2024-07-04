@@ -20,7 +20,7 @@ use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepo
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
 use prose_core_client::{
-    Client, ClientEvent, ClientRoomEventType, FsAvatarCache, SignalServiceHandle,
+    Client, ClientEvent, ClientRoomEventType, FsAvatarRepository, SignalServiceHandle,
 };
 use prose_store::prelude::Store;
 use prose_xmpp::stanza::VCard4;
@@ -117,7 +117,7 @@ impl TestClientBuilder {
             .set_id_provider(IncrementingIDProvider::new("id"))
             .set_short_id_provider(IncrementingIDProvider::new("short-id"))
             .set_rng_provider(StepRngProvider::default())
-            .set_avatar_cache(FsAvatarCache::new(&path).unwrap())
+            .set_avatar_repository(FsAvatarRepository::new(&path).unwrap())
             .set_encryption_service(Arc::new(encryption_service))
             .set_store(store)
             .set_time_provider(self.time_provider.clone())
@@ -305,6 +305,13 @@ impl TestClient {
         self.context.lock().pop();
     }
 
+    pub fn get_ctx(&self, key: impl AsRef<str>) -> Option<String> {
+        self.context
+            .lock()
+            .iter()
+            .find_map(|ctx| ctx.get(key.as_ref()).cloned())
+    }
+
     fn apply_ctx(&self, xml_str: &mut String) {
         let guard = self.context.lock();
         for ctx in guard.iter().rev() {
@@ -357,14 +364,45 @@ impl TestClient {
         self.pop_ctx();
     }
 
-    pub fn expect_receive_vcard(&self, vcard4: VCard4) {
-        self.push_ctx([("VCARD", String::from(&Element::from(vcard4)))]);
+    pub fn receive_vcard(&self, user_id: &UserId, vcard4: VCard4) {
+        self.push_ctx([
+            ("SENDER_ID", user_id.to_string()),
+            ("VCARD", String::from(&Element::from(vcard4))),
+        ]);
         recv!(
             self,
             r#"
-            <iq xmlns='jabber:client' id="{{ID}}" type="result">
-              {{VCARD}}
-            </iq>
+            <message xmlns="jabber:client" from="{{SENDER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="headline">
+              <event xmlns="http://jabber.org/protocol/pubsub#event">
+                <items node="urn:ietf:params:xml:ns:vcard-4.0">
+                  <item id="{{SENDER_ID}}" publisher="{{SENDER_ID}}">
+                    {{VCARD}}
+                  </item>
+                </items>
+              </event>
+            </message>
+            "#
+        );
+        self.pop_ctx();
+    }
+
+    pub fn receive_nickname(&self, user_id: &UserId, nickname: impl AsRef<str>) {
+        self.push_ctx([
+            ("SENDER_ID", user_id.to_string()),
+            ("NICKNAME", nickname.as_ref().to_string()),
+        ]);
+        recv!(
+            self,
+            r#"
+            <message xmlns="jabber:client" from="{{SENDER_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="headline">
+              <event xmlns="http://jabber.org/protocol/pubsub#event">
+                <items node="http://jabber.org/protocol/nick">
+                  <item>
+                    <nick xmlns="http://jabber.org/protocol/nick">{{NICKNAME}}</nick>
+                  </item>
+                </items>
+              </event>
+            </message>
             "#
         );
         self.pop_ctx();

@@ -5,15 +5,14 @@
 
 use anyhow::Result;
 use futures::future::join_all;
-use futures::join;
 
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::*;
 use crate::app::dtos::Contact as ContactDTO;
-use crate::domain::contacts::models::Contact;
-use crate::domain::shared::models::AccountId;
-use crate::domain::shared::utils::build_contact_name;
+use crate::domain::contacts::models::{Contact, PresenceSubRequest as DomainPresenceSubRequest};
+use crate::domain::shared::models::{AccountId, CachePolicy};
+use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{Group, PresenceSubRequest, PresenceSubRequestId, UserId};
 
 #[derive(InjectDependencies)]
@@ -58,13 +57,13 @@ impl ContactListService {
     }
 
     pub async fn load_presence_sub_requests(&self) -> Result<Vec<PresenceSubRequest>> {
-        let requesting_user_ids = self
+        let domain_requests = self
             .contact_list_domain_service
             .load_presence_sub_requests()
             .await?;
 
         let requests = join_all(
-            requesting_user_ids
+            domain_requests
                 .into_iter()
                 .map(|id| self.enrich_presence_sub_request(id)),
         )
@@ -90,46 +89,47 @@ impl ContactListService {
 
 impl ContactListService {
     /// Converts a domain `Contact` to a `Contact` DTO by enriching it with additional data.
-    /// Potential errors are ignored since the additional data is deemed optional and we rather
+    /// Potential errors are ignored since the additional data is deemed optional, and we rather
     /// return something than nothing.
     async fn enrich_domain_contact(&self, account: &AccountId, contact: Contact) -> ContactDTO {
-        let (profile, user_info) = join!(
-            self.user_info_domain_service.get_user_profile(&contact.id),
-            self.user_info_domain_service.get_user_info(&contact.id)
-        );
-
-        // We'll march on even in the event of a failure…
-        let profile = profile.unwrap_or_default().unwrap_or_default();
-        let user_info = user_info.unwrap_or_default().unwrap_or_default();
-        let name = build_contact_name(&contact.id, &profile);
         let group = if account.is_same_domain(&contact.id) {
             Group::Team
         } else {
             Group::Other
         };
 
+        let user_info = self
+            .user_info_domain_service
+            .get_user_info(&contact.id, CachePolicy::ReturnCacheDataElseLoad)
+            .await
+            .unwrap_or_default()
+            .into_user_presence_info_or_fallback(contact.id);
+
         ContactDTO {
-            id: contact.id,
-            name,
+            id: user_info.id,
+            name: user_info.name,
             availability: user_info.availability,
-            status: user_info.activity,
+            status: user_info.status,
             group,
             presence_subscription: contact.presence_subscription,
         }
     }
 
-    async fn enrich_presence_sub_request(&self, user_id: UserId) -> PresenceSubRequest {
-        let profile = self
+    async fn enrich_presence_sub_request(
+        &self,
+        request: DomainPresenceSubRequest,
+    ) -> PresenceSubRequest {
+        let user_info = self
             .user_info_domain_service
-            .get_user_profile(&user_id)
+            .get_user_info(&request.user_id, CachePolicy::ReturnCacheDataElseLoad)
             .await
             .unwrap_or_default()
-            .unwrap_or_default();
-        let name = build_contact_name(&user_id, &profile);
+            .into_user_basic_info_or_fallback(request.user_id);
+
         PresenceSubRequest {
-            id: user_id.clone().into(),
-            name,
-            user_id,
+            id: user_info.id.clone().into(),
+            name: user_info.name,
+            user_id: user_info.id,
         }
     }
 }

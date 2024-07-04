@@ -83,6 +83,7 @@ pub enum UserInfoEventType {
     AvatarChanged { metadata: AvatarMetadata },
     ProfileChanged { profile: UserProfile },
     StatusChanged { status: Option<UserStatus> },
+    NicknameChanged { nickname: Option<String> },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -189,7 +190,7 @@ pub enum ContactListEventType {
     /// The contact was removed from our contact list.
     ContactRemoved,
     /// The contact requested to subscribe to our presence.
-    PresenceSubscriptionRequested,
+    PresenceSubscriptionRequested { nickname: Option<String> },
 }
 
 #[derive(Debug, Clone, PartialEq)]

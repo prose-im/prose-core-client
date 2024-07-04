@@ -6,12 +6,16 @@
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use crate::domain::shared::utils::concatenate_names;
-
 #[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
 pub struct Address {
     pub locality: Option<String>,
     pub country: Option<String>,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum Image {
+    Binary { media_type: String, data: Box<[u8]> },
+    External(Url),
 }
 
 #[derive(Debug, PartialEq, Clone, Default, Serialize, Deserialize)]
@@ -26,10 +30,5 @@ pub struct UserProfile {
     pub tel: Option<String>,
     pub url: Option<Url>,
     pub address: Option<Address>,
-}
-
-impl UserProfile {
-    pub fn full_name(&self) -> Option<String> {
-        concatenate_names(&self.first_name, &self.last_name)
-    }
+    pub photo: Option<Image>,
 }

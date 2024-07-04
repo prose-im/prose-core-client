@@ -154,13 +154,6 @@ async fn test_rounds_timestamps() -> Result<()> {
             "#
         );
 
-        // A room and a corresponding bookmark will be created…
-        client.expect_load_vcard(&user_id);
-        client.receive_not_found_iq_response();
-
-        client.expect_load_avatar_metadata(&user_id);
-        client.receive_not_found_iq_response();
-
         client.expect_load_synced_room_settings(user_id.clone(), None);
 
         client.expect_catchup(&user_id);

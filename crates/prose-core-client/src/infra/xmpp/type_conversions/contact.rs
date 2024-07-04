@@ -13,6 +13,7 @@ impl From<Item> for Contact {
 
         Contact {
             id: roster_item.jid.into(),
+            name: roster_item.name,
             presence_subscription,
         }
     }

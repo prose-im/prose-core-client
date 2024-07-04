@@ -7,6 +7,7 @@ use std::fmt::{Debug, Display, Formatter};
 
 use crate::dtos::UserId;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct PresenceSubRequest {
     pub id: PresenceSubRequestId,
     pub name: String,

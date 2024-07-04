@@ -16,8 +16,9 @@ use prose_core_client::services::{
 use crate::error::WasmError;
 use crate::types::message::ArchiveID;
 use crate::types::{
-    try_user_id_vec_from_string_array, MessageResultSet, MessagesArray, ParticipantInfo,
-    ParticipantInfoArray, SendMessageRequest, StringArray, UserBasicInfo, UserBasicInfoArray,
+    try_user_id_vec_from_string_array, MessageResultSet, MessagesArray, ParticipantBasicInfo,
+    ParticipantBasicInfoArray, ParticipantInfo, ParticipantInfoArray, SendMessageRequest,
+    StringArray,
 };
 
 use super::IntoJSArray;
@@ -64,7 +65,7 @@ export interface RoomBase {
     loadUnreadMessages(): Promise<MessageResultSet>;
     
     setUserIsComposing(isComposing: boolean): Promise<void>;
-    loadComposingUsers(): Promise<UserBasicInfo[]>;
+    loadComposingUsers(): Promise<ParticipantBasicInfo[]>;
     
     saveDraft(message?: string): Promise<void>;
     loadDraft(): Promise<string>;
@@ -366,15 +367,15 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(js_name = "loadComposingUsers")]
-            pub async fn load_composing_users(&self) -> Result<UserBasicInfoArray> {
+            pub async fn load_composing_users(&self) -> Result<ParticipantBasicInfoArray> {
                 Ok(self
                     .room
                     .load_composing_users()
                     .await
                     .map_err(WasmError::from)?
                     .into_iter()
-                    .map(UserBasicInfo::from)
-                    .collect_into_js_array::<UserBasicInfoArray>())
+                    .map(ParticipantBasicInfo::from)
+                    .collect_into_js_array::<ParticipantBasicInfoArray>())
             }
 
             #[wasm_bindgen(js_name = "saveDraft")]

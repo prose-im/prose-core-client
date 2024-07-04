@@ -24,13 +24,13 @@ use prose_core_client::domain::rooms::services::{
 };
 use prose_core_client::domain::settings::models::{AccountSettings, SyncedRoomSettings};
 use prose_core_client::domain::shared::models::{
-    MucId, OccupantId, RoomId, RoomType, UserResourceId,
+    CachePolicy, MucId, OccupantId, RoomId, RoomType, UserResourceId,
 };
 use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::domain::user_info::models::Presence;
+use prose_core_client::domain::user_info::models::{Presence, UserName};
 use prose_core_client::dtos::{
     Availability, Bookmark, Participant, ParticipantInfo, PublicRoomInfo, RoomState, UserId,
-    UserInfo, UserProfile,
+    UserInfo,
 };
 use prose_core_client::test::{mock_data, MockRoomsDomainServiceDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id, user_resource_id};
@@ -103,10 +103,11 @@ async fn test_joins_room() -> Result<()> {
         .with(
             predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
             predicate::always(),
+            predicate::always(),
             predicate::eq(deps.ctx.capabilities.clone()),
             predicate::eq(Availability::DoNotDisturb),
         )
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async move {
                 Ok(RoomSessionInfo {
                     room_id: muc_id!("room@conf.prose.org").into(),
@@ -163,16 +164,27 @@ async fn test_joins_room() -> Result<()> {
         });
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .times(3)
-        .with(predicate::in_iter([
-            user_id!("user1@prose.org"),
-            user_id!("user2@prose.org"),
-            user_id!("user3@prose.org"),
-        ]))
-        .returning(|user_id| {
+        .expect_get_user_info()
+        .times(4)
+        .with(
+            predicate::in_iter([
+                user_id!("user1@prose.org"),
+                user_id!("user2@prose.org"),
+                user_id!("user3@prose.org"),
+            ]),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .returning(|user_id, _| {
             let username = user_id.formatted_username();
-            Box::pin(async move { Ok(Some(username)) })
+            Box::pin(async move {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some(username),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
         });
 
     deps.synced_room_settings_service
@@ -223,31 +235,37 @@ async fn test_joins_room() -> Result<()> {
     assert_eq!(
         vec![
             ParticipantInfo {
-                id: Some(user_id!("user1@prose.org")),
+                id: occupant_id!("room@conf.prose.org/user1#3dea7f2").into(),
+                user_id: Some(user_id!("user1@prose.org")),
                 name: "User1".to_string(),
                 is_self: true,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Owner,
                 avatar: None,
                 client: None,
+                status: None,
             },
             ParticipantInfo {
-                id: Some(user_id!("user2@prose.org")),
+                id: occupant_id!("room@conf.prose.org/user2#fdbda94").into(),
+                user_id: Some(user_id!("user2@prose.org")),
                 name: "User2".to_string(),
                 is_self: false,
                 availability: Availability::Available,
                 affiliation: RoomAffiliation::Member,
                 avatar: None,
                 client: None,
+                status: None,
             },
             ParticipantInfo {
-                id: Some(user_id!("user3@prose.org")),
+                id: user_id!("user3@prose.org").into(),
+                user_id: Some(user_id!("user3@prose.org")),
                 name: "User3".to_string(),
                 is_self: false,
                 availability: Availability::Unavailable,
                 affiliation: RoomAffiliation::Member,
                 avatar: None,
                 client: None,
+                status: None,
             }
         ],
         participants
@@ -347,13 +365,13 @@ async fn test_creates_group() -> Result<()> {
             })
         });
 
-    {
-        let account_node = account_node.clone();
-        deps.user_info_domain_service
-            .expect_get_user_profile()
-            .times(4)
-            .in_sequence(&mut seq)
-            .returning(move |jid| {
+    deps.user_info_domain_service
+        .expect_get_user_info()
+        .times(5)
+        .in_sequence(&mut seq)
+        .returning({
+            let account_node = account_node.clone();
+            move |jid, _| {
                 let jid = jid.clone();
                 let account_node = account_node.clone();
 
@@ -365,14 +383,16 @@ async fn test_creates_group() -> Result<()> {
                         "c" => "Track",
                         _ => panic!("Unexpected JID"),
                     };
-
-                    let mut user_profile = UserProfile::default();
-                    user_profile.first_name = Some(first_name.to_string());
-
-                    Ok(Some(user_profile))
+                    Ok(Some(UserInfo {
+                        name: UserName {
+                            nickname: Some(first_name.to_string()),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }))
                 })
-            });
-    }
+            }
+        });
 
     deps.connected_rooms_repo
         .expect_get()
@@ -407,11 +427,12 @@ async fn test_creates_group() -> Result<()> {
             .with(
                 predicate::eq(occupant_id),
                 predicate::eq("Jane, Tick, Track, Trick"),
+                predicate::always(),
                 predicate::eq(RoomSpec::Group),
                 predicate::eq(deps.ctx.capabilities.clone()),
                 predicate::eq(Availability::Away),
             )
-            .return_once(|_, _, _, _, _| {
+            .return_once(|_, _, _, _, _, _| {
                 Box::pin(async {
                     Ok(
                         RoomSessionInfo::new_room(group_jid, RoomType::Group).with_members(vec![
@@ -441,24 +462,32 @@ async fn test_creates_group() -> Result<()> {
         .return_once(|_, _| Box::pin(async { Ok(()) }));
 
     deps.user_info_domain_service
-        .expect_get_display_name()
+        .expect_get_user_info()
         .times(4)
         .in_sequence(&mut seq)
-        .returning(move |jid| {
-            let jid = jid.clone();
+        .returning({
             let account_node = account_node.clone();
+            move |jid, _| {
+                let jid = jid.clone();
+                let account_node = account_node.clone();
 
-            Box::pin(async move {
-                let first_name = match jid.username() {
-                    _ if jid.username() == &account_node => "Jane",
-                    "a" => "Tick",
-                    "b" => "Trick",
-                    "c" => "Track",
-                    _ => panic!("Unexpected JID"),
-                };
-
-                Ok(Some(first_name.to_string()))
-            })
+                Box::pin(async move {
+                    let first_name = match jid.username() {
+                        _ if jid.username() == &account_node => "Jane",
+                        "a" => "Tick",
+                        "b" => "Trick",
+                        "c" => "Track",
+                        _ => panic!("Unexpected JID"),
+                    };
+                    Ok(Some(UserInfo {
+                        name: UserName {
+                            nickname: Some(first_name.to_string()),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    }))
+                })
+            }
         });
 
     deps.synced_room_settings_service
@@ -581,20 +610,20 @@ async fn test_joins_direct_message() -> Result<()> {
         .return_once(|_, _| None);
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .once()
-        .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
-
-    deps.user_info_domain_service
         .expect_get_user_info()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| {
+        .with(
+            predicate::eq(user_id!("user2@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .return_once(|_, _| {
             Box::pin(async {
                 Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some("Jennifer Doe".to_string()),
+                        ..Default::default()
+                    },
                     availability: Availability::Available,
                     ..Default::default()
                 }))
@@ -645,11 +674,15 @@ async fn test_joins_direct_message() -> Result<()> {
     assert_eq!(
         participants,
         vec![ParticipantInfo {
-            id: Some(user_id!("user2@prose.org")),
+            id: user_id!("user2@prose.org").into(),
+            user_id: Some(user_id!("user2@prose.org")),
             name: "Jennifer Doe".to_string(),
+            is_self: false,
             availability: Availability::Available,
             affiliation: RoomAffiliation::Owner,
-            ..Default::default()
+            avatar: None,
+            client: None,
+            status: None,
         },]
     );
 
@@ -725,10 +758,19 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
         )
         .return_once(|_, _| Ok(()));
 
+    deps.user_info_domain_service
+        .expect_get_user_info()
+        .once()
+        .with(
+            predicate::eq(user_id!("jane.doe@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .returning(|_, _| Box::pin(async { Ok(None) }));
+
     deps.room_management_service
         .expect_create_or_join_room()
         .once()
-        .return_once(|_, _, _, _, _| {
+        .return_once(|_, _, _, _, _, _| {
             Box::pin(async {
                 Ok(RoomSessionInfo::new_room(
                     muc_id!("org.prose.channel.hash-1@conference.prose.org"),
@@ -854,6 +896,16 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
         )
         .return_once(|_, _| None);
 
+    deps.user_info_domain_service
+        .expect_get_user_info()
+        .once()
+        .with(
+            predicate::eq(user_id!("jane.doe@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .in_sequence(&mut seq)
+        .returning(|_, _| Box::pin(async { Ok(None) }));
+
     deps.connected_rooms_repo
         .expect_get()
         .once()
@@ -887,11 +939,12 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             .with(
                 predicate::eq(occupant_id),
                 predicate::eq("Private Channel"),
+                predicate::always(),
                 predicate::eq(RoomSpec::PrivateChannel),
                 predicate::eq(deps.ctx.capabilities.clone()),
                 predicate::eq(Availability::DoNotDisturb),
             )
-            .return_once(|_, _, _, _, _| {
+            .return_once(|_, _, _, _, _, _| {
                 Box::pin(async move {
                     Ok(RoomSessionInfo::new_room(
                         channel_jid.clone(),
@@ -1158,20 +1211,20 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
     }
 
     deps.user_info_domain_service
-        .expect_get_display_name()
-        .once()
-        .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| Box::pin(async { Ok(Some("Jennifer Doe".to_string())) }));
-
-    deps.user_info_domain_service
         .expect_get_user_info()
         .once()
         .in_sequence(&mut seq)
-        .with(predicate::eq(user_id!("user2@prose.org")))
-        .return_once(|_| {
+        .with(
+            predicate::eq(user_id!("user2@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .return_once(|_, _| {
             Box::pin(async {
                 Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some("Jennifer Doe".to_string()),
+                        ..Default::default()
+                    },
                     availability: Availability::Available,
                     ..Default::default()
                 }))
@@ -1222,11 +1275,15 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
     assert_eq!(
         participants,
         vec![ParticipantInfo {
-            id: Some(user_id!("user2@prose.org")),
+            id: user_id!("user2@prose.org").into(),
+            user_id: Some(user_id!("user2@prose.org")),
             name: "Jennifer Doe".to_string(),
+            is_self: false,
             availability: Availability::Available,
             affiliation: RoomAffiliation::Owner,
-            ..Default::default()
+            avatar: None,
+            client: None,
+            status: None,
         },]
     );
 
@@ -1266,6 +1323,27 @@ async fn test_updates_pending_public_channel() -> Result<()> {
         "user1#3dea7f2",
     )));
 
+    deps.user_info_domain_service
+        .expect_get_user_info()
+        .once()
+        .in_sequence(&mut seq)
+        .with(
+            predicate::eq(user_id!("user1@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .returning(|user_id, _| {
+            let username = user_id.formatted_username();
+            Box::pin(async move {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some(username),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
+        });
+
     {
         let pending_room = pending_room.lock().clone();
         deps.connected_rooms_repo
@@ -1292,9 +1370,10 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             predicate::always(),
             predicate::always(),
             predicate::always(),
+            predicate::always(),
         )
         .in_sequence(&mut seq)
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async {
                 Ok(RoomSessionInfo {
                     room_id: muc_id!("room@conf.prose.org"),
@@ -1324,16 +1403,24 @@ async fn test_updates_pending_public_channel() -> Result<()> {
         });
 
     deps.user_info_domain_service
-        .expect_get_display_name()
+        .expect_get_user_info()
         .times(2)
         .in_sequence(&mut seq)
-        .with(predicate::in_iter([
-            user_id!("user1@prose.org"),
-            user_id!("user2@prose.org"),
-        ]))
-        .returning(|user_id| {
+        .with(
+            predicate::in_iter([user_id!("user1@prose.org"), user_id!("user2@prose.org")]),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .returning(|user_id, _| {
             let username = user_id.formatted_username();
-            Box::pin(async move { Ok(Some(username)) })
+            Box::pin(async move {
+                Ok(Some(UserInfo {
+                    name: UserName {
+                        nickname: Some(username),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }))
+            })
         });
 
     deps.synced_room_settings_service
@@ -1415,11 +1502,20 @@ async fn test_join_retains_room_on_failure() -> Result<()> {
             });
     }
 
+    deps.user_info_domain_service
+        .expect_get_user_info()
+        .once()
+        .with(
+            predicate::eq(user_id!("jane.doe@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .returning(|_, _| Box::pin(async { Ok(None) }));
+
     deps.room_management_service
         .expect_join_room()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async { Err(RoomError::Anyhow(format_err!("failure-error-message"))) })
         });
 
@@ -1474,11 +1570,20 @@ async fn test_join_removes_room_on_failure() -> Result<()> {
         .in_sequence(&mut seq)
         .return_once(move |_, _| Ok(()));
 
+    deps.user_info_domain_service
+        .expect_get_user_info()
+        .once()
+        .with(
+            predicate::eq(user_id!("jane.doe@prose.org")),
+            predicate::eq(CachePolicy::ReturnCacheDataElseLoad),
+        )
+        .returning(|_, _| Box::pin(async { Ok(None) }));
+
     deps.room_management_service
         .expect_join_room()
         .once()
         .in_sequence(&mut seq)
-        .return_once(|_, _, _, _| {
+        .return_once(|_, _, _, _, _| {
             Box::pin(async { Err(RoomError::Anyhow(format_err!("failure-error-message"))) })
         });
 

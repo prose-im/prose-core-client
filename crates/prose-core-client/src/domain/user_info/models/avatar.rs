@@ -5,30 +5,32 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::shared::models::{AvatarId, ParticipantId};
-use crate::domain::user_info::models::AvatarInfo;
+use crate::domain::shared::models::{AvatarId, ParticipantId, ParticipantIdRef, UserId};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AvatarSource {
-    Pep { mime_type: String },
-    Vcard,
+    Pep { owner: UserId, mime_type: String },
+    Vcard { owner: ParticipantId },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Avatar {
     pub id: AvatarId,
     pub source: AvatarSource,
-    pub owner: ParticipantId,
 }
 
 impl Avatar {
-    pub fn info(&self) -> Option<AvatarInfo> {
-        let AvatarSource::Pep { mime_type } = &self.source else {
-            return None;
-        };
-        Some(AvatarInfo {
-            checksum: self.id.clone(),
-            mime_type: mime_type.clone(),
-        })
+    pub fn owner(&self) -> ParticipantIdRef {
+        match &self.source {
+            AvatarSource::Pep { owner, .. } => owner.into(),
+            AvatarSource::Vcard { owner } => owner.to_ref(),
+        }
+    }
+
+    pub fn is_pep(&self) -> bool {
+        match &self.source {
+            AvatarSource::Pep { .. } => true,
+            AvatarSource::Vcard { .. } => false,
+        }
     }
 }

@@ -3,11 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::ns;
-use crate::util::ElementExt;
-use anyhow::Context;
 use minidom::Element;
 use xmpp_parsers::iq::{IqGetPayload, IqResultPayload};
+
+use crate::util::ElementExt;
+use crate::{ns, RequestError};
 
 pub struct LastActivityRequest;
 
@@ -37,14 +37,15 @@ impl From<LastActivityRequest> for Element {
 }
 
 impl TryFrom<Element> for LastActivityResponse {
-    type Error = anyhow::Error;
+    type Error = RequestError;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         Ok(LastActivityResponse {
-            seconds: root
-                .attr_req("seconds")?
-                .parse::<u64>()
-                .context("Failed to parse seconds in LastActivityResponse")?,
+            seconds: root.attr_req("seconds")?.parse::<u64>().map_err(|_| {
+                RequestError::Generic {
+                    msg: "Failed to parse seconds in LastActivityResponse".to_string(),
+                }
+            })?,
             status: root.texts().next().map(|s| s.to_string()),
         })
     }
@@ -61,9 +62,11 @@ impl From<LastActivityResponse> for Element {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use anyhow::Result;
     use std::str::FromStr;
+
+    use anyhow::Result;
+
+    use super::*;
 
     #[test]
     fn test_deserialize_last_activity() -> Result<()> {

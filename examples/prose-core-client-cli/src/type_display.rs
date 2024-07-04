@@ -117,14 +117,14 @@ impl Display for ParticipantEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{real_id:<20} {name:<20} {aff:<10} {avatar} {avail}",
+            "{id:<60} {real_id:<20} {name:<20} {aff:<10} {avatar} {avail}",
+            id = self.0.id.to_string().truncate_to(60),
             real_id = self
                 .0
-                .id
+                .user_id
                 .as_ref()
-                .map(|jid| jid.to_string())
-                .unwrap_or("<unknown real jid>".to_string())
-                .truncate_to(20),
+                .map(|jid| format!("({})", jid.to_string().truncate_to(20)))
+                .unwrap_or("(<unknown real jid>)".to_string()),
             name = self.0.name.truncate_to(20),
             aff = self.0.affiliation,
             avatar = self
@@ -144,7 +144,7 @@ impl Display for AvatarEnvelope {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let kind = match self.0.source {
             AvatarSource::Pep { .. } => "PEP",
-            AvatarSource::Vcard => "vCard",
+            AvatarSource::Vcard { .. } => "vCard",
         };
         write!(f, "{id} ({kind})", id = self.0.id)
     }

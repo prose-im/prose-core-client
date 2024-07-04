@@ -16,8 +16,6 @@ use xmpp_parsers::stanza_error::DefinedCondition;
 use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::{IDProvider, RequestError};
 
-use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
-use super::{build_nickname, ParticipantsVecExt};
 use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynClientEventDispatcher,
     DynConnectedRoomsRepository, DynEncryptionDomainService, DynIDProvider,
@@ -35,11 +33,13 @@ use crate::domain::rooms::services::rooms_domain_service::{
 };
 use crate::domain::rooms::services::{CreateOrEnterRoomRequest, JoinRoomBehavior};
 use crate::domain::settings::models::SyncedRoomSettings;
-use crate::domain::shared::models::{AccountId, MucId, RoomId, RoomType, UserId};
-use crate::domain::user_info::models::Presence;
+use crate::domain::shared::models::{AccountId, CachePolicy, MucId, RoomId, RoomType, UserId};
+use crate::domain::user_info::models::{Presence, UserInfoOptExt};
 use crate::dtos::{Availability, RoomState};
-use crate::util::StringExt;
 use crate::{ClientEvent, ClientRoomEventType};
+
+use super::super::{CreateRoomType, RoomsDomainService as RoomsDomainServiceTrait};
+use super::{build_nickname, ParticipantsVecExt};
 
 const CHANNEL_PREFIX: &str = "org.prose.channel";
 
@@ -592,9 +592,10 @@ impl RoomsDomainService {
 
         let display_name = self
             .user_info_domain_service
-            .get_display_name(account.as_ref())
+            .get_user_info(account.as_ref(), CachePolicy::ReturnCacheDataElseLoad)
             .await?
-            .unwrap_or_else(|| account.as_ref().username().to_string());
+            .display_name()
+            .unwrap_or_username(account.as_ref());
 
         let nickname = build_nickname(account.as_ref());
         let mut room_id = room_id.clone();
@@ -654,10 +655,10 @@ impl RoomsDomainService {
     async fn join_direct_message(
         &self,
         account: &AccountId,
-        participant: &UserId,
+        user_id: &UserId,
         sidebar_state: RoomSidebarState,
     ) -> Result<RoomStatus, RoomError> {
-        let room_is_new = match self.connected_rooms_repo.get(account, participant.as_ref()) {
+        let room_is_new = match self.connected_rooms_repo.get(account, user_id.as_ref()) {
             Some(room) if room.state() == RoomState::Pending || room.state().is_disconnected() => {
                 false
             }
@@ -665,22 +666,15 @@ impl RoomsDomainService {
             Some(room) => return Ok(RoomStatus::Exists(room)),
         };
 
-        let contact_name = self
-            .user_info_domain_service
-            .get_display_name(participant)
-            .await;
         let user_info = self
             .user_info_domain_service
-            .get_user_info(participant)
-            .await;
-
-        // Let's ignore potential errors here since the information we're gathering is optional…
-        let contact_name = contact_name
+            .get_user_info(user_id, CachePolicy::ReturnCacheDataElseLoad)
+            .await
             .unwrap_or_default()
-            .unwrap_or_else(|| participant.formatted_username());
-        let user_info = user_info.unwrap_or_default().unwrap_or_default();
+            .unwrap_or_default();
+        let contact_name = user_info.display_name().unwrap_or_username(user_id);
 
-        let room_id = RoomId::User(participant.clone());
+        let room_id = RoomId::User(user_id.clone());
         let settings = self
             .synced_room_settings_service
             .load_settings(&room_id)
@@ -691,7 +685,7 @@ impl RoomsDomainService {
         let features = self.ctx.server_features()?;
 
         let room = Room::for_direct_message(
-            &participant,
+            &user_id,
             &contact_name,
             Presence {
                 availability: user_info.availability,
@@ -825,23 +819,22 @@ impl RoomsDomainService {
             return Err(RoomError::InvalidNumberOfParticipants);
         }
 
-        let user_jid = account.to_user_id();
-
         // Load participant infos so that we can build a nice human-readable name for the group…
         let mut participant_names = vec![];
         let participants_including_self = participants
             .iter()
-            .chain(iter::once(&user_jid))
+            .chain(iter::once(account.as_ref()))
             .cloned()
             .collect::<Vec<_>>();
 
-        for jid in participants_including_self.iter() {
+        for user_id in participants_including_self.iter() {
             let participant_name = self
                 .user_info_domain_service
-                .get_user_profile(jid)
-                .await?
-                .and_then(|profile| profile.first_name.or(profile.nickname))
-                .unwrap_or_else(|| jid.username().to_uppercase_first_letter());
+                .get_user_info(user_id, CachePolicy::ReturnCacheDataElseLoad)
+                .await
+                .unwrap_or_default()
+                .display_name()
+                .unwrap_or_username(user_id);
             participant_names.push(participant_name);
         }
         participant_names.sort();
@@ -929,12 +922,13 @@ impl RoomsDomainService {
         availability: Availability,
         perform_additional_config: impl FnOnce(&MucId, &mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomInfoStatus, RoomError> {
-        let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
+        let nickname = build_nickname(account.as_ref());
         let display_name = self
             .user_info_domain_service
-            .get_display_name(account.as_ref())
+            .get_user_info(account.as_ref(), CachePolicy::ReturnCacheDataElseLoad)
             .await?
-            .unwrap_or_else(|| account.as_ref().username().to_string());
+            .display_name()
+            .unwrap_or_username(account.as_ref());
 
         let mut attempt = 0;
         let mut unique_room_id = room_id.to_string();
@@ -1069,9 +1063,11 @@ impl RoomsDomainService {
         for member in info.members {
             let name = self
                 .user_info_domain_service
-                .get_display_name(&member.id)
+                .get_user_info(&member.id, CachePolicy::ReturnCacheDataElseLoad)
                 .await
-                .unwrap_or_default();
+                .unwrap_or_default()
+                .display_name()
+                .build();
             let is_self = member.id == current_user_id;
 
             members.push(RegisteredMember {

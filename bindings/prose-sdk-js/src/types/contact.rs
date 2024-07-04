@@ -63,6 +63,7 @@ impl From<Availability> for CoreAvailability {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct UserStatus(CoreUserStatus);
 
 impl From<CoreUserStatus> for UserStatus {

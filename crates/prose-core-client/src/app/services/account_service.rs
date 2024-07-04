@@ -10,9 +10,10 @@ use prose_proc_macros::InjectDependencies;
 use prose_xmpp::mods::AvatarData;
 
 use crate::app::deps::*;
-use crate::domain::shared::models::{Availability, AvatarId};
+use crate::domain::account::services::UserProfileFormat;
+use crate::domain::shared::models::{Availability, AvatarId, CachePolicy, ParticipantIdRef};
 use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
-use crate::dtos::{AccountInfo, DeviceId, DeviceInfo};
+use crate::dtos::{AccountInfo, DeviceId, DeviceInfo, UserProfile as UserProfileDTO};
 use crate::ClientEvent;
 
 #[derive(InjectDependencies)]
@@ -42,42 +43,36 @@ impl AccountService {
 
         let user_info = self
             .user_info_domain_service
-            .get_user_info(&user_id)
-            .await?;
-        let account_settings = self.account_settings_repo.get(&account).await?;
-        let name = self
-            .user_info_domain_service
-            .get_display_name(&user_id)
+            .get_user_info(&user_id, CachePolicy::ReturnCacheDataElseLoad)
             .await?
-            .unwrap_or_else(|| user_id.formatted_username());
+            .unwrap_or_default();
+        let name = user_info.display_name().unwrap_or_username(&user_id);
+        let account_settings = self.account_settings_repo.get(&account).await?;
 
         Ok(AccountInfo {
             id: user_id,
             name,
             availability: account_settings.availability,
-            status: user_info.and_then(|info| info.activity),
+            status: user_info.status,
         })
     }
 
-    pub async fn set_profile(&self, user_profile: &UserProfile) -> Result<()> {
+    pub async fn set_profile(&self, user_profile: UserProfileDTO) -> Result<()> {
         let account = self.ctx.connected_account()?;
         let user_id = account.to_user_id();
+        let user_profile = UserProfile::from(user_profile);
 
-        self.user_account_service.set_profile(&user_profile).await?;
+        let format = if self.ctx.server_features()?.vcard4 {
+            UserProfileFormat::Vcard4
+        } else {
+            UserProfileFormat::VcardTemp
+        };
+
+        self.user_account_service
+            .set_profile(user_profile.clone(), format)
+            .await?;
         self.user_info_domain_service
             .handle_user_profile_changed(&user_id, Some(user_profile))
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn delete_profile(&self) -> Result<()> {
-        let account = self.ctx.connected_account()?;
-        let user_id = account.to_user_id();
-
-        self.user_account_service.delete_profile().await?;
-        self.user_info_domain_service
-            .handle_user_profile_changed(&user_id, None)
             .await?;
 
         Ok(())
@@ -120,7 +115,7 @@ impl AccountService {
             .set_user_activity(user_activity.as_ref())
             .await?;
         self.user_info_domain_service
-            .handle_user_status_changed(&user_id, user_activity.as_ref())
+            .handle_user_status_changed(&user_id, user_activity)
             .await?;
         Ok(())
     }
@@ -135,7 +130,7 @@ impl AccountService {
         let account = self.ctx.connected_account()?;
         let user_id = account.to_user_id();
         let image_data_len = image_data.as_ref().len();
-        let image_data = AvatarData::Data(image_data.as_ref().to_vec());
+        let image_data = AvatarData::Data(image_data.as_ref().to_vec().into_boxed_slice());
 
         let metadata = AvatarMetadata {
             bytes: image_data_len,
@@ -160,7 +155,7 @@ impl AccountService {
         self.avatar_repo
             .set(
                 &account,
-                &user_id,
+                ParticipantIdRef::User(&user_id),
                 &metadata.clone().into_info(),
                 &image_data,
             )
@@ -168,7 +163,7 @@ impl AccountService {
 
         debug!("Caching avatar metadata");
         self.user_info_domain_service
-            .handle_avatar_changed(&user_id, Some(&metadata))
+            .handle_avatar_changed(&user_id, Some(metadata))
             .await?;
 
         Ok(())

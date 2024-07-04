@@ -88,8 +88,9 @@ impl PresenceExt for presence::Presence {
     fn to_domain_presence(&self, participant: impl Into<ParticipantId>) -> Presence {
         let avatar = self.avatar_id().map(|avatar_id| Avatar {
             id: avatar_id,
-            source: AvatarSource::Vcard,
-            owner: participant.into(),
+            source: AvatarSource::Vcard {
+                owner: participant.into(),
+            },
         });
 
         let (caps, client) = self

@@ -60,7 +60,7 @@ impl SidebarItem {
             RoomEnvelope::Group(_) => SidebarSection::DirectMessage,
             RoomEnvelope::PrivateChannel(_) => SidebarSection::Channel,
             RoomEnvelope::PublicChannel(_) => SidebarSection::Channel,
-            RoomEnvelope::Generic(_) => unreachable!("Unexpected Sidebar item for generic room"),
+            RoomEnvelope::Generic(_) => SidebarSection::Channel,
         }
     }
 

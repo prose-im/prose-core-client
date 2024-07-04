@@ -27,17 +27,18 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, AttachmentType, Availability, Mention, RoomEnvelope, RoomId,
-    SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt, UploadSlot, UserId, Utf8Index,
+    Address, Attachment, AttachmentType, Availability, Avatar, Mention, ParticipantId,
+    RoomEnvelope, RoomId, SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt,
+    UploadSlot, UserId, Utf8Index,
 };
-use prose_core_client::infra::avatars::FsAvatarCache;
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
+use prose_core_client::FsAvatarRepository;
 use prose_core_client::{
     open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, PlatformDriver,
     SignalServiceHandle,
 };
-use prose_xmpp::{connector, Secret};
+use prose_xmpp::{connector, mods, Secret};
 
 use crate::type_display::{
     ConnectedRoomEnvelope, DeviceInfoEnvelope, JidWithName, MessageEnvelope, ParticipantEnvelope,
@@ -46,7 +47,8 @@ use crate::type_display::{
 use crate::type_selection::{
     load_messages, select_contact, select_contact_or_self, select_device, select_file,
     select_item_from_list, select_message, select_muc_room, select_multiple_contacts,
-    select_multiple_jids_from_list, select_public_channel, select_room, select_sidebar_item,
+    select_multiple_jids_from_list, select_participant, select_public_channel, select_room,
+    select_sidebar_item,
 };
 
 mod type_display;
@@ -71,7 +73,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
             Arc::new(OsRngProvider),
         )))
         .set_store(store)
-        .set_avatar_cache(FsAvatarCache::new(&cache_path.join("Avatar"))?)
+        .set_avatar_repository(FsAvatarRepository::new(&cache_path.join("Avatar"))?)
         .set_delegate(Some(Box::new(Delegate {})))
         .build();
 
@@ -222,11 +224,11 @@ fn prompt_string(prompt: impl Into<String>) -> String {
         .unwrap()
 }
 
-async fn load_avatar(client: &Client, jid: &UserId) -> Result<()> {
-    println!("Loading avatar for {}…", jid);
-    match client.user_data.load_avatar(jid).await? {
+async fn load_avatar(client: &Client, avatar: &Avatar) -> Result<()> {
+    println!("Loading avatar {avatar:?}…");
+    match client.user_data.load_avatar(avatar).await? {
         Some(path) => println!("Saved avatar image to {:?}.", path),
-        None => println!("{} has not set an avatar.", jid),
+        None => println!("No avatar found."),
     }
     Ok(())
 }
@@ -348,7 +350,7 @@ async fn update_user_profile(client: &Client, id: UserId) -> Result<()> {
         profile.address = Some(Address { locality, country })
     }
 
-    client.account.set_profile(&profile).await
+    client.account.set_profile(profile).await
 }
 
 async fn load_contacts(client: &Client) -> Result<()> {
@@ -383,7 +385,7 @@ async fn send_message(client: &Client) -> Result<()> {
         .to_generic_room()
         .participants()
         .into_iter()
-        .filter_map(|p| p.id)
+        .filter_map(|p| p.user_id)
         .collect::<Vec<_>>();
 
     let message: String = Input::with_theme(&ColorfulTheme::default())
@@ -562,8 +564,6 @@ enum Selection {
     LoadUserProfile,
     #[strum(serialize = "Update profile")]
     UpdateUserProfile,
-    #[strum(serialize = "Delete profile")]
-    DeleteUserProfile,
     #[strum(serialize = "Set Availability")]
     SetAvailability,
     #[strum(serialize = "Load avatar")]
@@ -630,6 +630,8 @@ enum Selection {
     SetRoomTopic,
     #[strum(serialize = "List participants in room")]
     ListRoomParticipants,
+    #[strum(serialize = "Load participant metadata")]
+    LoadParticipantMetadata,
     #[strum(serialize = "Resend group invites")]
     ResendGroupInvites,
     #[strum(serialize = "Invite user to private channel")]
@@ -675,23 +677,34 @@ async fn main() -> Result<()> {
             Selection::UpdateUserProfile => {
                 update_user_profile(&client, jid.clone().into()).await?;
             }
-            Selection::DeleteUserProfile => {
-                client.account.delete_profile().await?;
-            }
             Selection::SetAvailability => {
-                let availability = select_item_from_list(
+                let Some(availability) = select_item_from_list(
                     vec![
                         Availability::Available,
                         Availability::Away,
                         Availability::DoNotDisturb,
                     ],
                     |a| a.to_string(),
-                );
+                ) else {
+                    continue;
+                };
                 client.account.set_availability(availability).await?;
             }
             Selection::LoadUserAvatar => {
-                let jid = prompt_bare_jid(&jid);
-                load_avatar(&client, &jid.into()).await?;
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+
+                let Some(participant) = select_participant(&room.to_generic_room()).await else {
+                    continue;
+                };
+
+                let Some(avatar) = participant.avatar else {
+                    println!("{} doesn't have an avatar set.", participant.name);
+                    continue;
+                };
+
+                load_avatar(&client, &avatar).await?;
             }
             Selection::SaveUserAvatar => {
                 save_avatar(&client).await?;
@@ -704,7 +717,9 @@ async fn main() -> Result<()> {
                 client.contact_list.add_contact(&jid.into()).await?;
             }
             Selection::RemoveContact => {
-                let contact = select_contact(&client).await?;
+                let Some(contact) = select_contact(&client).await? else {
+                    continue;
+                };
                 client.contact_list.remove_contact(&contact).await?;
             }
             Selection::LoadBlockList => {
@@ -724,8 +739,11 @@ async fn main() -> Result<()> {
             }
             Selection::UnblockUser => {
                 let blocked_users = client.block_list.load_block_list().await?;
-                let user =
-                    select_item_from_list(blocked_users, |u| UserBasicInfoEnvelope(u.clone()));
+                let Some(user) =
+                    select_item_from_list(blocked_users, |u| UserBasicInfoEnvelope(u.clone()))
+                else {
+                    continue;
+                };
                 client.block_list.unblock_user(&user.id).await?;
             }
             Selection::ClearBlockList => {
@@ -738,8 +756,11 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                let req =
-                    select_item_from_list(requests, |req| format!("{} ({})", req.name, req.id));
+                let Some(req) =
+                    select_item_from_list(requests, |req| format!("{} ({})", req.name, req.id))
+                else {
+                    continue;
+                };
 
                 enum Response {
                     Approve,
@@ -757,10 +778,12 @@ async fn main() -> Result<()> {
                     }
                 }
 
-                let response = select_item_from_list(
+                let Some(response) = select_item_from_list(
                     [Response::Approve, Response::Deny, Response::Cancel],
                     |r| r.to_string(),
-                );
+                ) else {
+                    continue;
+                };
                 match response {
                     Response::Approve => {
                         client
@@ -844,7 +867,9 @@ async fn main() -> Result<()> {
                 };
 
                 let room = room.to_generic_room();
-                let message_id = select_message(&room).await?;
+                let Some(message_id) = select_message(&room).await? else {
+                    continue;
+                };
 
                 let body: String = Input::with_theme(&ColorfulTheme::default())
                     .with_prompt("Enter updated message")
@@ -902,7 +927,9 @@ async fn main() -> Result<()> {
                 println!("{}", rooms.join("\n"));
             }
             Selection::JoinPublicRoom => {
-                let room = select_public_channel(&client).await?;
+                let Some(room) = select_public_channel(&client).await? else {
+                    continue;
+                };
                 client.rooms.join_room(&room.id, None).await?;
             }
             Selection::JoinRoomByJid => {
@@ -1058,6 +1085,24 @@ async fn main() -> Result<()> {
                     .collect::<Vec<_>>();
                 println!("{}", occupants.join("\n"))
             }
+            Selection::LoadParticipantMetadata => {
+                let Some(room) = select_room(&client, |_| true).await? else {
+                    continue;
+                };
+                let Some(participant) = select_participant(&room.to_generic_room()).await else {
+                    continue;
+                };
+
+                let jid = match participant.id {
+                    ParticipantId::User(id) => Jid::from(id.into_inner()),
+                    ParticipantId::Occupant(id) => Jid::from(id.into_inner()),
+                };
+
+                let profile = client.debug.xmpp_client().get_mod::<mods::Profile>();
+                let time = profile.load_last_activity(jid).await?;
+
+                println!("> {time:?}");
+            }
             Selection::ResendGroupInvites => {
                 let Some(RoomEnvelope::Group(room)) = select_room(&client, |item| {
                     if let RoomEnvelope::Group(_) = item.room {
@@ -1084,7 +1129,9 @@ async fn main() -> Result<()> {
                     continue;
                 };
 
-                let contact = select_contact(&client).await?;
+                let Some(contact) = select_contact(&client).await? else {
+                    continue;
+                };
                 room.invite_users(vec![&contact]).await?;
             }
             Selection::ConvertGroupToPrivateChannel => {
@@ -1103,7 +1150,9 @@ async fn main() -> Result<()> {
                 room.convert_to_private_channel(&channel_name).await?;
             }
             Selection::ListUserDevices => {
-                let jid = select_contact_or_self(&client).await?;
+                let Some(jid) = select_contact_or_self(&client).await? else {
+                    continue;
+                };
                 let devices = client.user_data.load_user_device_infos(&jid).await?;
 
                 if devices.is_empty() {
@@ -1120,9 +1169,12 @@ async fn main() -> Result<()> {
                 }
             }
             Selection::DeleteDevice => {
-                let device_id =
+                let Some(device_id) =
                     select_device(&client, &client.connected_user_id().unwrap().into_user_id())
-                        .await?;
+                        .await?
+                else {
+                    continue;
+                };
                 client.account.delete_device(&device_id).await?;
                 println!("Device deleted.")
             }
@@ -1167,7 +1219,7 @@ async fn main() -> Result<()> {
                     .with_prompt("Enter XML")
                     .interact_text()?;
                 let element = Element::from_str(&input)?;
-                client.send_raw_stanza(element).await?;
+                client.debug.xmpp_client().send_raw_stanza(element)?;
             }
             Selection::Disconnect => {
                 println!("Disconnecting…");

@@ -140,6 +140,7 @@ impl Participant {
             avatar: None,
             client: None,
             caps: None,
+            status: None,
         }
     }
 
@@ -156,6 +157,7 @@ impl Participant {
             avatar: None,
             client: None,
             caps: None,
+            status: None,
         }
     }
 

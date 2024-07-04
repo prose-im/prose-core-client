@@ -34,17 +34,6 @@ impl ContactListRepository for CachingContactsRepository {
         Ok(self.contacts.read().clone().unwrap_or_else(|| vec![]))
     }
 
-    async fn get(&self, _account: &AccountId, contact_id: &UserId) -> Result<Option<Contact>> {
-        self.load_contacts_if_needed().await?;
-
-        let Some(contacts) = &*self.contacts.read() else {
-            return Ok(None);
-        };
-
-        let contact = contacts.iter().find(|c| &c.id == contact_id).cloned();
-        Ok(contact)
-    }
-
     async fn set(
         &self,
         _account: &AccountId,
@@ -66,6 +55,7 @@ impl ContactListRepository for CachingContactsRepository {
 
         contacts.push(Contact {
             id: contact_id.clone(),
+            name: Some(contact_id.formatted_username()),
             presence_subscription: subscription,
         });
 
@@ -87,13 +77,13 @@ impl ContactListRepository for CachingContactsRepository {
         Ok(true)
     }
 
+    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()> {
+        self.clear_cache(account).await
+    }
+
     async fn clear_cache(&self, _account: &AccountId) -> Result<()> {
         self.contacts.write().take();
         Ok(())
-    }
-
-    async fn reset_before_reconnect(&self, account: &AccountId) -> Result<()> {
-        self.clear_cache(account).await
     }
 }
 

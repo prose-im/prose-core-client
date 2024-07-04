@@ -114,14 +114,8 @@ impl Default for StartDMStrategy {
     fn default() -> Self {
         Self {
             expect_catchup: Box::new(|client, user_id| client.expect_catchup(user_id)),
-            expect_load_vcard: Box::new(|client, user_id| {
-                client.expect_load_vcard(&user_id);
-                client.receive_not_found_iq_response();
-            }),
-            expect_load_avatar: Box::new(|client, user_id| {
-                client.expect_load_avatar_metadata(&user_id);
-                client.receive_not_found_iq_response();
-            }),
+            expect_load_vcard: Box::new(|_client, _user_id| {}),
+            expect_load_avatar: Box::new(|_client, _user_id| {}),
             expect_load_settings: Box::new(|client, user_id| {
                 client.expect_load_synced_room_settings(user_id.clone(), None);
             }),

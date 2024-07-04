@@ -7,6 +7,7 @@ use anyhow::{format_err, Result};
 use jid::BareJid;
 use tracing::error;
 use xmpp_parsers::iq::{Iq, IqType};
+use xmpp_parsers::nick::Nick;
 use xmpp_parsers::presence::{Presence, Type};
 use xmpp_parsers::roster::{Group, Item, Roster as Query, Subscription};
 
@@ -24,8 +25,13 @@ pub struct Roster {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Event {
-    PresenceSubscriptionRequest { from: BareJid },
-    RosterItemChanged { item: Item },
+    PresenceSubscriptionRequest {
+        from: BareJid,
+        nickname: Option<String>,
+    },
+    RosterItemChanged {
+        item: Item,
+    },
 }
 
 impl Module for Roster {
@@ -42,9 +48,18 @@ impl Module for Roster {
             return Ok(());
         };
 
+        let nickname = stanza
+            .payloads
+            .iter()
+            .find(|p| p.is("nick", ns::NICK))
+            .cloned()
+            .and_then(|p| Nick::try_from(p).ok())
+            .map(|nick| nick.0);
+
         self.ctx
             .schedule_event(ClientEvent::Roster(PresenceSubscriptionRequest {
                 from: jid.to_bare(),
+                nickname,
             }));
 
         Ok(())

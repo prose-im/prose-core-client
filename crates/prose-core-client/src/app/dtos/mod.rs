@@ -14,6 +14,7 @@ pub use room_envelope::RoomEnvelope;
 pub use send_message_request::{Body as SendMessageRequestBody, SendMessageRequest};
 pub use sidebar_item::SidebarItem;
 pub use upload_slot::UploadSlot;
+pub use user_profile::{Address, UserProfile};
 
 #[cfg(any(feature = "debug", feature = "test"))]
 pub use crate::domain::sidebar::models::Bookmark;
@@ -31,14 +32,13 @@ pub use crate::domain::{
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        AccountId, Availability, MucId, OccupantId, ParticipantId, ParticipantInfo, RoomId,
-        ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId,
-        UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index,
+        AccountId, Availability, MucId, OccupantId, ParticipantBasicInfo, ParticipantId,
+        ParticipantInfo, RoomId, ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex,
+        UserBasicInfo, UserId, UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index,
     },
     uploads::models::UploadHeader,
     user_info::models::{
-        Address, Avatar, AvatarSource, LastActivity, UserInfo, UserMetadata, UserProfile,
-        UserStatus,
+        Avatar, AvatarSource, JabberClient, LastActivity, UserInfo, UserMetadata, UserStatus,
     },
 };
 
@@ -51,3 +51,4 @@ mod room_envelope;
 mod send_message_request;
 mod sidebar_item;
 mod upload_slot;
+mod user_profile;

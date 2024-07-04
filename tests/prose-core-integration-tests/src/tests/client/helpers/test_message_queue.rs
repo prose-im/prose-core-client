@@ -29,6 +29,7 @@ pub enum MessageType {
 }
 
 pub struct ClientEventMatcher {
+    expected_event_description: String,
     matcher: Box<dyn FnOnce(ClientEvent, String, u32) + Send>,
 }
 
@@ -65,13 +66,14 @@ impl Debug for MessageType {
 
 impl Debug for ClientEventMatcher {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ClientEvent")
+        f.write_str(&self.expected_event_description)
     }
 }
 
 impl ClientEventMatcher {
     pub fn event(expected_event: ClientEvent) -> Self {
         Self {
+            expected_event_description: format!("{expected_event:?}"),
             matcher: Box::new(move |event, file, line| {
                 assert_eq!(
                     expected_event, event,
@@ -84,6 +86,7 @@ impl ClientEventMatcher {
 
     pub fn room_event(room_id: RoomId, expected_type: ClientRoomEventType) -> Self {
         Self {
+            expected_event_description: format!("{expected_type:?}"),
             matcher: Box::new(move |event, file, line| {
                 let ClientEvent::RoomChanged {
                     room,
@@ -112,6 +115,7 @@ impl ClientEventMatcher {
 
     pub fn any() -> Self {
         Self {
+            expected_event_description: "<any>".to_string(),
             matcher: Box::new(|_, _, _| {}),
         }
     }

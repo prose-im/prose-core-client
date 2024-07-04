@@ -13,7 +13,9 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::rooms::models::ComposeState;
 use prose_core_client::domain::shared::models::{AvatarId, CapabilitiesId};
-use prose_core_client::domain::user_info::models::{AvatarMetadata, Presence};
+use prose_core_client::domain::user_info::models::{
+    Address, AvatarMetadata, Presence, UserProfile,
+};
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
 use prose_core_client::{occupant_id, user_id, user_resource_id};
@@ -72,8 +74,9 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
                     )),
                     avatar: Some(Avatar {
                         id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
-                        source: AvatarSource::Vcard,
-                        owner: user_id!("user@prose.org").into(),
+                        source: AvatarSource::Vcard {
+                            owner: user_id!("user@prose.org").into(),
+                        }
                     }),
                     client: Some("https://prose.org".parse()?),
                     ..Default::default()

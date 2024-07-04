@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use prose_core_client::FsAvatarCacheError;
+use prose_core_client::FsAvatarRepositoryError;
 pub use uniffi_api::*;
 
 mod account_bookmarks_client;
@@ -24,8 +24,8 @@ impl From<anyhow::Error> for ClientError {
     }
 }
 
-impl From<FsAvatarCacheError> for ClientError {
-    fn from(e: FsAvatarCacheError) -> Self {
+impl From<FsAvatarRepositoryError> for ClientError {
+    fn from(e: FsAvatarRepositoryError) -> Self {
         ClientError::Generic { msg: e.to_string() }
     }
 }

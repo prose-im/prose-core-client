@@ -14,29 +14,32 @@ use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, AvatarId, UserId};
+use crate::domain::shared::models::{AccountId, AvatarId, ParticipantIdRef};
 use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
-use crate::infra::avatars::{AvatarCache, MAX_IMAGE_DIMENSIONS};
+use crate::domain::user_info::repos::AvatarRepository;
+use crate::dtos::{Avatar, AvatarSource};
+
+use super::MAX_IMAGE_DIMENSIONS;
 
 pub const IMAGE_OUTPUT_FORMAT: ImageOutputFormat = ImageOutputFormat::Jpeg(94);
 pub const IMAGE_OUTPUT_MIME_TYPE: &str = "image/jpeg";
 
-pub struct FsAvatarCache {
+pub struct FsAvatarRepository {
     path: PathBuf,
 }
 
-impl FsAvatarCache {
+impl FsAvatarRepository {
     pub fn new(path: &Path) -> Result<Self> {
         fs::create_dir_all(&path)?;
 
-        Ok(FsAvatarCache {
+        Ok(FsAvatarRepository {
             path: path.to_path_buf(),
         })
     }
 }
 
 #[derive(Error, Debug)]
-pub enum FsAvatarCacheError {
+pub enum FsAvatarRepositoryError {
     #[error(transparent)]
     IO(#[from] io::Error),
 
@@ -48,13 +51,13 @@ pub enum FsAvatarCacheError {
 }
 
 #[async_trait]
-impl AvatarCache for FsAvatarCache {
-    async fn cache_avatar_image(
+impl AvatarRepository for FsAvatarRepository {
+    async fn set(
         &self,
         _account: &AccountId,
-        user_id: &UserId,
-        image_data: &AvatarData,
+        participant_id: ParticipantIdRef<'_>,
         info: &AvatarInfo,
+        image_data: &AvatarData,
     ) -> Result<()> {
         let image_buf_cow = image_data.data()?;
         let image_buf = image_buf_cow.as_ref();
@@ -64,8 +67,17 @@ impl AvatarCache for FsAvatarCache {
         let img = image::load_from_memory_with_format(&image_buf, image_format)?
             .thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);
 
-        let output_path = self.path.join(self.filename_for(user_id, &info.checksum));
-        let mut output_file = std::fs::File::create(&output_path)?;
+        let output_path = self
+            .path
+            .join(self.filename_for(participant_id, &info.checksum));
+
+        if let Some(parent_dir) = output_path.parent() {
+            if !parent_dir.exists() {
+                fs::create_dir(parent_dir)?;
+            }
+        }
+
+        let mut output_file = fs::File::create(&output_path)?;
 
         // Sometimes we encounter e.g. rgb16 pngs and image-rs complains that the JPEG encoder
         // cannot save these, so we convert the image to rgb8.
@@ -74,30 +86,20 @@ impl AvatarCache for FsAvatarCache {
         Ok(())
     }
 
-    async fn has_cached_avatar_image(
-        &self,
-        _account: &AccountId,
-        user_id: &UserId,
-        image_checksum: &AvatarId,
-    ) -> Result<bool> {
-        let path = self.filename_for(user_id, image_checksum);
-        Ok(path.exists())
-    }
+    async fn get(&self, _account: &AccountId, avatar: &Avatar) -> Result<Option<PlatformImage>> {
+        let participant_id = match &avatar.source {
+            AvatarSource::Pep { owner, .. } => ParticipantIdRef::User(owner),
+            AvatarSource::Vcard { owner } => owner.to_ref(),
+        };
 
-    async fn cached_avatar_image(
-        &self,
-        _account: &AccountId,
-        user_id: &UserId,
-        image_checksum: &AvatarId,
-    ) -> Result<Option<PlatformImage>> {
-        let path = self.filename_for(user_id, image_checksum);
+        let path = self.filename_for(participant_id, &avatar.id);
         if path.exists() {
             return Ok(Some(path));
         }
         return Ok(None);
     }
 
-    async fn delete_all_cached_images(&self, _account: &AccountId) -> Result<()> {
+    async fn clear_cache(&self, _account: &AccountId) -> Result<()> {
         for entry in fs::read_dir(&self.path)? {
             let entry = match entry {
                 Ok(entry) => entry,
@@ -114,9 +116,18 @@ impl AvatarCache for FsAvatarCache {
     }
 }
 
-impl FsAvatarCache {
-    fn filename_for(&self, jid: &UserId, image_checksum: &AvatarId) -> PathBuf {
-        self.path
-            .join(format!("{}-{}.jpg", jid.to_string(), image_checksum))
+impl FsAvatarRepository {
+    fn filename_for(
+        &self,
+        participant_id: ParticipantIdRef<'_>,
+        image_checksum: &AvatarId,
+    ) -> PathBuf {
+        match participant_id {
+            ParticipantIdRef::User(id) => self.path.join(format!("{id}-{image_checksum}.jpg")),
+            ParticipantIdRef::Occupant(id) => self
+                .path
+                .join(id.muc_id().as_ref().to_string())
+                .join(format!("{}-{image_checksum}.jpg", id.nickname())),
+        }
     }
 }

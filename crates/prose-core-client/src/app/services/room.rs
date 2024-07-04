@@ -31,11 +31,14 @@ use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMe
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{
-    AccountId, MucId, ParticipantId, ParticipantInfo, RoomId, RoomType,
+    AccountId, CachePolicy, MucId, ParticipantId, ParticipantInfo, RoomId, RoomType,
 };
+use crate::domain::shared::utils::ContactNameBuilder;
+use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{
-    Message as MessageDTO, MessageResultSet, MessageSender, Reaction as ReactionDTO, RoomState,
-    SendMessageRequest as SendMessageRequestDTO, StanzaId, UserBasicInfo, UserId,
+    Message as MessageDTO, MessageResultSet, MessageSender, ParticipantBasicInfo,
+    Reaction as ReactionDTO, RoomState, SendMessageRequest as SendMessageRequestDTO, StanzaId,
+    UserId,
 };
 use crate::{ClientEvent, ClientRoomEventType};
 
@@ -360,7 +363,7 @@ impl<Kind> Room<Kind> {
             .await
     }
 
-    pub async fn load_composing_users(&self) -> Result<Vec<UserBasicInfo>> {
+    pub async fn load_composing_users(&self) -> Result<Vec<ParticipantBasicInfo>> {
         // If the chat state is 'composing' but older than 30 seconds we do not consider
         // the user as currently typing.
         let thirty_secs_ago = self.time_provider.now() - Duration::seconds(30);
@@ -681,9 +684,9 @@ impl<Kind> Room<Kind> {
         let (name, mut real_id) = self
             .data
             .with_participants(|p| {
-                p.get(&id.clone().into()).map(|p| {
+                p.get(id).map(|p| {
                     (
-                        Some(p.name().or_participant_id(id).into_string()),
+                        Some(p.name().unwrap_or_participant_id(id)),
                         p.real_id.clone(),
                     )
                 })
@@ -692,40 +695,30 @@ impl<Kind> Room<Kind> {
 
         real_id = real_id.or_else(|| id.to_user_id());
 
-        let sender_id = real_id
-            .clone()
-            .map(ParticipantId::from)
-            .unwrap_or_else(|| id.clone());
-
         if let Some(name) = name {
             return MessageSender {
-                id: sender_id,
+                id: id.clone(),
                 name,
             };
         }
 
-        // TODO: Prevent performing a request here
-
-        if let Some(real_id) = real_id {
-            if let Some(name) = self
-                .user_info_domain_service
-                .get_display_name(&real_id)
-                .await
-                .unwrap_or_default()
-            {
-                return MessageSender {
-                    id: sender_id,
-                    name,
-                };
-            }
-        }
-
-        let name = match id {
-            ParticipantId::User(id) => id.formatted_username(),
-            ParticipantId::Occupant(id) => id.formatted_nickname(),
+        let Some(real_id) = real_id else {
+            return MessageSender {
+                id: id.clone(),
+                name: ContactNameBuilder::new().unwrap_or_participant_id(id),
+            };
         };
+
+        let name = self
+            .user_info_domain_service
+            .get_user_info(&real_id, CachePolicy::ReturnCacheDataDontLoad)
+            .await
+            .unwrap_or_default()
+            .display_name()
+            .unwrap_or_participant_id(id);
+
         MessageSender {
-            id: sender_id,
+            id: id.clone(),
             name,
         }
     }

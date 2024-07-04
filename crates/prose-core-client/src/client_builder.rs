@@ -16,7 +16,7 @@ use crate::app::deps::{
 use crate::app::event_handlers::{
     BlockListEventHandler, BookmarksEventHandler, ConnectionEventHandler, ContactListEventHandler,
     MessagesEventHandler, RequestsEventHandler, RoomsEventHandler, ServerEventHandlerQueue,
-    SyncedRoomSettingsEventHandler, UserDevicesEventHandler, UserStateEventHandler,
+    SyncedRoomSettingsEventHandler, UserDevicesEventHandler, UserInfoEventHandler,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactListService, RoomsService, UserDataService,
@@ -25,7 +25,7 @@ use crate::client::ClientInner;
 use crate::domain::encryption::services::{RandUserDeviceIdProvider, UserDeviceIdProvider};
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
 use crate::domain::user_info::models::PROSE_IM_NODE;
-use crate::infra::avatars::AvatarCache;
+use crate::domain::user_info::repos::AvatarRepository;
 use crate::infra::general::{NanoIDProvider, OsRngProvider, RngProvider};
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
@@ -33,12 +33,12 @@ use crate::services::{BlockListService, CacheService, SidebarService, UploadServ
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedStore;
-pub struct UndefinedAvatarCache;
+pub struct UndefinedAvatarRepository;
 pub struct UndefinedEncryptionService;
 
 pub struct ClientBuilder<S, A, E> {
     app_config: AppConfig,
-    avatar_cache: A,
+    avatar_repository: A,
     builder: XMPPClientBuilder,
     delegate: Option<Box<dyn ClientDelegate>>,
     encryption_service: E,
@@ -51,11 +51,11 @@ pub struct ClientBuilder<S, A, E> {
     user_device_id_provider: DynUserDeviceIdProvider,
 }
 
-impl ClientBuilder<UndefinedStore, UndefinedAvatarCache, UndefinedEncryptionService> {
+impl ClientBuilder<UndefinedStore, UndefinedAvatarRepository, UndefinedEncryptionService> {
     pub(crate) fn new() -> Self {
         ClientBuilder {
             app_config: Default::default(),
-            avatar_cache: UndefinedAvatarCache {},
+            avatar_repository: UndefinedAvatarRepository {},
             builder: XMPPClient::builder(),
             delegate: None,
             encryption_service: UndefinedEncryptionService,
@@ -77,7 +77,7 @@ impl<A, E> ClientBuilder<UndefinedStore, A, E> {
     ) -> ClientBuilder<Store<PlatformDriver>, A, E> {
         ClientBuilder {
             app_config: self.app_config,
-            avatar_cache: self.avatar_cache,
+            avatar_repository: self.avatar_repository,
             builder: self.builder,
             delegate: None,
             encryption_service: self.encryption_service,
@@ -92,11 +92,14 @@ impl<A, E> ClientBuilder<UndefinedStore, A, E> {
     }
 }
 
-impl<D, E> ClientBuilder<D, UndefinedAvatarCache, E> {
-    pub fn set_avatar_cache<A2: AvatarCache>(self, avatar_cache: A2) -> ClientBuilder<D, A2, E> {
+impl<D, E> ClientBuilder<D, UndefinedAvatarRepository, E> {
+    pub fn set_avatar_repository<A2: AvatarRepository>(
+        self,
+        avatar_repository: A2,
+    ) -> ClientBuilder<D, A2, E> {
         ClientBuilder {
             app_config: self.app_config,
-            avatar_cache,
+            avatar_repository,
             builder: self.builder,
             delegate: None,
             encryption_service: self.encryption_service,
@@ -118,7 +121,7 @@ impl<S, A> ClientBuilder<S, A, UndefinedEncryptionService> {
     ) -> ClientBuilder<S, A, DynEncryptionService> {
         ClientBuilder {
             app_config: self.app_config,
-            avatar_cache: self.avatar_cache,
+            avatar_repository: self.avatar_repository,
             builder: self.builder,
             delegate: None,
             encryption_service,
@@ -185,7 +188,7 @@ impl<D, A, E> ClientBuilder<D, A, E> {
     }
 }
 
-impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryptionService> {
+impl<A: AvatarRepository + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryptionService> {
     pub fn build(self) -> Client {
         let capabilities = Capabilities::new(
             self.software_version.name.clone(),
@@ -206,6 +209,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
                 Feature::Name(ns::LAST_ACTIVITY),
                 Feature::Name(ns::MAM),
                 Feature::Name(ns::MESSAGE_CORRECT),
+                Feature::Name(ns::NICK),
                 Feature::Name(ns::OUT_OF_BAND_DATA),
                 Feature::Name(ns::PING),
                 Feature::Name(ns::PUBSUB),
@@ -226,6 +230,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
                 Feature::Notify(ns::BOOKMARKS),
                 Feature::Notify(ns::BOOKMARKS2),
                 Feature::Notify(ns::LEGACY_OMEMO_DEVICELIST),
+                Feature::Notify(ns::NICK),
                 Feature::Notify(ns::PUBSUB),
                 Feature::Notify(ns::USER_ACTIVITY),
                 Feature::Notify(ns::VCARD4),
@@ -265,7 +270,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             time_provider: self.time_provider,
             user_device_id_provider: self.user_device_id_provider,
             xmpp: xmpp_client.clone(),
-            avatar_cache: Box::new(self.avatar_cache),
+            avatar_repository: Arc::new(self.avatar_repository),
             client_event_dispatcher: event_dispatcher.clone(),
         }
         .into();
@@ -273,7 +278,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
         server_event_handler_queue.set_handlers(vec![
             Box::new(ConnectionEventHandler::from(&dependencies)),
             Box::new(RequestsEventHandler::from(&dependencies)),
-            Box::new(UserStateEventHandler::from(&dependencies)),
+            Box::new(UserInfoEventHandler::from(&dependencies)),
             Box::new(MessagesEventHandler::from(&dependencies)),
             Box::new(RoomsEventHandler::from(&dependencies)),
             Box::new(BookmarksEventHandler::from(&dependencies)),
@@ -289,7 +294,7 @@ impl<A: AvatarCache + 'static> ClientBuilder<Store<PlatformDriver>, A, DynEncryp
             contact_list: ContactListService::from(&dependencies),
             ctx: dependencies.ctx.clone(),
             #[cfg(feature = "debug")]
-            debug: crate::services::DebugService::new(xmpp_client.clone()),
+            debug: crate::services::DebugService::new(xmpp_client.as_ref().clone()),
             rooms: RoomsService::from(&dependencies),
             sidebar: SidebarService::from(&dependencies),
             uploads: UploadService::from(&dependencies),

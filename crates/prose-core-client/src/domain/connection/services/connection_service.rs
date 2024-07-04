@@ -5,7 +5,6 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use minidom::Element;
 use secrecy::Secret;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
@@ -27,6 +26,4 @@ pub trait ConnectionService: SendUnlessWasm + SyncUnlessWasm {
 
     async fn set_message_carbons_enabled(&self, is_enabled: bool) -> Result<()>;
     async fn load_server_features(&self) -> Result<ServerFeatures>;
-
-    async fn send_raw_stanza(&self, stanza: Element) -> Result<()>;
 }
