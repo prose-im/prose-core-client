@@ -43,7 +43,7 @@ impl AvatarRecord {
         metadata: &AvatarInfo,
     ) -> Self {
         Self {
-            id: format!("{account}.{participant_id}"),
+            id: format!("{account}.{}", participant_id.to_ref().to_raw_key_string()),
             account: account.clone(),
             participant_id,
             avatar_id: metadata.checksum.clone(),
