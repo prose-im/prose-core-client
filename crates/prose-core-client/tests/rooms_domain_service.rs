@@ -54,7 +54,7 @@ async fn test_joins_room() -> Result<()> {
 
     let room = Arc::new(Mutex::new(Room::connecting(
         &muc_id!("room@conf.prose.org").into(),
-        "user1#3dea7f2",
+        "User1",
         RoomSidebarState::InSidebar,
     )));
 
@@ -101,7 +101,7 @@ async fn test_joins_room() -> Result<()> {
         .once()
         .in_sequence(&mut seq)
         .with(
-            predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
+            predicate::eq(occupant_id!("room@conf.prose.org/User1")),
             predicate::always(),
             predicate::always(),
             predicate::eq(deps.ctx.capabilities.clone()),
@@ -119,7 +119,7 @@ async fn test_joins_room() -> Result<()> {
                         supports_self_ping_optimization: false,
                     },
                     topic: Some("The Room Topic".to_string()),
-                    user_nickname: "user#3dea7f2".to_string(),
+                    user_nickname: "User".to_string(),
                     members: vec![
                         RoomSessionMember {
                             id: user_id!("user1@prose.org"),
@@ -346,9 +346,7 @@ async fn test_creates_group() -> Result<()> {
     // jane.doe@prose.org + a@prose.org + b@prose.org + c@prose.org
     let group_id =
         muc_id!("org.prose.group.b41be06eda5bac6e7fc5ad069d6cd863c4f329eb@conference.prose.org");
-    let occupant_id = group_id
-        .occupant_id_with_nickname("jane.doe#3c1234b")
-        .unwrap();
+    let occupant_id = group_id.occupant_id_with_nickname("Jane").unwrap();
 
     let account_node = mock_data::account_jid().to_user_id().username().to_string();
 
@@ -412,7 +410,7 @@ async fn test_creates_group() -> Result<()> {
             predicate::always(),
             predicate::eq(Room::connecting(
                 &group_id.clone().into(),
-                "jane.doe#3c1234b",
+                "Jane",
                 RoomSidebarState::InSidebar,
             )),
         )
@@ -752,7 +750,7 @@ async fn test_creates_public_room_if_it_does_not_exist() -> Result<()> {
             predicate::always(),
             predicate::eq(Room::connecting(
                 &muc_id!("org.prose.channel.hash-1@conference.prose.org").into(),
-                "jane.doe#3c1234b",
+                "Jane Doe",
                 RoomSidebarState::InSidebar,
             )),
         )
@@ -834,9 +832,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
     });
 
     let channel_id = muc_id!("org.prose.channel.hash-1@conf.prose.org");
-    let occupant_id = channel_id
-        .occupant_id_with_nickname("jane.doe#3c1234b")
-        .unwrap();
+    let occupant_id = channel_id.occupant_id_with_nickname("Jane Doe").unwrap();
 
     // Make sure that the method calls are in the exact order…
     let mut seq = Sequence::new();
@@ -854,7 +850,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
                 Room::group(muc_id!("group@conf.prose.org")).with_members(vec![
                     RegisteredMember {
                         user_id: user_id!("jane.doe@prose.org"),
-                        name: Some("Jane Doe".to_string()),
+                        name: Some("Jane".to_string()),
                         is_self: false,
                         affiliation: RoomAffiliation::Owner,
                     },
@@ -924,7 +920,7 @@ async fn test_converts_group_to_private_channel() -> Result<()> {
             predicate::always(),
             predicate::eq(Room::connecting(
                 &channel_id.clone().into(),
-                "jane.doe#3c1234b",
+                "Jane Doe",
                 RoomSidebarState::InSidebar,
             )),
         )
@@ -1197,7 +1193,7 @@ async fn test_updates_pending_dm_message_room() -> Result<()> {
             r#type: BookmarkType::DirectMessage,
             sidebar_state: RoomSidebarState::InSidebar,
         },
-        "user1#3dea7f2",
+        "User1",
     );
 
     {
@@ -1320,7 +1316,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
             r#type: BookmarkType::PublicChannel,
             sidebar_state: RoomSidebarState::InSidebar,
         },
-        "user1#3dea7f2",
+        "User1",
     )));
 
     deps.user_info_domain_service
@@ -1366,7 +1362,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
         .expect_join_room()
         .once()
         .with(
-            predicate::eq(occupant_id!("room@conf.prose.org/user1#3dea7f2")),
+            predicate::eq(occupant_id!("room@conf.prose.org/User1")),
             predicate::always(),
             predicate::always(),
             predicate::always(),
@@ -1385,7 +1381,7 @@ async fn test_updates_pending_public_channel() -> Result<()> {
                         supports_self_ping_optimization: false,
                     },
                     topic: None,
-                    user_nickname: "user#3dea7f2".to_string(),
+                    user_nickname: "User".to_string(),
                     members: vec![
                         RoomSessionMember {
                             id: user_id!("user1@prose.org"),

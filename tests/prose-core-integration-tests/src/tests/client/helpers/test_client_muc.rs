@@ -160,6 +160,7 @@ impl StartDMStrategy {
 impl TestClient {
     pub fn build_occupant_id(&self, room_id: &MucId) -> OccupantId {
         let nickname = build_nickname(
+            self.get_ctx("USER_NICKNAME").as_deref(),
             &self
                 .client
                 .connected_user_id()
