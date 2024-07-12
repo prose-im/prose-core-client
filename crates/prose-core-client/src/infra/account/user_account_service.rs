@@ -13,8 +13,9 @@ use prose_xmpp::stanza::VCard4;
 use crate::domain::account::services::{UserAccountService, UserProfileFormat};
 use crate::domain::general::models::Capabilities;
 use crate::domain::shared::models::{Availability, AvatarId};
+use crate::domain::shared::utils::ContactNameBuilder;
 use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
-use crate::dtos::OccupantId;
+use crate::dtos::{OccupantId, UserId};
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -72,6 +73,20 @@ impl UserAccountService for XMPPClient {
     ) -> Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
 
+        let nickname = ContactNameBuilder::new()
+            .or_nickname(user_profile.nickname.as_ref())
+            .or_firstname_lastname(
+                user_profile.first_name.as_ref(),
+                user_profile.last_name.as_ref(),
+            )
+            .or_username(
+                self.client
+                    .connected_jid()
+                    .map(|jid| UserId::from(jid.into_bare()))
+                    .as_ref(),
+            )
+            .build();
+
         match format {
             UserProfileFormat::Vcard4 => {
                 profile.publish_vcard4(user_profile.into()).await?;
@@ -80,6 +95,8 @@ impl UserAccountService for XMPPClient {
                 profile.publish_vcard_temp(user_profile.into()).await?;
             }
         }
+
+        profile.publish_nickname(nickname).await?;
 
         Ok(())
     }
