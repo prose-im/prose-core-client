@@ -172,6 +172,7 @@ async fn test_contact_list_name_cascade() -> Result<()> {
             Contact {
                 id: user_id!("user_a@prose.org"),
                 name: "User A".to_string(),
+                full_name: None,
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -180,6 +181,7 @@ async fn test_contact_list_name_cascade() -> Result<()> {
             Contact {
                 id: user_id!("b@prose.org"),
                 name: "Susan Doe".to_string(),
+                full_name: None,
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -188,6 +190,7 @@ async fn test_contact_list_name_cascade() -> Result<()> {
             Contact {
                 id: user_id!("c@example.com"),
                 name: "Jimmy Shmoe".to_string(),
+                full_name: Some("Jimmy Shmoe".to_string()),
                 availability: Default::default(),
                 status: None,
                 group: Group::Other,

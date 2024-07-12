@@ -59,6 +59,7 @@ async fn test_aggregates_user_data() -> Result<()> {
             Contact {
                 id: user_id!("friend@prose.org"),
                 name: "Jimmy".to_string(),
+                full_name: None,
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -67,6 +68,7 @@ async fn test_aggregates_user_data() -> Result<()> {
             Contact {
                 id: user_id!("unknown@prose.org"),
                 name: "Unknown".to_string(),
+                full_name: None,
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -105,6 +107,7 @@ async fn test_aggregates_user_data() -> Result<()> {
             Contact {
                 id: user_id!("friend@prose.org"),
                 name: "Jim Shmoe".to_string(),
+                full_name: Some("Jim Shmoe".to_string()),
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -113,6 +116,7 @@ async fn test_aggregates_user_data() -> Result<()> {
             Contact {
                 id: user_id!("unknown@prose.org"),
                 name: "Unknown".to_string(),
+                full_name: None,
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -141,6 +145,7 @@ async fn test_aggregates_user_data() -> Result<()> {
             Contact {
                 id: user_id!("friend@prose.org"),
                 name: "Jimmy S.".to_string(),
+                full_name: Some("Jim Shmoe".to_string()),
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -149,6 +154,7 @@ async fn test_aggregates_user_data() -> Result<()> {
             Contact {
                 id: user_id!("unknown@prose.org"),
                 name: "Unknown".to_string(),
+                full_name: None,
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
