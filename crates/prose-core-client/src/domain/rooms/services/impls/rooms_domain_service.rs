@@ -14,6 +14,7 @@ use tracing::{debug, error, info, warn};
 use xmpp_parsers::stanza_error::DefinedCondition;
 
 use prose_proc_macros::DependenciesStruct;
+use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::{IDProvider, RequestError};
 
 use crate::app::deps::{
@@ -597,29 +598,44 @@ impl RoomsDomainService {
             .display_name()
             .unwrap_or_username(account.as_ref());
 
-        let nickname = build_nickname(account.as_ref());
+        let nickname = build_nickname(Some(&display_name), account.as_ref());
         let mut room_id = room_id.clone();
         let availability = self.account_settings_repo.get(&account).await?.availability;
         let capabilities = &self.ctx.capabilities;
+        let password = password.map(ToString::to_string);
 
         let info = 'info: loop {
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // connecting to it…
             let room = self.insert_connecting_room(account, &room_id, &nickname, sidebar_state)?;
 
-            let full_room_jid = room_id.occupant_id_with_nickname(&nickname)?;
+            let join_room = {
+                let room_id = room_id.clone();
+                let password = password.clone();
+                let display_name = display_name.clone();
 
-            match self
-                .room_management_service
-                .join_room(
-                    &full_room_jid,
-                    password,
-                    &display_name,
-                    capabilities,
-                    availability,
-                )
-                .await
-            {
+                move |nickname| {
+                    let password = password.clone();
+                    let display_name = display_name.clone();
+                    let full_room_jid = room_id.occupant_id_with_nickname(&nickname);
+
+                    async move {
+                        self.room_management_service
+                            .join_room(
+                                &full_room_jid?,
+                                password.as_deref(),
+                                &display_name,
+                                capabilities,
+                                availability,
+                            )
+                            .await
+                    }
+                }
+            };
+
+            let result = Self::try_until_nickname_unique(&nickname, join_room, 10).await;
+
+            match result {
                 Ok(info) => {
                     break 'info if room.is_new() {
                         RoomInfoStatus::IsNew(info)
@@ -922,13 +938,13 @@ impl RoomsDomainService {
         availability: Availability,
         perform_additional_config: impl FnOnce(&MucId, &mut RoomSessionInfo) -> Fut,
     ) -> Result<RoomInfoStatus, RoomError> {
-        let nickname = build_nickname(account.as_ref());
         let display_name = self
             .user_info_domain_service
             .get_user_info(account.as_ref(), CachePolicy::ReturnCacheDataElseLoad)
             .await?
             .display_name()
             .unwrap_or_username(account.as_ref());
+        let nickname = build_nickname(Some(&display_name), account.as_ref());
 
         let mut attempt = 0;
         let mut unique_room_id = room_id.to_string();
@@ -938,7 +954,6 @@ impl RoomsDomainService {
                 Some(&NodePart::new(&unique_room_id)?),
                 &service.domain(),
             ));
-            let full_room_jid = room_jid.occupant_id_with_nickname(&nickname)?;
 
             // Insert pending room so that we don't miss any stanzas for this room while we're
             // creating (but potentially connecting to) it…
@@ -946,18 +961,33 @@ impl RoomsDomainService {
                 .insert_connecting_room(account, &room_jid, &nickname, sidebar_state)?
                 .is_new();
 
+            let create_or_join_room = {
+                let room_jid = room_jid.clone();
+                let display_name = display_name.clone();
+                let spec = spec.clone();
+
+                move |nickname| {
+                    let full_room_jid = room_jid.occupant_id_with_nickname(&nickname);
+                    let display_name = display_name.clone();
+                    let spec = spec.clone();
+
+                    async move {
+                        self.room_management_service
+                            .create_or_join_room(
+                                &full_room_jid?,
+                                room_name,
+                                &display_name,
+                                spec,
+                                capabilities,
+                                availability,
+                            )
+                            .await
+                    }
+                }
+            };
+
             // Try to create or enter the room and configure it…
-            let result = self
-                .room_management_service
-                .create_or_join_room(
-                    &full_room_jid,
-                    room_name,
-                    &display_name,
-                    spec.clone(),
-                    capabilities,
-                    availability,
-                )
-                .await;
+            let result = Self::try_until_nickname_unique(&nickname, create_or_join_room, 10).await;
 
             let mut info = match result {
                 Ok(occupancy) => occupancy,
@@ -1185,5 +1215,59 @@ impl RoomsDomainService {
             .set(account, room.clone())
             .map_err(|_| RoomError::RoomIsAlreadyConnected(room_id))?;
         Ok(RoomStatus::IsNew(room))
+    }
+
+    /// Attempts to join a chat room with a unique nickname, retrying with modified nicknames upon conflicts.
+    ///
+    /// This function takes a preferred nickname and tries to use it to join a chat room. If the nickname
+    /// is already in use (indicated by a `RoomError::RequestError` with a `Conflict` condition), it appends
+    /// a numerical suffix (e.g., `nickname#1`, `nickname#2`, etc.) and retries the operation. This process
+    /// repeats until a unique nickname is secured or the maximum number of attempts is reached.
+    ///
+    /// # Parameters
+    /// - `preferred_nickname`: The base nickname preferred by the user. This is the starting point for any modifications.
+    /// - `join_handler`: A closure that attempts to join the chat room with a given nickname. It should return
+    ///   `Ok(T)` on successful joining, or `Err(RoomError)` if there is an issue, such as a nickname conflict.
+    /// - `max_attempts`: The maximum number of attempts to make. If this limit is reached, the function
+    ///   will return the last encountered `RoomError`. Set to `0` for unlimited attempts.
+    ///
+    /// # Returns
+    /// Returns `Ok(T)` if joining the chat room was successful with a unique nickname. If the maximum number
+    /// of attempts is reached or another error occurs, returns `Err(RoomError)`.
+    ///
+    /// # Errors
+    /// This function propagates `RoomError`s from the `join_handler`. If a `RoomError::RequestRequest` with a
+    /// `Conflict` condition is not resolved after `max_attempts`, the function returns this error.
+    async fn try_until_nickname_unique<F, T, U>(
+        preferred_nickname: &str,
+        mut join_handler: F,
+        max_attempts: u32,
+    ) -> Result<U, RoomError>
+    where
+        F: FnMut(String) -> T + SendUnlessWasm + SyncUnlessWasm,
+        T: Future<Output = Result<U, RoomError>> + SendUnlessWasm,
+    {
+        let mut attempt = 0;
+
+        loop {
+            let nickname = if attempt == 0 {
+                preferred_nickname.to_string()
+            } else {
+                format!("{}#{}", preferred_nickname, attempt)
+            };
+            attempt += 1;
+
+            match join_handler(nickname).await {
+                Ok(result) => return Ok(result),
+                Err(RoomError::RequestError(error))
+                    if error.defined_condition() == Some(DefinedCondition::Conflict) =>
+                {
+                    if max_attempts > 0 && attempt >= max_attempts {
+                        return Err(RoomError::RequestError(error));
+                    }
+                }
+                Err(err) => return Err(err),
+            }
+        }
     }
 }

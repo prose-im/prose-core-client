@@ -60,10 +60,7 @@ async fn test_extend_items_inserts_items() -> Result<()> {
         .once()
         .with(
             predicate::always(),
-            predicate::eq(Room::pending(
-                &Bookmark::try_from(&room1).unwrap(),
-                "user1#3dea7f2",
-            )),
+            predicate::eq(Room::pending(&Bookmark::try_from(&room1).unwrap(), "User1")),
         )
         .return_once(|_, _| Ok(()));
 
@@ -1080,7 +1077,7 @@ async fn test_handles_destroyed_room_with_alternate_room() -> Result<()> {
                     r#type: BookmarkType::Group,
                     sidebar_state: RoomSidebarState::Favorite,
                 },
-                "user1#3dea7f2",
+                "User1",
             )),
         )
         .return_once(|_, _| Ok(()));

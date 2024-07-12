@@ -449,7 +449,7 @@ impl SidebarDomainServiceTrait for SidebarDomainService {
                     r#type: room.r#type.into(),
                     sidebar_state: room.sidebar_state(),
                 },
-                &build_nickname(&self.ctx.connected_id()?.to_user_id()),
+                &build_nickname(None, &self.ctx.connected_id()?.to_user_id()),
             ),
         );
 
@@ -637,7 +637,7 @@ impl SidebarDomainService {
         let mut join_room_futures = vec![];
         let mut update_bookmarks_futures = vec![];
 
-        let nickname = build_nickname(&self.ctx.connected_id()?.to_user_id());
+        let nickname = build_nickname(None, &self.ctx.connected_id()?.to_user_id());
         let rooms = self.connected_rooms_repo.get_all(&account);
         let mut rooms_changed = false;
 

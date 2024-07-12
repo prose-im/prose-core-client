@@ -1,33 +1,22 @@
+use jid::ResourcePart;
 use sha1::{Digest, Sha1};
 
 use crate::domain::shared::models::UserId;
 
 const GROUP_PREFIX: &str = "org.prose.group";
-const NICKNAME_MAX_LEN: usize = 20;
-const NICKNAME_HASH_LEN: usize = 7;
 
-pub fn build_nickname(user_id: &UserId) -> String {
-    // We append a suffix to prevent any nickname conflicts, but want to make sure that it is
-    // identical between multiple sessions so that these would be displayed as one user.
-
-    let mut hasher = Sha1::new();
-    hasher.update(user_id.to_string().to_lowercase());
-    let hash = format!("{:x}", hasher.finalize());
-
-    let username = user_id.username();
-    let username_max_length = username
-        .chars()
-        .count()
-        .min(NICKNAME_MAX_LEN - NICKNAME_HASH_LEN - 1);
-
-    format!(
-        "{}#{}",
-        username
-            .chars()
-            .take(username_max_length)
-            .collect::<String>(),
-        &hash[hash.len() - NICKNAME_HASH_LEN..]
-    )
+pub fn build_nickname(display_name: Option<&str>, user_id: &UserId) -> String {
+    // We check if the display_name can be converted into a Jid resource, i.e. that it doesn't
+    // contain any invalid characters. If that's the case, we take it or the node of the
+    // user_id otherwise.
+    display_name
+        .and_then(|display_name| {
+            let display_name = display_name.trim();
+            (!display_name.is_empty()).then_some(display_name)
+        })
+        .and_then(|display_name| ResourcePart::new(display_name).ok())
+        .map(|res| res.to_string())
+        .unwrap_or_else(|| user_id.formatted_username())
 }
 
 pub trait ParticipantsVecExt {
@@ -82,19 +71,26 @@ mod tests {
 
     #[test]
     fn test_build_nickname() {
-        assert_eq!(build_nickname(&user_id!("user@prose.org")), "user#1ed8798");
         assert_eq!(
-            build_nickname(&user_id!("super-long-username@prose.org")),
-            "super-long-u#fac4746"
-        );
-        assert_eq!(build_nickname(&user_id!("josé@prose.org")), "josé#6c09790");
-        assert_eq!(
-            build_nickname(&user_id!("JoséAndrés123@prose.org")),
-            "joséandrés12#7ebd867"
+            "Jane Doe",
+            build_nickname(Some("Jane Doe"), &user_id!("user@prose.org")),
         );
         assert_eq!(
-            build_nickname(&user_id!("TwelveCharsé@prose.org")),
-            "twelvecharsé#3246eb5"
+            "User",
+            build_nickname(Some("Jane Doe 🧋"), &user_id!("user@prose.org")),
+        );
+        assert_eq!("User", build_nickname(None, &user_id!("user@prose.org")));
+        assert_eq!(
+            "User",
+            build_nickname(Some(""), &user_id!("user@prose.org"))
+        );
+        assert_eq!(
+            "User",
+            build_nickname(Some(" "), &user_id!("user@prose.org"))
+        );
+        assert_eq!(
+            "jane",
+            build_nickname(Some(" jane "), &user_id!("user@prose.org"))
         );
     }
 }
