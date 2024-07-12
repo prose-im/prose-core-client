@@ -246,6 +246,29 @@ impl Profile {
         Ok(())
     }
 
+    pub async fn publish_nickname(&self, nickname: Option<String>) -> Result<()> {
+        let iq = Iq::from_set(
+            self.ctx.generate_id(),
+            PubSub::Publish {
+                publish: pubsub::pubsub::Publish {
+                    node: NodeName(ns::NICK.to_string()),
+                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                        id: None,
+                        publisher: None,
+                        payload: Some(
+                            Element::builder("nick", ns::NICK)
+                                .append_all(nickname)
+                                .build(),
+                        ),
+                    })],
+                },
+                publish_options: None,
+            },
+        );
+        self.ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
     pub async fn delete_vcard(&self) -> Result<()> {
         let mut iq = Iq::from_set(self.ctx.generate_id(), VCard4::new());
         iq.to = Some(self.ctx.bare_jid().into());
