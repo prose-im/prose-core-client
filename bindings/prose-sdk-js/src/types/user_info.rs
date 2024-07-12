@@ -45,6 +45,17 @@ pub struct ParticipantBasicInfo(SdkParticipantBasicInfo);
 pub struct ParticipantInfo(SdkParticipantInfo);
 
 #[wasm_bindgen]
+impl Avatar {
+    #[wasm_bindgen(getter)]
+    /// An opaque identifier to check if the contents of the `Avatar` have changed.
+    /// While `ProseClient` caches loaded avatars, checking for a change in the `Avatar` might
+    /// still make sense, since `Client::loadAvatarDataURL` is asynchronous.
+    pub fn id(&self) -> String {
+        format!("{}-{}", self.0.owner(), self.0.id)
+    }
+}
+
+#[wasm_bindgen]
 impl JabberClient {
     #[wasm_bindgen(js_name = "toString")]
     pub fn to_string(&self) -> String {
@@ -98,6 +109,7 @@ impl UserPresenceInfo {
     }
 
     #[wasm_bindgen(getter)]
+    /// XEP-0108: User Activity
     pub fn status(&self) -> Option<UserStatus> {
         self.0.status.clone().map(Into::into)
     }
@@ -164,6 +176,7 @@ impl ParticipantInfo {
     }
 
     #[wasm_bindgen(getter)]
+    /// XEP-0310: Presence State Annotations
     pub fn status(&self) -> Option<String> {
         self.0.status.clone()
     }
