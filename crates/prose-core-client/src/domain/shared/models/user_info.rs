@@ -19,6 +19,7 @@ pub struct UserBasicInfo {
 pub struct UserPresenceInfo {
     pub id: UserId,
     pub name: String,
+    pub full_name: Option<String>,
     pub availability: Availability,
     pub avatar: Option<Avatar>,
     pub status: Option<UserStatus>,

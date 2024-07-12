@@ -85,6 +85,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
             ContactDTO {
                 id: user_id!("a@prose.org"),
                 name: "First Last".to_string(),
+                full_name: Some("First Last".to_string()),
                 availability: Availability::Available,
                 status: None,
                 group: Group::Team,
@@ -93,6 +94,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
             ContactDTO {
                 id: user_id!("b@prose.org"),
                 name: "Nickname".to_string(),
+                full_name: None,
                 availability: Availability::Available,
                 status: None,
                 group: Group::Team,
@@ -101,6 +103,7 @@ async fn test_assembles_contact_dto() -> Result<()> {
             ContactDTO {
                 id: user_id!("john.doe@prose.org"),
                 name: "John Doe".to_string(),
+                full_name: None,
                 availability: Availability::Unavailable,
                 status: None,
                 group: Group::Team,

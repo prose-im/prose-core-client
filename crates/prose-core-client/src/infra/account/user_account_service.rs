@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use jid::Jid;
 
 use prose_xmpp::mods;
-use prose_xmpp::stanza::VCard4;
 
 use crate::domain::account::services::{UserAccountService, UserProfileFormat};
 use crate::domain::general::models::Capabilities;

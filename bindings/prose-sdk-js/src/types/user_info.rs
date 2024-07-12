@@ -93,6 +93,12 @@ impl UserPresenceInfo {
         self.0.name.clone()
     }
 
+    #[wasm_bindgen(getter, js_name = "fullName")]
+    /// Contains the full name only if first and last name are set.
+    pub fn full_name(&self) -> Option<String> {
+        self.0.full_name.clone()
+    }
+
     #[wasm_bindgen(getter)]
     pub fn jid(&self) -> BareJid {
         self.0.id.clone().into_inner().into()

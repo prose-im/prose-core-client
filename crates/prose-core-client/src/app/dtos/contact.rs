@@ -17,6 +17,7 @@ pub enum Group {
 pub struct Contact {
     pub id: UserId,
     pub name: String,
+    pub full_name: Option<String>,
     pub availability: Availability,
     pub status: Option<UserStatus>,
     pub group: Group,

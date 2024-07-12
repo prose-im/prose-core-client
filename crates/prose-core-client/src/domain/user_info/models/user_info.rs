@@ -44,6 +44,10 @@ impl UserInfo {
         self.name.display_name()
     }
 
+    pub fn full_name(&self) -> Option<String> {
+        self.name.full_name()
+    }
+
     pub fn into_user_basic_info(self, user_id: UserId) -> UserBasicInfo {
         let name = self.display_name().unwrap_or_username(&user_id);
 
@@ -60,6 +64,7 @@ impl UserInfo {
         UserPresenceInfo {
             id: user_id,
             name,
+            full_name: self.full_name(),
             availability: self.availability,
             avatar: self.avatar,
             status: self.status,
@@ -86,6 +91,29 @@ impl UserName {
                     .and_then(|vcard| vcard.last_name.as_ref()),
             )
             .or_nickname(self.roster.as_ref())
+    }
+
+    /// Returns the full name only if first and last name are set.
+    pub fn full_name(&self) -> Option<String> {
+        if self
+            .vcard
+            .as_ref()
+            .map(|vcard| vcard.first_name.is_some() && vcard.last_name.is_some())
+            .unwrap_or_default()
+        {
+            ContactNameBuilder::new()
+                .or_firstname_lastname(
+                    self.vcard
+                        .as_ref()
+                        .and_then(|vcard| vcard.first_name.as_ref()),
+                    self.vcard
+                        .as_ref()
+                        .and_then(|vcard| vcard.last_name.as_ref()),
+                )
+                .build()
+        } else {
+            None
+        }
     }
 }
 
@@ -120,6 +148,7 @@ impl UserInfoOptExt for Option<UserInfo> {
             return UserPresenceInfo {
                 id: user_id,
                 name,
+                full_name: None,
                 availability: Availability::Unavailable,
                 avatar: None,
                 status: None,

@@ -108,6 +108,7 @@ impl ContactListService {
         ContactDTO {
             id: user_info.id,
             name: user_info.name,
+            full_name: user_info.full_name,
             availability: user_info.availability,
             status: user_info.status,
             group,
