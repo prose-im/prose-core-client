@@ -1,7 +1,7 @@
 on:
   push:
     branches:
-      - '**'
+      - 'main'
     paths-ignore:
       - 'bindings/prose-sdk-js/Cargo.toml'
       - 'CHANGELOG.md'
