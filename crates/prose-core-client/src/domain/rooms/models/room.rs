@@ -348,8 +348,6 @@ impl Room {
         participants: Vec<RoomSessionParticipant>,
         settings: SyncedRoomSettings,
     ) -> Self {
-        assert!(self.is_connecting(), "Cannot promote a non-connecting room");
-
         let mut details = self.inner.details.read().clone();
         details.name = name;
         details.description = description;

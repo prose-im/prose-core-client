@@ -1145,6 +1145,11 @@ impl RoomsDomainService {
             .update(account, info.room_id.as_ref(), {
                 let room_name = room_name;
                 Box::new(move |room| {
+                    if !room.is_connecting() {
+                        warn!("Not resolving freshly connected room, since it has been modified in the meanwhile. Current state is {:?}", room.state());
+                        return room;
+                    }
+
                     // Convert the temporary room to its final form…
                     let room = room.by_resolving_with_info(
                         room_name,
