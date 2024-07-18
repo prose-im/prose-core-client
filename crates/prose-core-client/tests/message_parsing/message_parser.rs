@@ -18,7 +18,7 @@ use xmpp_parsers::muc::user::{Affiliation, Role};
 
 use prose_core_client::domain::encryption::services::mocks::MockEncryptionDomainService;
 use prose_core_client::domain::messaging::models::{
-    MessageLike, MessageLikePayload, MessageParser,
+    MessageLike, MessageLikeBody, MessageLikePayload, MessageParser,
 };
 use prose_core_client::dtos::{
     Attachment, AttachmentType, Mention, OccupantId, ParticipantId, UnicodeScalarIndex, UserId,
@@ -66,12 +66,15 @@ async fn test_parse_chat_message() -> Result<()> {
             from: ParticipantId::User(user_id!("them@prose.org")),
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
-                body: "Hello @them".to_string(),
+                body: MessageLikeBody {
+                    raw: "Hello @them".to_string(),
+                    html: "<p>Hello @them</p>".to_string().into(),
+                    mentions: vec![Mention {
+                        user: user_id!("them@prose.org"),
+                        range: Some(UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(11)),
+                    }],
+                },
                 attachments: vec![],
-                mentions: vec![Mention {
-                    user: user_id!("them@prose.org"),
-                    range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(11),
-                }],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -113,9 +116,12 @@ async fn test_parse_groupchat_message() -> Result<()> {
             from: ParticipantId::Occupant(occupant_id!("room@groups.prose.org/them")),
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
-                body: "Hello World".to_string(),
+                body: MessageLikeBody {
+                    raw: "Hello World".to_string(),
+                    html: "<p>Hello World</p>".to_string().into(),
+                    mentions: vec![],
+                },
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -163,9 +169,12 @@ async fn test_parse_sent_carbon_message() -> Result<()> {
             from: ParticipantId::User(user_id!("me@prose.org")),
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
-                body: "Hello World".to_string(),
+                body: MessageLikeBody {
+                    raw: "Hello World".to_string(),
+                    html: "<p>Hello World</p>".to_string().into(),
+                    mentions: vec![],
+                },
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -216,9 +225,12 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
             from: ParticipantId::Occupant(occupant_id!("room@groups.prose.org/them")),
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
-                body: "Hello World".to_string(),
+                body: MessageLikeBody {
+                    raw: "Hello World".to_string(),
+                    html: "<p>Hello World</p>".to_string().into(),
+                    mentions: vec![],
+                },
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -275,9 +287,12 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
             from: ParticipantId::User(user_id!("them@prose.org")),
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
-                body: "Hello World".to_string(),
+                body: MessageLikeBody {
+                    raw: "Hello World".to_string(),
+                    html: "<p>Hello World</p>".to_string().into(),
+                    mentions: vec![],
+                },
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -327,9 +342,12 @@ async fn test_parse_mam_chat_message() -> Result<()> {
             from: ParticipantId::User(user_id!("them@prose.org")),
             timestamp: Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap(),
             payload: MessageLikePayload::Message {
-                body: "Hello World".to_string(),
+                body: MessageLikeBody {
+                    raw: "Hello World".to_string(),
+                    html: "<p>Hello World</p>".to_string().into(),
+                    mentions: vec![],
+                },
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -376,9 +394,8 @@ async fn test_parse_delayed_message() -> Result<()> {
             from: ParticipantId::User(user_id!("them@prose.org")),
             timestamp: Utc.with_ymd_and_hms(2024, 01, 01, 20, 30, 10).unwrap(),
             payload: MessageLikePayload::Message {
-                body: "Hello".to_string(),
+                body: MessageLikeBody::text("Hello"),
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },
@@ -422,7 +439,11 @@ async fn test_message_with_attachment_and_empty_body() -> Result<()> {
             from: ParticipantId::User(user_id!("them@prose.org")),
             timestamp: Default::default(),
             payload: MessageLikePayload::Message {
-                body: "".to_string(),
+                body: MessageLikeBody {
+                    raw: "".to_string(),
+                    html: "<p></p>".to_string().into(),
+                    mentions: vec![],
+                },
                 attachments: vec![Attachment {
                     r#type: AttachmentType::Image { thumbnail: None },
                     url: "https://uploads.prose.org/file.jpg".parse()?,
@@ -430,7 +451,6 @@ async fn test_message_with_attachment_and_empty_body() -> Result<()> {
                     file_name: "file.jpg".to_string(),
                     file_size: Some(250),
                 }],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             },

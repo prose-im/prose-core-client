@@ -9,15 +9,15 @@ use minidom::Element;
 use pretty_assertions::assert_eq;
 use xmpp_parsers::mam::QueryId;
 
-use prose_core_client::domain::messaging::models::{ArchivedMessageRef, MessageLikePayload};
+use prose_core_client::domain::messaging::models::{
+    ArchivedMessageRef, MessageLikeBody, MessageLikePayload,
+};
 use prose_core_client::domain::messaging::repos::MessagesRepository;
 use prose_core_client::domain::rooms::models::RoomSidebarState;
 use prose_core_client::domain::settings::models::SyncedRoomSettings;
 use prose_core_client::domain::shared::models::AccountId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::dtos::{
-    Bookmark, Mention, MucId, OccupantId, RoomId, UnicodeScalarIndex, UserId,
-};
+use prose_core_client::dtos::{Bookmark, Mention, MucId, OccupantId, RoomId, UserId};
 use prose_core_client::infra::messaging::CachingMessageRepository;
 use prose_core_client::test::{ConstantTimeProvider, MessageBuilder};
 use prose_core_client::{
@@ -564,12 +564,15 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
                     .set_from(user_id.clone())
                     .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap())
                     .set_payload(MessageLikePayload::Message {
-                        body: "Hello @ou".to_string(),
+                        body: MessageLikeBody {
+                            raw: "Hello @ou".to_string(),
+                            html: "<p>Hello @ou</p>".into(),
+                            mentions: vec![Mention {
+                                user: user_id!("user@prose.org"),
+                                range: None,
+                            }],
+                        },
                         attachments: vec![],
-                        mentions: vec![Mention {
-                            user: user_id!("user@prose.org"),
-                            range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
-                        }],
                         encryption_info: None,
                         is_transient: false,
                     })
@@ -582,12 +585,15 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
                     .set_from(user_id.clone())
                     .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap())
                     .set_payload(MessageLikePayload::Message {
-                        body: "Hello @ou".to_string(),
+                        body: MessageLikeBody {
+                            raw: "Hello @ou".to_string(),
+                            html: "<p>Hello @ou</p>".into(),
+                            mentions: vec![Mention {
+                                user: user_id!("user@prose.org"),
+                                range: None,
+                            }],
+                        },
                         attachments: vec![],
-                        mentions: vec![Mention {
-                            user: user_id!("user@prose.org"),
-                            range: UnicodeScalarIndex::new(6)..UnicodeScalarIndex::new(9),
-                        }],
                         encryption_info: None,
                         is_transient: false,
                     })

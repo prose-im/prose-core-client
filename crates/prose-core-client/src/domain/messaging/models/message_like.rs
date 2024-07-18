@@ -14,7 +14,7 @@ use uuid::Uuid;
 use prose_xmpp::stanza::message;
 
 use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId};
-use crate::domain::shared::models::ParticipantId;
+use crate::domain::shared::models::{ParticipantId, HTML};
 use crate::dtos::DeviceId;
 
 use super::{MessageId, StanzaId};
@@ -44,24 +44,46 @@ pub struct EncryptionInfo {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct Body {
+    /// Contains Markdown text if the message was sent by a Prose client otherwise the raw body
+    /// text, which may or may not be formatted according to XEP-0393: Message Styling.
+    pub raw: String,
+
+    /// Contains either the Markdown text converted to HTML, or if the message did not include
+    /// Markdown the fallback message wrapped in an HTML paragraph.
+    pub html: HTML,
+
+    /// Contains any mentions that are contained in the message.
+    pub mentions: Vec<Mention>,
+}
+
+impl Default for Body {
+    fn default() -> Self {
+        Self {
+            raw: String::new(),
+            html: HTML::new(""),
+            mentions: vec![],
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type")]
 pub enum Payload {
     Error {
         message: String,
     },
     Correction {
-        body: String,
+        body: Body,
         attachments: Vec<Attachment>,
-        mentions: Vec<Mention>,
         // Set if the message was encrypted
         encryption_info: Option<EncryptionInfo>,
     },
     DeliveryReceipt,
     ReadReceipt,
     Message {
-        body: String,
+        body: Body,
         attachments: Vec<Attachment>,
-        mentions: Vec<Mention>,
         // Set if the message was encrypted
         encryption_info: Option<EncryptionInfo>,
         is_transient: bool,

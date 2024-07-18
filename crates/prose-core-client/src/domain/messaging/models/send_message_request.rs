@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use super::EncryptedPayload;
+use crate::domain::shared::models::{Markdown, StyledMessage};
 
 use super::{Attachment, Mention, MessageId};
 
@@ -22,6 +23,9 @@ pub struct Body {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Payload {
-    Plaintext(String),
+    Unencrypted {
+        message: Markdown,
+        fallback: StyledMessage,
+    },
     Encrypted(EncryptedPayload),
 }

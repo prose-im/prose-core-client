@@ -1,0 +1,5 @@
+---
+source: crates/prose-markup/tests/styling_writer.rs
+expression: "markdown_to_message_styling(include_str!(\"fixtures/nested_spans.md\")).unwrap()"
+---
+Some *bold*, _italic_, ~strikethrough~ and *_bold italic_* text.

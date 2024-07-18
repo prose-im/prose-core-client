@@ -17,7 +17,7 @@ use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::mam::ArchivedMessage;
 use crate::stanza::message::message::Message;
 use crate::stanza::message::muc_user::MucUser;
-use crate::stanza::message::{carbons, chat_marker, Fallback, Id, Reactions};
+use crate::stanza::message::{carbons, chat_marker, Content, Fallback, Id, Reactions};
 use crate::stanza::references::Reference;
 
 impl Message {
@@ -48,6 +48,22 @@ impl Message {
 
     pub fn set_body(mut self, body: impl Into<String>) -> Self {
         self.bodies.insert("".into(), Body(body.into()));
+        self
+    }
+
+    /// XEP-0481: Content Types in Messages
+    pub fn add_content(
+        mut self,
+        content_type: impl AsRef<str>,
+        content: impl Into<String>,
+    ) -> Self {
+        self.payloads.push(
+            Content {
+                r#type: content_type.as_ref().to_string(),
+                content: content.into(),
+            }
+            .into(),
+        );
         self
     }
 

@@ -12,7 +12,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 
 use prose_core_client::dtos;
-use prose_core_client::dtos::StringIndexRangeExt;
 
 use crate::types::attachment::{AttachmentMetadata, AttachmentType};
 use crate::types::{Attachment, AttachmentsArray, IntoJSArray, Mention, MentionsArray, Thumbnail};
@@ -29,7 +28,6 @@ pub struct SendMessageRequest {
 #[derive(Clone)]
 pub struct SendMessageRequestBody {
     text: String,
-    mentions: Vec<Mention>,
 }
 
 #[wasm_bindgen]
@@ -38,7 +36,6 @@ impl SendMessageRequestBody {
     pub fn new() -> Self {
         Self {
             text: String::new(),
-            mentions: vec![],
         }
     }
 
@@ -53,13 +50,15 @@ impl SendMessageRequestBody {
     }
 
     #[wasm_bindgen(getter)]
+    /// Deprecated.
     pub fn mentions(&self) -> MentionsArray {
-        self.mentions.iter().cloned().collect_into_js_array()
+        Vec::<Mention>::new().collect_into_js_array()
     }
 
     #[wasm_bindgen(js_name = "addMention")]
-    pub fn add_mention(&mut self, mention: Mention) {
-        self.mentions.push(mention)
+    /// Deprecated.
+    pub fn add_mention(&mut self, _mention: Mention) {
+        error!("`addMention` is deprecated. Encode references as links: `[@user](xmpp:user.prose.org)`")
     }
 }
 
@@ -131,19 +130,9 @@ impl TryFrom<SendMessageRequestBody> for dtos::SendMessageRequestBody {
     type Error = anyhow::Error;
 
     fn try_from(value: SendMessageRequestBody) -> Result<Self, Self::Error> {
-        let mut body = dtos::SendMessageRequestBody {
-            text: value.text,
-            mentions: vec![],
-        };
-
-        for mention in value.mentions {
-            body.mentions.push(dtos::Mention {
-                user: mention.user.into(),
-                range: mention.range.to_scalar_range(&body.text)?,
-            });
-        }
-
-        Ok(body)
+        Ok(dtos::SendMessageRequestBody {
+            text: value.text.into(),
+        })
     }
 }
 

@@ -608,6 +608,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         r#"
         <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="{{ROOM_ID}}" type="groupchat">
           <body>Hello</body>
+          <content xmlns="urn:xmpp:content" type="text/markdown">Hello</content>
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
           <store xmlns="urn:xmpp:hints" />
@@ -626,8 +627,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
     let room = client.get_room(room_id.clone()).await.to_generic_room();
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello".to_string(),
-            mentions: vec![],
+            text: "Hello".into(),
         }),
         attachments: vec![],
     })
@@ -661,7 +661,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         .load_messages_with_ids(&[message_id.clone().into()])
         .await?;
     assert_eq!(1, messages.len());
-    assert_eq!("Hello", messages[0].body);
+    assert_eq!("<p>Hello</p>", messages[0].body.html.as_ref());
     assert_eq!(
         Some("opZdWmO7r50ee_aGKnWvBMbK".into()),
         messages[0].stanza_id,
@@ -674,6 +674,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         r#"
         <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="{{ROOM_ID}}" type="groupchat">
           <body>Hello World</body>
+          <content xmlns="urn:xmpp:content" type="text/markdown">Hello World</content>
           <replace xmlns="urn:xmpp:message-correct:0" id="{{INITIAL_MESSAGE_ID}}" />
           <store xmlns="urn:xmpp:hints" />
         </message>
@@ -692,8 +693,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         message_id.clone().into(),
         SendMessageRequest {
             body: Some(SendMessageRequestBody {
-                text: "Hello World".to_string(),
-                mentions: vec![],
+                text: "Hello World".into(),
             }),
             attachments: vec![],
         },
@@ -704,7 +704,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         .load_messages_with_ids(&[message_id.clone().into()])
         .await?;
     assert_eq!(1, messages.len());
-    assert_eq!("Hello World", messages[0].body);
+    assert_eq!("<p>Hello World</p>", messages[0].body.html.as_ref());
 
     recv!(
         client,
@@ -733,7 +733,7 @@ async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
         .load_messages_with_ids(&[message_id.clone().into()])
         .await?;
     assert_eq!(1, messages.len());
-    assert_eq!("Hello World", messages[0].body);
+    assert_eq!("<p>Hello World</p>", messages[0].body.html.as_ref());
 
     client.pop_ctx();
     client.pop_ctx();

@@ -213,7 +213,7 @@ impl Display for MessageEnvelope {
             self.0.from.id.to_opaque_identifier().truncate_to(20),
             self.0.attachments.len(),
             self.0.mentions.len(),
-            self.0.body,
+            self.0.body.html,
             if self.0.reactions.is_empty() {
                 "".to_string()
             } else {
@@ -237,7 +237,7 @@ impl Display for CompactMessageEnvelope {
                 .map(|id| id.clone().into_inner())
                 .unwrap_or("<no-id>".to_string()),
             self.0.from.id.to_opaque_identifier().truncate_to(20),
-            self.0.body.truncate_to(40),
+            self.0.body.html.to_string().truncate_to(40),
         )
     }
 }

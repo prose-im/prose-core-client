@@ -1,0 +1,10 @@
+Nested lists example
+
+3. Item 1
+4. Item 2
+    1. Item 2.1
+    2. Item 2.2
+5. Item 3
+    - Item 3.1
+    - Item 3.2
+6. Item 4

@@ -13,5 +13,5 @@ use crate::dtos::UserId;
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Mention {
     pub user: UserId,
-    pub range: Range<UnicodeScalarIndex>,
+    pub range: Option<Range<UnicodeScalarIndex>>,
 }

@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 use prose_utils::id_string;
 
 use crate::domain::shared::models::ParticipantId;
-use crate::dtos::{Attachment, MessageId, StanzaId};
+use crate::dtos::{Attachment, MessageId, StanzaId, HTML};
 
 use super::{Mention, MessageLike, MessageLikePayload, MessageTargetId};
 
@@ -25,11 +25,17 @@ pub struct Reaction {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Body {
+    pub raw: String,
+    pub html: HTML,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     pub id: Option<MessageId>,
     pub stanza_id: Option<StanzaId>,
     pub from: ParticipantId,
-    pub body: String,
+    pub body: Body,
     pub timestamp: DateTime<Utc>,
     pub is_read: bool,
     pub is_edited: bool,
@@ -86,7 +92,6 @@ impl Message {
                 MessageLikePayload::Message {
                     body,
                     attachments,
-                    mentions,
                     encryption_info,
                     is_transient: is_private,
                 } => {
@@ -96,7 +101,10 @@ impl Message {
                         id: message_id.into_original_id(),
                         stanza_id: msg.stanza_id,
                         from: msg.from.into(),
-                        body,
+                        body: Body {
+                            raw: body.raw,
+                            html: body.html,
+                        },
                         timestamp: msg.timestamp.into(),
                         is_read: false,
                         is_edited: false,
@@ -105,7 +113,7 @@ impl Message {
                         is_encrypted: encryption_info.is_some(),
                         reactions: vec![],
                         attachments,
-                        mentions,
+                        mentions: body.mentions,
                     };
 
                     if let Some(stanza_id) = &message.stanza_id {
@@ -121,7 +129,10 @@ impl Message {
                         id: message_id.into_original_id(),
                         stanza_id: msg.stanza_id,
                         from: msg.from.into(),
-                        body: error,
+                        body: Body {
+                            raw: error.clone(),
+                            html: HTML::new(error),
+                        },
                         timestamp: msg.timestamp.into(),
                         is_read: false,
                         is_edited: false,
@@ -169,11 +180,13 @@ impl Message {
                 MessageLikePayload::Correction {
                     body,
                     attachments,
-                    mentions,
                     encryption_info,
                 } => {
-                    message.body = body;
-                    message.mentions = mentions;
+                    message.body = Body {
+                        raw: body.raw,
+                        html: body.html,
+                    };
+                    message.mentions = body.mentions;
                     message.is_edited = true;
                     message.attachments = attachments;
                     message.is_encrypted = encryption_info.is_some()
@@ -242,6 +255,7 @@ mod tests {
 
     use prose_xmpp::bare;
 
+    use crate::domain::messaging::models::MessageLikeBody;
     use crate::domain::shared::models::UserId;
     use crate::test::MessageBuilder;
     use crate::user_id;
@@ -370,9 +384,12 @@ mod tests {
                     .unwrap()
                     .into(),
                 payload: MessageLikePayload::Message {
-                    body: String::from("Hello World"),
+                    body: MessageLikeBody {
+                        raw: "Hello World".to_string(),
+                        html: String::from("Hello World").into(),
+                        mentions: vec![],
+                    },
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 },
@@ -441,7 +458,10 @@ mod tests {
                 id: Some("1".into()),
                 stanza_id: Some("stanza-id-1".into()),
                 from: user_id!("b@prose.org").into(),
-                body: "Hello World".to_string(),
+                body: Body {
+                    raw: "Hello World".to_string(),
+                    html: "Hello World".to_string().into(),
+                },
                 timestamp: Utc
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
                     .unwrap()

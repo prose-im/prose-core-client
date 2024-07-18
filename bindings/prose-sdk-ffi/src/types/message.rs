@@ -36,7 +36,7 @@ impl From<ProseMessage> for Message {
             id: value.id,
             stanza_id: value.stanza_id,
             from: value.from.id.to_user_id().map(|id| id.into_inner().into()),
-            body: value.body,
+            body: todo!(),
             timestamp: value.timestamp,
             is_read: value.is_read,
             is_edited: value.is_edited,

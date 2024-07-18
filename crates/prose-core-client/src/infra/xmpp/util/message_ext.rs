@@ -104,7 +104,9 @@ impl MessageExt for Message {
         self = self.add_references(body.mentions.into_iter().map(Into::into));
 
         match body.payload {
-            Payload::Plaintext(message) => self.set_body(message),
+            Payload::Unencrypted { message, fallback } => self
+                .add_content("text/markdown", message.into_string())
+                .set_body(fallback.into_string()),
             Payload::Encrypted(encrypted_payload) => self
                 .set_omemo_payload(encrypted_payload)
                 .set_body("[This message is OMEMO encrypted]"),

@@ -141,6 +141,12 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         recipient_ids: Vec<UserId>,
         message: String,
     ) -> Result<EncryptedPayload, EncryptionError> {
+        print!("ENCRYPT >{message}<");
+
+        if message.ends_with("\n") {
+            println!("WHYYYY");
+        }
+
         let account = self.ctx.connected_account()?;
         let current_user_id = account.to_user_id();
 
@@ -325,7 +331,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
             return Err(error);
         };
 
-        Ok(body.to_string())
+        Ok(body.raw.clone())
     }
 
     async fn finalize_decryption(&self, context: DecryptionContext) {

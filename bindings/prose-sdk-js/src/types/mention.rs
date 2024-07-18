@@ -15,7 +15,7 @@ use crate::types::BareJid;
 #[derive(Clone)]
 pub struct Mention {
     pub(crate) user: BareJid,
-    pub(crate) range: Range<Utf16Index>,
+    pub(crate) range: Option<Range<Utf16Index>>,
 }
 
 #[wasm_bindgen]
@@ -39,7 +39,7 @@ impl Mention {
         );
         Self {
             user,
-            range: Utf16Index::new(start)..Utf16Index::new(end),
+            range: Some(Utf16Index::new(start)..Utf16Index::new(end)),
         }
     }
 
@@ -54,14 +54,14 @@ impl Mention {
     /// Gets the start index of the mention in the source string, based on Javascript's UTF-16
     /// string indexes.
     #[wasm_bindgen(getter)]
-    pub fn start(&self) -> usize {
-        *self.range.start.as_ref()
+    pub fn start(&self) -> Option<usize> {
+        self.range.as_ref().map(|r| *r.start.as_ref())
     }
 
     /// Gets the end index of the mention in the source string, based on Javascript's UTF-16
     /// string indexes.
     #[wasm_bindgen(getter)]
-    pub fn end(&self) -> usize {
-        *self.range.end.as_ref()
+    pub fn end(&self) -> Option<usize> {
+        self.range.as_ref().map(|r| *r.end.as_ref())
     }
 }

@@ -28,6 +28,7 @@ mockall = { version = "0.12.1", optional = true }
 nanoid = "0.4"
 parking_lot = { workspace = true }
 paste = "1.0"
+prose-markup = { path = "../prose-markup" }
 prose-proc-macros = { path = "../prose-proc-macros" }
 prose-store = { path = "../prose-store", features = ["chrono", "jid", "uuid"] }
 prose-utils = { path = "../prose-utils" }

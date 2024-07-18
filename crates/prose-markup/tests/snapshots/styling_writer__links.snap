@@ -1,0 +1,8 @@
+---
+source: crates/prose-markup/tests/styling_writer.rs
+expression: message.body
+---
+A link with a title (https://www.example.com) and a plain link: https://www.example.com.
+And a link with a *bold* title (https://www.example.com).
+
+Hey @user!

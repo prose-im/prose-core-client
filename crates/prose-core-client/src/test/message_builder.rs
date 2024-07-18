@@ -17,10 +17,13 @@ use prose_xmpp::stanza::message::{Forwarded, MucUser, Reactions};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
-    Message, MessageId, MessageLike, MessageLikeId, MessageLikePayload, Reaction, StanzaId,
+    Body, Message, MessageId, MessageLike, MessageLikeBody, MessageLikeId, MessageLikePayload,
+    Reaction, StanzaId,
 };
 use crate::domain::shared::models::AnonOccupantId;
-use crate::dtos::{Message as MessageDTO, MessageSender, ParticipantId, Reaction as ReactionDTO};
+use crate::dtos::{
+    Mention, Message as MessageDTO, MessageSender, ParticipantId, Reaction as ReactionDTO,
+};
 use crate::test::mock_data;
 
 impl<T> From<T> for MessageLikeId
@@ -60,13 +63,33 @@ impl MessageBuilder {
 
 impl MessageLikePayload {
     pub fn message(body: impl Into<String>) -> Self {
+        let body = body.into();
         Self::Message {
-            body: body.into(),
+            body: MessageLikeBody {
+                raw: body.clone(),
+                html: format!("<p>{}</p>", body).into(),
+                mentions: vec![],
+            },
             attachments: vec![],
-            mentions: vec![],
             encryption_info: None,
             is_transient: false,
         }
+    }
+}
+
+impl MessageLikeBody {
+    pub fn text(body: impl Into<String>) -> Self {
+        let body = body.into();
+        Self {
+            raw: body.clone(),
+            html: format!("<p>{}</p>", body).into(),
+            mentions: vec![],
+        }
+    }
+
+    pub fn with_mentions(mut self, mentions: impl IntoIterator<Item = Mention>) -> Self {
+        self.mentions = mentions.into_iter().collect();
+        self
     }
 }
 
@@ -153,7 +176,10 @@ impl MessageBuilder {
             id: Some(self.id),
             stanza_id: self.stanza_id,
             from: self.from,
-            body,
+            body: Body {
+                raw: body.raw,
+                html: body.html,
+            },
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
             is_edited: self.is_edited,
@@ -180,7 +206,10 @@ impl MessageBuilder {
                     .from_name
                     .expect("You must set a name when building a MessageDTO"),
             },
-            body,
+            body: Body {
+                raw: body.raw,
+                html: body.html,
+            },
             timestamp: self.timestamp.into(),
             is_read: self.is_read,
             is_edited: self.is_edited,
@@ -295,7 +324,7 @@ impl MessageBuilder {
             MessageLikePayload::Error { message: error } => {
                 message = message.set_body(format!("Error: {error}"))
             }
-            MessageLikePayload::Message { body, .. } => message = message.set_body(body),
+            MessageLikePayload::Message { body, .. } => message = message.set_body(body.raw),
             MessageLikePayload::Reaction { emojis } => {
                 message = message.set_message_reactions(Reactions {
                     id: Self::id_for_index(

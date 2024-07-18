@@ -1,0 +1,1 @@
+Some **bold**, _italic_, ~~strikethrough~~ and **_bold italic_** text.

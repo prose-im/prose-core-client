@@ -395,29 +395,11 @@ async fn send_message(client: &Client) -> Result<()> {
         .unwrap();
 
     let mut body = SendMessageRequestBody {
-        text: message,
-        mentions: vec![],
+        text: message.into(),
     };
 
-    let regex = Regex::new(r"@(\w+)").unwrap();
-
-    for mat in regex.find_iter(&body.text) {
-        let user = mat.as_str().chars().skip(1).collect::<String>();
-
-        if let Some(user_id) = participant_ids.iter().find(|id| id.username() == user) {
-            body.mentions.push(Mention {
-                user: user_id.clone(),
-                range: Range {
-                    start: Utf8Index::new(mat.start()),
-                    end: Utf8Index::new(mat.end()),
-                }
-                .to_scalar_range(&body.text)?,
-            });
-        }
-    }
-
     let mut request = SendMessageRequest {
-        body: (!body.text.is_empty()).then_some(body),
+        body: (!body.text.as_ref().is_empty()).then_some(body),
         attachments: vec![],
     };
 
@@ -814,8 +796,7 @@ async fn main() -> Result<()> {
                     room.to_generic_room()
                         .send_message(SendMessageRequest {
                             body: Some(SendMessageRequestBody {
-                                text: format!("Message {idx}"),
-                                mentions: vec![],
+                                text: format!("Message {idx}").into(),
                             }),
                             attachments: vec![],
                         })
@@ -843,10 +824,7 @@ async fn main() -> Result<()> {
                     .unwrap();
                 room.to_generic_room()
                     .send_message(SendMessageRequest {
-                        body: Some(SendMessageRequestBody {
-                            text: body,
-                            mentions: vec![],
-                        }),
+                        body: Some(SendMessageRequestBody { text: body.into() }),
                         attachments: vec![],
                     })
                     .await?;
@@ -880,10 +858,7 @@ async fn main() -> Result<()> {
                 room.update_message(
                     message_id,
                     SendMessageRequest {
-                        body: Some(SendMessageRequestBody {
-                            text: body,
-                            mentions: vec![],
-                        }),
+                        body: Some(SendMessageRequestBody { text: body.into() }),
                         attachments: vec![],
                     },
                 )

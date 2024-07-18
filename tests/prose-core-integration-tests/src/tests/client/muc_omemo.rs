@@ -298,7 +298,10 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
         .load_messages_with_ids(&["my-message-id".into()])
         .await?;
     assert_eq!(messages.len(), 1);
-    assert_eq!(messages.first().unwrap().body, "Can you read this?");
+    assert_eq!(
+        messages.first().unwrap().body.html.as_ref(),
+        "<p>Can you read this?</p>"
+    );
 
     Ok(())
 }
@@ -613,8 +616,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -658,7 +660,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
 
     let messages = room.load_messages_with_ids(&[message_id.into()]).await?;
     assert_eq!(messages.len(), 1);
-    assert_eq!(messages.first().unwrap().body, "Hello World");
+    assert_eq!(messages.first().unwrap().body.raw, "Hello World");
 
     Ok(())
 }

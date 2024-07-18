@@ -239,7 +239,7 @@ impl Room {
         let is_muc = self.room_id.is_muc_room();
 
         for message in messages {
-            let MessageLikePayload::Message { ref mentions, .. } = message.payload else {
+            let MessageLikePayload::Message { ref body, .. } = message.payload else {
                 continue;
             };
 
@@ -255,7 +255,7 @@ impl Room {
                 continue;
             }
 
-            for mention in mentions {
+            for mention in &body.mentions {
                 if account == &mention.user {
                     stats.mentions_count += 1;
                     break;

@@ -78,3 +78,6 @@ pub const MAM1: &str = "urn:xmpp:mam:1";
 pub const MAM2: &str = "urn:xmpp:mam:2";
 pub const MAM2_EXTENDED: &str = "urn:xmpp:mam:2#extended";
 pub const AVATAR_PEP_VCARD_CONVERSION: &str = "urn:xmpp:pep-vcard-conversion:0";
+
+/// XEP-0481: Content Types in Messages
+pub const CONTENT: &str = "urn:xmpp:content";

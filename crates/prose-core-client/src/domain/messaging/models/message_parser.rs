@@ -17,12 +17,14 @@ use crate::app::deps::DynEncryptionDomainService;
 use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
-    EncryptedMessage, MessageLike, MessageLikeEncryptionInfo, MessageLikeId, MessageTargetId,
-    StanzaId, StanzaParseError,
+    EncryptedMessage, MessageLike, MessageLikeBody, MessageLikeEncryptionInfo, MessageLikeId,
+    MessageTargetId, StanzaId, StanzaParseError,
 };
 use crate::domain::rooms::models::Room;
-use crate::domain::shared::models::AnonOccupantId;
-use crate::dtos::{DeviceId, Mention, MessageId, OccupantId, ParticipantId, RoomId, UserId};
+use crate::domain::shared::models::{AnonOccupantId, StyledMessage};
+use crate::dtos::{
+    DeviceId, Markdown, Mention, MessageId, OccupantId, ParticipantId, RoomId, UserId,
+};
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
 
@@ -242,14 +244,16 @@ impl MessageParser {
             .parse_message_body(sender_id, room_id, message)
             .await?
             .or_else(|| {
-                (!message.attachments().is_empty())
-                    .then_some(ParsedMessageBody::Plaintext("".to_string()))
+                (!message.attachments().is_empty()).then_some(ParsedMessageBody::Plaintext {
+                    message: None,
+                    fallback: StyledMessage::new(""),
+                })
             });
 
         if let Some(parsed_body) = parsed_body {
-            let (body, encryption_info) = match parsed_body {
-                ParsedMessageBody::Plaintext(body) => (body, None),
-                ParsedMessageBody::EncryptedMessage(body, info) => (body, Some(info)),
+            let (body, fallback, encryption_info) = match parsed_body {
+                ParsedMessageBody::Plaintext { message, fallback } => (message, fallback, None),
+                ParsedMessageBody::EncryptedMessage(fallback, info) => (None, fallback, Some(info)),
                 ParsedMessageBody::EmptyMessage => return Err(MessageLikeError::NoPayload.into()),
             };
 
@@ -268,13 +272,23 @@ impl MessageParser {
                 })
                 .collect::<Vec<_>>();
 
+            let (raw, html) = if let Some(markdown) = body {
+                let html = markdown.to_html();
+                (markdown.into_string(), html)
+            } else {
+                (fallback.to_string(), fallback.into_html())
+            };
+
             if let Some(replace_id) = message.replace() {
                 return Ok(TargetedPayload {
                     target: Some(MessageTargetId::MessageId(replace_id.as_ref().into())),
                     payload: Payload::Correction {
-                        body: body.to_string(),
+                        body: MessageLikeBody {
+                            raw,
+                            html,
+                            mentions,
+                        },
                         attachments: message.attachments(),
-                        mentions,
                         encryption_info,
                     },
                 });
@@ -283,9 +297,12 @@ impl MessageParser {
             return Ok(TargetedPayload {
                 target: None,
                 payload: Payload::Message {
-                    body: body.to_string(),
+                    body: MessageLikeBody {
+                        raw,
+                        html,
+                        mentions,
+                    },
                     attachments: message.attachments(),
-                    mentions,
                     encryption_info,
                     // A message that we consider a groupchat message but is of type 'chat' is
                     // usually a private message. We'll treat them as transient messages.
@@ -344,9 +361,10 @@ impl MessageParser {
             };
 
             let parsed_message = match decryption_result {
-                Ok(body) => {
-                    ParsedMessageBody::EncryptedMessage(body, MessageLikeEncryptionInfo { sender })
-                }
+                Ok(body) => ParsedMessageBody::EncryptedMessage(
+                    StyledMessage::new(body),
+                    MessageLikeEncryptionInfo { sender },
+                ),
                 Err(error) => {
                     error!(
                         "Failed to decrypt message from {sender_id}. {}",
@@ -358,7 +376,8 @@ impl MessageParser {
                             .unwrap_or(
                                 "Message failed to decrypt and did not contain a fallback text.",
                             )
-                            .to_string(),
+                            .to_string()
+                            .into(),
                         MessageLikeEncryptionInfo { sender },
                     )
                 }
@@ -366,18 +385,24 @@ impl MessageParser {
             return Ok(Some(parsed_message));
         }
 
-        Ok(message
-            .body()
-            .map(|body| ParsedMessageBody::Plaintext(body.to_string())))
+        Ok(message.body().map(|body| ParsedMessageBody::Plaintext {
+            message: message
+                .content_with_type("text/markdown")
+                .map(|c| Markdown::new(c.content)),
+            fallback: StyledMessage::new(body.to_string()),
+        }))
     }
 }
 
 /// Represents the body of the message.
 enum ParsedMessageBody {
     /// The message was sent unencrypted.
-    Plaintext(String),
+    Plaintext {
+        message: Option<Markdown>,
+        fallback: StyledMessage,
+    },
     /// The message was sent encrypted.
-    EncryptedMessage(String, MessageLikeEncryptionInfo),
+    EncryptedMessage(StyledMessage, MessageLikeEncryptionInfo),
     /// The message did not contain a human-readable body. This can happen for messages that are
     /// used to exchange OMEMO key material.
     EmptyMessage,

@@ -10,7 +10,9 @@ use chrono::{TimeZone, Utc};
 use mockall::predicate;
 use pretty_assertions::assert_eq;
 
-use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId, Reaction};
+use prose_core_client::domain::messaging::models::{
+    MessageLikeBody, MessageLikePayload, MessageTargetId, Reaction,
+};
 use prose_core_client::domain::messaging::services::MessagePage;
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
@@ -381,9 +383,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                         MessageBuilder::new_with_index(101)
                             .set_from(user_id!("a@prose.org"))
                             .set_payload(MessageLikePayload::Message {
-                                body: "Message 101".to_string(),
+                                body: MessageLikeBody::text("Message 101"),
                                 attachments: vec![],
-                                mentions: vec![],
                                 encryption_info: None,
                                 is_transient: false,
                             })
@@ -391,9 +392,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                         MessageBuilder::new_with_index(102)
                             .set_from(user_id!("b@prose.org"))
                             .set_payload(MessageLikePayload::Message {
-                                body: "Message 102".to_string(),
+                                body: MessageLikeBody::text("Message 102"),
                                 attachments: vec![],
-                                mentions: vec![],
                                 encryption_info: None,
                                 is_transient: false,
                             })
@@ -431,9 +431,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                         MessageBuilder::new_with_index(90)
                             .set_from(user_id!("a@prose.org"))
                             .set_payload(MessageLikePayload::Message {
-                                body: "Message 90".to_string(),
+                                body: MessageLikeBody::text("Message 90"),
                                 attachments: vec![],
-                                mentions: vec![],
                                 encryption_info: None,
                                 is_transient: false,
                             })
@@ -448,9 +447,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                         MessageBuilder::new_with_index(92)
                             .set_from(user_id!("b@prose.org"))
                             .set_payload(MessageLikePayload::Message {
-                                body: "Message 92".to_string(),
+                                body: MessageLikeBody::text("Message 92"),
                                 attachments: vec![],
-                                mentions: vec![],
                                 encryption_info: None,
                                 is_transient: false,
                             })
@@ -458,9 +456,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                         MessageBuilder::new_with_index(93)
                             .set_from(user_id!("a@prose.org"))
                             .set_payload(MessageLikePayload::Message {
-                                body: "Message 93".to_string(),
+                                body: MessageLikeBody::text("Message 93"),
                                 attachments: vec![],
-                                mentions: vec![],
                                 encryption_info: None,
                                 is_transient: false,
                             })
@@ -468,9 +465,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                         MessageBuilder::new_with_index(94)
                             .set_from(user_id!("a@prose.org"))
                             .set_payload(MessageLikePayload::Message {
-                                body: "Message 94".to_string(),
+                                body: MessageLikeBody::text("Message 94"),
                                 attachments: vec![],
-                                mentions: vec![],
                                 encryption_info: None,
                                 is_transient: false,
                             })
@@ -503,9 +499,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
-                    body: "Message 90".to_string(),
+                    body: MessageLikeBody::text("Message 90"),
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 })
@@ -521,9 +516,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_from(user_id!("b@prose.org"))
                 .set_from_name("B")
                 .set_payload(MessageLikePayload::Message {
-                    body: "Message 92".to_string(),
+                    body: MessageLikeBody::text("Message 92"),
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 })
@@ -532,9 +526,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
-                    body: "Message 93".to_string(),
+                    body: MessageLikeBody::text("Message 93"),
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 })
@@ -543,9 +536,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
-                    body: "Message 94".to_string(),
+                    body: MessageLikeBody::text("Message 94"),
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 })
@@ -554,9 +546,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
-                    body: "Message 101".to_string(),
+                    body: MessageLikeBody::text("Message 101"),
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 })
@@ -569,9 +560,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_from(user_id!("b@prose.org"))
                 .set_from_name("B")
                 .set_payload(MessageLikePayload::Message {
-                    body: "Message 102".to_string(),
+                    body: MessageLikeBody::text("Message 102"),
                     attachments: vec![],
-                    mentions: vec![],
                     encryption_info: None,
                     is_transient: false,
                 })
@@ -615,9 +605,8 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                             MessageBuilder::new_with_index(100)
                                 .set_from(user_id!("a@prose.org"))
                                 .set_payload(MessageLikePayload::Message {
-                                    body: "Message 100".to_string(),
+                                    body: MessageLikeBody::text("Message 100"),
                                     attachments: vec![],
-                                    mentions: vec![],
                                     encryption_info: None,
                                     is_transient: false,
                                 })
@@ -676,9 +665,8 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
             .set_from(user_id!("a@prose.org"))
             .set_from_name("A")
             .set_payload(MessageLikePayload::Message {
-                body: "Message 100".to_string(),
+                body: MessageLikeBody::text("Message 100"),
                 attachments: vec![],
-                mentions: vec![],
                 encryption_info: None,
                 is_transient: false,
             })

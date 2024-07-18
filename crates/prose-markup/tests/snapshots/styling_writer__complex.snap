@@ -1,0 +1,46 @@
+---
+source: crates/prose-markup/tests/styling_writer.rs
+expression: "markdown_to_message_styling(include_str!(\"fixtures/complex.md\")).unwrap()"
+---
+My Complex Markdown Sample
+
+Table of Contents
+
+1. Introduction (#introduction)
+2. Features (#features)
+3. Code Example (#code-example)
+4. Data Table (#data-table)
+5. Blockquote (#blockquote)
+6. Conclusion (#conclusion)
+
+Introduction
+
+Welcome to the *complex Markdown sample*. This document demonstrates various Markdown elements and
+how they can be combined to create a rich document.
+
+Features
+
+* *Headers*: Different levels of headers.
+* *Text Formatting*: Bold, italic, and strikethrough.
+* *Lists*: Ordered and unordered lists.
+* *Tables*: Organize data in a tabular format.
+* *Code Blocks*: Display code snippets.
+* *Images and Links*: Embed images and hyperlinks.
+* *Blockquotes*: Highlight important quotes.
+
+Subsection: Text Formatting
+
+* _Italic_: Use `*` or `_` around the text.
+* *Bold*: Use `**` or `__` around the text.
+* ~Strikethrough~: Use `~~` around the text.
+
+Code Example
+
+Here’s a simple Python code snippet:
+
+```python
+def greet(name):
+    print(f"Hello, {name}!")
+
+greet("World")
+```

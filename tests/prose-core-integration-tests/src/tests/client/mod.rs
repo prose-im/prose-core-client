@@ -6,6 +6,7 @@
 mod catchup_unread;
 mod contact_list;
 mod helpers;
+mod message_styling;
 mod muc;
 mod muc_omemo;
 mod omemo;

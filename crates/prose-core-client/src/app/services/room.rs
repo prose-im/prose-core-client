@@ -15,6 +15,7 @@ use chrono::Duration;
 use itertools::Itertools;
 use tracing::{debug, error, info, warn};
 
+use prose_markup::MarkdownParser;
 use prose_xmpp::{IDProvider, TimeProvider};
 
 use crate::app::deps::{
@@ -25,20 +26,20 @@ use crate::app::deps::{
 };
 use crate::domain::messaging::models::{
     send_message_request, ArchivedMessageRef, Emoji, Message, MessageId, MessageLike,
-    MessageLikeError, MessageParser, MessageTargetId,
+    MessageLikeBody, MessageLikeError, MessageParser, MessageTargetId,
 };
 use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{
-    AccountId, CachePolicy, MucId, ParticipantId, ParticipantInfo, RoomId, RoomType,
+    AccountId, CachePolicy, MucId, ParticipantId, ParticipantInfo, RoomId, RoomType, StyledMessage,
 };
 use crate::domain::shared::utils::ContactNameBuilder;
 use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{
-    Message as MessageDTO, MessageResultSet, MessageSender, ParticipantBasicInfo,
-    Reaction as ReactionDTO, RoomState, SendMessageRequest as SendMessageRequestDTO, StanzaId,
-    UserId,
+    Attachment, Markdown, Mention, Message as MessageDTO, MessageResultSet, MessageSender,
+    ParticipantBasicInfo, Reaction as ReactionDTO, RoomState,
+    SendMessageRequest as SendMessageRequestDTO, StanzaId, UserId, HTML,
 };
 use crate::{ClientEvent, ClientRoomEventType};
 
@@ -184,7 +185,7 @@ impl<Kind> Room<Kind> {
             return Ok(());
         }
 
-        match request.body.as_ref().map(|body| body.text.as_str()) {
+        match request.body.as_ref().map(|body| body.text.as_ref()) {
             Some("/omemo enable") => {
                 self.set_encryption_enabled(true).await;
                 self.show_system_message("OMEMO is now enabled.").await?;
@@ -198,23 +199,47 @@ impl<Kind> Room<Kind> {
             _ => (),
         }
 
-        let payload = MessageLikePayload::Message {
-            body: request
-                .body
-                .as_ref()
-                .map(|body| body.text.clone())
-                .unwrap_or_else(|| "".to_string()),
-            attachments: request.attachments.clone(),
-            mentions: request
-                .body
-                .as_ref()
-                .map(|body| body.mentions.clone())
-                .unwrap_or_default(),
-            encryption_info: None,
-            is_transient: false,
+        let (payload, body) = if let Some(body) = request.body {
+            let parser = MarkdownParser::new(body.text.as_ref());
+            let html = HTML::new(parser.convert_to_html());
+            let fallback = StyledMessage::new(parser.convert_to_message_styling());
+            let mentions = parser
+                .collect_mentions()
+                .into_iter()
+                .map(|jid| Mention {
+                    user: jid.into(),
+                    range: None,
+                })
+                .collect::<Vec<_>>();
+
+            (
+                MessageLikePayload::Message {
+                    body: MessageLikeBody {
+                        raw: body.text.to_string(),
+                        html,
+                        mentions: mentions.clone(),
+                    },
+                    attachments: vec![],
+                    encryption_info: None,
+                    is_transient: false,
+                },
+                Some((body.text, fallback, mentions)),
+            )
+        } else {
+            (
+                MessageLikePayload::Message {
+                    body: MessageLikeBody::default(),
+                    attachments: vec![],
+                    encryption_info: None,
+                    is_transient: false,
+                },
+                None,
+            )
         };
 
-        let request = self.encrypt_message_if_needed(request).await?;
+        let request = self
+            .encrypt_message_if_needed(body, request.attachments)
+            .await?;
         let message_id = request.id.clone();
 
         // Save the unencrypted message so that we can look it up later…
@@ -258,22 +283,45 @@ impl<Kind> Room<Kind> {
             return Ok(());
         }
 
-        let payload = MessageLikePayload::Correction {
-            body: request
-                .body
-                .as_ref()
-                .map(|body| body.text.clone())
-                .unwrap_or_else(|| "".to_string()),
-            attachments: request.attachments.clone(),
-            mentions: request
-                .body
-                .as_ref()
-                .map(|body| body.mentions.clone())
-                .unwrap_or_default(),
-            encryption_info: None,
+        let (payload, body) = if let Some(body) = request.body {
+            let parser = MarkdownParser::new(body.text.as_ref());
+            let html = HTML::new(parser.convert_to_html());
+            let fallback = StyledMessage::new(parser.convert_to_message_styling());
+            let mentions = parser
+                .collect_mentions()
+                .into_iter()
+                .map(|jid| Mention {
+                    user: jid.into(),
+                    range: None,
+                })
+                .collect::<Vec<_>>();
+
+            (
+                MessageLikePayload::Correction {
+                    body: MessageLikeBody {
+                        raw: body.text.to_string(),
+                        html,
+                        mentions: mentions.clone(),
+                    },
+                    attachments: vec![],
+                    encryption_info: None,
+                },
+                Some((body.text, fallback, mentions)),
+            )
+        } else {
+            (
+                MessageLikePayload::Correction {
+                    body: MessageLikeBody::default(),
+                    attachments: vec![],
+                    encryption_info: None,
+                },
+                None,
+            )
         };
 
-        let request = self.encrypt_message_if_needed(request).await?;
+        let request = self
+            .encrypt_message_if_needed(body, request.attachments)
+            .await?;
         let message_id = request.id.clone();
 
         // Save the unencrypted message so that we can look it up later…
@@ -725,6 +773,7 @@ impl<Kind> Room<Kind> {
 
     async fn show_system_message(&self, message: impl Into<String>) -> Result<()> {
         let id = MessageLikeId::new(Some(self.id_provider.new_id().into()));
+        let message = message.into();
 
         self.message_repo
             .append(
@@ -738,9 +787,12 @@ impl<Kind> Room<Kind> {
                     from: ParticipantId::User("prose-bot@prose.org".parse()?),
                     timestamp: self.time_provider.now(),
                     payload: MessageLikePayload::Message {
-                        body: message.into(),
+                        body: MessageLikeBody {
+                            raw: message.clone().into(),
+                            html: message.into(),
+                            mentions: vec![],
+                        },
                         attachments: vec![],
-                        mentions: vec![],
                         encryption_info: None,
                         is_transient: true,
                     },
@@ -760,13 +812,14 @@ impl<Kind> Room<Kind> {
 
     async fn encrypt_message_if_needed(
         &self,
-        request: SendMessageRequestDTO,
+        body: Option<(Markdown, StyledMessage, Vec<Mention>)>,
+        attachments: Vec<Attachment>,
     ) -> Result<SendMessageRequest> {
-        let Some(body) = request.body else {
+        let Some((message, fallback, mentions)) = body else {
             return Ok(SendMessageRequest {
                 id: MessageId::from(self.id_provider.new_id()),
                 body: None,
-                attachments: request.attachments,
+                attachments,
             });
         };
 
@@ -786,22 +839,21 @@ impl<Kind> Room<Kind> {
                         .collect::<Vec<_>>()
                 });
 
+                println!("ENCRYPT >{fallback}<");
+
                 send_message_request::Payload::Encrypted(
                     self.encryption_domain_service
-                        .encrypt_message(user_ids, body.text)
+                        .encrypt_message(user_ids, fallback.into_string())
                         .await?,
                 )
             }
-            _ => send_message_request::Payload::Plaintext(body.text),
+            _ => send_message_request::Payload::Unencrypted { message, fallback },
         };
 
         Ok(SendMessageRequest {
             id: MessageId::from(self.id_provider.new_id()),
-            body: Some(send_message_request::Body {
-                payload,
-                mentions: body.mentions,
-            }),
-            attachments: request.attachments,
+            body: Some(send_message_request::Body { payload, mentions }),
+            attachments,
         })
     }
 

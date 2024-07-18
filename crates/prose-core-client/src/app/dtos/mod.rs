@@ -27,14 +27,14 @@ pub use crate::domain::{
     },
     general::models::SoftwareVersion,
     messaging::models::{
-        Attachment, AttachmentType, Emoji, EncryptedPayload, EncryptionKey, Mention, MessageId,
-        StanzaId, Thumbnail,
+        Attachment, AttachmentType, Body, Emoji, EncryptedPayload, EncryptionKey, Mention,
+        MessageId, StanzaId, Thumbnail,
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        AccountId, Availability, MucId, OccupantId, ParticipantBasicInfo, ParticipantId,
+        AccountId, Availability, Markdown, MucId, OccupantId, ParticipantBasicInfo, ParticipantId,
         ParticipantInfo, RoomId, ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex,
-        UserBasicInfo, UserId, UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index,
+        UserBasicInfo, UserId, UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index, HTML,
     },
     uploads::models::UploadHeader,
     user_info::models::{

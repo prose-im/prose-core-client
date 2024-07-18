@@ -25,7 +25,7 @@ use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::muc_invite::MucInvite;
 use crate::stanza::message::muc_user::MucUser;
 use crate::stanza::message::stanza_id::StanzaId;
-use crate::stanza::message::{carbons, Reactions};
+use crate::stanza::message::{carbons, Content, Reactions};
 use crate::stanza::message::{chat_marker, mam};
 use crate::stanza::muc;
 use crate::stanza::references::Reference;
@@ -79,6 +79,12 @@ impl Message {
         self.get_best_body(vec![])
             .as_ref()
             .map(|(_, body)| body.0.as_str())
+    }
+
+    pub fn content_with_type(&self, content_type: impl AsRef<str>) -> Option<Content> {
+        self.typed_payload_with_predicate(|elem| {
+            elem.is("content", ns::CONTENT) && elem.attr("type") == Some(content_type.as_ref())
+        })
     }
 
     pub fn subject(&self) -> Option<&str> {

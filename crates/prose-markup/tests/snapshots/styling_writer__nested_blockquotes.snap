@@ -1,0 +1,13 @@
+---
+source: crates/prose-markup/tests/styling_writer.rs
+expression: "convert_markdown_to_message_styling(include_str!(\"fixtures/nested_blockquotes.md\"))"
+---
+> Level 1.0
+> 
+>> Level 2.0
+>> Level 2.1
+>> 
+>>> Level 3.0
+>>> 
+> Level 1.1
+>

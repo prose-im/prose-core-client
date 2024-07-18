@@ -145,6 +145,7 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
         r#"
         <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
           <body>Hello World</body>
+          <content xmlns="urn:xmpp:content" type="text/markdown">Hello World</content>
           <active xmlns="http://jabber.org/protocol/chatstates" />
           <markable xmlns="urn:xmpp:chat-markers:0" />
           <store xmlns="urn:xmpp:hints" />
@@ -162,8 +163,7 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -196,8 +196,7 @@ async fn test_sending_encrypted_message_fails_if_recipient_has_no_devices() -> R
     let result = room
         .send_message(SendMessageRequest {
             body: Some(SendMessageRequestBody {
-                text: "Hello World".to_string(),
-                mentions: vec![],
+                text: "Hello World".into(),
             }),
             attachments: vec![],
         })
@@ -286,8 +285,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -327,8 +325,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World 2".to_string(),
-            mentions: vec![],
+            text: "Hello World 2".into(),
         }),
         attachments: vec![],
     })
@@ -393,8 +390,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -457,8 +453,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World 2".to_string(),
-            mentions: vec![],
+            text: "Hello World 2".into(),
         }),
         attachments: vec![],
     })
@@ -529,8 +524,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -608,8 +602,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -683,8 +676,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -775,8 +767,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -833,8 +824,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
 
     room.send_message(SendMessageRequest {
         body: Some(SendMessageRequestBody {
-            text: "Hello World".to_string(),
-            mentions: vec![],
+            text: "Hello World".into(),
         }),
         attachments: vec![],
     })
@@ -930,7 +920,10 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         .load_messages_with_ids(&["my-message-id".into()])
         .await?;
     assert_eq!(messages.len(), 1);
-    assert_eq!(messages.first().unwrap().body, "Can you read this?");
+    assert_eq!(
+        messages.first().unwrap().body.html.as_ref(),
+        "<p>Can you read this?</p>"
+    );
 
     let device_infos = client
         .user_data
@@ -1008,7 +1001,10 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         .load_messages_with_ids(&["other-message-id".into()])
         .await?;
     assert_eq!(messages.len(), 1);
-    assert_eq!(messages.first().unwrap().body, "Can you read this too?");
+    assert_eq!(
+        messages.first().unwrap().body.html.as_ref(),
+        "<p>Can you read this too?</p>"
+    );
 
     Ok(())
 }

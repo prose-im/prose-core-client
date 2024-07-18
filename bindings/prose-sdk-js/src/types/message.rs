@@ -31,12 +31,19 @@ impl AsRef<StanzaId> for ArchiveID {
     }
 }
 
+pub struct Body {
+    /// The original raw message. Can be used for copying the message.
+    pub raw: String,
+    /// The formatted HTML. Should be used for display.
+    pub html: String,
+}
+
 #[wasm_bindgen]
 pub struct Message {
     id: Option<String>,
     stanza_id: Option<ArchiveID>,
     from: MessageSender,
-    body: String,
+    body: Body,
     timestamp: js_sys::Date,
     meta: MessageMetadata,
     reactions: js_sys::Array,
@@ -72,7 +79,11 @@ impl From<dtos::Message> for Message {
             .mentions
             .into_iter()
             .filter_map(|mention| {
-                let Ok(range) = mention.range.to_utf16_range(&value.body) else {
+                let Ok(range) = mention
+                    .range
+                    .map(|r| r.to_utf16_range(&value.body.html.as_ref()))
+                    .transpose()
+                else {
                     error!("Failed to convert mention range");
                     return None;
                 };
@@ -87,7 +98,10 @@ impl From<dtos::Message> for Message {
             id: value.id.map(|id| id.to_string()),
             stanza_id: value.stanza_id.map(ArchiveID::from),
             from: value.from.into(),
-            body: value.body,
+            body: Body {
+                raw: value.body.raw,
+                html: value.body.html.into_string(),
+            },
             timestamp: js_sys::Date::new(&JsValue::from(value.timestamp.timestamp_millis() as f64)),
             meta: MessageMetadata {
                 is_edited: value.is_edited,
@@ -138,11 +152,15 @@ impl Message {
     }
 
     #[wasm_bindgen(getter, js_name = "content")]
-    pub fn body(&self) -> String {
-        if self.body.is_empty() {
-            return "<empty message>".to_string();
-        }
-        self.body.clone()
+    /// The formatted HTML. Should be used for display.
+    pub fn html_body(&self) -> String {
+        self.body.html.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "rawContent")]
+    /// The original raw message. Can be used for copying the message.
+    pub fn raw_body(&self) -> String {
+        self.body.raw.clone()
     }
 
     #[wasm_bindgen(getter)]
@@ -154,8 +172,9 @@ impl Message {
         "text".to_string()
     }
     #[wasm_bindgen(getter)]
+    /// Deprecated. Use `content` or `rawContent` instead.
     pub fn text(&self) -> String {
-        self.body()
+        self.html_body()
     }
     #[wasm_bindgen(getter)]
     pub fn meta(&self) -> MessageMetadata {

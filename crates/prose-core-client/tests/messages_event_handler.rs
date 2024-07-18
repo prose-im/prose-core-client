@@ -15,7 +15,9 @@ use prose_core_client::app::event_handlers::{
     MessageEvent, MessageEventType, MessagesEventHandler, ServerEvent, ServerEventHandler,
 };
 use prose_core_client::domain::connection::models::ConnectionProperties;
-use prose_core_client::domain::messaging::models::{MessageLike, MessageLikePayload};
+use prose_core_client::domain::messaging::models::{
+    MessageLike, MessageLikeBody, MessageLikePayload,
+};
 use prose_core_client::domain::rooms::models::{Room, RoomInfo};
 use prose_core_client::domain::shared::models::{
     MucId, OccupantId, RoomId, RoomType, UserId, UserResourceId,
@@ -227,9 +229,12 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         from: ParticipantId::User(user_id!("from@prose.org")), // Resource should be dropped
         timestamp: Utc.with_ymd_and_hms(2023, 09, 11, 0, 0, 0).unwrap(),
         payload: MessageLikePayload::Message {
-            body: "Hello World".to_string(),
+            body: MessageLikeBody {
+                raw: "Hello World".to_string(),
+                html: "<p>Hello World</p>".to_string().into(),
+                mentions: vec![],
+            },
             attachments: vec![],
-            mentions: vec![],
             encryption_info: None,
             is_transient: false,
         },
@@ -324,9 +329,12 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
         from: ParticipantId::Occupant(occupant_id!("room@conference.prose.org/other-user")),
         timestamp: Utc.with_ymd_and_hms(2023, 09, 11, 0, 0, 0).unwrap(),
         payload: MessageLikePayload::Message {
-            body: "Private Message".to_string(),
+            body: MessageLikeBody {
+                raw: "Private Message".to_string(),
+                html: "<p>Private Message</p>".to_string().into(),
+                mentions: vec![],
+            },
             attachments: vec![],
-            mentions: vec![],
             encryption_info: None,
             is_transient: true,
         },
