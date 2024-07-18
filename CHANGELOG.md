@@ -1,4 +1,11 @@
 
+## What's Changed in 0.1.91
+
+* Prevent panic when reconnecting rooms after disconnect/reconnect cycle
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.90...0.1.91)
+
+
 ## What's Changed in 0.1.90
 
 * Use pretty nicknames in MUCs
