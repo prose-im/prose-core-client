@@ -5,7 +5,7 @@
 
 use chrono::{DateTime as ChronoDateTime, Utc};
 
-use prose_core_client::dtos::{Emoji, Message as ProseMessage, MessageId, StanzaId};
+use prose_core_client::dtos::{Emoji, Message as ProseMessage, MessageRemoteId, MessageServerId};
 
 use crate::types::JID;
 
@@ -19,8 +19,8 @@ pub struct Reaction {
 
 #[derive(uniffi::Record)]
 pub struct Message {
-    pub id: Option<MessageId>,
-    pub stanza_id: Option<StanzaId>,
+    pub id: Option<MessageRemoteId>,
+    pub stanza_id: Option<MessageServerId>,
     pub from: Option<JID>,
     pub body: String,
     pub timestamp: DateTime,

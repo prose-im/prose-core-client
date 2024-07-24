@@ -10,7 +10,7 @@ use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
 use tracing::info;
 
-use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
+use prose_core_client::dtos::{Availability, Emoji, MessageRemoteId, UserProfile};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
@@ -139,7 +139,7 @@ impl Client {
     pub async fn load_latest_messages(
         &self,
         _from: JID,
-        _since: Option<MessageId>,
+        _since: Option<MessageRemoteId>,
         _load_from_server: bool,
     ) -> Result<Vec<Message>, ClientError> {
         todo!("Use Room API");
@@ -153,7 +153,7 @@ impl Client {
     pub async fn load_messages_with_ids(
         &self,
         _conversation: JID,
-        _ids: Vec<MessageId>,
+        _ids: Vec<MessageRemoteId>,
     ) -> Result<Vec<Message>, ClientError> {
         todo!("Use Room API");
         // let messages = self
@@ -172,7 +172,7 @@ impl Client {
     pub async fn update_message(
         &self,
         _conversation: JID,
-        _id: MessageId,
+        _id: MessageRemoteId,
         _body: String,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
@@ -185,7 +185,7 @@ impl Client {
     pub async fn toggle_reaction_to_message(
         &self,
         _conversation: JID,
-        _id: MessageId,
+        _id: MessageRemoteId,
         _emoji: Emoji,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
@@ -198,7 +198,7 @@ impl Client {
     pub async fn retract_message(
         &self,
         _conversation: JID,
-        _id: MessageId,
+        _id: MessageRemoteId,
     ) -> Result<(), ClientError> {
         todo!("Use Room API");
         // self.client

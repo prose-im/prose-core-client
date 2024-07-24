@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_proc_macros::DependenciesStruct;
 
 use crate::app::deps::{DynMessageArchiveService, DynMessagingService};
-use crate::domain::messaging::models::StanzaId;
+use crate::domain::messaging::models::MessageServerId;
 use crate::domain::messaging::services::MessagePage;
 use crate::domain::shared::models::RoomId;
 
@@ -29,7 +29,7 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
         source_room: &RoomId,
         target_room: &RoomId,
     ) -> Result<()> {
-        let mut first_message_id: Option<StanzaId> = None;
+        let mut first_message_id: Option<MessageServerId> = None;
 
         loop {
             let MessagePage { messages, is_last } = self
@@ -41,7 +41,7 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
                 .first()
                 .and_then(|m| m.forwarded.stanza.as_ref())
                 .and_then(|m| m.stanza_id().clone())
-                .map(|id| StanzaId::from(id.id.into_inner()));
+                .map(|id| MessageServerId::from(id.id.into_inner()));
 
             for message in messages {
                 self.messaging_service

@@ -6,12 +6,12 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::shared::models::ParticipantId;
-use crate::dtos::{Attachment, Body, Emoji, Mention, MessageId, StanzaId};
+use crate::dtos::{Attachment, Body, Emoji, Mention, MessageRemoteId, MessageServerId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
-    pub id: Option<MessageId>,
-    pub stanza_id: Option<StanzaId>,
+    pub id: Option<MessageRemoteId>,
+    pub stanza_id: Option<MessageServerId>,
     pub from: MessageSender,
     pub body: Body,
     pub timestamp: DateTime<Utc>,

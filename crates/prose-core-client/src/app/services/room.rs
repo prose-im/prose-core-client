@@ -25,8 +25,8 @@ use crate::app::deps::{
     DynSyncedRoomSettingsService, DynTimeProvider, DynUserInfoDomainService,
 };
 use crate::domain::messaging::models::{
-    send_message_request, ArchivedMessageRef, Emoji, Message, MessageId, MessageLike,
-    MessageLikeBody, MessageLikeError, MessageParser, MessageTargetId,
+    send_message_request, ArchivedMessageRef, Emoji, Message, MessageLike, MessageLikeBody,
+    MessageLikeError, MessageParser, MessageRemoteId, MessageTargetId,
 };
 use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
@@ -38,8 +38,8 @@ use crate::domain::shared::utils::ContactNameBuilder;
 use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{
     Attachment, Markdown, Mention, Message as MessageDTO, MessageResultSet, MessageSender,
-    ParticipantBasicInfo, Reaction as ReactionDTO, RoomState,
-    SendMessageRequest as SendMessageRequestDTO, StanzaId, UserId, HTML,
+    MessageServerId, ParticipantBasicInfo, Reaction as ReactionDTO, RoomState,
+    SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
 };
 use crate::{ClientEvent, ClientRoomEventType};
 
@@ -275,7 +275,7 @@ impl<Kind> Room<Kind> {
 
     pub async fn update_message(
         &self,
-        id: MessageId,
+        id: MessageRemoteId,
         request: SendMessageRequestDTO,
     ) -> Result<()> {
         if request.is_empty() {
@@ -355,7 +355,11 @@ impl<Kind> Room<Kind> {
         Ok(())
     }
 
-    pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
+    pub async fn toggle_reaction_to_message(
+        &self,
+        id: MessageRemoteId,
+        emoji: Emoji,
+    ) -> Result<()> {
         let account = self.ctx.connected_account()?;
         let messages = self
             .message_repo
@@ -380,7 +384,7 @@ impl<Kind> Room<Kind> {
                     .await
             }
             RoomId::Muc(room_id) => {
-                let Some(stanza_id) = &message.stanza_id else {
+                let Some(stanza_id) = &message.server_id else {
                     bail!("Cannot react to MUC message for which we do not have a StanzaId.")
                 };
                 self.messaging_service
@@ -390,13 +394,13 @@ impl<Kind> Room<Kind> {
         }
     }
 
-    pub async fn retract_message(&self, id: MessageId) -> Result<()> {
+    pub async fn retract_message(&self, id: MessageRemoteId) -> Result<()> {
         self.messaging_service
             .retract_message(&self.data.room_id, &id)
             .await
     }
 
-    pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<MessageDTO>> {
+    pub async fn load_messages_with_ids(&self, ids: &[MessageRemoteId]) -> Result<Vec<MessageDTO>> {
         let account = self.ctx.connected_account()?;
         let messages = self
             .message_repo
@@ -441,7 +445,10 @@ impl<Kind> Room<Kind> {
         Ok(messages)
     }
 
-    pub async fn load_messages_before(&self, stanza_id: &StanzaId) -> Result<MessageResultSet> {
+    pub async fn load_messages_before(
+        &self,
+        stanza_id: &MessageServerId,
+    ) -> Result<MessageResultSet> {
         debug!("Loading latest messages before '{stanza_id}' from server…");
         self.load_messages(Some(stanza_id)).await
     }
@@ -464,7 +471,7 @@ impl<Kind> Room<Kind> {
         })
     }
 
-    pub async fn set_last_read_message(&self, id: &MessageId) -> Result<()> {
+    pub async fn set_last_read_message(&self, id: &MessageRemoteId) -> Result<()> {
         let account = self.ctx.connected_account()?;
 
         let mut messages = self
@@ -530,13 +537,13 @@ impl<Kind> Room<Kind> {
 }
 
 impl<Kind> Room<Kind> {
-    async fn load_messages(&self, before: Option<&StanzaId>) -> Result<MessageResultSet> {
+    async fn load_messages(&self, before: Option<&MessageServerId>) -> Result<MessageResultSet> {
         let account = self.ctx.connected_account()?;
         let message_page_size = self.ctx.config.message_page_size;
         let max_message_pages_to_load = self.ctx.config.max_message_pages_to_load as usize;
 
         let mut messages = vec![];
-        let mut last_message_id: Option<StanzaId> = before.cloned();
+        let mut last_message_id: Option<MessageServerId> = before.cloned();
         let mut num_text_messages = 0;
         let mut text_message_ids = vec![];
         let mut loaded_pages = 0;
@@ -551,7 +558,10 @@ impl<Kind> Room<Kind> {
                 )
                 .await?;
 
-            last_message_id = page.messages.first().map(|m| StanzaId::from(m.id.as_ref()));
+            last_message_id = page
+                .messages
+                .first()
+                .map(|m| MessageServerId::from(m.id.as_ref()));
 
             // We're potentially loading multiple pages all oldest from newest, i.e.:
             // Page 1: 4, 5, 6
@@ -590,10 +600,10 @@ impl<Kind> Room<Kind> {
                 if parsed_message.payload.is_message() {
                     num_text_messages += 1;
                     if let Some(message_id) = parsed_message.id.original_id().cloned() {
-                        text_message_ids.push(MessageTargetId::MessageId(message_id))
+                        text_message_ids.push(MessageTargetId::RemoteId(message_id))
                     }
                     if let Some(stanza_id) = parsed_message.stanza_id.as_ref() {
-                        text_message_ids.push(MessageTargetId::StanzaId(stanza_id.clone()))
+                        text_message_ids.push(MessageTargetId::ServerId(stanza_id.clone()))
                     }
                 }
 
@@ -705,11 +715,11 @@ impl<Kind> Room<Kind> {
             }
 
             let is_last_read_message =
-                message.stanza_id.is_some() && message.stanza_id == last_read_message_id;
+                message.server_id.is_some() && message.server_id == last_read_message_id;
 
             message_dtos.push(MessageDTO {
-                id: message.id,
-                stanza_id: message.stanza_id,
+                id: message.remote_id,
+                stanza_id: message.server_id,
                 from,
                 body: message.body,
                 timestamp: message.timestamp,
@@ -817,7 +827,7 @@ impl<Kind> Room<Kind> {
     ) -> Result<SendMessageRequest> {
         let Some((message, fallback, mentions)) = body else {
             return Ok(SendMessageRequest {
-                id: MessageId::from(self.id_provider.new_id()),
+                id: MessageRemoteId::from(self.id_provider.new_id()),
                 body: None,
                 attachments,
             });
@@ -851,7 +861,7 @@ impl<Kind> Room<Kind> {
         };
 
         Ok(SendMessageRequest {
-            id: MessageId::from(self.id_provider.new_id()),
+            id: MessageRemoteId::from(self.id_provider.new_id()),
             body: Some(send_message_request::Body { payload, mentions }),
             attachments,
         })

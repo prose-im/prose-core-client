@@ -18,7 +18,7 @@ use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffil
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{CachePolicy, MucId, OccupantId, RoomId, UserId};
 use prose_core_client::domain::user_info::models::{UserInfo, UserName};
-use prose_core_client::dtos::{Availability, MessageResultSet, Participant, StanzaId};
+use prose_core_client::dtos::{Availability, MessageResultSet, MessageServerId, Participant};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id};
 use prose_xmpp::jid;
@@ -291,7 +291,7 @@ async fn test_toggle_reaction_in_muc_room() -> Result<()> {
             emojis: vec!["🍻".into()],
         })
         .build_message_like();
-    message2.target = Some(MessageTargetId::StanzaId(
+    message2.target = Some(MessageTargetId::ServerId(
         MessageBuilder::stanza_id_for_index(1),
     ));
 
@@ -302,7 +302,7 @@ async fn test_toggle_reaction_in_muc_room() -> Result<()> {
             emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
         })
         .build_message_like();
-    message3.target = Some(MessageTargetId::StanzaId(
+    message3.target = Some(MessageTargetId::ServerId(
         MessageBuilder::stanza_id_for_index(1),
     ));
 
@@ -855,7 +855,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .to_generic_room();
 
     let result = room
-        .load_messages_before(&StanzaId::from("some-stanza-id"))
+        .load_messages_before(&MessageServerId::from("some-stanza-id"))
         .await?;
 
     assert_eq!(

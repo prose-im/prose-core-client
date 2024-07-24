@@ -28,7 +28,7 @@ use crate::domain::messaging::models::{
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{AccountId, ConnectionState, RoomId, UserEndpointId};
-use crate::dtos::{MessageId, OccupantId, ParticipantId};
+use crate::dtos::{MessageRemoteId, OccupantId, ParticipantId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
 
@@ -397,10 +397,10 @@ impl MessagesEventHandler {
         room_id: &RoomId,
         message_id: &MessageLikeId,
         target_id: MessageTargetId,
-    ) -> Option<MessageId> {
+    ) -> Option<MessageRemoteId> {
         match target_id {
-            MessageTargetId::MessageId(id) => Some(id),
-            MessageTargetId::StanzaId(stanza_id) => {
+            MessageTargetId::RemoteId(id) => Some(id),
+            MessageTargetId::ServerId(stanza_id) => {
                 match self
                     .messages_repo
                     .resolve_message_id(account, &room_id, &stanza_id)

@@ -10,7 +10,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
 use crate::domain::messaging::models::{
-    Emoji, KeyTransportPayload, MessageId, SendMessageRequest, StanzaId,
+    Emoji, KeyTransportPayload, MessageRemoteId, MessageServerId, SendMessageRequest,
 };
 use crate::domain::shared::models::RoomId;
 use crate::dtos::{MucId, UserId};
@@ -30,29 +30,30 @@ pub trait MessagingService: SendUnlessWasm + SyncUnlessWasm {
     async fn update_message(
         &self,
         room_id: &RoomId,
-        message_id: &MessageId,
+        message_id: &MessageRemoteId,
         body: SendMessageRequest,
     ) -> Result<()>;
 
-    async fn retract_message(&self, room_id: &RoomId, message_id: &MessageId) -> Result<()>;
+    async fn retract_message(&self, room_id: &RoomId, message_id: &MessageRemoteId) -> Result<()>;
 
     async fn react_to_chat_message(
         &self,
         room_id: &UserId,
-        message_id: &MessageId,
+        message_id: &MessageRemoteId,
         emoji: &[Emoji],
     ) -> Result<()>;
 
     async fn react_to_muc_message(
         &self,
         room_id: &MucId,
-        message_id: &StanzaId,
+        message_id: &MessageServerId,
         emoji: &[Emoji],
     ) -> Result<()>;
 
     async fn set_user_is_composing(&self, room_id: &RoomId, is_composing: bool) -> Result<()>;
 
-    async fn send_read_receipt(&self, room_id: &RoomId, message_id: &MessageId) -> Result<()>;
+    async fn send_read_receipt(&self, room_id: &RoomId, message_id: &MessageRemoteId)
+        -> Result<()>;
 
     async fn relay_archived_message_to_room(
         &self,

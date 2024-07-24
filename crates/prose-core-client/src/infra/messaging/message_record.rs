@@ -13,7 +13,7 @@ use crate::domain::messaging::models::{
     MessageLike, MessageLikeId, MessageLikePayload, MessageTargetId,
 };
 use crate::domain::shared::models::AccountId;
-use crate::dtos::{MessageId, ParticipantId, RoomId, StanzaId};
+use crate::dtos::{MessageRemoteId, MessageServerId, ParticipantId, RoomId};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MessageRecord {
@@ -21,9 +21,9 @@ pub struct MessageRecord {
     pub account: AccountId,
     pub room_id: RoomId,
     pub message_id: MessageLikeId,
-    pub message_id_target: Option<MessageId>,
-    pub stanza_id: Option<StanzaId>,
-    pub stanza_id_target: Option<StanzaId>,
+    pub message_id_target: Option<MessageRemoteId>,
+    pub stanza_id: Option<MessageServerId>,
+    pub stanza_id_target: Option<MessageServerId>,
     pub to: Option<BareJid>,
     pub from: ParticipantId,
     pub timestamp: DateTime<Utc>,
@@ -57,13 +57,13 @@ impl KeyType for MessageLikeId {
     }
 }
 
-impl KeyType for MessageId {
+impl KeyType for MessageRemoteId {
     fn to_raw_key(&self) -> RawKey {
         RawKey::Text(self.to_string())
     }
 }
 
-impl KeyType for StanzaId {
+impl KeyType for MessageServerId {
     fn to_raw_key(&self) -> RawKey {
         RawKey::Text(self.to_string())
     }
@@ -72,8 +72,8 @@ impl KeyType for StanzaId {
 impl MessageRecord {
     pub fn from_message(account: AccountId, room_id: RoomId, value: MessageLike) -> Self {
         let (stanza_id_target, message_id_target) = match value.target {
-            Some(MessageTargetId::MessageId(id)) => (None, Some(id)),
-            Some(MessageTargetId::StanzaId(id)) => (Some(id), None),
+            Some(MessageTargetId::RemoteId(id)) => (None, Some(id)),
+            Some(MessageTargetId::ServerId(id)) => (Some(id), None),
             None => (None, None),
         };
 
@@ -98,8 +98,8 @@ impl MessageRecord {
 impl From<MessageRecord> for MessageLike {
     fn from(value: MessageRecord) -> Self {
         let target = match (value.stanza_id_target, value.message_id_target) {
-            (Some(id), _) => Some(MessageTargetId::StanzaId(id)),
-            (_, Some(id)) => Some(MessageTargetId::MessageId(id)),
+            (Some(id), _) => Some(MessageTargetId::ServerId(id)),
+            (_, Some(id)) => Some(MessageTargetId::RemoteId(id)),
             (None, None) => None,
         };
 

@@ -14,7 +14,8 @@ use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::Message;
 
 use crate::domain::messaging::models::{
-    Emoji, KeyTransportPayload, MessageId, SendMessageRequest, StanzaId, StanzaParseError,
+    Emoji, KeyTransportPayload, MessageRemoteId, MessageServerId, SendMessageRequest,
+    StanzaParseError,
 };
 use crate::domain::messaging::services::MessagingService;
 use crate::dtos::{MucId, RoomId, UserId};
@@ -73,7 +74,7 @@ impl MessagingService for XMPPClient {
     async fn update_message(
         &self,
         room_id: &RoomId,
-        message_id: &MessageId,
+        message_id: &MessageRemoteId,
         request: SendMessageRequest,
     ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
@@ -96,7 +97,7 @@ impl MessagingService for XMPPClient {
         Ok(())
     }
 
-    async fn retract_message(&self, room_id: &RoomId, message_id: &MessageId) -> Result<()> {
+    async fn retract_message(&self, room_id: &RoomId, message_id: &MessageRemoteId) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
         chat.retract_message(
             message_id.as_ref().into(),
@@ -109,7 +110,7 @@ impl MessagingService for XMPPClient {
     async fn react_to_chat_message(
         &self,
         room_id: &UserId,
-        message_id: &MessageId,
+        message_id: &MessageRemoteId,
         emoji: &[Emoji],
     ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
@@ -124,7 +125,7 @@ impl MessagingService for XMPPClient {
     async fn react_to_muc_message(
         &self,
         room_id: &MucId,
-        message_id: &StanzaId,
+        message_id: &MessageServerId,
         emoji: &[Emoji],
     ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
@@ -149,7 +150,11 @@ impl MessagingService for XMPPClient {
         )
     }
 
-    async fn send_read_receipt(&self, room_id: &RoomId, message_id: &MessageId) -> Result<()> {
+    async fn send_read_receipt(
+        &self,
+        room_id: &RoomId,
+        message_id: &MessageRemoteId,
+    ) -> Result<()> {
         let chat = self.client.get_mod::<mods::Chat>();
         chat.mark_message_received(
             message_id.as_ref().into(),

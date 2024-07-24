@@ -18,12 +18,12 @@ use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
     EncryptedMessage, MessageLike, MessageLikeBody, MessageLikeEncryptionInfo, MessageLikeId,
-    MessageTargetId, StanzaId, StanzaParseError,
+    MessageServerId, MessageTargetId, StanzaParseError,
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{AnonOccupantId, StyledMessage};
 use crate::dtos::{
-    DeviceId, Markdown, Mention, MessageId, OccupantId, ParticipantId, RoomId, UserId,
+    DeviceId, Markdown, Mention, MessageRemoteId, OccupantId, ParticipantId, RoomId, UserId,
 };
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
@@ -54,7 +54,7 @@ impl MessageParser {
 impl MessageParser {
     pub async fn parse_mam_message(self, mam_message: ArchivedMessage) -> Result<MessageLike> {
         let mut parsed_message = self.parse_forwarded_message(mam_message.forwarded).await?;
-        parsed_message.stanza_id = Some(StanzaId::from(mam_message.id.into_inner()));
+        parsed_message.stanza_id = Some(MessageServerId::from(mam_message.id.into_inner()));
         Ok(parsed_message)
     }
 
@@ -88,7 +88,7 @@ impl MessageParser {
     pub async fn parse_message(self, message: Message) -> Result<MessageLike> {
         let stanza_id = message
             .stanza_id()
-            .map(|sid| StanzaId::from(sid.id.into_inner()));
+            .map(|sid| MessageServerId::from(sid.id.into_inner()));
         let (participant_id, user_id) = self.parse_sender(&message)?;
         // We're going to prefer the id of our associated room here, so that we'll even resolve
         // the correct id for sent messages where the `from` might be our JID.
@@ -197,9 +197,9 @@ impl MessageParser {
         if let Some(reactions) = message.reactions() {
             return Ok(TargetedPayload {
                 target: Some(if is_groupchat_message {
-                    MessageTargetId::StanzaId(reactions.id.into())
+                    MessageTargetId::ServerId(reactions.id.into())
                 } else {
-                    MessageTargetId::MessageId(reactions.id.into())
+                    MessageTargetId::RemoteId(reactions.id.into())
                 }),
                 payload: Payload::Reaction {
                     emojis: reactions.reactions,
@@ -210,7 +210,7 @@ impl MessageParser {
         if let Some(fastening) = message.fastening() {
             if fastening.retract() {
                 return Ok(TargetedPayload {
-                    target: Some(MessageTargetId::MessageId(fastening.id.as_ref().into())),
+                    target: Some(MessageTargetId::RemoteId(fastening.id.as_ref().into())),
                     payload: Payload::Retraction,
                 });
             }
@@ -219,9 +219,9 @@ impl MessageParser {
         if let Some(marker) = message.received_marker() {
             return Ok(TargetedPayload {
                 target: Some(if is_groupchat_message {
-                    MessageTargetId::StanzaId(marker.id.as_ref().into())
+                    MessageTargetId::ServerId(marker.id.as_ref().into())
                 } else {
-                    MessageTargetId::MessageId(marker.id.as_ref().into())
+                    MessageTargetId::RemoteId(marker.id.as_ref().into())
                 }),
                 payload: Payload::DeliveryReceipt,
             });
@@ -230,9 +230,9 @@ impl MessageParser {
         if let Some(marker) = message.displayed_marker() {
             return Ok(TargetedPayload {
                 target: Some(if is_groupchat_message {
-                    MessageTargetId::StanzaId(marker.id.as_ref().into())
+                    MessageTargetId::ServerId(marker.id.as_ref().into())
                 } else {
-                    MessageTargetId::MessageId(marker.id.as_ref().into())
+                    MessageTargetId::RemoteId(marker.id.as_ref().into())
                 }),
                 payload: Payload::ReadReceipt,
             });
@@ -281,7 +281,7 @@ impl MessageParser {
 
             if let Some(replace_id) = message.replace() {
                 return Ok(TargetedPayload {
-                    target: Some(MessageTargetId::MessageId(replace_id.as_ref().into())),
+                    target: Some(MessageTargetId::RemoteId(replace_id.as_ref().into())),
                     payload: Payload::Correction {
                         body: MessageLikeBody {
                             raw,
@@ -327,7 +327,10 @@ impl MessageParser {
         if let (Some(sender_id), Some(omemo_element)) = (sender_id, message.omemo_element()) {
             let sender = DeviceId::from(omemo_element.header.sid);
             let encrypted_message = EncryptedMessage::from(omemo_element);
-            let message_id = message.id.as_ref().map(|id| MessageId::from(id.clone()));
+            let message_id = message
+                .id
+                .as_ref()
+                .map(|id| MessageRemoteId::from(id.clone()));
 
             let decryption_result = match encrypted_message {
                 EncryptedMessage::Message(message) => {

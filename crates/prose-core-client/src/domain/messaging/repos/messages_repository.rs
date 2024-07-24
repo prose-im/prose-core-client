@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageId, MessageLike, MessageTargetId, StanzaId,
+    ArchivedMessageRef, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
 };
 use crate::domain::shared::models::{AccountId, RoomId};
 
@@ -23,14 +23,14 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageId,
+        id: &MessageRemoteId,
     ) -> Result<Vec<MessageLike>>;
     /// Returns all parts (MessageLike) that make up all messages in `ids`. Sorted chronologically.
     async fn get_all(
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        ids: &[MessageId],
+        ids: &[MessageRemoteId],
     ) -> Result<Vec<MessageLike>>;
     /// Returns all messages that target any IDs contained in `targeted_id` and are newer
     /// than `newer_than`.
@@ -41,8 +41,12 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         targeted_ids: &[MessageTargetId],
         newer_than: &DateTime<Utc>,
     ) -> Result<Vec<MessageLike>>;
-    async fn contains(&self, account: &AccountId, room_id: &RoomId, id: &MessageId)
-        -> Result<bool>;
+    async fn contains(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        id: &MessageRemoteId,
+    ) -> Result<bool>;
     async fn append(
         &self,
         account: &AccountId,
@@ -57,8 +61,8 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        stanza_id: &StanzaId,
-    ) -> Result<Option<MessageId>>;
+        stanza_id: &MessageServerId,
+    ) -> Result<Option<MessageRemoteId>>;
 
     /// Returns the latest message, if available, that has a `stanza_id` set and was received
     /// before `before` (if set).

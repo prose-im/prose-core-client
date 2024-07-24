@@ -12,8 +12,8 @@ use dialoguer::{Input, MultiSelect, Select};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    DeviceId, Message, MessageId, ParticipantInfo, PublicRoomInfo, RoomEnvelope, SidebarItem,
-    StanzaId, UserId,
+    DeviceId, Message, MessageRemoteId, MessageServerId, ParticipantInfo, PublicRoomInfo,
+    RoomEnvelope, SidebarItem, UserId,
 };
 use prose_core_client::services::{Generic, Room};
 use prose_core_client::Client;
@@ -120,7 +120,7 @@ pub async fn select_participant<T>(room: &Room<T>) -> Option<ParticipantInfo> {
     select_item_from_list(room.participants(), |p| ParticipantEnvelope(p.clone()))
 }
 
-pub async fn select_message(room: &Room<Generic>) -> Result<Option<MessageId>> {
+pub async fn select_message(room: &Room<Generic>) -> Result<Option<MessageRemoteId>> {
     let messages = load_messages(room, 1).await?;
     let message =
         select_item_from_list(messages, |message| CompactMessageEnvelope(message.clone()));
@@ -201,7 +201,7 @@ pub fn select_file(prompt: &str) -> Option<PathBuf> {
 }
 
 pub async fn load_messages(room: &Room<Generic>, pages: u32) -> Result<Vec<Message>> {
-    let mut stanza_id: Option<StanzaId> = None;
+    let mut stanza_id: Option<MessageServerId> = None;
     let mut messages = vec![];
     let mut page = 0;
 

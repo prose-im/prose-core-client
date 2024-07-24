@@ -10,7 +10,7 @@ pub use std::path::PathBuf;
 pub use jid::{BareJid, Error as JidParseError, FullJid};
 
 pub use prose_core_client::dtos::{
-    Address, Availability, Emoji, MessageId, StanzaId, Url, UserProfile, UserStatus,
+    Address, Availability, Emoji, MessageRemoteId, MessageServerId, Url, UserProfile, UserStatus,
 };
 pub use prose_core_client::ConnectionEvent;
 pub use prose_xmpp::ConnectionError;
@@ -20,7 +20,7 @@ pub use crate::{
     account_bookmarks_client::AccountBookmarksClient, client::*, logger::*, ClientError,
 };
 
-impl UniffiCustomTypeConverter for MessageId {
+impl UniffiCustomTypeConverter for MessageRemoteId {
     type Builtin = String;
 
     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
@@ -32,7 +32,7 @@ impl UniffiCustomTypeConverter for MessageId {
     }
 }
 
-impl UniffiCustomTypeConverter for StanzaId {
+impl UniffiCustomTypeConverter for MessageServerId {
     type Builtin = String;
 
     fn into_custom(val: Self::Builtin) -> uniffi::Result<Self> {
@@ -102,7 +102,7 @@ pub mod uniffi_types {
         client::Client,
         types::{parse_jid, AccountBookmark, DateTime, Message, Reaction, JID},
         Availability, ClientError, ConnectionError, Contact, Emoji, FullJid, JidParseError,
-        MessageId, PathBuf, StanzaId, Url, UserProfile,
+        MessageRemoteId, MessageServerId, PathBuf, Url, UserProfile,
     };
 }
 

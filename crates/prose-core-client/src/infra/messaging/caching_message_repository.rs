@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageId, MessageLike, MessageTargetId, StanzaId,
+    ArchivedMessageRef, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
 };
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::{AccountId, RoomId};
@@ -37,7 +37,7 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageId,
+        id: &MessageRemoteId,
     ) -> Result<Vec<MessageLike>> {
         Ok(self.get_all(account, room_id, &[id.clone()]).await?)
     }
@@ -46,7 +46,7 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        ids: &[MessageId],
+        ids: &[MessageRemoteId],
     ) -> Result<Vec<MessageLike>> {
         let tx = self
             .store
@@ -119,7 +119,7 @@ impl MessagesRepository for CachingMessageRepository {
         let mut messages: Vec<MessageLike> = vec![];
         for id in targeted_ids {
             let targeting_messages = match id {
-                MessageTargetId::MessageId(id) => {
+                MessageTargetId::RemoteId(id) => {
                     message_idx
                         .get_all_values::<MessageRecord>(
                             Query::Only((account.clone(), room_id.clone(), id.clone())),
@@ -128,7 +128,7 @@ impl MessagesRepository for CachingMessageRepository {
                         )
                         .await?
                 }
-                MessageTargetId::StanzaId(id) => {
+                MessageTargetId::ServerId(id) => {
                     stanza_idx
                         .get_all_values::<MessageRecord>(
                             Query::Only((account.clone(), room_id.clone(), id.clone())),
@@ -155,7 +155,7 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageId,
+        id: &MessageRemoteId,
     ) -> Result<bool> {
         let tx = self
             .store
@@ -209,8 +209,8 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        stanza_id: &StanzaId,
-    ) -> Result<Option<MessageId>> {
+        stanza_id: &MessageServerId,
+    ) -> Result<Option<MessageRemoteId>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])

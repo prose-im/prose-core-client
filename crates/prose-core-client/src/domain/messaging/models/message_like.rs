@@ -17,12 +17,12 @@ use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId};
 use crate::domain::shared::models::{ParticipantId, HTML};
 use crate::dtos::DeviceId;
 
-use super::{MessageId, StanzaId};
+use super::{MessageRemoteId, MessageServerId};
 
 /// An ID that can act as a placeholder in the rare cases when a message doesn't have an ID. Since
 /// our DataCache backends require some ID for each message we simply generate one.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MessageLikeId(MessageId);
+pub struct MessageLikeId(MessageRemoteId);
 
 /// A type that describes permanent messages, i.e. messages that need to be replayed to restore
 /// the complete history of a conversation. Note that ephemeral messages like chat states are
@@ -30,7 +30,7 @@ pub struct MessageLikeId(MessageId);
 #[derive(Debug, PartialEq, Clone)]
 pub struct MessageLike {
     pub id: MessageLikeId,
-    pub stanza_id: Option<StanzaId>,
+    pub stanza_id: Option<MessageServerId>,
     pub target: Option<MessageTargetId>,
     pub to: Option<BareJid>,
     pub from: ParticipantId,
@@ -111,7 +111,7 @@ impl Payload {
 }
 
 impl MessageLikeId {
-    pub fn new(id: Option<MessageId>) -> Self {
+    pub fn new(id: Option<MessageRemoteId>) -> Self {
         if let Some(id) = id {
             return MessageLikeId(id);
         }
@@ -119,19 +119,19 @@ impl MessageLikeId {
     }
 
     /// Returns either the original message ID or the generated one.
-    pub fn id(&self) -> &MessageId {
+    pub fn id(&self) -> &MessageRemoteId {
         &self.0
     }
 
     /// Returns the original message ID or None if we contain a generated ID.
-    pub fn into_original_id(self) -> Option<MessageId> {
+    pub fn into_original_id(self) -> Option<MessageRemoteId> {
         if self.0.as_ref().starts_with("!!") {
             return None;
         }
         return Some(self.0);
     }
 
-    pub fn original_id(&self) -> Option<&MessageId> {
+    pub fn original_id(&self) -> Option<&MessageRemoteId> {
         if self.0.as_ref().starts_with("!!") {
             return None;
         }

@@ -7,7 +7,7 @@ use tracing::error;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos;
-use prose_core_client::dtos::{ScalarRangeExt, StanzaId};
+use prose_core_client::dtos::{MessageServerId, ScalarRangeExt};
 
 use crate::types::{
     Attachment, AttachmentsArray, BareJid, IntoJSArray, Mention, MentionsArray, MessageSendersArray,
@@ -17,16 +17,16 @@ use super::ReactionsArray;
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct ArchiveID(StanzaId);
+pub struct ArchiveID(MessageServerId);
 
-impl From<StanzaId> for ArchiveID {
-    fn from(value: StanzaId) -> Self {
+impl From<MessageServerId> for ArchiveID {
+    fn from(value: MessageServerId) -> Self {
         Self(value)
     }
 }
 
-impl AsRef<StanzaId> for ArchiveID {
-    fn as_ref(&self) -> &StanzaId {
+impl AsRef<MessageServerId> for ArchiveID {
+    fn as_ref(&self) -> &MessageServerId {
         &self.0
     }
 }

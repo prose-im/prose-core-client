@@ -13,7 +13,7 @@ use prose_xmpp::stanza::mam::query;
 use prose_xmpp::stanza::mam::query::{DateTimeFilter, RangeFilter};
 use prose_xmpp::stanza::message::stanza_id;
 
-use crate::domain::messaging::models::StanzaId;
+use crate::domain::messaging::models::MessageServerId;
 use crate::domain::messaging::services::{MessageArchiveService, MessagePage};
 use crate::dtos::RoomId;
 use crate::infra::xmpp::XMPPClient;
@@ -24,7 +24,7 @@ impl MessageArchiveService for XMPPClient {
     async fn load_messages_before(
         &self,
         room_id: &RoomId,
-        before: Option<&StanzaId>,
+        before: Option<&MessageServerId>,
         batch_size: u32,
     ) -> Result<MessagePage> {
         let mam = self.client.get_mod::<mods::MAM>();
@@ -63,7 +63,7 @@ impl MessageArchiveService for XMPPClient {
     async fn load_messages_after(
         &self,
         room_id: &RoomId,
-        after: &StanzaId,
+        after: &MessageServerId,
         batch_size: u32,
     ) -> Result<MessagePage> {
         let mam = self.client.get_mod::<mods::MAM>();

@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 
-use crate::domain::messaging::models::StanzaId;
+use crate::domain::messaging::models::MessageServerId;
 use crate::dtos::RoomId;
 
 #[derive(Debug)]
@@ -27,7 +27,7 @@ pub trait MessageArchiveService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_messages_before(
         &self,
         room_id: &RoomId,
-        before: Option<&StanzaId>,
+        before: Option<&MessageServerId>,
         batch_size: u32,
     ) -> Result<MessagePage>;
 
@@ -35,7 +35,7 @@ pub trait MessageArchiveService: SendUnlessWasm + SyncUnlessWasm {
     async fn load_messages_after(
         &self,
         room_id: &RoomId,
-        after: &StanzaId,
+        after: &MessageServerId,
         batch_size: u32,
     ) -> Result<MessagePage>;
 

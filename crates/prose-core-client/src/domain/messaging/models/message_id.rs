@@ -7,24 +7,27 @@ use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
 
-id_string!(MessageId);
-id_string!(StanzaId);
+// The ID assigned by a client sending the message. It is not guaranteed to be unique.
+id_string!(MessageRemoteId);
+
+// The ID assigned by the server to the message.
+id_string!(MessageServerId);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "id")]
 pub enum MessageTargetId {
-    MessageId(MessageId),
-    StanzaId(StanzaId),
+    RemoteId(MessageRemoteId),
+    ServerId(MessageServerId),
 }
 
-impl From<MessageId> for MessageTargetId {
-    fn from(value: MessageId) -> Self {
-        Self::MessageId(value)
+impl From<MessageRemoteId> for MessageTargetId {
+    fn from(value: MessageRemoteId) -> Self {
+        Self::RemoteId(value)
     }
 }
 
-impl From<StanzaId> for MessageTargetId {
-    fn from(value: StanzaId) -> Self {
-        Self::StanzaId(value)
+impl From<MessageServerId> for MessageTargetId {
+    fn from(value: MessageServerId) -> Self {
+        Self::ServerId(value)
     }
 }

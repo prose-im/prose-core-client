@@ -19,7 +19,7 @@ use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, MessageParser};
 use crate::domain::messaging::services::MessagePage;
 use crate::domain::rooms::models::Room;
-use crate::dtos::StanzaId;
+use crate::dtos::MessageServerId;
 
 use super::super::MessageArchiveDomainService as MessageArchiveDomainServiceTrait;
 
@@ -81,7 +81,10 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
             .load_messages_since(&room.room_id, catchup_since, 100)
             .await?;
 
-        let mut last_message_id = page.messages.last().map(|m| StanzaId::from(m.id.as_ref()));
+        let mut last_message_id = page
+            .messages
+            .last()
+            .map(|m| MessageServerId::from(m.id.as_ref()));
         let mut is_last_page = page.is_last;
 
         self.parse_message_page(room, page, &mut messages, &context)
@@ -97,7 +100,10 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
                 .load_messages_after(&room.room_id, &message_id, 100)
                 .await?;
 
-            last_message_id = page.messages.last().map(|m| StanzaId::from(m.id.as_ref()));
+            last_message_id = page
+                .messages
+                .last()
+                .map(|m| MessageServerId::from(m.id.as_ref()));
             is_last_page = page.is_last;
 
             self.parse_message_page(room, page, &mut messages, &context)

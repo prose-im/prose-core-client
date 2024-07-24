@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::uniffi_types::JID;
-use prose_core_client::dtos::MessageId;
+use prose_core_client::dtos::MessageRemoteId;
 use prose_core_client::ConnectionEvent;
 
 pub enum ClientEvent {
@@ -23,19 +23,19 @@ pub enum ClientEvent {
     /// One or many messages were either received or sent.
     MessagesAppended {
         conversation: JID,
-        message_ids: Vec<MessageId>,
+        message_ids: Vec<MessageRemoteId>,
     },
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
     MessagesUpdated {
         conversation: JID,
-        message_ids: Vec<MessageId>,
+        message_ids: Vec<MessageRemoteId>,
     },
 
     /// A message was deleted.
     MessagesDeleted {
         conversation: JID,
-        message_ids: Vec<MessageId>,
+        message_ids: Vec<MessageRemoteId>,
     },
 }
 

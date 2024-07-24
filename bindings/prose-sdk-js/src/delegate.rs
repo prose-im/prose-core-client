@@ -6,7 +6,7 @@
 use tracing::warn;
 use wasm_bindgen::prelude::*;
 
-use prose_core_client::dtos::MessageId;
+use prose_core_client::dtos::MessageRemoteId;
 use prose_core_client::{ClientDelegate, ClientEvent, ClientRoomEventType, ConnectionEvent};
 use prose_xmpp::ConnectionError;
 
@@ -215,7 +215,7 @@ trait JSValueConvertible {
     fn into_js_array(self) -> Vec<JsValue>;
 }
 
-impl JSValueConvertible for Vec<MessageId> {
+impl JSValueConvertible for Vec<MessageRemoteId> {
     fn into_js_array(self) -> Vec<JsValue> {
         self.into_iter()
             .map(|id| JsValue::from(id.into_inner()))

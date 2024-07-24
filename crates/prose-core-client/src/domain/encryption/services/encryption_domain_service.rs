@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::encryption::models::{DecryptionContext, DeviceId, DeviceInfo, DeviceList};
-use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload, MessageId};
+use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload, MessageRemoteId};
 use crate::domain::shared::models::{RoomId, UserId};
 
 #[derive(Debug, thiserror::Error)]
@@ -51,7 +51,7 @@ pub trait EncryptionDomainService: SendUnlessWasm + SyncUnlessWasm {
         &self,
         sender_id: &UserId,
         room_id: &RoomId,
-        message_id: Option<&MessageId>,
+        message_id: Option<&MessageRemoteId>,
         payload: EncryptedPayload,
         context: Option<DecryptionContext>,
     ) -> Result<String, DecryptionError>;

@@ -6,11 +6,11 @@
 use super::EncryptedPayload;
 use crate::domain::shared::models::{Markdown, StyledMessage};
 
-use super::{Attachment, Mention, MessageId};
+use super::{Attachment, Mention, MessageRemoteId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SendMessageRequest {
-    pub id: MessageId,
+    pub id: MessageRemoteId,
     pub body: Option<Body>,
     pub attachments: Vec<Attachment>,
 }

@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 use prose_utils::id_string;
 
 use crate::domain::shared::models::ParticipantId;
-use crate::dtos::{Attachment, MessageId, StanzaId, HTML};
+use crate::dtos::{Attachment, MessageRemoteId, MessageServerId, HTML};
 
 use super::{Mention, MessageLike, MessageLikePayload, MessageTargetId};
 
@@ -32,8 +32,8 @@ pub struct Body {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
-    pub id: Option<MessageId>,
-    pub stanza_id: Option<StanzaId>,
+    pub remote_id: Option<MessageRemoteId>,
+    pub server_id: Option<MessageServerId>,
     pub from: ParticipantId,
     pub body: Body,
     pub timestamp: DateTime<Utc>,
@@ -98,8 +98,8 @@ impl Message {
                     let message_id = msg.id.clone();
 
                     let message = Message {
-                        id: message_id.into_original_id(),
-                        stanza_id: msg.stanza_id,
+                        remote_id: message_id.into_original_id(),
+                        server_id: msg.stanza_id,
                         from: msg.from.into(),
                         body: Body {
                             raw: body.raw,
@@ -116,7 +116,7 @@ impl Message {
                         mentions: body.mentions,
                     };
 
-                    if let Some(stanza_id) = &message.stanza_id {
+                    if let Some(stanza_id) = &message.server_id {
                         stanza_to_id_map.insert(stanza_id.clone(), msg.id.id().clone());
                     };
 
@@ -126,8 +126,8 @@ impl Message {
                     let message_id = msg.id.clone();
 
                     let message = Message {
-                        id: message_id.into_original_id(),
-                        stanza_id: msg.stanza_id,
+                        remote_id: message_id.into_original_id(),
+                        server_id: msg.stanza_id,
                         from: msg.from.into(),
                         body: Body {
                             raw: error.clone(),
@@ -144,7 +144,7 @@ impl Message {
                         mentions: vec![],
                     };
 
-                    if let Some(stanza_id) = &message.stanza_id {
+                    if let Some(stanza_id) = &message.server_id {
                         stanza_to_id_map.insert(stanza_id.clone(), msg.id.id().clone());
                     };
 
@@ -161,8 +161,8 @@ impl Message {
             };
 
             let message_id = match target_id {
-                MessageTargetId::MessageId(ref id) => id,
-                MessageTargetId::StanzaId(stanza_id) => {
+                MessageTargetId::RemoteId(ref id) => id,
+                MessageTargetId::ServerId(stanza_id) => {
                     let Some(id) = stanza_to_id_map.get(&stanza_id) else {
                         info!("Could not resolve StanzaId '{stanza_id}' to a MessageId");
                         continue;
@@ -397,7 +397,7 @@ mod tests {
             MessageLike {
                 id: "2".into(),
                 stanza_id: None,
-                target: Some(MessageTargetId::MessageId("1".into())),
+                target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -411,7 +411,7 @@ mod tests {
             MessageLike {
                 id: "3".into(),
                 stanza_id: None,
-                target: Some(MessageTargetId::MessageId("1".into())),
+                target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("c@prose.org").into(),
                 timestamp: Utc
@@ -425,7 +425,7 @@ mod tests {
             MessageLike {
                 id: "4".into(),
                 stanza_id: None,
-                target: Some(MessageTargetId::MessageId("1".into())),
+                target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -439,7 +439,7 @@ mod tests {
             MessageLike {
                 id: "5".into(),
                 stanza_id: None,
-                target: Some(MessageTargetId::StanzaId("stanza-id-1".into())),
+                target: Some(MessageTargetId::ServerId("stanza-id-1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -455,8 +455,8 @@ mod tests {
         let reduced_message = Message::reducing_messages(messages).pop().unwrap();
         assert_eq!(
             Message {
-                id: Some("1".into()),
-                stanza_id: Some("stanza-id-1".into()),
+                remote_id: Some("1".into()),
+                server_id: Some("stanza-id-1".into()),
                 from: user_id!("b@prose.org").into(),
                 body: Body {
                     raw: "Hello World".to_string(),

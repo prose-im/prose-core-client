@@ -17,8 +17,8 @@ use prose_xmpp::stanza::message::{Forwarded, MucUser, Reactions};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
-    Body, Message, MessageId, MessageLike, MessageLikeBody, MessageLikeId, MessageLikePayload,
-    Reaction, StanzaId,
+    Body, Message, MessageLike, MessageLikeBody, MessageLikeId, MessageLikePayload,
+    MessageRemoteId, MessageServerId, Reaction,
 };
 use crate::domain::shared::models::AnonOccupantId;
 use crate::dtos::{
@@ -36,8 +36,8 @@ where
 }
 
 pub struct MessageBuilder {
-    id: MessageId,
-    stanza_id: Option<StanzaId>,
+    id: MessageRemoteId,
+    stanza_id: Option<MessageServerId>,
     from: ParticipantId,
     from_anon: Option<AnonOccupantId>,
     from_name: Option<String>,
@@ -52,11 +52,11 @@ pub struct MessageBuilder {
 }
 
 impl MessageBuilder {
-    pub fn id_for_index(idx: u32) -> MessageId {
+    pub fn id_for_index(idx: u32) -> MessageRemoteId {
         format!("msg-{}", idx).into()
     }
 
-    pub fn stanza_id_for_index(idx: u32) -> StanzaId {
+    pub fn stanza_id_for_index(idx: u32) -> MessageServerId {
         format!("res-{}", idx).into()
     }
 }
@@ -104,7 +104,7 @@ impl MessageBuilder {
     }
 
     pub fn new_with_id(
-        id: impl Into<MessageId>,
+        id: impl Into<MessageRemoteId>,
         timestamp: DateTime<Utc>,
         payload: MessageLikePayload,
     ) -> Self {
@@ -125,7 +125,7 @@ impl MessageBuilder {
         }
     }
 
-    pub fn set_stanza_id(mut self, stanza_id: Option<StanzaId>) -> Self {
+    pub fn set_stanza_id(mut self, stanza_id: Option<MessageServerId>) -> Self {
         self.stanza_id = stanza_id;
         self
     }
@@ -173,8 +173,8 @@ impl MessageBuilder {
         };
 
         Message {
-            id: Some(self.id),
-            stanza_id: self.stanza_id,
+            remote_id: Some(self.id),
+            server_id: self.stanza_id,
             from: self.from,
             body: Body {
                 raw: body.raw,

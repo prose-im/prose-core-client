@@ -105,7 +105,7 @@ async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
         .build_message_like();
 
     // Reactions in MUC rooms target other messages by their StanzaId.
-    message2.target = Some(MessageTargetId::StanzaId(
+    message2.target = Some(MessageTargetId::ServerId(
         MessageBuilder::stanza_id_for_index(1),
     ));
     message2.payload = MessageLikePayload::Reaction {
@@ -211,7 +211,7 @@ async fn test_load_only_messages_targeting() -> Result<()> {
         .set_from(user_id!("c@prose.org"))
         .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
         .build_message_like();
-    message6.target = Some(MessageTargetId::StanzaId(
+    message6.target = Some(MessageTargetId::ServerId(
         MessageBuilder::stanza_id_for_index(2),
     ));
     message6.payload = MessageLikePayload::Reaction {
@@ -244,10 +244,10 @@ async fn test_load_only_messages_targeting() -> Result<()> {
             &account_id!("account@prose.org"),
             &room_id,
             &[
-                MessageTargetId::MessageId(MessageBuilder::id_for_index(1)),
-                MessageTargetId::StanzaId(MessageBuilder::stanza_id_for_index(1)),
-                MessageTargetId::MessageId(MessageBuilder::id_for_index(2)),
-                MessageTargetId::StanzaId(MessageBuilder::stanza_id_for_index(2)),
+                MessageTargetId::RemoteId(MessageBuilder::id_for_index(1)),
+                MessageTargetId::ServerId(MessageBuilder::stanza_id_for_index(1)),
+                MessageTargetId::RemoteId(MessageBuilder::id_for_index(2)),
+                MessageTargetId::ServerId(MessageBuilder::stanza_id_for_index(2)),
             ],
             &Utc.with_ymd_and_hms(2024, 02, 22, 0, 0, 0).unwrap()
         )
@@ -291,9 +291,7 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
         repo.get_messages_targeting(
             &account_id!("account@prose.org"),
             &room_id,
-            &[MessageTargetId::MessageId(MessageBuilder::id_for_index(
-                100
-            ))],
+            &[MessageTargetId::RemoteId(MessageBuilder::id_for_index(100))],
             &DateTime::<Utc>::default()
         )
         .await?
