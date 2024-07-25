@@ -14,7 +14,7 @@ use sha1::{Digest, Sha1};
 use xmpp_parsers::hashes::Sha1HexAttribute;
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub;
-use xmpp_parsers::pubsub::pubsub::Items;
+use xmpp_parsers::pubsub::pubsub::{Items, PublishOptions};
 use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
 use xmpp_parsers::time::{TimeQuery, TimeResult};
 use xmpp_parsers::version::{VersionQuery, VersionResult};
@@ -227,7 +227,11 @@ impl Profile {
         Ok(())
     }
 
-    pub async fn publish_vcard4(&self, vcard: VCard4) -> Result<()> {
+    pub async fn publish_vcard4(
+        &self,
+        vcard: VCard4,
+        publish_options: Option<PublishOptions>,
+    ) -> Result<()> {
         let iq = Iq::from_set(
             self.ctx.generate_id(),
             PubSub::Publish {
@@ -239,7 +243,7 @@ impl Profile {
                         payload: Some(vcard.into()),
                     })],
                 },
-                publish_options: None,
+                publish_options,
             },
         );
         self.ctx.send_iq(iq).await?;

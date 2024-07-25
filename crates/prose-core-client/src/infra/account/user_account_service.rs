@@ -6,8 +6,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::Jid;
-
-use prose_xmpp::mods;
+use prose_xmpp::{mods, PublishOptionsExt};
+use xmpp_parsers::pubsub::pubsub::PublishOptions;
 
 use crate::domain::account::services::{UserAccountService, UserProfileFormat};
 use crate::domain::general::models::Capabilities;
@@ -88,7 +88,7 @@ impl UserAccountService for XMPPClient {
 
         match format {
             UserProfileFormat::Vcard4 => {
-                profile.publish_vcard4(user_profile.into()).await?;
+                profile.publish_vcard4(user_profile.into(), None).await?;
             }
             UserProfileFormat::VcardTemp => {
                 profile.publish_vcard_temp(user_profile.into()).await?;
