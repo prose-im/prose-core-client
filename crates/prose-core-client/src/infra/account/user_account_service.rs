@@ -6,8 +6,8 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::Jid;
-use prose_xmpp::{mods, PublishOptionsExt};
-use xmpp_parsers::pubsub::pubsub::PublishOptions;
+
+use prose_xmpp::mods;
 
 use crate::domain::account::services::{UserAccountService, UserProfileFormat};
 use crate::domain::general::models::Capabilities;
