@@ -10,8 +10,8 @@ use prose_store::prelude::*;
 
 use crate::app::deps::{
     AppContext, AppDependencies, DynAvatarRepository, DynClientEventDispatcher,
-    DynEncryptionService, DynIDProvider, DynRngProvider, DynServerEventHandlerQueue,
-    DynTimeProvider, DynUserDeviceIdProvider,
+    DynEncryptionService, DynIDProvider, DynMessageIdProvider, DynRngProvider,
+    DynServerEventHandlerQueue, DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::services::RoomInner;
 use crate::domain::contacts::services::impls::{
@@ -61,6 +61,7 @@ pub(crate) struct PlatformDependencies {
     pub ctx: AppContext,
     pub encryption_service: DynEncryptionService,
     pub id_provider: DynIDProvider,
+    pub message_id_provider: DynMessageIdProvider,
     pub rng_provider: DynRngProvider,
     pub server_event_handler_queue: DynServerEventHandlerQueue,
     pub short_id_provider: DynIDProvider,
@@ -70,7 +71,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 29;
+const DB_VERSION: u32 = 30;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -202,6 +203,11 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, MessageRecord>(&tx)?;
         }
 
+        if event.old_version < 30 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
+        }
+
         Ok(())
     })
     .await?;
@@ -226,6 +232,7 @@ impl From<PlatformDependencies> for AppDependencies {
         let ctx = Arc::new(d.ctx);
         let drafts_repo = Arc::new(DraftsRepository::new(d.store.clone()));
         let id_provider = d.id_provider;
+        let message_id_provider = d.message_id_provider;
         let messages_repo = Arc::new(CachingMessageRepository::new(d.store.clone()));
         let time_provider = d.time_provider;
         let user_device_repo = Arc::new(CachingUserDeviceRepository::new(
@@ -282,6 +289,7 @@ impl From<PlatformDependencies> for AppDependencies {
             encryption_domain_service: encryption_domain_service.clone(),
             local_room_settings_repo: local_room_settings_repo.clone(),
             message_archive_service: d.xmpp.clone(),
+            message_id_provider: message_id_provider.clone(),
             message_repo: messages_repo.clone(),
             time_provider: time_provider.clone(),
         };
@@ -350,7 +358,7 @@ impl From<PlatformDependencies> for AppDependencies {
             let ctx = ctx.clone();
             let drafts_repo = drafts_repo.clone();
             let encryption_domain_service = encryption_domain_service.clone();
-            let id_provider = id_provider.clone();
+            let message_id_provider = message_id_provider.clone();
             let message_repo = messages_repo.clone();
             let sidebar_domain_service = sidebar_domain_service.clone();
             let time_provider = time_provider.clone();
@@ -365,7 +373,7 @@ impl From<PlatformDependencies> for AppDependencies {
                     data: data.clone(),
                     drafts_repo: drafts_repo.clone(),
                     encryption_domain_service: encryption_domain_service.clone(),
-                    id_provider: id_provider.clone(),
+                    message_id_provider: message_id_provider.clone(),
                     message_archive_service: xmpp.clone(),
                     message_repo: message_repo.clone(),
                     messaging_service: xmpp.clone(),
@@ -391,6 +399,7 @@ impl From<PlatformDependencies> for AppDependencies {
             drafts_repo,
             encryption_domain_service,
             id_provider,
+            message_id_provider,
             local_room_settings_repo,
             message_archive_service: d.xmpp.clone(),
             messages_repo,

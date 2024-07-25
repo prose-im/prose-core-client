@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::ops::Deref;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::TimeDelta;
@@ -18,13 +16,12 @@ use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynEncryptionDomainService, DynMessagesRepository, DynOfflineMessagesRepository,
-    DynSidebarDomainService, DynTimeProvider,
+    DynEncryptionDomainService, DynMessageIdProvider, DynMessagesRepository,
+    DynOfflineMessagesRepository, DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
-    MessageLike, MessageLikeError, MessageLikeId, MessageLikePayload, MessageParser,
-    MessageTargetId,
+    MessageId, MessageLike, MessageLikeError, MessageLikePayload, MessageParser, MessageTargetId,
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{AccountId, ConnectionState, RoomId, UserEndpointId};
@@ -40,6 +37,8 @@ pub struct MessagesEventHandler {
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
+    #[inject]
+    message_id_provider: DynMessageIdProvider,
     #[inject]
     messages_repo: DynMessagesRepository,
     #[inject]
@@ -81,69 +80,64 @@ impl ServerEventHandler for MessagesEventHandler {
     }
 }
 
-enum ReceivedMessage {
-    Message(Message),
-    Carbon(Forwarded),
-}
-
-enum SentMessage {
-    Message(Message),
-    Carbon(Forwarded),
-}
-
-impl ReceivedMessage {
-    pub fn from(&self) -> Option<UserEndpointId> {
-        let message = match &self {
-            ReceivedMessage::Message(message) => Some(message),
-            ReceivedMessage::Carbon(message) => message.stanza.as_ref().map(|m| m.deref()),
-        };
-
-        let Some(message) = message else { return None };
-
-        let Some(from) = message.from.clone() else {
-            return None;
-        };
-
-        if message.is_groupchat_message() {
-            let Ok(from) = from.try_into_full() else {
-                error!("Expected FullJid in received groupchat message");
-                return None;
-            };
-            UserEndpointId::Occupant(from.into())
-        } else {
-            match from.try_into_full() {
-                Ok(full) => UserEndpointId::UserResource(full.into()),
-                Err(bare) => UserEndpointId::User(bare.into()),
-            }
+impl MessageEventType {
+    fn message(&self) -> Option<&Message> {
+        match self {
+            MessageEventType::Received(message) => Some(message),
+            MessageEventType::Sent(message) => Some(message),
+            MessageEventType::Sync(Carbon::Received(carbon)) => carbon.stanza.as_deref(),
+            MessageEventType::Sync(Carbon::Sent(carbon)) => carbon.stanza.as_deref(),
         }
-        .into()
     }
 }
 
-impl SentMessage {
-    pub fn room_id(&self) -> Option<RoomId> {
-        let message = match self {
-            SentMessage::Message(message) => Some(message),
-            SentMessage::Carbon(message) => message.stanza.as_ref().map(|m| m.deref()),
-        };
+enum MessageOrCarbon {
+    Message(Message),
+    Carbon(Forwarded),
+}
 
-        let Some(message) = message else { return None };
-
-        let Some(to) = message.to.clone() else {
-            return None;
-        };
-
-        match message.type_ {
-            MessageType::Groupchat => RoomId::Muc(to.into_bare().into()),
-            _ => RoomId::User(to.into_bare().into()),
+impl MessageOrCarbon {
+    fn message(&self) -> Option<&Message> {
+        match self {
+            Self::Message(message) => Some(message),
+            Self::Carbon(carbon) => carbon.stanza.as_deref(),
         }
-        .into()
+    }
+
+    pub fn from(&self) -> Option<UserEndpointId> {
+        self.message().and_then(|m| m.sender())
+    }
+
+    pub fn room_id(&self) -> Option<RoomId> {
+        self.message().and_then(|m| m.room_id())
+    }
+
+    pub fn remote_id(&self) -> Option<MessageRemoteId> {
+        self.message()
+            .and_then(|m| m.id.clone())
+            .map(MessageRemoteId::from)
     }
 }
 
 impl MessagesEventHandler {
     async fn handle_message_event(&self, event: MessageEvent) -> Result<()> {
         let account = self.ctx.connected_account()?;
+
+        // Skip known messages…
+        if let Some((Some(room_id), Some(server_id))) = event
+            .r#type
+            .message()
+            .map(|msg| (msg.room_id(), msg.server_id()))
+        {
+            if self
+                .messages_repo
+                .contains(&account, &room_id, &server_id)
+                .await?
+            {
+                // We've seen this message already…
+                return Ok(());
+            }
+        }
 
         match event.r#type {
             MessageEventType::Received(mut message) => {
@@ -176,24 +170,24 @@ impl MessagesEventHandler {
                             message.from = message.to.take();
                             message.to = Some(room_id.into_bare().into());
                             return self
-                                .handle_sent_message(account, SentMessage::Message(message))
+                                .handle_sent_message(account, MessageOrCarbon::Message(message))
                                 .await;
                         }
                     }
                 }
-                self.handle_received_message(account, ReceivedMessage::Message(message))
+                self.handle_received_message(account, MessageOrCarbon::Message(message))
                     .await?
             }
             MessageEventType::Sync(Carbon::Received(message)) => {
-                self.handle_received_message(account, ReceivedMessage::Carbon(message))
+                self.handle_received_message(account, MessageOrCarbon::Carbon(message))
                     .await?
             }
             MessageEventType::Sync(Carbon::Sent(message)) => {
-                self.handle_sent_message(account, SentMessage::Carbon(message))
+                self.handle_sent_message(account, MessageOrCarbon::Carbon(message))
                     .await?
             }
             MessageEventType::Sent(message) => {
-                self.handle_sent_message(account, SentMessage::Message(message))
+                self.handle_sent_message(account, MessageOrCarbon::Message(message))
                     .await?
             }
         }
@@ -203,7 +197,7 @@ impl MessagesEventHandler {
     async fn handle_received_message(
         &self,
         account: AccountId,
-        message: ReceivedMessage,
+        message: MessageOrCarbon,
     ) -> Result<()> {
         let Some(from) = message.from() else {
             error!("Received message from unknown sender.");
@@ -227,6 +221,7 @@ impl MessagesEventHandler {
                 .unwrap_or_else(|| TimeDelta::zero());
 
         let parser = MessageParser::new(
+            self.message_id_provider.new_id(),
             room.clone(),
             server_time,
             self.encryption_domain_service.clone(),
@@ -234,8 +229,8 @@ impl MessagesEventHandler {
         );
 
         let parsed_message: Result<MessageLike> = match message {
-            ReceivedMessage::Message(message) => parser.parse_message(message).await,
-            ReceivedMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon).await,
+            MessageOrCarbon::Message(message) => parser.parse_message(message).await,
+            MessageOrCarbon::Carbon(carbon) => parser.parse_forwarded_message(carbon).await,
         };
 
         let message = match parsed_message {
@@ -252,17 +247,16 @@ impl MessagesEventHandler {
         };
 
         if message.payload.is_message() {
-            match self
+            _ = self
                 .sidebar_domain_service
                 .handle_received_message(&room_id, &message)
                 .await
-            {
-                Ok(_) => (),
-                Err(err) => error!(
-                    "Could not insert sidebar item for message. {}",
-                    err.to_string()
-                ),
-            }
+                .inspect_err(|err| {
+                    error!(
+                        "Could not insert sidebar item for message. {}",
+                        err.to_string()
+                    )
+                });
         }
 
         let Some(room) = room else {
@@ -282,7 +276,11 @@ impl MessagesEventHandler {
         Ok(())
     }
 
-    async fn handle_sent_message(&self, account: AccountId, message: SentMessage) -> Result<()> {
+    async fn handle_sent_message(
+        &self,
+        account: AccountId,
+        message: MessageOrCarbon,
+    ) -> Result<()> {
         let Some(room_id) = &message.room_id() else {
             error!("Sent message to unknown recipient.");
             return Ok(());
@@ -293,7 +291,19 @@ impl MessagesEventHandler {
             return Ok(());
         };
 
+        let existing_message_id = match message.remote_id() {
+            Some(remote_id) => {
+                self.messages_repo
+                    .resolve_remote_id_to_message_id(&account, &room_id, &remote_id)
+                    .await?
+            }
+            None => None,
+        };
+
+        let is_update = existing_message_id.is_some();
+
         let parser = MessageParser::new(
+            existing_message_id.unwrap_or_else(|| self.message_id_provider.new_id()),
             Some(room.clone()),
             room.features
                 .local_time_to_server_time(self.time_provider.now()),
@@ -302,8 +312,8 @@ impl MessagesEventHandler {
         );
 
         let mut parsed_message = match message {
-            SentMessage::Message(message) => parser.parse_message(message).await,
-            SentMessage::Carbon(carbon) => parser.parse_forwarded_message(carbon).await,
+            MessageOrCarbon::Message(message) => parser.parse_message(message).await,
+            MessageOrCarbon::Carbon(carbon) => parser.parse_forwarded_message(carbon).await,
         }?;
 
         // Usually for sent messages the `from` would be our connected JID and the `to` would be
@@ -318,6 +328,15 @@ impl MessagesEventHandler {
         // take our connected jid and plug it into the `from`.
         parsed_message.from = ParticipantId::User(account.to_user_id());
 
+        // We had this message saved before without a StanzaId, so we'll save it again with
+        // the StanzaId but won't dispatch an event since this part is irrelevant for the UI.
+        if is_update {
+            self.messages_repo
+                .append(&account, &room_id, &[parsed_message])
+                .await?;
+            return Ok(());
+        }
+
         self.save_message_and_dispatch_event(&account, room, parsed_message)
             .await?;
         Ok(())
@@ -329,42 +348,15 @@ impl MessagesEventHandler {
         room: Room,
         message: MessageLike,
     ) -> Result<()> {
-        let is_message_update = if let Some(message_id) = message.id.original_id() {
-            self.messages_repo
-                .contains(account, &room.room_id, message_id)
-                .await
-                .unwrap_or(false)
-        } else {
-            false
-        };
-
         let messages = [message];
         self.messages_repo
             .append(&account, &room.room_id, &messages)
             .await?;
         let [message] = messages;
 
-        if is_message_update {
-            let message_id = if let Some(target_id) = message.target {
-                self.resolve_message_target_id(account, &room.room_id, &message.id, target_id)
-                    .await
-            } else {
-                None
-            }
-            .unwrap_or_else(|| message.id.id().clone());
-
-            self.client_event_dispatcher.dispatch_room_event(
-                room.clone(),
-                ClientRoomEventType::MessagesUpdated {
-                    message_ids: vec![message_id],
-                },
-            );
-            return Ok(());
-        }
-
         let event_type = if let Some(target) = message.target {
             let Some(message_id) = self
-                .resolve_message_target_id(account, &room.room_id, &message.id, target)
+                .resolve_message_target_id(account, &room.room_id, target)
                 .await
             else {
                 return Ok(());
@@ -381,7 +373,7 @@ impl MessagesEventHandler {
             }
         } else {
             ClientRoomEventType::MessagesAppended {
-                message_ids: vec![message.id.id().as_ref().into()],
+                message_ids: vec![message.id.clone()],
             }
         };
 
@@ -395,27 +387,30 @@ impl MessagesEventHandler {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        message_id: &MessageLikeId,
         target_id: MessageTargetId,
-    ) -> Option<MessageRemoteId> {
-        match target_id {
-            MessageTargetId::RemoteId(id) => Some(id),
-            MessageTargetId::ServerId(stanza_id) => {
-                match self
-                    .messages_repo
-                    .resolve_message_id(account, &room_id, &stanza_id)
+    ) -> Option<MessageId> {
+        let result = match &target_id {
+            MessageTargetId::RemoteId(remote_id) => {
+                self.messages_repo
+                    .resolve_remote_id_to_message_id(account, &room_id, remote_id)
                     .await
-                {
-                    Ok(Some(id)) => Some(id),
-                    Ok(None) => {
-                        warn!("Not dispatching event for message with id '{}'. Failed to look up targeted MessageId from StanzaId '{}'.", message_id, stanza_id);
-                        None
-                    }
-                    Err(err) => {
-                        error!("Not dispatching event for message with id '{}'. Encountered error while looking up StanzaId '{}': {}", message_id, stanza_id, err.to_string());
-                        None
-                    }
-                }
+            }
+            MessageTargetId::ServerId(server_id) => {
+                self.messages_repo
+                    .resolve_server_id_to_message_id(account, &room_id, server_id)
+                    .await
+            }
+        };
+
+        match result {
+            Ok(Some(id)) => Some(id),
+            Ok(None) => {
+                warn!("Not dispatching event for message. Failed to look up targeted MessageId from {:?}.", target_id);
+                None
+            }
+            Err(err) => {
+                error!("Not dispatching event for message. Encountered error while looking up {:?}: {}", target_id, err.to_string());
+                None
             }
         }
     }

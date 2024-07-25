@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::str::FromStr;
-
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use minidom::Element;
@@ -18,8 +16,8 @@ use prose_xmpp::stanza::message::{Forwarded, MucUser, Reactions};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
-    Body, Message, MessageLike, MessageLikeBody, MessageLikeId, MessageLikePayload,
-    MessageRemoteId, MessageServerId, Reaction,
+    Body, Message, MessageId, MessageLike, MessageLikeBody, MessageLikePayload, MessageRemoteId,
+    MessageServerId, Reaction,
 };
 use crate::domain::shared::models::AnonOccupantId;
 use crate::dtos::{
@@ -27,23 +25,15 @@ use crate::dtos::{
 };
 use crate::test::mock_data;
 
-impl<T> From<T> for MessageLikeId
-where
-    T: Into<String>,
-{
-    fn from(s: T) -> MessageLikeId {
-        MessageLikeId::from_str(&s.into()).unwrap()
-    }
-}
-
 pub struct MessageBuilder {
-    id: MessageRemoteId,
+    id: MessageId,
+    remote_id: Option<MessageRemoteId>,
     stanza_id: Option<MessageServerId>,
     from: ParticipantId,
     from_anon: Option<AnonOccupantId>,
     from_name: Option<String>,
     to: BareJid,
-    target_message_idx: Option<u32>,
+    target_message_id: Option<MessageRemoteId>,
     payload: MessageLikePayload,
     timestamp: DateTime<Utc>,
     is_read: bool,
@@ -53,7 +43,11 @@ pub struct MessageBuilder {
 }
 
 impl MessageBuilder {
-    pub fn id_for_index(idx: u32) -> MessageRemoteId {
+    pub fn id_for_index(idx: u32) -> MessageId {
+        format!("msg-{}", idx).into()
+    }
+
+    pub fn remote_id_for_index(idx: u32) -> MessageRemoteId {
         format!("msg-{}", idx).into()
     }
 
@@ -75,6 +69,15 @@ impl MessageLikePayload {
             encryption_info: None,
             is_transient: false,
         }
+    }
+}
+
+impl<T> From<T> for MessageLikePayload
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        MessageLikePayload::message(value)
     }
 }
 
@@ -101,22 +104,24 @@ impl MessageBuilder {
             mock_data::reference_date() + Duration::minutes(idx.into()),
             MessageLikePayload::message(format!("Message {}", idx)),
         )
-        .set_stanza_id(Some(Self::stanza_id_for_index(idx)))
+        .set_remote_id(Some(Self::remote_id_for_index(idx)))
+        .set_server_id(Some(Self::stanza_id_for_index(idx)))
     }
 
     pub fn new_with_id(
-        id: impl Into<MessageRemoteId>,
+        id: impl Into<MessageId>,
         timestamp: DateTime<Utc>,
         payload: MessageLikePayload,
     ) -> Self {
         MessageBuilder {
             id: id.into(),
+            remote_id: None,
             stanza_id: None,
             from: ParticipantId::User(BareJid::ours().into()),
             from_anon: None,
             from_name: None,
             to: BareJid::theirs(),
-            target_message_idx: None,
+            target_message_id: None,
             payload,
             timestamp,
             is_read: false,
@@ -126,7 +131,17 @@ impl MessageBuilder {
         }
     }
 
-    pub fn set_stanza_id(mut self, stanza_id: Option<MessageServerId>) -> Self {
+    pub fn set_id(mut self, id: impl Into<MessageId>) -> Self {
+        self.id = id.into();
+        self
+    }
+
+    pub fn set_remote_id(mut self, remote_id: Option<MessageRemoteId>) -> Self {
+        self.remote_id = remote_id;
+        self
+    }
+
+    pub fn set_server_id(mut self, stanza_id: Option<MessageServerId>) -> Self {
         self.stanza_id = stanza_id;
         self
     }
@@ -151,13 +166,13 @@ impl MessageBuilder {
         self
     }
 
-    pub fn set_payload(mut self, payload: MessageLikePayload) -> Self {
-        self.payload = payload;
+    pub fn set_payload(mut self, payload: impl Into<MessageLikePayload>) -> Self {
+        self.payload = payload.into();
         self
     }
 
     pub fn set_target_message_idx(mut self, idx: u32) -> Self {
-        self.target_message_idx = Some(idx);
+        self.target_message_id = Some(Self::remote_id_for_index(idx));
         self
     }
 
@@ -174,7 +189,8 @@ impl MessageBuilder {
         };
 
         Message {
-            remote_id: Some(self.id),
+            id: self.id,
+            remote_id: self.remote_id,
             server_id: self.stanza_id,
             from: self.from,
             body: Body {
@@ -199,8 +215,7 @@ impl MessageBuilder {
         };
 
         MessageDTO {
-            id: Some(self.id),
-            stanza_id: self.stanza_id,
+            id: self.id,
             from: MessageSender {
                 id: self.from,
                 name: self
@@ -245,11 +260,10 @@ impl MessageBuilder {
 
     pub fn build_message_like(self) -> MessageLike {
         MessageLike {
-            id: MessageLikeId::new(Some(self.id)),
-            stanza_id: self.stanza_id,
-            target: self
-                .target_message_idx
-                .map(|idx| Self::id_for_index(idx).into()),
+            id: self.id,
+            remote_id: self.remote_id,
+            server_id: self.stanza_id,
+            target: self.target_message_id.map(Into::into),
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
@@ -309,7 +323,12 @@ impl MessageBuilder {
 
     pub fn build_message_stanza(self) -> prose_xmpp::stanza::Message {
         let mut message = prose_xmpp::stanza::Message::new()
-            .set_id(self.id.as_ref().into())
+            .set_id(
+                self.remote_id
+                    .map(|id| id.to_string())
+                    .unwrap_or_else(|| self.id.to_string())
+                    .into(),
+            )
             .set_type(match self.from {
                 ParticipantId::User(_) => MessageType::Chat,
                 ParticipantId::Occupant(_) => MessageType::Groupchat,
@@ -330,11 +349,11 @@ impl MessageBuilder {
             MessageLikePayload::Message { body, .. } => message = message.set_body(body.raw),
             MessageLikePayload::Reaction { emojis } => {
                 message = message.set_message_reactions(Reactions {
-                    id: Self::id_for_index(
-                        self.target_message_idx.expect("Missing target_message_idx"),
-                    )
-                    .as_ref()
-                    .into(),
+                    id: self
+                        .target_message_id
+                        .expect("Missing target_message_idx")
+                        .as_ref()
+                        .into(),
                     reactions: emojis.into_iter().map(Into::into).collect(),
                 })
             }

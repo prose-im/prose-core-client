@@ -7,9 +7,7 @@ typedef string PathBuf;
 [Custom]
 typedef string Url;
 [Custom]
-typedef string MessageRemoteId;
-[Custom]
-typedef string MessageServerId;
+typedef string MessageId;
 [Custom]
 typedef string Emoji;
 [Custom]
@@ -55,9 +53,9 @@ interface ClientEvent {
     ConnectionStatusChanged(ConnectionEvent event);
     ContactChanged(JID jid);
     AvatarChanged(JID jid);
-    MessagesAppended(JID conversation, sequence<MessageRemoteId> message_ids);
-    MessagesUpdated(JID conversation, sequence<MessageRemoteId> message_ids);
-    MessagesDeleted(JID conversation, sequence<MessageRemoteId> message_ids);
+    MessagesAppended(JID conversation, sequence<MessageId> message_ids);
+    MessagesUpdated(JID conversation, sequence<MessageId> message_ids);
+    MessagesDeleted(JID conversation, sequence<MessageId> message_ids);
 };
 
 [Enum]

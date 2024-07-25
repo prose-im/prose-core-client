@@ -23,7 +23,9 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
     let room_id = RoomId::from(user_id!("a@prose.org"));
-    let message = MessageBuilder::new_with_index(123).build_message_like();
+    let message = MessageBuilder::new_with_index(123)
+        .set_id("my-message-id")
+        .build_message_like();
 
     repo.append(
         &account_id!("account@prose.org"),
@@ -40,12 +42,8 @@ async fn test_can_insert_same_message_twice() -> Result<()> {
 
     assert_eq!(
         vec![message.clone()],
-        repo.get_all(
-            &account_id!("account@prose.org"),
-            &room_id,
-            &[message.id.clone().into_original_id().unwrap()]
-        )
-        .await?,
+        repo.get_all(&account_id!("account@prose.org"), &room_id, &[message.id])
+            .await?,
     );
 
     Ok(())
@@ -244,9 +242,9 @@ async fn test_load_only_messages_targeting() -> Result<()> {
             &account_id!("account@prose.org"),
             &room_id,
             &[
-                MessageTargetId::RemoteId(MessageBuilder::id_for_index(1)),
+                MessageTargetId::RemoteId(MessageBuilder::remote_id_for_index(1)),
                 MessageTargetId::ServerId(MessageBuilder::stanza_id_for_index(1)),
-                MessageTargetId::RemoteId(MessageBuilder::id_for_index(2)),
+                MessageTargetId::RemoteId(MessageBuilder::remote_id_for_index(2)),
                 MessageTargetId::ServerId(MessageBuilder::stanza_id_for_index(2)),
             ],
             &Utc.with_ymd_and_hms(2024, 02, 22, 0, 0, 0).unwrap()
@@ -291,7 +289,9 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
         repo.get_messages_targeting(
             &account_id!("account@prose.org"),
             &room_id,
-            &[MessageTargetId::RemoteId(MessageBuilder::id_for_index(100))],
+            &[MessageTargetId::RemoteId(
+                MessageBuilder::remote_id_for_index(100)
+            )],
             &DateTime::<Utc>::default()
         )
         .await?
@@ -301,7 +301,7 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
 }
 
 #[async_test]
-async fn test_resolves_message_id() -> Result<()> {
+async fn test_resolves_server_id_to_message_id() -> Result<()> {
     let repo = CachingMessageRepository::new(store().await?);
 
     let room_id = RoomId::from(user_id!("a@prose.org"));
@@ -312,7 +312,7 @@ async fn test_resolves_message_id() -> Result<()> {
 
     assert_eq!(
         Some(MessageBuilder::id_for_index(101)),
-        repo.resolve_message_id(
+        repo.resolve_server_id_to_message_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::stanza_id_for_index(101)
@@ -322,10 +322,76 @@ async fn test_resolves_message_id() -> Result<()> {
 
     assert_eq!(
         None,
-        repo.resolve_message_id(
+        repo.resolve_server_id_to_message_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::stanza_id_for_index(1)
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_resolves_remote_id_to_message_id() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = RoomId::from(user_id!("a@prose.org"));
+    let message = MessageBuilder::new_with_index(101).build_message_like();
+
+    repo.append(&account_id!("account@prose.org"), &room_id, &[message])
+        .await?;
+
+    assert_eq!(
+        Some(MessageBuilder::id_for_index(101)),
+        repo.resolve_remote_id_to_message_id(
+            &account_id!("account@prose.org"),
+            &room_id,
+            &MessageBuilder::remote_id_for_index(101)
+        )
+        .await?
+    );
+
+    assert_eq!(
+        None,
+        repo.resolve_remote_id_to_message_id(
+            &account_id!("account@prose.org"),
+            &room_id,
+            &MessageBuilder::remote_id_for_index(1)
+        )
+        .await?
+    );
+
+    Ok(())
+}
+
+#[async_test]
+async fn test_resolves_message_id_to_remote_id() -> Result<()> {
+    let repo = CachingMessageRepository::new(store().await?);
+
+    let room_id = RoomId::from(user_id!("a@prose.org"));
+    let message = MessageBuilder::new_with_index(101).build_message_like();
+
+    repo.append(&account_id!("account@prose.org"), &room_id, &[message])
+        .await?;
+
+    assert_eq!(
+        Some(MessageBuilder::remote_id_for_index(101)),
+        repo.resolve_message_id_to_remote_id(
+            &account_id!("account@prose.org"),
+            &room_id,
+            &MessageBuilder::id_for_index(101)
+        )
+        .await?
+    );
+
+    assert_eq!(
+        None,
+        repo.resolve_message_id_to_remote_id(
+            &account_id!("account@prose.org"),
+            &room_id,
+            &MessageBuilder::id_for_index(1)
         )
         .await?
     );
@@ -383,9 +449,9 @@ async fn test_get_messages_after() -> Result<()> {
 
     assert_eq!(
         vec![
-            MessageBuilder::id_for_index(1),
-            MessageBuilder::id_for_index(2),
-            MessageBuilder::id_for_index(3)
+            MessageBuilder::remote_id_for_index(1),
+            MessageBuilder::remote_id_for_index(2),
+            MessageBuilder::remote_id_for_index(3)
         ],
         repo.get_messages_after(
             &account_id!("a@prose.org"),
@@ -394,12 +460,12 @@ async fn test_get_messages_after() -> Result<()> {
         )
         .await?
         .into_iter()
-        .map(|m| m.id.into_original_id().unwrap())
+        .map(|m| m.remote_id.unwrap())
         .collect::<Vec<_>>()
     );
 
     assert_eq!(
-        vec![MessageBuilder::id_for_index(3)],
+        vec![MessageBuilder::remote_id_for_index(3)],
         repo.get_messages_after(
             &account_id!("a@prose.org"),
             &muc_id!("room2@prose.org").into(),
@@ -407,7 +473,7 @@ async fn test_get_messages_after() -> Result<()> {
         )
         .await?
         .into_iter()
-        .map(|m| m.id.into_original_id().unwrap())
+        .map(|m| m.remote_id.unwrap())
         .collect::<Vec<_>>()
     );
 
@@ -536,7 +602,7 @@ async fn test_loads_latest_received_message() -> Result<()> {
         &[
             MessageBuilder::new_with_index(2)
                 .set_timestamp(Utc.with_ymd_and_hms(2024, 5, 1, 0, 0, 0).unwrap())
-                .set_stanza_id(None)
+                .set_server_id(None)
                 .build_message_like(),
             MessageBuilder::new_with_index(3)
                 .set_timestamp(Utc.with_ymd_and_hms(2024, 4, 1, 0, 0, 0).unwrap())

@@ -283,20 +283,20 @@ async fn test_decrypts_message_from_private_nonanonymous_muc_room() -> Result<()
         "#
     );
 
+    let message_id = client.get_next_message_id();
+
     event!(client, ClientEvent::SidebarChanged);
     room_event!(
         client,
         room_id,
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec!["my-message-id".into()]
+            message_ids: vec![message_id.clone()]
         }
     );
 
     client.receive_next().await;
 
-    let messages = room
-        .load_messages_with_ids(&["my-message-id".into()])
-        .await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
     assert_eq!(messages.len(), 1);
     assert_eq!(
         messages.first().unwrap().body.html.as_ref(),
@@ -584,10 +584,12 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
         Some(DeviceBundle::test(account_id!("user2@prose.org"), 200).await),
     );
 
+    let message_id = client.get_next_message_id();
+
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="{{ROOM_ID}}" type="groupchat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="{{ROOM_ID}}" type="groupchat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -610,7 +612,7 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -622,12 +624,10 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
     })
     .await?;
 
-    let message_id = client.get_last_id();
-
     recv!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{OCCUPANT_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="groupchat">
+        <message xmlns="jabber:client" from="{{OCCUPANT_ID}}" id="{{LAST_MSG_ID}}" to="{{USER_RESOURCE_ID}}" type="groupchat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -646,14 +646,6 @@ async fn test_encrypts_message_in_private_nonanonymous_muc_room() -> Result<()> 
           <stanza-id xmlns="urn:xmpp:sid:0" by="{{ROOM_ID}}" id="opZdWmO7r50ee_aGKnWvBMbK" />
         </message>
         "#
-    );
-
-    room_event!(
-        client,
-        room_id,
-        ClientRoomEventType::MessagesUpdated {
-            message_ids: vec![message_id.clone().into()]
-        }
     );
 
     client.receive_next().await;

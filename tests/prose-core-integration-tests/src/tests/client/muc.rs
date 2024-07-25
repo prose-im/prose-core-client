@@ -10,11 +10,8 @@ use pretty_assertions::assert_eq;
 use super::helpers::{JoinRoomStrategy, TestClient};
 use crate::{event, recv, room_event, send};
 use itertools::Itertools;
-use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
-use prose_core_client::dtos::{
-    MucId, ParticipantId, SendMessageRequest, SendMessageRequestBody, UserId,
-};
+use prose_core_client::dtos::{MucId, ParticipantId, UserId};
 use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
 use prose_xmpp::bare;
@@ -556,6 +553,8 @@ async fn test_receives_chat_states() -> Result<()> {
         composing_users[0].id
     );
 
+    let message_id = client.get_next_message_id();
+
     recv!(
         client,
         r#"
@@ -580,7 +579,7 @@ async fn test_receives_chat_states() -> Result<()> {
         client,
         room_id.clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec!["message-id-2".into()]
+            message_ids: vec![message_id.clone()]
         }
     );
 
@@ -589,173 +588,9 @@ async fn test_receives_chat_states() -> Result<()> {
     let composing_users = room.load_composing_users().await?;
     assert!(composing_users.is_empty());
 
-    let messages = room
-        .load_messages_with_ids(&["message-id-2".into()])
-        .await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
     assert_eq!(1, messages.len());
-    assert_eq!(Some("stanza-id".into()), messages[0].stanza_id);
-
-    Ok(())
-}
-
-#[mt_test]
-async fn test_sends_and_updates_message_to_muc_room() -> Result<()> {
-    let client = TestClient::new().await;
-
-    client
-        .expect_login(user_id!("user@prose.org"), "secret")
-        .await?;
-
-    let room_id = muc_id!("room@conference.prose.org");
-    let occupant_id = client.build_occupant_id(&room_id);
-    let anon_occupant_id = AnonOccupantId::from("anon-occupant-id");
-
-    client
-        .join_room(room_id.clone(), anon_occupant_id.clone())
-        .await?;
-
-    client.push_ctx([
-        ("OCCUPANT_ID", occupant_id.to_string()),
-        ("ROOM_ID", room_id.to_string()),
-        ("ANON_OCCUPANT_ID", anon_occupant_id.to_string()),
-    ]);
-
-    let message_id = client.get_next_id();
-
-    send!(
-        client,
-        r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="{{ROOM_ID}}" type="groupchat">
-          <body>Hello</body>
-          <content xmlns="urn:xmpp:content" type="text/markdown">Hello</content>
-          <active xmlns="http://jabber.org/protocol/chatstates" />
-          <markable xmlns="urn:xmpp:chat-markers:0" />
-          <store xmlns="urn:xmpp:hints" />
-        </message>
-        "#
-    );
-
-    room_event!(
-        client,
-        room_id.clone(),
-        ClientRoomEventType::MessagesAppended {
-            message_ids: vec![message_id.clone().into()]
-        }
-    );
-
-    let room = client.get_room(room_id.clone()).await.to_generic_room();
-    room.send_message(SendMessageRequest {
-        body: Some(SendMessageRequestBody {
-            text: "Hello".into(),
-        }),
-        attachments: vec![],
-    })
-    .await?;
-
-    recv!(
-        client,
-        r#"
-        <message xmlns="jabber:client" from="{{OCCUPANT_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="groupchat" xml:lang="en">
-          <body>Hello</body>
-          <active xmlns="http://jabber.org/protocol/chatstates" />
-          <markable xmlns="urn:xmpp:chat-markers:0" />
-          <store xmlns="urn:xmpp:hints" />
-          <occupant-id xmlns="urn:xmpp:occupant-id:0" id="{{ANON_OCCUPANT_ID}}" />
-          <stanza-id xmlns="urn:xmpp:sid:0" by="{{ROOM_ID}}" id="opZdWmO7r50ee_aGKnWvBMbK" />
-        </message>
-        "#
-    );
-
-    room_event!(
-        client,
-        room_id.clone(),
-        ClientRoomEventType::MessagesUpdated {
-            message_ids: vec![message_id.clone().into()]
-        }
-    );
-
-    client.receive_next().await;
-
-    let messages = room
-        .load_messages_with_ids(&[message_id.clone().into()])
-        .await?;
-    assert_eq!(1, messages.len());
-    assert_eq!("<p>Hello</p>", messages[0].body.html.as_ref());
-    assert_eq!(
-        Some("opZdWmO7r50ee_aGKnWvBMbK".into()),
-        messages[0].stanza_id,
-    );
-
-    client.push_ctx([("INITIAL_MESSAGE_ID", message_id.to_string())]);
-
-    send!(
-        client,
-        r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="{{ROOM_ID}}" type="groupchat">
-          <body>Hello World</body>
-          <content xmlns="urn:xmpp:content" type="text/markdown">Hello World</content>
-          <replace xmlns="urn:xmpp:message-correct:0" id="{{INITIAL_MESSAGE_ID}}" />
-          <store xmlns="urn:xmpp:hints" />
-        </message>
-        "#
-    );
-
-    room_event!(
-        client,
-        room_id.clone(),
-        ClientRoomEventType::MessagesUpdated {
-            message_ids: vec![message_id.clone().into()]
-        }
-    );
-
-    room.update_message(
-        message_id.clone().into(),
-        SendMessageRequest {
-            body: Some(SendMessageRequestBody {
-                text: "Hello World".into(),
-            }),
-            attachments: vec![],
-        },
-    )
-    .await?;
-
-    let messages = room
-        .load_messages_with_ids(&[message_id.clone().into()])
-        .await?;
-    assert_eq!(1, messages.len());
-    assert_eq!("<p>Hello World</p>", messages[0].body.html.as_ref());
-
-    recv!(
-        client,
-        r#"
-        <message xmlns="jabber:client" from="{{OCCUPANT_ID}}" id="{{ID}}" to="{{USER_RESOURCE_ID}}" type="groupchat" xml:lang="en">
-          <body>Hello World</body>
-          <replace xmlns="urn:xmpp:message-correct:0" id="{{INITIAL_MESSAGE_ID}}" />
-          <store xmlns="urn:xmpp:hints" />
-          <occupant-id xmlns="urn:xmpp:occupant-id:0" id="{{ANON_OCCUPANT_ID}}" />
-          <stanza-id xmlns="urn:xmpp:sid:0" by="{{ROOM_ID}}" id="907z40xwIIuX4b1YH5jRv1ko" />
-        </message>
-        "#
-    );
-
-    room_event!(
-        client,
-        room_id.clone(),
-        ClientRoomEventType::MessagesUpdated {
-            message_ids: vec![message_id.clone().into()]
-        }
-    );
-
-    client.receive_next().await;
-
-    let messages = room
-        .load_messages_with_ids(&[message_id.clone().into()])
-        .await?;
-    assert_eq!(1, messages.len());
-    assert_eq!("<p>Hello World</p>", messages[0].body.html.as_ref());
-
-    client.pop_ctx();
-    client.pop_ctx();
+    assert_eq!("Hello World", messages[0].body.raw);
 
     Ok(())
 }

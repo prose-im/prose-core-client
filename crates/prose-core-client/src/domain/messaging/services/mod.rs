@@ -5,12 +5,14 @@
 
 pub use message_archive_domain_service::MessageArchiveDomainService;
 pub use message_archive_service::{MessageArchiveService, MessagePage};
+pub use message_id_provider::{MessageIdProvider, WrappingMessageIdProvider};
 pub use message_migration_domain_service::MessageMigrationDomainService;
 pub use messaging_service::MessagingService;
 
 pub mod impls;
 mod message_archive_domain_service;
 mod message_archive_service;
+mod message_id_provider;
 mod message_migration_domain_service;
 mod messaging_service;
 

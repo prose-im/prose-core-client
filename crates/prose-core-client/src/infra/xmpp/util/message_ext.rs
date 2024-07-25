@@ -14,6 +14,8 @@ use prose_xmpp::stanza::Message;
 
 use crate::domain::messaging::models::send_message_request::{Body, Payload};
 use crate::domain::messaging::models::Attachment;
+use crate::domain::shared::models::UserEndpointId;
+use crate::dtos::{MessageServerId, RoomId};
 
 pub trait MessageExt {
     /// Returns unique attachments. Either SIMS or OOB.
@@ -28,6 +30,17 @@ pub trait MessageExt {
     fn is_groupchat_message(&self) -> bool;
     fn set_message_body(self, body: Option<Body>) -> Self;
     fn set_omemo_payload(self, payload: impl Into<legacy_omemo::Encrypted>) -> Self;
+
+    /// Returns the value of the `from` attribute converted to a `UserEndpointId`, depending on
+    /// the message type (groupchat or chat).
+    fn sender(&self) -> Option<UserEndpointId>;
+
+    /// Returns the value of the `to` attribute converted to a `RoomId`, depending on the
+    /// message type (groupchat or chat)
+    fn room_id(&self) -> Option<RoomId>;
+
+    /// Returns the value of the `stanza-id` element converted to a `MessageServerId`.
+    fn server_id(&self) -> Option<MessageServerId>;
 }
 
 impl MessageExt for Message {
@@ -123,6 +136,43 @@ impl MessageExt for Message {
             .into(),
         );
         self
+    }
+
+    fn sender(&self) -> Option<UserEndpointId> {
+        let Some(from) = self.from.clone() else {
+            return None;
+        };
+
+        if self.is_groupchat_message() {
+            let Ok(from) = from.try_into_full() else {
+                error!("Expected FullJid in received groupchat message");
+                return None;
+            };
+            UserEndpointId::Occupant(from.into())
+        } else {
+            match from.try_into_full() {
+                Ok(full) => UserEndpointId::UserResource(full.into()),
+                Err(bare) => UserEndpointId::User(bare.into()),
+            }
+        }
+        .into()
+    }
+
+    fn room_id(&self) -> Option<RoomId> {
+        let Some(to) = self.to.clone() else {
+            return None;
+        };
+
+        if self.is_groupchat_message() {
+            Some(RoomId::Muc(to.into_bare().into()))
+        } else {
+            Some(RoomId::User(to.into_bare().into()))
+        }
+    }
+
+    fn server_id(&self) -> Option<MessageServerId> {
+        self.stanza_id()
+            .map(|sid| MessageServerId::from(sid.id.as_ref()))
     }
 }
 

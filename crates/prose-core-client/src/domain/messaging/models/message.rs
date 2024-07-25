@@ -11,6 +11,7 @@ use tracing::{error, info, warn};
 
 use prose_utils::id_string;
 
+use crate::domain::messaging::models::message_id::MessageId;
 use crate::domain::shared::models::ParticipantId;
 use crate::dtos::{Attachment, MessageRemoteId, MessageServerId, HTML};
 
@@ -32,6 +33,7 @@ pub struct Body {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
+    pub id: MessageId,
     pub remote_id: Option<MessageRemoteId>,
     pub server_id: Option<MessageServerId>,
     pub from: ParticipantId,
@@ -84,74 +86,70 @@ impl Message {
         messages: impl IntoIterator<Item = MessageLike>,
     ) -> Vec<Message> {
         let mut messages_map = IndexMap::new();
-        let mut stanza_to_id_map = HashMap::new();
+        let mut remote_id_to_id_map = HashMap::new();
+        let mut server_id_to_id_map = HashMap::new();
         let mut modifiers: Vec<MessageLike> = vec![];
 
         for msg in messages.into_iter() {
-            match msg.payload {
+            let message = match msg.payload {
                 MessageLikePayload::Message {
                     body,
                     attachments,
                     encryption_info,
                     is_transient: is_private,
-                } => {
-                    let message_id = msg.id.clone();
-
-                    let message = Message {
-                        remote_id: message_id.into_original_id(),
-                        server_id: msg.stanza_id,
-                        from: msg.from.into(),
-                        body: Body {
-                            raw: body.raw,
-                            html: body.html,
-                        },
-                        timestamp: msg.timestamp.into(),
-                        is_read: false,
-                        is_edited: false,
-                        is_delivered: false,
-                        is_transient: is_private,
-                        is_encrypted: encryption_info.is_some(),
-                        reactions: vec![],
-                        attachments,
-                        mentions: body.mentions,
-                    };
-
-                    if let Some(stanza_id) = &message.server_id {
-                        stanza_to_id_map.insert(stanza_id.clone(), msg.id.id().clone());
-                    };
-
-                    messages_map.insert(msg.id.id().clone(), Some(message));
+                } => Message {
+                    id: msg.id,
+                    remote_id: msg.remote_id,
+                    server_id: msg.server_id,
+                    from: msg.from.into(),
+                    body: Body {
+                        raw: body.raw,
+                        html: body.html,
+                    },
+                    timestamp: msg.timestamp.into(),
+                    is_read: false,
+                    is_edited: false,
+                    is_delivered: false,
+                    is_transient: is_private,
+                    is_encrypted: encryption_info.is_some(),
+                    reactions: vec![],
+                    attachments,
+                    mentions: body.mentions,
+                },
+                MessageLikePayload::Error { message: error } => Message {
+                    id: msg.id,
+                    remote_id: msg.remote_id,
+                    server_id: msg.server_id,
+                    from: msg.from.into(),
+                    body: Body {
+                        raw: error.clone(),
+                        html: HTML::new(error),
+                    },
+                    timestamp: msg.timestamp.into(),
+                    is_read: false,
+                    is_edited: false,
+                    is_delivered: false,
+                    is_transient: false,
+                    is_encrypted: false,
+                    reactions: vec![],
+                    attachments: vec![],
+                    mentions: vec![],
+                },
+                _ => {
+                    modifiers.push(msg);
+                    continue;
                 }
-                MessageLikePayload::Error { message: error } => {
-                    let message_id = msg.id.clone();
+            };
 
-                    let message = Message {
-                        remote_id: message_id.into_original_id(),
-                        server_id: msg.stanza_id,
-                        from: msg.from.into(),
-                        body: Body {
-                            raw: error.clone(),
-                            html: HTML::new(error),
-                        },
-                        timestamp: msg.timestamp.into(),
-                        is_read: false,
-                        is_edited: false,
-                        is_delivered: false,
-                        is_transient: false,
-                        is_encrypted: false,
-                        reactions: vec![],
-                        attachments: vec![],
-                        mentions: vec![],
-                    };
-
-                    if let Some(stanza_id) = &message.server_id {
-                        stanza_to_id_map.insert(stanza_id.clone(), msg.id.id().clone());
-                    };
-
-                    messages_map.insert(msg.id.id().clone(), Some(message));
-                }
-                _ => modifiers.push(msg),
+            if let Some(remote_id) = message.remote_id.clone() {
+                remote_id_to_id_map.insert(remote_id, message.id.clone());
             }
+
+            if let Some(stanza_id) = message.server_id.clone() {
+                server_id_to_id_map.insert(stanza_id, message.id.clone());
+            }
+
+            messages_map.insert(message.id.clone(), Some(message));
         }
 
         for modifier in modifiers.into_iter() {
@@ -161,17 +159,23 @@ impl Message {
             };
 
             let message_id = match target_id {
-                MessageTargetId::RemoteId(ref id) => id,
+                MessageTargetId::RemoteId(remote_id) => {
+                    let Some(id) = remote_id_to_id_map.get(&remote_id) else {
+                        info!("Could not resolve RemoteId '{remote_id}' to a MessageId");
+                        continue;
+                    };
+                    id.clone()
+                }
                 MessageTargetId::ServerId(stanza_id) => {
-                    let Some(id) = stanza_to_id_map.get(&stanza_id) else {
+                    let Some(id) = server_id_to_id_map.get(&stanza_id) else {
                         info!("Could not resolve StanzaId '{stanza_id}' to a MessageId");
                         continue;
                     };
-                    id
+                    id.clone()
                 }
             };
 
-            let Some(Some(message)) = messages_map.get_mut(message_id) else {
+            let Some(Some(message)) = messages_map.get_mut(&message_id) else {
                 warn!("Ignoring message modifier targeting unknown message '{message_id}'.");
                 continue;
             };
@@ -239,7 +243,7 @@ impl Message {
                     }
                 }
                 MessageLikePayload::Retraction => {
-                    messages_map.insert(message_id.clone(), None);
+                    messages_map.insert(message_id, None);
                 }
             }
         }
@@ -261,6 +265,78 @@ mod tests {
     use crate::user_id;
 
     use super::*;
+
+    #[test]
+    fn test_reduces_messages_with_duplicate_remote_ids() {
+        let messages = vec![
+            MessageLike {
+                id: "id1".into(),
+                remote_id: Some("mid1".into()),
+                server_id: Some("sid1".into()),
+                target: None,
+                to: Some(bare!("a@prose.org")),
+                from: user_id!("b@prose.org").into(),
+                timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 00).unwrap(),
+                payload: MessageLikePayload::message("Message 1"),
+            },
+            MessageLike {
+                id: "id2".into(),
+                remote_id: Some("mid1".into()),
+                server_id: Some("sid1".into()),
+                target: None,
+                to: Some(bare!("a@prose.org")),
+                from: user_id!("b@prose.org").into(),
+                timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 01).unwrap(),
+                payload: MessageLikePayload::message("Message 2"),
+            },
+        ];
+
+        let reduced_message = Message::reducing_messages(messages);
+
+        assert_eq!(
+            vec![
+                Message {
+                    id: "id1".into(),
+                    remote_id: Some("mid1".into()),
+                    server_id: Some("sid1".into()),
+                    from: user_id!("b@prose.org").into(),
+                    body: Body {
+                        raw: "Message 1".to_string(),
+                        html: "<p>Message 1</p>".to_string().into(),
+                    },
+                    timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 00).unwrap(),
+                    is_read: false,
+                    is_edited: false,
+                    is_delivered: false,
+                    is_transient: false,
+                    is_encrypted: false,
+                    reactions: vec![],
+                    attachments: vec![],
+                    mentions: vec![]
+                },
+                Message {
+                    id: "id2".into(),
+                    remote_id: Some("mid1".into()),
+                    server_id: Some("sid1".into()),
+                    from: user_id!("b@prose.org").into(),
+                    body: Body {
+                        raw: "Message 2".to_string(),
+                        html: "<p>Message 2</p>".to_string().into(),
+                    },
+                    timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 01).unwrap(),
+                    is_read: false,
+                    is_edited: false,
+                    is_delivered: false,
+                    is_transient: false,
+                    is_encrypted: false,
+                    reactions: vec![],
+                    attachments: vec![],
+                    mentions: vec![]
+                }
+            ],
+            reduced_message,
+        )
+    }
 
     #[test]
     fn test_toggle_reaction() {
@@ -374,8 +450,9 @@ mod tests {
     fn test_reduces_emojis() {
         let messages = [
             MessageLike {
-                id: "1".into(),
-                stanza_id: Some("stanza-id-1".into()),
+                id: "id1".into(),
+                remote_id: Some("1".into()),
+                server_id: Some("stanza-id-1".into()),
                 target: None,
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
@@ -395,8 +472,9 @@ mod tests {
                 },
             },
             MessageLike {
-                id: "2".into(),
-                stanza_id: None,
+                id: "id2".into(),
+                remote_id: Some("2".into()),
+                server_id: None,
                 target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
@@ -409,8 +487,9 @@ mod tests {
                 },
             },
             MessageLike {
-                id: "3".into(),
-                stanza_id: None,
+                id: "id3".into(),
+                remote_id: Some("3".into()),
+                server_id: None,
                 target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("c@prose.org").into(),
@@ -423,8 +502,9 @@ mod tests {
                 },
             },
             MessageLike {
-                id: "4".into(),
-                stanza_id: None,
+                id: "id4".into(),
+                remote_id: Some("4".into()),
+                server_id: None,
                 target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
@@ -437,8 +517,9 @@ mod tests {
                 },
             },
             MessageLike {
-                id: "5".into(),
-                stanza_id: None,
+                id: "id5".into(),
+                remote_id: Some("5".into()),
+                server_id: None,
                 target: Some(MessageTargetId::ServerId("stanza-id-1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
@@ -455,6 +536,7 @@ mod tests {
         let reduced_message = Message::reducing_messages(messages).pop().unwrap();
         assert_eq!(
             Message {
+                id: "id1".into(),
                 remote_id: Some("1".into()),
                 server_id: Some("stanza-id-1".into()),
                 from: user_id!("b@prose.org").into(),

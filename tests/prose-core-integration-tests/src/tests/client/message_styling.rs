@@ -28,7 +28,7 @@ async fn test_send_markdown_message() -> Result<()> {
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>Some *bold*, _italic_, ~strikethrough~ and *_bold italic_* text.</body>
           <content xmlns="urn:xmpp:content" type="text/markdown">Some **bold**, _italic_, ~~strikethrough~~ and **_bold italic_** text.</content>
           <active xmlns="http://jabber.org/protocol/chatstates" />
@@ -42,7 +42,7 @@ async fn test_send_markdown_message() -> Result<()> {
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -82,20 +82,20 @@ async fn test_receive_markdown_message() -> Result<()> {
         "#
     );
 
+    let message_id = client.get_next_message_id();
+
     event!(client, ClientEvent::SidebarChanged);
     room_event!(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec!["my-message-id".into()]
+            message_ids: vec![message_id.clone()]
         }
     );
 
     client.receive_next().await;
 
-    let messages = room
-        .load_messages_with_ids(&["my-message-id".into()])
-        .await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
 
     let message = messages.first().unwrap();
 
@@ -137,20 +137,20 @@ And another newline</body>
         "#
     );
 
+    let message_id = client.get_next_message_id();
+
     event!(client, ClientEvent::SidebarChanged);
     room_event!(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec!["my-message-id".into()]
+            message_ids: vec![message_id.clone()]
         }
     );
 
     client.receive_next().await;
 
-    let messages = room
-        .load_messages_with_ids(&["my-message-id".into()])
-        .await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
 
     let message = messages.first().unwrap();
 

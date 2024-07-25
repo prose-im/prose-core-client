@@ -3,17 +3,17 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::iter;
-
 use anyhow::Result;
 use chrono::{TimeZone, Utc};
 use mockall::predicate;
 use pretty_assertions::assert_eq;
+use std::iter;
+use std::sync::Arc;
 
 use prose_core_client::domain::messaging::models::{
     MessageLikeBody, MessageLikePayload, MessageTargetId, Reaction,
 };
-use prose_core_client::domain::messaging::services::MessagePage;
+use prose_core_client::domain::messaging::services::{MessagePage, WrappingMessageIdProvider};
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{CachePolicy, MucId, OccupantId, RoomId, UserId};
@@ -116,6 +116,7 @@ async fn test_load_messages_with_ids_resolves_real_jids() -> Result<()> {
 #[tokio::test]
 async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
+    deps.message_id_provider = Arc::new(WrappingMessageIdProvider::incrementing("msg-id"));
 
     let internals = Room::group(muc_id!("room@conference.prose.org"))
         .with_members([RegisteredMember {
@@ -188,6 +189,11 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         });
 
     deps.message_repo
+        .expect_resolve_server_id_to_message_id()
+        .times(4)
+        .returning(|_, _, _| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
         .expect_append()
         .once()
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
@@ -195,28 +201,32 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
     let room = RoomFactory::from(deps).build(internals).to_generic_room();
 
     assert_eq!(
-        room.load_latest_messages().await?,
         MessageResultSet {
             messages: vec![
                 MessageBuilder::new_with_index(1)
+                    .set_id("msg-id-4")
                     .set_from(user_id!("a@prose.org"))
                     .set_from_name("Aron Doe")
                     .build_message_dto(),
                 MessageBuilder::new_with_index(2)
+                    .set_id("msg-id-3")
                     .set_from(occupant_id!("room@conference.prose.org/b"))
                     .set_from_name("Bernhard Doe")
                     .build_message_dto(),
                 MessageBuilder::new_with_index(3)
+                    .set_id("msg-id-2")
                     .set_from(user_id!("c@prose.org"))
                     .set_from_name("Carl Doe")
                     .build_message_dto(),
                 MessageBuilder::new_with_index(4)
+                    .set_id("msg-id-1")
                     .set_from(occupant_id!("room@conference.prose.org/denise_doe"))
                     .set_from_name("Denise Doe")
                     .build_message_dto(),
             ],
             last_message_id: None
-        }
+        },
+        room.load_latest_messages().await?,
     );
 
     Ok(())
@@ -261,7 +271,7 @@ async fn test_toggle_reaction_in_direct_message() -> Result<()> {
         .once()
         .with(
             predicate::eq(user_id!("user@prose.org")),
-            predicate::eq(MessageBuilder::id_for_index(1)),
+            predicate::eq(MessageBuilder::remote_id_for_index(1)),
             predicate::eq(vec!["🍻".into(), "✅".into()]),
         )
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
@@ -360,6 +370,7 @@ async fn test_renames_channel_in_sidebar() -> Result<()> {
 #[tokio::test]
 async fn test_fills_result_set_when_loading_messages() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
+    deps.message_id_provider = Arc::new(WrappingMessageIdProvider::incrementing("msg-id"));
 
     deps.ctx.config.message_page_size = 5;
 
@@ -482,6 +493,11 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
+        .expect_resolve_server_id_to_message_id()
+        .times(10)
+        .returning(|_, _, _| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
         .expect_append()
         .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
@@ -496,6 +512,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
     assert_eq!(
         vec![
             MessageBuilder::new_with_index(90)
+                .set_id("msg-id-10")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
@@ -513,6 +530,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 },])
                 .build_message_dto(),
             MessageBuilder::new_with_index(92)
+                .set_id("msg-id-8")
                 .set_from(user_id!("b@prose.org"))
                 .set_from_name("B")
                 .set_payload(MessageLikePayload::Message {
@@ -523,6 +541,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 })
                 .build_message_dto(),
             MessageBuilder::new_with_index(93)
+                .set_id("msg-id-7")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
@@ -533,6 +552,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 })
                 .build_message_dto(),
             MessageBuilder::new_with_index(94)
+                .set_id("msg-id-6")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
@@ -543,6 +563,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 })
                 .build_message_dto(),
             MessageBuilder::new_with_index(101)
+                .set_id("msg-id-4")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
                 .set_payload(MessageLikePayload::Message {
@@ -557,6 +578,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 }])
                 .build_message_dto(),
             MessageBuilder::new_with_index(102)
+                .set_id("msg-id-3")
                 .set_from(user_id!("b@prose.org"))
                 .set_from_name("B")
                 .set_payload(MessageLikePayload::Message {
@@ -580,6 +602,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
 #[tokio::test]
 async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
+    deps.message_id_provider = Arc::new(WrappingMessageIdProvider::incrementing("msg-id"));
 
     deps.ctx.config.message_page_size = 5;
     deps.ctx.config.max_message_pages_to_load = 2;
@@ -646,6 +669,11 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
+        .expect_resolve_server_id_to_message_id()
+        .times(10)
+        .returning(|_, _, _| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
         .expect_append()
         .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
@@ -662,6 +690,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
 
     assert_eq!(
         vec![MessageBuilder::new_with_index(100)
+            .set_id("msg-id-1")
             .set_from(user_id!("a@prose.org"))
             .set_from_name("A")
             .set_payload(MessageLikePayload::Message {
@@ -723,6 +752,11 @@ async fn test_stops_at_last_page() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
+        .expect_resolve_server_id_to_message_id()
+        .times(8)
+        .returning(|_, _, _| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
         .expect_append()
         .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
@@ -742,6 +776,7 @@ async fn test_stops_at_last_page() -> Result<()> {
 async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
     deps.ctx.config.max_message_pages_to_load = 1;
+    deps.message_id_provider = Arc::new(WrappingMessageIdProvider::incrementing("msg-id"));
 
     deps.message_archive_service
         .expect_load_messages_before()
@@ -759,7 +794,6 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                             .set_from(user_id!("user@prose.org"))
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(3)
-                            .set_from(user_id!("user@prose.org"))
                             .set_target_message_idx(2)
                             .set_from(user_id!("a@prose.org"))
                             .set_payload(MessageLikePayload::Reaction {
@@ -786,13 +820,13 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
             predicate::always(),
             predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
             predicate::eq(vec![
-                MessageBuilder::id_for_index(5).into(),
+                MessageBuilder::remote_id_for_index(5).into(),
                 MessageBuilder::stanza_id_for_index(5).into(),
-                MessageBuilder::id_for_index(4).into(),
+                MessageBuilder::remote_id_for_index(4).into(),
                 MessageBuilder::stanza_id_for_index(4).into(),
-                MessageBuilder::id_for_index(2).into(),
+                MessageBuilder::remote_id_for_index(2).into(),
                 MessageBuilder::stanza_id_for_index(2).into(),
-                MessageBuilder::id_for_index(1).into(),
+                MessageBuilder::remote_id_for_index(1).into(),
                 MessageBuilder::stanza_id_for_index(1).into(),
             ]),
             predicate::eq(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap()),
@@ -847,6 +881,11 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
+        .expect_resolve_server_id_to_message_id()
+        .times(5)
+        .returning(|_, _, _| Box::pin(async { Ok(None) }));
+
+    deps.message_repo
         .expect_append()
         .returning(|_, _, _| Box::pin(async { Ok(()) }));
 
@@ -861,6 +900,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
     assert_eq!(
         vec![
             MessageBuilder::new_with_index(1)
+                .set_id("msg-id-5")
                 .set_from(user_id!("user@prose.org"))
                 .set_from_name("User")
                 .set_reactions([
@@ -875,6 +915,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                 ])
                 .build_message_dto(),
             MessageBuilder::new_with_index(2)
+                .set_id("msg-id-4")
                 .set_from(user_id!("user@prose.org"))
                 .set_from_name("User")
                 .set_reactions([Reaction {
@@ -883,6 +924,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                 }])
                 .build_message_dto(),
             MessageBuilder::new_with_index(4)
+                .set_id("msg-id-2")
                 .set_from(user_id!("user@prose.org"))
                 .set_from_name("User")
                 .set_reactions([Reaction {
@@ -891,6 +933,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                 }])
                 .build_message_dto(),
             MessageBuilder::new_with_index(5)
+                .set_id("msg-id-1")
                 .set_from(user_id!("user@prose.org"))
                 .set_from_name("User")
                 .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())

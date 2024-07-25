@@ -143,7 +143,7 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>Hello World</body>
           <content xmlns="urn:xmpp:content" type="text/markdown">Hello World</content>
           <active xmlns="http://jabber.org/protocol/chatstates" />
@@ -157,7 +157,7 @@ async fn test_does_not_start_session_when_sending_message_in_non_encrypted_room(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -256,7 +256,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -279,7 +279,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -296,7 +296,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -319,7 +319,7 @@ async fn test_start_session_when_sending_message_in_encrypted_room() -> Result<(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -363,7 +363,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -384,7 +384,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -425,7 +425,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -447,7 +447,7 @@ async fn test_starts_session_for_new_devices_when_sending() -> Result<()> {
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -496,7 +496,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -518,7 +518,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -574,7 +574,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -596,7 +596,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -647,7 +647,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -670,7 +670,7 @@ async fn test_marks_disappeared_devices_as_inactive_and_reappeared_as_active() -
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -738,7 +738,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -761,7 +761,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -796,7 +796,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
     send!(
         client,
         r#"
-        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{ID}}" to="them@prose.org" type="chat">
+        <message xmlns="jabber:client" from="{{USER_RESOURCE_ID}}" id="{{MSG_ID}}" to="them@prose.org" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           <encrypted xmlns="eu.siacs.conversations.axolotl">
             <header sid="{{USER_DEVICE_ID}}">
@@ -818,7 +818,7 @@ async fn test_marks_own_disappeared_devices_as_inactive() -> Result<()> {
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec![client.get_last_id().into()]
+            message_ids: vec![client.get_last_message_id()]
         }
     );
 
@@ -905,20 +905,20 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         "#
     );
 
+    let message_id = client.get_next_message_id();
+
     event!(client, ClientEvent::SidebarChanged);
     room_event!(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec!["my-message-id".into()]
+            message_ids: vec![message_id.clone()]
         }
     );
 
     client.receive_next().await;
 
-    let messages = room
-        .load_messages_with_ids(&["my-message-id".into()])
-        .await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
     assert_eq!(messages.len(), 1);
     assert_eq!(
         messages.first().unwrap().body.html.as_ref(),
@@ -957,7 +957,7 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
     recv!(
         client,
         r#"
-        <message xmlns="jabber:client" from="them@prose.org" id="other-message-id" to="{{USER_ID}}" type="chat">
+        <message xmlns="jabber:client" from="them@prose.org" id="{{MSG_ID}}" to="{{USER_ID}}" type="chat">
           <body>[This message is OMEMO encrypted]</body>
           {{ENCRYPTED_PAYLOAD}}
           <encryption xmlns="urn:xmpp:eme:0" name="OMEMO" namespace="eu.siacs.conversations.axolotl" />
@@ -984,12 +984,14 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
         "#
     );
 
+    let message_id = client.get_next_message_id();
+
     event!(client, ClientEvent::SidebarChanged);
     room_event!(
         client,
         room.jid().clone(),
         ClientRoomEventType::MessagesAppended {
-            message_ids: vec!["other-message-id".into()]
+            message_ids: vec![message_id.clone()]
         }
     );
 
@@ -997,9 +999,7 @@ async fn test_starts_session_and_decrypts_received_messages() -> Result<()> {
 
     // Second message should not contain a pre-key, thus the bundle shouldn't be published again.
 
-    let messages = room
-        .load_messages_with_ids(&["other-message-id".into()])
-        .await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
     assert_eq!(messages.len(), 1);
     assert_eq!(
         messages.first().unwrap().body.html.as_ref(),

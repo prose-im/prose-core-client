@@ -17,7 +17,7 @@ use crate::app::deps::DynEncryptionDomainService;
 use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::message_like::Payload;
 use crate::domain::messaging::models::{
-    EncryptedMessage, MessageLike, MessageLikeBody, MessageLikeEncryptionInfo, MessageLikeId,
+    EncryptedMessage, MessageId, MessageLike, MessageLikeBody, MessageLikeEncryptionInfo,
     MessageServerId, MessageTargetId, StanzaParseError,
 };
 use crate::domain::rooms::models::Room;
@@ -29,6 +29,7 @@ use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
 
 pub struct MessageParser {
+    message_id: MessageId,
     room: Option<Room>,
     timestamp: DateTime<Utc>,
     encryption_domain_service: DynEncryptionDomainService,
@@ -37,12 +38,14 @@ pub struct MessageParser {
 
 impl MessageParser {
     pub fn new(
+        next_message_id: MessageId,
         room: Option<Room>,
         now: DateTime<Utc>,
         encryption_domain_service: DynEncryptionDomainService,
         decryption_context: Option<DecryptionContext>,
     ) -> Self {
         Self {
+            message_id: next_message_id,
             room,
             timestamp: now.round_subsecs(0),
             encryption_domain_service,
@@ -54,7 +57,7 @@ impl MessageParser {
 impl MessageParser {
     pub async fn parse_mam_message(self, mam_message: ArchivedMessage) -> Result<MessageLike> {
         let mut parsed_message = self.parse_forwarded_message(mam_message.forwarded).await?;
-        parsed_message.stanza_id = Some(MessageServerId::from(mam_message.id.into_inner()));
+        parsed_message.server_id = Some(MessageServerId::from(mam_message.id.into_inner()));
         Ok(parsed_message)
     }
 
@@ -106,12 +109,12 @@ impl MessageParser {
             .unwrap_or(self.timestamp);
 
         let message = message.into_inner();
-        let id = MessageLikeId::new(message.id.map(Into::into));
         let to = message.to.map(|jid| jid.into_bare());
 
         Ok(MessageLike {
-            id,
-            stanza_id,
+            id: self.message_id,
+            remote_id: message.id.map(MessageRemoteId::from),
+            server_id: stanza_id,
             target,
             to,
             from: user_id.map(ParticipantId::User).unwrap_or(participant_id),
@@ -327,18 +330,13 @@ impl MessageParser {
         if let (Some(sender_id), Some(omemo_element)) = (sender_id, message.omemo_element()) {
             let sender = DeviceId::from(omemo_element.header.sid);
             let encrypted_message = EncryptedMessage::from(omemo_element);
-            let message_id = message
-                .id
-                .as_ref()
-                .map(|id| MessageRemoteId::from(id.clone()));
-
             let decryption_result = match encrypted_message {
                 EncryptedMessage::Message(message) => {
                     self.encryption_domain_service
                         .decrypt_message(
                             sender_id,
                             room_id,
-                            message_id.as_ref(),
+                            Some(&self.message_id),
                             message,
                             self.decryption_context.clone(),
                         )

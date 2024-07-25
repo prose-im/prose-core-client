@@ -11,17 +11,17 @@ use tracing::{error, info};
 use prose_proc_macros::DependenciesStruct;
 use prose_xmpp::TimeProvider;
 
+use super::super::MessageArchiveDomainService as MessageArchiveDomainServiceTrait;
 use crate::app::deps::{
     DynAppContext, DynEncryptionDomainService, DynLocalRoomSettingsRepository,
-    DynMessageArchiveService, DynMessagesRepository, DynTimeProvider,
+    DynMessageArchiveService, DynMessageIdProvider, DynMessagesRepository, DynTimeProvider,
 };
 use crate::domain::encryption::models::DecryptionContext;
 use crate::domain::messaging::models::{MessageLike, MessageLikeError, MessageParser};
 use crate::domain::messaging::services::MessagePage;
 use crate::domain::rooms::models::Room;
-use crate::dtos::MessageServerId;
-
-use super::super::MessageArchiveDomainService as MessageArchiveDomainServiceTrait;
+use crate::dtos::{AccountId, MessageRemoteId, MessageServerId};
+use crate::infra::xmpp::util::MessageExt;
 
 #[derive(DependenciesStruct)]
 pub struct MessageArchiveDomainService {
@@ -29,6 +29,7 @@ pub struct MessageArchiveDomainService {
     encryption_domain_service: DynEncryptionDomainService,
     local_room_settings_repo: DynLocalRoomSettingsRepository,
     message_archive_service: DynMessageArchiveService,
+    message_id_provider: DynMessageIdProvider,
     message_repo: DynMessagesRepository,
     time_provider: DynTimeProvider,
 }
@@ -87,7 +88,7 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
             .map(|m| MessageServerId::from(m.id.as_ref()));
         let mut is_last_page = page.is_last;
 
-        self.parse_message_page(room, page, &mut messages, &context)
+        self.parse_message_page(&account, room, page, &mut messages, &context)
             .await;
 
         while !is_last_page {
@@ -106,7 +107,7 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
                 .map(|m| MessageServerId::from(m.id.as_ref()));
             is_last_page = page.is_last;
 
-            self.parse_message_page(room, page, &mut messages, &context)
+            self.parse_message_page(&account, room, page, &mut messages, &context)
                 .await;
         }
 
@@ -138,13 +139,52 @@ impl MessageArchiveDomainServiceTrait for MessageArchiveDomainService {
 impl MessageArchiveDomainService {
     async fn parse_message_page(
         &self,
+        account: &AccountId,
         room: &Room,
         page: MessagePage,
         messages: &mut Vec<MessageLike>,
         context: &DecryptionContext,
     ) {
         for archive_message in page.messages {
+            let inner_message = archive_message.forwarded.stanza.as_ref();
+
+            let is_our_message = inner_message
+                .and_then(|m| m.sender())
+                .map(|s| room.is_current_user(&account, &s.to_participant_id()))
+                .unwrap_or_default();
+
+            let message_id = if is_our_message {
+                if let Some(remote_id) = archive_message
+                    .forwarded
+                    .stanza
+                    .as_ref()
+                    .and_then(|m| m.id.clone())
+                {
+                    self.message_repo
+                        .resolve_remote_id_to_message_id(
+                            &account,
+                            &room.room_id,
+                            &MessageRemoteId::from(remote_id),
+                        )
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    None
+                }
+            } else {
+                self.message_repo
+                    .resolve_server_id_to_message_id(
+                        &account,
+                        &room.room_id,
+                        &MessageServerId::from(archive_message.id.as_ref()),
+                    )
+                    .await
+                    .unwrap_or_default()
+            }
+            .unwrap_or_else(|| self.message_id_provider.new_id());
+
             let parsed_message = match MessageParser::new(
+                message_id,
                 Some(room.clone()),
                 Default::default(),
                 self.encryption_domain_service.clone(),

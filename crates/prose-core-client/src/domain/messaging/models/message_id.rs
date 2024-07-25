@@ -7,11 +7,20 @@ use serde::{Deserialize, Serialize};
 
 use prose_utils::id_string;
 
-// The ID assigned by a client sending the message. It is not guaranteed to be unique.
-id_string!(MessageRemoteId);
+id_string!(
+    /// The ID assigned by a client sending the message. It is not guaranteed to be unique.
+    MessageRemoteId
+);
 
-// The ID assigned by the server to the message.
-id_string!(MessageServerId);
+id_string!(
+    /// The ID assigned by the server to the message.
+    MessageServerId
+);
+
+id_string!(
+    /// The ID assigned to the message by us locally.
+    MessageId
+);
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(tag = "type", content = "id")]

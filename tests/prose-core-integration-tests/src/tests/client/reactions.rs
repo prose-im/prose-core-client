@@ -24,6 +24,7 @@ async fn test_reactions() -> Result<()> {
         .await?;
 
     let room_id = muc_id!("room@conf.prose.org");
+    let message_id = client.get_next_message_id();
 
     let messages = vec![
         Element::from_pretty_printed_xml(r#"
@@ -90,9 +91,9 @@ async fn test_reactions() -> Result<()> {
         .await?;
 
     let room = client.get_room(room_id).await.to_generic_room();
-    let messages = room.load_messages_with_ids(&["id-1".into()]).await?;
+    let messages = room.load_messages_with_ids(&[message_id]).await?;
 
-    assert_eq!(messages.len(), 1);
+    assert_eq!(1, messages.len());
 
     let message = messages.get(0).unwrap();
 

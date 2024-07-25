@@ -6,14 +6,14 @@
 use std::iter;
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Input, MultiSelect, Select};
 use jid::BareJid;
 
 use prose_core_client::dtos::{
-    DeviceId, Message, MessageRemoteId, MessageServerId, ParticipantInfo, PublicRoomInfo,
-    RoomEnvelope, SidebarItem, UserId,
+    DeviceId, Message, MessageId, MessageServerId, ParticipantInfo, PublicRoomInfo, RoomEnvelope,
+    SidebarItem, UserId,
 };
 use prose_core_client::services::{Generic, Room};
 use prose_core_client::Client;
@@ -120,13 +120,11 @@ pub async fn select_participant<T>(room: &Room<T>) -> Option<ParticipantInfo> {
     select_item_from_list(room.participants(), |p| ParticipantEnvelope(p.clone()))
 }
 
-pub async fn select_message(room: &Room<Generic>) -> Result<Option<MessageRemoteId>> {
+pub async fn select_message(room: &Room<Generic>) -> Result<Option<MessageId>> {
     let messages = load_messages(room, 1).await?;
     let message =
         select_item_from_list(messages, |message| CompactMessageEnvelope(message.clone()));
-    Ok(message
-        .map(|m| m.id.ok_or(anyhow!("Selected message does not have an ID")))
-        .transpose()?)
+    Ok(message.map(|m| m.id))
 }
 
 pub async fn select_public_channel(client: &Client) -> Result<Option<PublicRoomInfo>> {

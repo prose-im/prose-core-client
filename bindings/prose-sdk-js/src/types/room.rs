@@ -8,7 +8,7 @@ use tracing::debug;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsError, JsValue};
 
-use prose_core_client::dtos::{MessageRemoteId, RoomEnvelope, RoomState as SdkRoomState};
+use prose_core_client::dtos::{MessageId, RoomEnvelope, RoomState as SdkRoomState};
 use prose_core_client::services::{
     DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room as SdkRoom,
 };
@@ -337,9 +337,9 @@ macro_rules! base_room_impl {
                 &self,
                 message_ids: &StringArray,
             ) -> Result<MessagesArray> {
-                let message_ids: Vec<MessageRemoteId> = Vec::<String>::try_from(message_ids)?
+                let message_ids: Vec<MessageId> = Vec::<String>::try_from(message_ids)?
                     .into_iter()
-                    .map(|id| MessageRemoteId::from(id))
+                    .map(|id| MessageId::from(id))
                     .collect();
 
                 let messages = self
