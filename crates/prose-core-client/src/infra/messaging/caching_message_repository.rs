@@ -12,7 +12,7 @@ use chrono::{DateTime, Utc};
 use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
+    ArchivedMessageRef, MessageId, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
 };
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::{AccountId, RoomId};
@@ -37,7 +37,7 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageRemoteId,
+        id: &MessageId,
     ) -> Result<Vec<MessageLike>> {
         Ok(self.get_all(account, room_id, &[id.clone()]).await?)
     }
@@ -46,7 +46,7 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        ids: &[MessageRemoteId],
+        ids: &[MessageId],
     ) -> Result<Vec<MessageLike>> {
         let tx = self
             .store
@@ -54,8 +54,8 @@ impl MessagesRepository for CachingMessageRepository {
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
 
-        let stanza_id_target_idx = collection.index(&MessageRecord::stanza_id_target_idx())?;
-        let message_id_target_idx = collection.index(&MessageRecord::message_id_target_idx())?;
+        let stanza_id_target_idx = collection.index(&MessageRecord::server_id_target_idx())?;
+        let message_id_target_idx = collection.index(&MessageRecord::remote_id_target_idx())?;
         let message_id_idx = collection.index(&MessageRecord::message_id_idx())?;
 
         let mut messages: Vec<MessageLike> = vec![];
@@ -77,7 +77,7 @@ impl MessagesRepository for CachingMessageRepository {
                     .map(MessageLike::from),
             );
 
-            if let Some(stanza_id) = message.as_ref().and_then(|m| m.stanza_id.as_ref()) {
+            if let Some(stanza_id) = message.as_ref().and_then(|m| m.server_id.as_ref()) {
                 messages.extend(
                     &mut stanza_id_target_idx
                         .get_all_values::<MessageRecord>(
@@ -113,8 +113,8 @@ impl MessagesRepository for CachingMessageRepository {
             .await?;
 
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let stanza_idx = collection.index(&MessageRecord::stanza_id_target_idx())?;
-        let message_idx = collection.index(&MessageRecord::message_id_target_idx())?;
+        let stanza_idx = collection.index(&MessageRecord::server_id_target_idx())?;
+        let message_idx = collection.index(&MessageRecord::remote_id_target_idx())?;
 
         let mut messages: Vec<MessageLike> = vec![];
         for id in targeted_ids {
@@ -155,17 +155,15 @@ impl MessagesRepository for CachingMessageRepository {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageRemoteId,
+        id: &MessageServerId,
     ) -> Result<bool> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let idx = collection.index(&MessageRecord::message_id_idx())?;
-        let flag = idx
-            .contains_key(&(account.clone(), room_id.clone(), id.clone()))
-            .await?;
+        let idx = collection.index(&MessageRecord::server_id_idx())?;
+        let flag = idx.contains_key(&(account, room_id, id)).await?;
         Ok(flag)
     }
 
@@ -205,22 +203,58 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(())
     }
 
-    async fn resolve_message_id(
+    async fn resolve_server_id_to_message_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        stanza_id: &MessageServerId,
+        server_id: &MessageServerId,
+    ) -> Result<Option<MessageId>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessageRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessageRecord::collection())?;
+        let stanza_idx = collection.index(&MessageRecord::server_id_idx())?;
+        let message = stanza_idx
+            .get::<_, MessageRecord>(&(account, room_id, server_id))
+            .await?;
+        Ok(message.map(|m| m.message_id))
+    }
+
+    async fn resolve_remote_id_to_message_id(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        remote_id: &MessageRemoteId,
+    ) -> Result<Option<MessageId>> {
+        let tx = self
+            .store
+            .transaction_for_reading(&[MessageRecord::collection()])
+            .await?;
+        let collection = tx.readable_collection(MessageRecord::collection())?;
+        let remote_id_idx = collection.index(&MessageRecord::remote_id_idx())?;
+        let message = remote_id_idx
+            .get::<_, MessageRecord>(&(account, room_id, remote_id))
+            .await?;
+        Ok(message.map(|m| m.message_id))
+    }
+
+    async fn resolve_message_id_to_remote_id(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        id: &MessageId,
     ) -> Result<Option<MessageRemoteId>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
             .await?;
         let collection = tx.readable_collection(MessageRecord::collection())?;
-        let stanza_idx = collection.index(&MessageRecord::stanza_id_idx())?;
-        let message = stanza_idx
-            .get::<_, MessageRecord>(&(account.clone(), room_id.clone(), stanza_id.clone()))
+        let message_id_idx = collection.index(&MessageRecord::message_id_idx())?;
+        let message = message_id_idx
+            .get::<_, MessageRecord>(&(account, room_id, id))
             .await?;
-        Ok(message.and_then(|m| m.message_id.into_original_id()))
+        Ok(message.and_then(|m| m.remote_id))
     }
 
     async fn get_last_received_message(
@@ -251,7 +285,7 @@ impl MessagesRepository for CachingMessageRepository {
                         return (result, is_placeholder);
                     }
 
-                    let Some(stanza_id) = message.stanza_id else {
+                    let Some(stanza_id) = message.server_id else {
                         return (result, is_placeholder);
                     };
 

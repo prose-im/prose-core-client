@@ -27,7 +27,7 @@ use crate::domain::general::services::RequestHandlingService;
 use crate::domain::messaging::repos::{
     DraftsRepository, MessagesRepository, OfflineMessagesRepository,
 };
-use crate::domain::messaging::services::MessageArchiveDomainService;
+use crate::domain::messaging::services::{MessageArchiveDomainService, MessageIdProvider};
 use crate::domain::messaging::services::{
     MessageArchiveService, MessageMigrationDomainService, MessagingService,
 };
@@ -68,6 +68,7 @@ pub type DynIDProvider = Arc<dyn IDProvider>;
 pub type DynLocalRoomSettingsRepository = Arc<dyn LocalRoomSettingsRepository>;
 pub type DynMessageArchiveDomainService = Arc<dyn MessageArchiveDomainService>;
 pub type DynMessageArchiveService = Arc<dyn MessageArchiveService>;
+pub type DynMessageIdProvider = Arc<dyn MessageIdProvider>;
 pub type DynMessageMigrationDomainService = Arc<dyn MessageMigrationDomainService>;
 pub type DynMessagesRepository = Arc<dyn MessagesRepository>;
 pub type DynMessagingService = Arc<dyn MessagingService>;
@@ -107,6 +108,7 @@ pub struct AppDependencies {
     pub drafts_repo: DynDraftsRepository,
     pub encryption_domain_service: DynEncryptionDomainService,
     pub id_provider: DynIDProvider,
+    pub message_id_provider: DynMessageIdProvider,
     pub local_room_settings_repo: DynLocalRoomSettingsRepository,
     pub message_archive_service: DynMessageArchiveService,
     pub messages_repo: DynMessagesRepository,

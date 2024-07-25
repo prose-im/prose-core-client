@@ -41,8 +41,7 @@ pub struct Body {
 
 #[wasm_bindgen]
 pub struct Message {
-    id: Option<String>,
-    stanza_id: Option<ArchiveID>,
+    id: String,
     from: MessageSender,
     body: Body,
     timestamp: js_sys::Date,
@@ -96,8 +95,7 @@ impl From<dtos::Message> for Message {
             .collect_into_js_array();
 
         Self {
-            id: value.id.map(|id| id.to_string()),
-            stanza_id: value.stanza_id.map(ArchiveID::from),
+            id: value.id.to_string(),
             from: value.from.into(),
             body: Body {
                 raw: value.body.raw,
@@ -128,18 +126,13 @@ impl From<dtos::Message> for Message {
 #[wasm_bindgen]
 impl Message {
     #[wasm_bindgen(getter)]
-    pub fn id(&self) -> Option<String> {
-        self.id.as_ref().map(|id| id.to_string())
+    pub fn id(&self) -> String {
+        self.id.to_string()
     }
 
     #[wasm_bindgen(setter)]
-    pub fn set_id(&mut self, id: Option<String>) {
-        self.id = id.clone().map(Into::into)
-    }
-
-    #[wasm_bindgen(getter, js_name = "archiveId")]
-    pub fn stanza_id(&self) -> Option<ArchiveID> {
-        self.stanza_id.clone()
+    pub fn set_id(&mut self, id: String) {
+        self.id = id.into()
     }
 
     #[wasm_bindgen(getter, js_name = "from")]

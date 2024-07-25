@@ -3,34 +3,29 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
-use anyhow::Result;
 use chrono::{DateTime, Utc};
 use jid::BareJid;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use prose_xmpp::stanza::message;
 
+use crate::domain::messaging::models::message_id::MessageId;
 use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId};
 use crate::domain::shared::models::{ParticipantId, HTML};
 use crate::dtos::DeviceId;
 
 use super::{MessageRemoteId, MessageServerId};
 
-/// An ID that can act as a placeholder in the rare cases when a message doesn't have an ID. Since
-/// our DataCache backends require some ID for each message we simply generate one.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct MessageLikeId(MessageRemoteId);
-
 /// A type that describes permanent messages, i.e. messages that need to be replayed to restore
 /// the complete history of a conversation. Note that ephemeral messages like chat states are
 /// handled differently.
 #[derive(Debug, PartialEq, Clone)]
 pub struct MessageLike {
-    pub id: MessageLikeId,
-    pub stanza_id: Option<MessageServerId>,
+    pub id: MessageId,
+    pub remote_id: Option<MessageRemoteId>,
+    pub server_id: Option<MessageServerId>,
     pub target: Option<MessageTargetId>,
     pub to: Option<BareJid>,
     pub from: ParticipantId,
@@ -107,48 +102,5 @@ impl Payload {
             Self::Error { .. } => true,
             _ => false,
         }
-    }
-}
-
-impl MessageLikeId {
-    pub fn new(id: Option<MessageRemoteId>) -> Self {
-        if let Some(id) = id {
-            return MessageLikeId(id);
-        }
-        return MessageLikeId(format!("!!{}", Uuid::new_v4().to_string()).into());
-    }
-
-    /// Returns either the original message ID or the generated one.
-    pub fn id(&self) -> &MessageRemoteId {
-        &self.0
-    }
-
-    /// Returns the original message ID or None if we contain a generated ID.
-    pub fn into_original_id(self) -> Option<MessageRemoteId> {
-        if self.0.as_ref().starts_with("!!") {
-            return None;
-        }
-        return Some(self.0);
-    }
-
-    pub fn original_id(&self) -> Option<&MessageRemoteId> {
-        if self.0.as_ref().starts_with("!!") {
-            return None;
-        }
-        return Some(&self.0);
-    }
-}
-
-impl std::str::FromStr for MessageLikeId {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(MessageLikeId(s.to_string().into()))
-    }
-}
-
-impl Display for MessageLikeId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
     }
 }

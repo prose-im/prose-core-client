@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
+    ArchivedMessageRef, MessageId, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
 };
 use crate::domain::shared::models::{AccountId, RoomId};
 
@@ -23,14 +23,14 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageRemoteId,
+        id: &MessageId,
     ) -> Result<Vec<MessageLike>>;
     /// Returns all parts (MessageLike) that make up all messages in `ids`. Sorted chronologically.
     async fn get_all(
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        ids: &[MessageRemoteId],
+        ids: &[MessageId],
     ) -> Result<Vec<MessageLike>>;
     /// Returns all messages that target any IDs contained in `targeted_id` and are newer
     /// than `newer_than`.
@@ -45,7 +45,7 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        id: &MessageRemoteId,
+        id: &MessageServerId,
     ) -> Result<bool>;
     async fn append(
         &self,
@@ -55,13 +55,25 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     ) -> Result<()>;
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 
-    /// Attempts to look up the message identified by `stanza_id` and returns
-    /// its `id` if it was found.
-    async fn resolve_message_id(
+    async fn resolve_server_id_to_message_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        stanza_id: &MessageServerId,
+        server_id: &MessageServerId,
+    ) -> Result<Option<MessageId>>;
+
+    async fn resolve_remote_id_to_message_id(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        remote_id: &MessageRemoteId,
+    ) -> Result<Option<MessageId>>;
+
+    async fn resolve_message_id_to_remote_id(
+        &self,
+        account: &AccountId,
+        room_id: &RoomId,
+        id: &MessageId,
     ) -> Result<Option<MessageRemoteId>>;
 
     /// Returns the latest message, if available, that has a `stanza_id` set and was received

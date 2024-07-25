@@ -10,8 +10,8 @@ use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::{ns, IDProvider, SystemTimeProvider, TimeProvider, UUIDProvider};
 
 use crate::app::deps::{
-    AppConfig, AppContext, AppDependencies, DynEncryptionService, DynIDProvider, DynRngProvider,
-    DynTimeProvider, DynUserDeviceIdProvider,
+    AppConfig, AppContext, AppDependencies, DynEncryptionService, DynIDProvider,
+    DynMessageIdProvider, DynRngProvider, DynTimeProvider, DynUserDeviceIdProvider,
 };
 use crate::app::event_handlers::{
     BlockListEventHandler, BookmarksEventHandler, ConnectionEventHandler, ContactListEventHandler,
@@ -24,6 +24,7 @@ use crate::app::services::{
 use crate::client::ClientInner;
 use crate::domain::encryption::services::{RandUserDeviceIdProvider, UserDeviceIdProvider};
 use crate::domain::general::models::{Capabilities, Feature, SoftwareVersion};
+use crate::domain::messaging::services::{MessageIdProvider, WrappingMessageIdProvider};
 use crate::domain::user_info::models::PROSE_IM_NODE;
 use crate::domain::user_info::repos::AvatarRepository;
 use crate::infra::general::{NanoIDProvider, OsRngProvider, RngProvider};
@@ -49,6 +50,7 @@ pub struct ClientBuilder<S, A, E> {
     store: S,
     time_provider: DynTimeProvider,
     user_device_id_provider: DynUserDeviceIdProvider,
+    message_id_provider: DynMessageIdProvider,
 }
 
 impl ClientBuilder<UndefinedStore, UndefinedAvatarRepository, UndefinedEncryptionService> {
@@ -66,6 +68,7 @@ impl ClientBuilder<UndefinedStore, UndefinedAvatarRepository, UndefinedEncryptio
             store: UndefinedStore,
             time_provider: Arc::new(SystemTimeProvider::default()),
             user_device_id_provider: Arc::new(RandUserDeviceIdProvider::default()),
+            message_id_provider: Arc::new(WrappingMessageIdProvider::uuid()),
         }
     }
 }
@@ -88,6 +91,7 @@ impl<A, E> ClientBuilder<UndefinedStore, A, E> {
             store,
             time_provider: self.time_provider,
             user_device_id_provider: self.user_device_id_provider,
+            message_id_provider: self.message_id_provider,
         }
     }
 }
@@ -110,6 +114,7 @@ impl<D, E> ClientBuilder<D, UndefinedAvatarRepository, E> {
             store: self.store,
             time_provider: self.time_provider,
             user_device_id_provider: self.user_device_id_provider,
+            message_id_provider: self.message_id_provider,
         }
     }
 }
@@ -132,6 +137,7 @@ impl<S, A> ClientBuilder<S, A, UndefinedEncryptionService> {
             store: self.store,
             time_provider: self.time_provider,
             user_device_id_provider: self.user_device_id_provider,
+            message_id_provider: self.message_id_provider,
         }
     }
 }
@@ -164,6 +170,14 @@ impl<D, A, E> ClientBuilder<D, A, E> {
         id_provider: P,
     ) -> Self {
         self.user_device_id_provider = Arc::new(id_provider);
+        self
+    }
+
+    pub fn set_message_id_provider<P: MessageIdProvider + 'static>(
+        mut self,
+        id_provider: P,
+    ) -> Self {
+        self.message_id_provider = Arc::new(id_provider);
         self
     }
 
@@ -263,6 +277,7 @@ impl<A: AvatarRepository + 'static> ClientBuilder<Store<PlatformDriver>, A, DynE
             ctx: AppContext::new(capabilities, self.software_version, self.app_config),
             encryption_service: self.encryption_service,
             id_provider: self.id_provider,
+            message_id_provider: self.message_id_provider,
             rng_provider: self.rng_provider,
             server_event_handler_queue: server_event_handler_queue.clone(),
             short_id_provider: self.short_id_provider,

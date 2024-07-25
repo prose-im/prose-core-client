@@ -202,6 +202,17 @@ impl Room {
         self.inner.details.write().statistics.needs_update = true;
     }
 
+    pub fn is_current_user(&self, account: &AccountId, participant: &ParticipantId) -> bool {
+        if self.room_id.is_muc_room() {
+            // We're generally trying to resolve OccupantIDs into UserIDs if possible.
+            // So the sender could be either/or depending on the room configuration.
+            Some(participant) == self.occupant_id().map(ParticipantId::Occupant).as_ref()
+                || participant == &ParticipantId::User(account.to_user_id())
+        } else {
+            participant == &ParticipantId::User(account.to_user_id())
+        }
+    }
+
     pub async fn update_statistics_if_needed(
         &self,
         account: &AccountId,

@@ -5,7 +5,8 @@
 
 #[macro_export]
 macro_rules! id_string {
-    ($t:ident) => {
+    ($(#[$meta:meta])* $t:ident) => {
+        $(#[$meta])*
         #[derive(Debug, Eq, PartialEq, Hash, Clone, serde::Serialize, serde::Deserialize)]
         #[serde(transparent)]
         pub struct $t(String);
@@ -32,8 +33,14 @@ macro_rules! id_string {
             }
         }
 
+        impl std::borrow::Borrow<str> for $t {
+            fn borrow(&self) -> &str {
+                &self.0
+            }
+        }
+
         impl std::str::FromStr for $t {
-            type Err = ();
+            type Err = std::convert::Infallible;
 
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 Ok($t(s.to_string()))

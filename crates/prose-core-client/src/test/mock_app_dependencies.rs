@@ -16,9 +16,9 @@ use prose_xmpp::test::IncrementingIDProvider;
 use crate::app::deps::{
     AppContext, AppDependencies, DynAppContext, DynBookmarksService, DynClientEventDispatcher,
     DynDraftsRepository, DynEncryptionDomainService, DynIDProvider, DynMessageArchiveService,
-    DynMessagesRepository, DynMessagingService, DynRngProvider, DynRoomAttributesService,
-    DynRoomParticipationService, DynSidebarDomainService, DynSyncedRoomSettingsService,
-    DynTimeProvider, DynUserInfoDomainService,
+    DynMessageIdProvider, DynMessagesRepository, DynMessagingService, DynRngProvider,
+    DynRoomAttributesService, DynRoomParticipationService, DynSidebarDomainService,
+    DynSyncedRoomSettingsService, DynTimeProvider, DynUserInfoDomainService,
 };
 use crate::app::event_handlers::{MockClientEventDispatcherTrait, ServerEventHandlerQueue};
 use crate::app::services::RoomInner;
@@ -40,6 +40,7 @@ use crate::domain::messaging::services::mocks::{
     MockMessageArchiveDomainService, MockMessageArchiveService, MockMessageMigrationDomainService,
     MockMessagingService,
 };
+use crate::domain::messaging::services::WrappingMessageIdProvider;
 use crate::domain::rooms::repos::mocks::{
     MockConnectedRoomsReadOnlyRepository, MockConnectedRoomsReadWriteRepository,
 };
@@ -127,6 +128,10 @@ pub struct MockAppDependencies {
     pub id_provider: DynIDProvider,
     pub local_room_settings_repo: MockLocalRoomSettingsRepository,
     pub message_archive_service: MockMessageArchiveService,
+    #[derivative(Default(
+        value = "Arc::new(WrappingMessageIdProvider::incrementing(\"msg-id\"))"
+    ))]
+    pub message_id_provider: DynMessageIdProvider,
     pub messages_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
     pub offline_message_repo: MockOfflineMessagesRepository,
@@ -177,7 +182,7 @@ impl From<MockAppDependencies> for AppDependencies {
             let ctx = ctx.clone();
             let drafts_repo = drafts_repo.clone();
             let encryption_domain_service = encryption_domain_service.clone();
-            let id_provider = mock.id_provider.clone();
+            let message_id_provider = mock.message_id_provider.clone();
             let message_archive_service = message_archive_service.clone();
             let message_repo = messages_repo.clone();
             let messaging_service = messaging_service.clone();
@@ -196,7 +201,7 @@ impl From<MockAppDependencies> for AppDependencies {
                     data: data.clone(),
                     drafts_repo: drafts_repo.clone(),
                     encryption_domain_service: encryption_domain_service.clone(),
-                    id_provider: id_provider.clone(),
+                    message_id_provider: message_id_provider.clone(),
                     message_archive_service: message_archive_service.clone(),
                     message_repo: message_repo.clone(),
                     messaging_service: messaging_service.clone(),
@@ -221,6 +226,7 @@ impl From<MockAppDependencies> for AppDependencies {
             drafts_repo,
             encryption_domain_service,
             id_provider: mock.id_provider,
+            message_id_provider: mock.message_id_provider,
             local_room_settings_repo: Arc::new(mock.local_room_settings_repo),
             message_archive_service,
             messages_repo,
@@ -364,8 +370,10 @@ pub struct MockRoomFactoryDependencies {
     pub ctx: AppContext,
     pub drafts_repo: MockDraftsRepository,
     pub encryption_domain_service: MockEncryptionDomainService,
-    #[derivative(Default(value = "Arc::new(IncrementingIDProvider::new(Default::default()))"))]
-    pub id_provider: DynIDProvider,
+    #[derivative(Default(
+        value = "Arc::new(WrappingMessageIdProvider::incrementing(\"msg-id\"))"
+    ))]
+    pub message_id_provider: DynMessageIdProvider,
     pub message_archive_service: MockMessageArchiveService,
     pub message_repo: MockMessagesRepository,
     pub messaging_service: MockMessagingService,
@@ -383,7 +391,7 @@ pub struct MockSealedRoomFactoryDependencies {
     pub ctx: DynAppContext,
     pub drafts_repo: DynDraftsRepository,
     pub encryption_domain_service: DynEncryptionDomainService,
-    pub id_provider: DynIDProvider,
+    pub message_id_provider: DynMessageIdProvider,
     pub message_archive_service: DynMessageArchiveService,
     pub message_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
@@ -403,7 +411,7 @@ impl From<MockRoomFactoryDependencies> for MockSealedRoomFactoryDependencies {
             ctx: Arc::new(value.ctx),
             drafts_repo: Arc::new(value.drafts_repo),
             encryption_domain_service: Arc::new(value.encryption_domain_service),
-            id_provider: value.id_provider,
+            message_id_provider: value.message_id_provider,
             message_archive_service: Arc::new(value.message_archive_service),
             message_repo: Arc::new(value.message_repo),
             messaging_service: Arc::new(value.messaging_service),
@@ -427,7 +435,7 @@ impl From<MockSealedRoomFactoryDependencies> for RoomFactory {
                 data: data.clone(),
                 drafts_repo: value.drafts_repo.clone(),
                 encryption_domain_service: value.encryption_domain_service.clone(),
-                id_provider: value.id_provider.clone(),
+                message_id_provider: value.message_id_provider.clone(),
                 message_archive_service: value.message_archive_service.clone(),
                 message_repo: value.message_repo.clone(),
                 messaging_service: value.messaging_service.clone(),

@@ -15,7 +15,8 @@ use regex::Regex;
 
 use prose_core_client::app::deps::AppConfig;
 use prose_core_client::domain::encryption::services::IncrementingUserDeviceIdProvider;
-use prose_core_client::dtos::{DeviceId, RoomEnvelope, RoomId, UserId};
+use prose_core_client::domain::messaging::services::WrappingMessageIdProvider;
+use prose_core_client::dtos::{DeviceId, MessageId, RoomEnvelope, RoomId, UserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::mocks::StepRngProvider;
 use prose_core_client::test::ConstantTimeProvider;
@@ -37,6 +38,7 @@ pub struct TestClient {
     pub(super) client: Client,
     connector: Connector,
     pub(crate) id_provider: IncrementingOffsettingIDProvider,
+    pub(crate) message_id_provider: IncrementingOffsettingIDProvider,
     pub(super) short_id_provider: IncrementingIDProvider,
     messages: TestMessageQueue,
     context: Mutex<Vec<HashMap<String, String>>>,
@@ -115,6 +117,7 @@ impl TestClientBuilder {
         let client = Client::builder()
             .set_connector_provider(connector.provider())
             .set_id_provider(IncrementingIDProvider::new("id"))
+            .set_message_id_provider(WrappingMessageIdProvider::incrementing("msg-id"))
             .set_short_id_provider(IncrementingIDProvider::new("short-id"))
             .set_rng_provider(StepRngProvider::default())
             .set_avatar_repository(FsAvatarRepository::new(&path).unwrap())
@@ -131,6 +134,7 @@ impl TestClientBuilder {
             // We'll just mirror the used ID provider here…
             connector,
             id_provider: IncrementingOffsettingIDProvider::new("id"),
+            message_id_provider: IncrementingOffsettingIDProvider::new("msg-id"),
             short_id_provider: IncrementingIDProvider::new("short-id"),
             messages,
             context: Default::default(),
@@ -193,6 +197,7 @@ macro_rules! any_event(
 impl TestClient {
     pub fn send(&self, xml: impl Into<String>, file: &str, line: u32) {
         self.id_provider.apply_offset();
+        self.message_id_provider.apply_offset();
 
         let mut xml = xml.into();
 
@@ -219,7 +224,16 @@ impl TestClient {
         }
 
         self.id_provider.set_offset(highest_offset);
+
         self.apply_ctx(&mut xml);
+
+        if xml.contains("{{MSG_ID}}") {
+            self.push_ctx([("MSG_ID", self.message_id_provider.id_with_offset(1))]);
+            self.apply_ctx(&mut xml);
+            self.pop_ctx();
+            self.message_id_provider.set_offset(1);
+        };
+
         self.messages.send(xml, file, line);
     }
 
@@ -247,6 +261,23 @@ impl TestClient {
         }
 
         self.apply_ctx(&mut xml);
+
+        if xml.contains("{{LAST_MSG_ID}}") {
+            self.push_ctx([(
+                "LAST_MSG_ID",
+                self.message_id_provider.last_id_with_offset(1),
+            )]);
+            self.apply_ctx(&mut xml);
+            self.pop_ctx();
+        };
+
+        if xml.contains("{{MSG_ID}}") {
+            self.push_ctx([("MSG_ID", self.message_id_provider.id_with_offset(1))]);
+            self.apply_ctx(&mut xml);
+            self.pop_ctx();
+            self.message_id_provider.set_offset(1);
+        };
+
         self.messages.receive(xml, file, line);
     }
 
@@ -347,6 +378,24 @@ impl TestClient {
 
     pub fn get_next_id(&self) -> String {
         self.id_provider.next_id()
+    }
+
+    pub fn get_last_message_id(&self) -> MessageId {
+        self.message_id_provider.last_id_with_offset(1).into()
+    }
+
+    pub fn get_next_message_id_with_offset(&self, offset: i64) -> MessageId {
+        assert!(offset > 0);
+        self.message_id_provider.id_with_offset(offset).into()
+    }
+
+    pub fn get_next_message_id(&self) -> MessageId {
+        self.message_id_provider.next_id().into()
+    }
+
+    pub fn bump_message_id(&self) {
+        self.message_id_provider.set_offset(1);
+        self.message_id_provider.apply_offset();
     }
 }
 

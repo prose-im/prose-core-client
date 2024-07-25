@@ -162,6 +162,7 @@ async fn test_rounds_timestamps() -> Result<()> {
         event!(client, ClientEvent::SidebarChanged);
     }
     client.receive_next().await;
+    client.bump_message_id();
 
     // Check that we have one SidebarItem with an unread_count of 1
     let sidebar_items = client.sidebar.sidebar_items().await;
@@ -181,13 +182,14 @@ async fn test_rounds_timestamps() -> Result<()> {
             </message>
             "#
         );
+        client.bump_message_id();
 
         event!(client, ClientEvent::SidebarChanged);
         room_event!(
             client,
             user_id.clone(),
             ClientRoomEventType::MessagesAppended {
-                message_ids: vec!["id-2".into()]
+                message_ids: vec![client.get_last_message_id()]
             }
         )
     }
@@ -233,13 +235,14 @@ async fn test_rounds_timestamps() -> Result<()> {
             </message>
             "#
         );
+        client.bump_message_id();
 
         event!(client, ClientEvent::SidebarChanged);
         room_event!(
             client,
             user_id.clone(),
             ClientRoomEventType::MessagesAppended {
-                message_ids: vec!["id-3".into()]
+                message_ids: vec![client.get_last_message_id()]
             }
         )
     }
@@ -275,25 +278,25 @@ async fn test_rounds_timestamps() -> Result<()> {
                     MessageBuilder::new_with_id(
                         "id-1",
                         Utc.with_ymd_and_hms(2024, 04, 05, 10, 00, 01).unwrap(),
-                        MessageLikePayload::message("Hello"),
+                        MessageLikePayload::message("hello 1"),
                     )
-                    .set_stanza_id(Some("stanza-id-1".into()))
+                    .set_server_id(Some("stanza-id-1".into()))
                     .set_from(user_id!("other@prose.org"))
                     .build_archived_message("", None),
                     MessageBuilder::new_with_id(
                         "id-2",
                         Utc.with_ymd_and_hms(2024, 04, 05, 10, 00, 01).unwrap(),
-                        MessageLikePayload::message("Hello"),
+                        MessageLikePayload::message("hello 2"),
                     )
-                    .set_stanza_id(Some("stanza-id-2".into()))
+                    .set_server_id(Some("stanza-id-2".into()))
                     .set_from(user_id!("other@prose.org"))
                     .build_archived_message("", None),
                     MessageBuilder::new_with_id(
                         "id-3",
                         Utc.with_ymd_and_hms(2024, 04, 05, 10, 01, 00).unwrap(),
-                        MessageLikePayload::message("Hello"),
+                        MessageLikePayload::message("hello 3"),
                     )
-                    .set_stanza_id(Some("stanza-id-3".into()))
+                    .set_server_id(Some("stanza-id-3".into()))
                     .set_from(user_id!("other@prose.org"))
                     .build_archived_message("", None),
                 ];
@@ -343,7 +346,7 @@ async fn test_rounds_timestamps() -> Result<()> {
 
     let unread_messages = room.load_unread_messages().await?.messages;
     assert_eq!(1, unread_messages.len());
-    assert_eq!(Some("id-3".into()), unread_messages[0].id);
+    assert_eq!("hello 3", unread_messages[0].body.raw);
 
     Ok(())
 }
@@ -491,14 +494,17 @@ async fn test_loads_unread_messages() -> Result<()> {
             &room_id,
             &[
                 MessageBuilder::new_with_index(1)
+                    .set_payload("hello 1")
                     .set_from(occupant_id!("room@conf.prose.org/friend"))
                     .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 25, 10, 00, 00).unwrap())
                     .build_message_like(),
                 MessageBuilder::new_with_index(2)
+                    .set_payload("hello 2")
                     .set_from(occupant_id!("room@conf.prose.org/friend"))
                     .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 10, 00, 00).unwrap())
                     .build_message_like(),
                 MessageBuilder::new_with_index(3)
+                    .set_payload("hello 3")
                     .set_from(occupant_id!("room@conf.prose.org/friend"))
                     .set_timestamp(Utc.with_ymd_and_hms(2024, 04, 26, 11, 00, 00).unwrap())
                     .build_message_like(),
@@ -533,13 +539,10 @@ async fn test_loads_unread_messages() -> Result<()> {
     let unread_messages = room.load_unread_messages().await?;
 
     assert_eq!(
-        vec![
-            MessageBuilder::stanza_id_for_index(2),
-            MessageBuilder::stanza_id_for_index(3),
-        ],
+        vec!["hello 2", "hello 3",],
         unread_messages
             .into_iter()
-            .filter_map(|message| message.stanza_id)
+            .map(|message| message.body.raw)
             .collect::<Vec<_>>()
     );
 
@@ -877,8 +880,8 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
             .build_message_like(),
     ];
 
-    messages[2].stanza_id = None;
-    messages[3].stanza_id = None;
+    messages[2].server_id = None;
+    messages[3].server_id = None;
 
     let message_repo = CachingMessageRepository::new(store.clone());
     message_repo.append(&account, &room_id, &messages).await?;

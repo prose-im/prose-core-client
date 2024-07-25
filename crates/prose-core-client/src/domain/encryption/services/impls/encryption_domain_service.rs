@@ -29,10 +29,10 @@ use crate::domain::encryption::models::{
 use crate::domain::encryption::services::encryption_domain_service::{
     DecryptionError, EncryptionError,
 };
-use crate::domain::messaging::models::MessageLikePayload;
 use crate::domain::messaging::models::{EncryptedPayload, KeyTransportPayload};
+use crate::domain::messaging::models::{MessageId, MessageLikePayload};
 use crate::domain::shared::models::{AccountId, UserId};
-use crate::dtos::{EncryptionKey, MessageRemoteId, PreKeyId, RoomId};
+use crate::dtos::{EncryptionKey, PreKeyId, RoomId};
 use crate::util::join_all;
 
 use super::super::EncryptionDomainService as EncryptionDomainServiceTrait;
@@ -288,7 +288,7 @@ impl EncryptionDomainServiceTrait for EncryptionDomainService {
         &self,
         sender_id: &UserId,
         room_id: &RoomId,
-        message_id: Option<&MessageRemoteId>,
+        message_id: Option<&MessageId>,
         payload: EncryptedPayload,
         context: Option<DecryptionContext>,
     ) -> Result<String, DecryptionError> {
