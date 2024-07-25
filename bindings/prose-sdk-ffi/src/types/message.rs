@@ -33,7 +33,7 @@ pub struct Message {
 impl From<ProseMessage> for Message {
     fn from(value: ProseMessage) -> Self {
         Message {
-            id: value.id,
+            id: value.remote_id,
             stanza_id: value.stanza_id,
             from: value.from.id.to_user_id().map(|id| id.into_inner().into()),
             body: todo!(),

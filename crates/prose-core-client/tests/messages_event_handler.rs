@@ -22,13 +22,16 @@ use prose_core_client::domain::rooms::models::{Room, RoomInfo};
 use prose_core_client::domain::shared::models::{
     MucId, OccupantId, RoomId, RoomType, UserId, UserResourceId,
 };
-use prose_core_client::dtos::{Availability, MessageRemoteId, MessageServerId, ParticipantId};
+use prose_core_client::dtos::{
+    Availability, MessageId, MessageRemoteId, MessageServerId, ParticipantId,
+};
 use prose_core_client::test::{ConstantTimeProvider, MockAppDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id, user_resource_id, ClientRoomEventType};
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message::{Forwarded, Reactions};
 use prose_xmpp::stanza::muc::MucUser;
 use prose_xmpp::stanza::Message;
+use prose_xmpp::test::IncrementingIDProvider;
 use prose_xmpp::{bare, full, jid};
 
 #[tokio::test]
@@ -210,6 +213,8 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         decryption_context: None,
     });
 
+    deps.id_provider = Arc::new(IncrementingIDProvider::new("internal-id"));
+
     let room = Room::group(muc_id!("room@conference.prose.org"));
 
     let sent_message = prose_xmpp::stanza::Message::new()
@@ -222,8 +227,9 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         .set_markable();
 
     let expected_saved_message = MessageLike {
-        id: "message-id".into(),
-        stanza_id: None,
+        id: "internal-id-1".into(),
+        remote_id: Some("message-id".into()),
+        server_id: None,
         target: None,
         to: Some(bare!("room@conference.prose.org")),
         from: ParticipantId::User(user_id!("from@prose.org")), // Resource should be dropped
@@ -302,6 +308,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
 async fn test_parses_private_message_in_muc_room() -> Result<()> {
     let mut deps = MockAppDependencies::default();
     let mut seq = Sequence::new();
+    deps.id_provider = Arc::new(IncrementingIDProvider::new("internal-id"));
 
     *deps.ctx.connection_properties.write() = Some(ConnectionProperties {
         connection_timestamp: Default::default(),
@@ -322,8 +329,9 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
         .add_payload(MucUser::new());
 
     let expected_saved_message = MessageLike {
-        id: "message-id".into(),
-        stanza_id: None,
+        id: "internal-id-1".into(),
+        remote_id: Some("message-id".into()),
+        server_id: None,
         target: None,
         to: Some(bare!("user@prose.org")),
         from: ParticipantId::Occupant(occupant_id!("room@conference.prose.org/other-user")),
@@ -677,15 +685,13 @@ async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()>
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
-        .expect_resolve_message_id()
+        .expect_resolve_server_id_to_message_id()
         .with(
             predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
             predicate::eq(MessageServerId::from("stanza-id-100")),
         )
-        .return_once(|_, _, _| {
-            Box::pin(async { Ok(Some(MessageRemoteId::from("message-id-100"))) })
-        });
+        .return_once(|_, _, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -748,15 +754,13 @@ async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_m
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
-        .expect_resolve_message_id()
+        .expect_resolve_server_id_to_message_id()
         .with(
             predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
             predicate::eq(MessageServerId::from("stanza-id-100")),
         )
-        .return_once(|_, _, _| {
-            Box::pin(async { Ok(Some(MessageRemoteId::from("message-id-100"))) })
-        });
+        .return_once(|_, _, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()

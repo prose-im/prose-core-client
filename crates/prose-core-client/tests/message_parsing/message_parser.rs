@@ -49,6 +49,7 @@ async fn test_parse_chat_message() -> Result<()> {
         .add_references([reference]);
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -59,8 +60,9 @@ async fn test_parse_chat_message() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: None,
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: None,
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::User(user_id!("them@prose.org")),
@@ -99,6 +101,7 @@ async fn test_parse_groupchat_message() -> Result<()> {
         });
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -109,8 +112,9 @@ async fn test_parse_groupchat_message() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: Some("dekEV-gtF2hrg_iekCjPAlON".into()),
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: Some("dekEV-gtF2hrg_iekCjPAlON".into()),
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::Occupant(occupant_id!("room@groups.prose.org/them")),
@@ -152,6 +156,7 @@ async fn test_parse_sent_carbon_message() -> Result<()> {
     });
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -162,8 +167,9 @@ async fn test_parse_sent_carbon_message() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: Some("Qiuahv1eo3C222uKhOqjPiW0".into()),
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: Some("Qiuahv1eo3C222uKhOqjPiW0".into()),
             target: None,
             to: Some(bare!("them@prose.org")),
             from: ParticipantId::User(user_id!("me@prose.org")),
@@ -208,6 +214,7 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
     };
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -218,8 +225,9 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: Some("FbGQI-iEUNysr8pdD2PP9mmU".into()),
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: Some("FbGQI-iEUNysr8pdD2PP9mmU".into()),
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::Occupant(occupant_id!("room@groups.prose.org/them")),
@@ -269,6 +277,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
     };
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -280,8 +289,9 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
     assert_eq!(
         parsed_message,
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: Some("FbGQI-iEUNysr8pdD2PP9mmU".into()),
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: Some("FbGQI-iEUNysr8pdD2PP9mmU".into()),
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::User(user_id!("them@prose.org")),
@@ -325,6 +335,7 @@ async fn test_parse_mam_chat_message() -> Result<()> {
     };
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -335,8 +346,9 @@ async fn test_parse_mam_chat_message() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: Some("bne6LtG1ev_jIb1oYNA7nxip".into()),
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: Some("bne6LtG1ev_jIb1oYNA7nxip".into()),
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::User(user_id!("them@prose.org")),
@@ -377,6 +389,7 @@ async fn test_parse_delayed_message() -> Result<()> {
         .set_body("Hello");
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -387,8 +400,9 @@ async fn test_parse_delayed_message() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: None,
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: None,
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::User(user_id!("them@prose.org")),
@@ -422,6 +436,7 @@ async fn test_message_with_attachment_and_empty_body() -> Result<()> {
     }]);
 
     let parsed_message = MessageParser::new(
+        "local-id-1".into(),
         None,
         Default::default(),
         Arc::new(MockEncryptionDomainService::new()),
@@ -432,8 +447,9 @@ async fn test_message_with_attachment_and_empty_body() -> Result<()> {
 
     assert_eq!(
         MessageLike {
-            id: "message-id-1".into(),
-            stanza_id: None,
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-1".into()),
+            server_id: None,
             target: None,
             to: Some(bare!("me@prose.org")),
             from: ParticipantId::User(user_id!("them@prose.org")),

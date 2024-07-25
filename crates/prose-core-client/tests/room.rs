@@ -261,7 +261,7 @@ async fn test_toggle_reaction_in_direct_message() -> Result<()> {
         .once()
         .with(
             predicate::eq(user_id!("user@prose.org")),
-            predicate::eq(MessageBuilder::id_for_index(1)),
+            predicate::eq(MessageBuilder::remote_id_for_index(1)),
             predicate::eq(vec!["🍻".into(), "✅".into()]),
         )
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
@@ -786,13 +786,13 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
             predicate::always(),
             predicate::eq(RoomId::from(muc_id!("room@conference.prose.org"))),
             predicate::eq(vec![
-                MessageBuilder::id_for_index(5).into(),
+                MessageBuilder::remote_id_for_index(5).into(),
                 MessageBuilder::stanza_id_for_index(5).into(),
-                MessageBuilder::id_for_index(4).into(),
+                MessageBuilder::remote_id_for_index(4).into(),
                 MessageBuilder::stanza_id_for_index(4).into(),
-                MessageBuilder::id_for_index(2).into(),
+                MessageBuilder::remote_id_for_index(2).into(),
                 MessageBuilder::stanza_id_for_index(2).into(),
-                MessageBuilder::id_for_index(1).into(),
+                MessageBuilder::remote_id_for_index(1).into(),
                 MessageBuilder::stanza_id_for_index(1).into(),
             ]),
             predicate::eq(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap()),

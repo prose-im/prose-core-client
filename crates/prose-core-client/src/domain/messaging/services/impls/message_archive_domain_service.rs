@@ -9,14 +9,14 @@ use chrono::{DateTime, Duration, Utc};
 use tracing::{error, info};
 
 use prose_proc_macros::DependenciesStruct;
-use prose_xmpp::TimeProvider;
+use prose_xmpp::{IDProvider, TimeProvider};
 
 use crate::app::deps::{
-    DynAppContext, DynEncryptionDomainService, DynLocalRoomSettingsRepository,
+    DynAppContext, DynEncryptionDomainService, DynIDProvider, DynLocalRoomSettingsRepository,
     DynMessageArchiveService, DynMessagesRepository, DynTimeProvider,
 };
 use crate::domain::encryption::models::DecryptionContext;
-use crate::domain::messaging::models::{MessageLike, MessageLikeError, MessageParser};
+use crate::domain::messaging::models::{MessageId, MessageLike, MessageLikeError, MessageParser};
 use crate::domain::messaging::services::MessagePage;
 use crate::domain::rooms::models::Room;
 use crate::dtos::MessageServerId;
@@ -27,6 +27,7 @@ use super::super::MessageArchiveDomainService as MessageArchiveDomainServiceTrai
 pub struct MessageArchiveDomainService {
     ctx: DynAppContext,
     encryption_domain_service: DynEncryptionDomainService,
+    id_provider: DynIDProvider,
     local_room_settings_repo: DynLocalRoomSettingsRepository,
     message_archive_service: DynMessageArchiveService,
     message_repo: DynMessagesRepository,
@@ -145,6 +146,7 @@ impl MessageArchiveDomainService {
     ) {
         for archive_message in page.messages {
             let parsed_message = match MessageParser::new(
+                MessageId::from(self.id_provider.new_id()),
                 Some(room.clone()),
                 Default::default(),
                 self.encryption_domain_service.clone(),

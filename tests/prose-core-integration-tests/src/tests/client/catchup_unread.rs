@@ -343,7 +343,7 @@ async fn test_rounds_timestamps() -> Result<()> {
 
     let unread_messages = room.load_unread_messages().await?.messages;
     assert_eq!(1, unread_messages.len());
-    assert_eq!(Some("id-3".into()), unread_messages[0].id);
+    assert_eq!(Some("id-3".into()), unread_messages[0].remote_id);
 
     Ok(())
 }
@@ -877,8 +877,8 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
             .build_message_like(),
     ];
 
-    messages[2].stanza_id = None;
-    messages[3].stanza_id = None;
+    messages[2].server_id = None;
+    messages[3].server_id = None;
 
     let message_repo = CachingMessageRepository::new(store.clone());
     message_repo.append(&account, &room_id, &messages).await?;
@@ -920,8 +920,8 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
         room_id.clone(),
         ClientRoomEventType::MessagesUpdated {
             message_ids: vec![
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2)
+                MessageBuilder::remote_id_for_index(1),
+                MessageBuilder::remote_id_for_index(2)
             ]
         }
     );
@@ -929,7 +929,7 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
     event!(client, ClientEvent::SidebarChanged);
 
     let room = client.get_room(room_id.clone()).await.to_generic_room();
-    room.set_last_read_message(&MessageBuilder::id_for_index(4))
+    room.set_last_read_message(&MessageBuilder::remote_id_for_index(4))
         .await?;
 
     let sidebar_items = client.sidebar.sidebar_items().await;
@@ -954,15 +954,15 @@ async fn test_set_unread_message_saves_settings() -> Result<()> {
         room_id.clone(),
         ClientRoomEventType::MessagesUpdated {
             message_ids: vec![
-                MessageBuilder::id_for_index(2),
-                MessageBuilder::id_for_index(5)
+                MessageBuilder::remote_id_for_index(2),
+                MessageBuilder::remote_id_for_index(5)
             ]
         }
     );
 
     event!(client, ClientEvent::SidebarChanged);
 
-    room.set_last_read_message(&MessageBuilder::id_for_index(5))
+    room.set_last_read_message(&MessageBuilder::remote_id_for_index(5))
         .await?;
 
     let sidebar_items = client.sidebar.sidebar_items().await;

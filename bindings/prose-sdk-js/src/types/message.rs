@@ -95,7 +95,7 @@ impl From<dtos::Message> for Message {
             .collect_into_js_array();
 
         Self {
-            id: value.id.map(|id| id.to_string()),
+            id: value.remote_id.map(|id| id.to_string()),
             stanza_id: value.stanza_id.map(ArchiveID::from),
             from: value.from.into(),
             body: Body {
