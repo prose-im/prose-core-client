@@ -174,27 +174,21 @@ impl Module for Profile {
 }
 
 impl Profile {
-    pub async fn load_vcard(
+    pub async fn load_vcard4(
         &self,
         from: impl Into<BareJid>,
     ) -> Result<Option<VCard4>, RequestError> {
-        let iq = Iq {
-            from: None,
-            to: Some(Jid::from(from.into())),
-            id: self.ctx.generate_id(),
-            payload: IqType::Get(Element::builder("vcard", ns::VCARD4).build()),
-        };
-
-        let vcard = match self.ctx.send_iq(iq).await {
-            Ok(Some(payload)) => {
-                VCard4::try_from(payload).map_err(|e| ParseError::Generic { msg: e.to_string() })?
-            }
-            Ok(None) => return Err(RequestError::UnexpectedResponse.into()),
-            Err(e) if e.is_item_not_found_err() => return Ok(None),
-            Err(e) => return Err(e.into()),
-        };
-
-        Ok(Some(vcard))
+        let vcard = self
+            .ctx
+            .query_pubsub_node(
+                PubSubQuery::new(self.ctx.generate_id(), ns::VCARD4).set_to(from.into()),
+            )
+            .await?
+            .and_then(|mut items| items.pop())
+            .and_then(|item| item.payload)
+            .map(VCard4::try_from)
+            .transpose()?;
+        Ok(vcard)
     }
 
     pub async fn load_vcard_temp(

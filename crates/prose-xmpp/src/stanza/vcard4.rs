@@ -7,8 +7,8 @@ use anyhow::Result;
 use minidom::{Element, ElementBuilder};
 use xmpp_parsers::iq::IqSetPayload;
 
-use crate::ns;
 use crate::util::ElementExt;
+use crate::{ns, ParseError};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct VCard4 {
@@ -118,7 +118,7 @@ pub struct Tel {
 }
 
 impl TryFrom<Element> for VCard4 {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         root.expect_is("vcard", ns::VCARD4)?;
@@ -189,7 +189,7 @@ impl From<VCard4> for Element {
 }
 
 impl TryFrom<&Element> for Name {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(root: &Element) -> Result<Self, Self::Error> {
         root.expect_is("n", ns::VCARD4)?;
@@ -232,7 +232,7 @@ impl From<Name> for Element {
 }
 
 impl TryFrom<&Element> for Adr {
-    type Error = anyhow::Error;
+    type Error = ParseError;
 
     fn try_from(root: &Element) -> Result<Self, Self::Error> {
         let mut adr = Adr::default();
@@ -269,8 +269,8 @@ impl From<Adr> for Element {
 }
 
 trait VCardExt {
-    fn text_value(&self) -> Result<String>;
-    fn uri_value(&self) -> Result<String>;
+    fn text_value(&self) -> Result<String, ParseError>;
+    fn uri_value(&self) -> Result<String, ParseError>;
 }
 
 trait VCardBuilderExt {
@@ -287,16 +287,20 @@ trait VCardBuilderExt {
 }
 
 impl VCardExt for Element {
-    fn text_value(&self) -> Result<String> {
+    fn text_value(&self) -> Result<String, ParseError> {
         self.get_child("text", ns::VCARD4)
             .map(|e| e.text())
-            .ok_or(anyhow::format_err!("Missing element {}.text", self.name()))
+            .ok_or_else(|| ParseError::Generic {
+                msg: format!("Missing element {}.text", self.name()),
+            })
     }
 
-    fn uri_value(&self) -> Result<String> {
+    fn uri_value(&self) -> Result<String, ParseError> {
         self.get_child("uri", ns::VCARD4)
             .map(|e| e.text())
-            .ok_or(anyhow::format_err!("Missing element {}.uri", self.name()))
+            .ok_or_else(|| ParseError::Generic {
+                msg: format!("Missing element {}.uri", self.name()),
+            })
     }
 }
 
