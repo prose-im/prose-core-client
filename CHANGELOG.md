@@ -1,4 +1,15 @@
 
+## What's Changed in 0.1.92
+
+* Send Markdown content via XEP-0481 and convert body text to XEP-0393: Message Styling
+* Rename message ids
+* Allow specifying PublishOptions when publishing a vCard4
+* Remove unused imports
+* Load vCard4 properly from PubSub
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.91...0.1.92)
+
+
 ## What's Changed in 0.1.91
 
 * Prevent panic when reconnecting rooms after disconnect/reconnect cycle
