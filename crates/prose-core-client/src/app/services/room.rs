@@ -219,7 +219,7 @@ impl<Kind> Room<Kind> {
                         html,
                         mentions: mentions.clone(),
                     },
-                    attachments: vec![],
+                    attachments: request.attachments.clone(),
                     encryption_info: None,
                     is_transient: false,
                 },
@@ -229,7 +229,7 @@ impl<Kind> Room<Kind> {
             (
                 MessageLikePayload::Message {
                     body: MessageLikeBody::default(),
-                    attachments: vec![],
+                    attachments: request.attachments.clone(),
                     encryption_info: None,
                     is_transient: false,
                 },
@@ -303,7 +303,7 @@ impl<Kind> Room<Kind> {
                         html,
                         mentions: mentions.clone(),
                     },
-                    attachments: vec![],
+                    attachments: request.attachments.clone(),
                     encryption_info: None,
                 },
                 Some((body.text, fallback, mentions)),
@@ -312,7 +312,7 @@ impl<Kind> Room<Kind> {
             (
                 MessageLikePayload::Correction {
                     body: MessageLikeBody::default(),
-                    attachments: vec![],
+                    attachments: request.attachments.clone(),
                     encryption_info: None,
                 },
                 None,
@@ -848,8 +848,6 @@ impl<Kind> Room<Kind> {
                         .sorted()
                         .collect::<Vec<_>>()
                 });
-
-                println!("ENCRYPT >{fallback}<");
 
                 send_message_request::Payload::Encrypted(
                     self.encryption_domain_service
