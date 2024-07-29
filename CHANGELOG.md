@@ -1,46 +1,44 @@
 
+## What's Changed in 0.1.94
+
+* Expose avatar on AccountInfo and Contact by @nesium
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.93...0.1.94)
+
+
 ## What's Changed in 0.1.93
 
-* Add avatar to Contact and AccountInfo
-* Attachments of sent messages were not stored (and thus not displayed)
+* Add avatar to Contact and AccountInfo by @nesium
+* Attachments of sent messages were not stored (and thus not displayed) by @nesium
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.92...0.1.93)
 
 
 ## What's Changed in 0.1.92
 
-* Send Markdown content via XEP-0481 and convert body text to XEP-0393: Message Styling
-* Rename message ids
-* Allow specifying PublishOptions when publishing a vCard4
-* Remove unused imports
-* Load vCard4 properly from PubSub
+* Load vCard4 properly from PubSub by @nesium
+* Send Markdown content via XEP-0481 and convert body text to XEP-0393: Message Styling by @nesium
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.91...0.1.92)
 
 
 ## What's Changed in 0.1.91
 
-* Prevent panic when reconnecting rooms after disconnect/reconnect cycle
+* Prevent panic when reconnecting rooms after disconnect/reconnect cycle by @nesium
+* Use pretty nicknames in MUCs by @nesium
+* Include optional full name in Contact and UserPresenceInfo by @nesium
+* Publish nickname explicitly when saving profile by @nesium
+* Add id to Avatar by @nesium
+* Use proper key for AvatarRecord by @nesium
+* Refactor user info, nickname and avatar handling by @nesium
+* Add method to load vcard-temp by @nesium
+* Prevent roster from being loaded twice by @nesium
+* Include nickname in MUC presence by @nesium
+* Distinguish between presence and vCard name for participants by @nesium
+* Add client and caps on Participant by @nesium
+* Introduce Avatar struct to support vCard and PEP avatars by @nesium
 
-[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.90...0.1.91)
-
-
-## What's Changed in 0.1.90
-
-* Use pretty nicknames in MUCs
-* Include optional full name in Contact and UserPresenceInfo
-* Publish nickname explicitly when saving profile
-* Add id to Avatar
-* Use proper key for AvatarRecord
-* Refactor user info, nickname and avatar handling
-* Add method to load vcard-temp
-* Prevent roster from being loaded twice
-* Include nickname in MUC presence
-* Distinguish between presence and vCard name for participants
-* Add client and caps on Participant
-* Introduce Avatar struct to support vCard and PEP avatars
-
-[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.89...0.1.90)
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.89...0.1.91)
 
 
 ## What's Changed in 0.1.89
