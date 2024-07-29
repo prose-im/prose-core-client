@@ -1,6 +1,6 @@
 [package]
 name = "prose-sdk-js"
-version = "0.1.93"
+version = "0.1.94"
 description = "Prose JavaScript SDK"
 readme = "README.md"
 license = "MPL-2.0"
