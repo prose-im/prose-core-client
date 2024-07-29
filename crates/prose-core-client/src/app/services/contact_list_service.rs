@@ -109,6 +109,7 @@ impl ContactListService {
             id: user_info.id,
             name: user_info.name,
             full_name: user_info.full_name,
+            avatar: user_info.avatar,
             availability: user_info.availability,
             status: user_info.status,
             group,

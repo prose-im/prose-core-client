@@ -6,6 +6,7 @@
 use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::shared::models::{Availability, UserId};
 use crate::domain::user_info::models::UserStatus;
+use crate::dtos::Avatar;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Group {
@@ -18,6 +19,7 @@ pub struct Contact {
     pub id: UserId,
     pub name: String,
     pub full_name: Option<String>,
+    pub avatar: Option<Avatar>,
     pub availability: Availability,
     pub status: Option<UserStatus>,
     pub group: Group,

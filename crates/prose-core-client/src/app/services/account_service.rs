@@ -52,6 +52,7 @@ impl AccountService {
         Ok(AccountInfo {
             id: user_id,
             name,
+            avatar: user_info.avatar,
             availability: account_settings.availability,
             status: user_info.status,
         })

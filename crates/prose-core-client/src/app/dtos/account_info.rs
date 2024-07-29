@@ -3,12 +3,13 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::dtos::{Availability, UserId, UserStatus};
+use crate::dtos::{Availability, Avatar, UserId, UserStatus};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct AccountInfo {
     pub id: UserId,
     pub name: String,
+    pub avatar: Option<Avatar>,
     pub availability: Availability,
     pub status: Option<UserStatus>,
 }
