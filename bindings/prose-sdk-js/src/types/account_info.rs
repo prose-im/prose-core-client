@@ -7,7 +7,7 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::AccountInfo as CoreAccountInfo;
 
-use super::{contact::UserStatus, Availability, BareJid};
+use super::{contact::UserStatus, Availability, Avatar, BareJid};
 
 #[wasm_bindgen]
 pub struct AccountInfo(CoreAccountInfo);
@@ -28,6 +28,11 @@ impl AccountInfo {
     #[wasm_bindgen(getter)]
     pub fn name(&self) -> String {
         self.0.name.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn avatar(&self) -> Option<Avatar> {
+        self.0.avatar.clone().map(|avatar| avatar.into())
     }
 
     #[wasm_bindgen(getter)]

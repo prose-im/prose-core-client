@@ -9,7 +9,7 @@ use prose_core_client::dtos::{
 };
 use wasm_bindgen::prelude::*;
 
-use super::BareJid;
+use super::{Avatar, BareJid};
 
 #[wasm_bindgen]
 pub struct Contact(CoreContact);
@@ -88,6 +88,11 @@ impl Contact {
     /// Contains the full name only if first and last name are set.
     pub fn full_name(&self) -> Option<String> {
         self.0.full_name.clone()
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn avatar(&self) -> Option<Avatar> {
+        self.0.avatar.clone().map(|avatar| avatar.into())
     }
 
     #[wasm_bindgen(getter)]
