@@ -7,9 +7,10 @@ use std::str::FromStr;
 
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
+use minidom::Element;
 use xmpp_parsers::delay::Delay;
 use xmpp_parsers::message::MessageType;
-use xmpp_parsers::{date, mam, Element};
+use xmpp_parsers::{date, mam};
 
 use prose_xmpp::stanza::message;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;

@@ -20,8 +20,10 @@ chrono = "0.4"
 futures = "0.3"
 insta = "1.3"
 itertools = "0.12"
+jid = { version = "0.11", default-features = false }
 js-sys = "0.3"
 mime = "0.3"
+minidom = "0.16"
 once_cell = "1.12"
 parking_lot = "0.12"
 pretty_assertions = "1.4"
@@ -34,6 +36,7 @@ strum_macros = "0.26"
 tempfile = "3.5"
 thiserror = "1.0"
 tokio = "1.26"
+tokio-xmpp = "4.0"
 tracing = { version = "0.1" }
 tracing-log = "0.2.0"
 tracing-subscriber = "0.3"
@@ -42,18 +45,8 @@ url = "2.3"
 uuid = { version = "1.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 wasm-bindgen = { version = "0.2" }
 wasm-bindgen-futures = "0.4"
-
-jid = { git = "https://gitlab.com/nesium/xmpp-rs", branch = "main", default-features = false }
-minidom = { git = "https://gitlab.com/nesium/xmpp-rs", branch = "main" }
-tokio-xmpp = { git = "https://gitlab.com/nesium/xmpp-rs", branch = "main" }
-xmpp-parsers = { git = "https://gitlab.com/nesium/xmpp-rs", branch = "main", features = ["disable-validation"] }
-
-#[patch.crates-io]
-#jid = { path = "../../xmpp-rs/jid" }
-#minidom = { path = "../../xmpp-rs/minidom" }
-#tokio-xmpp = { path = "../../xmpp-rs/tokio-xmpp" }
-#xmpp-parsers = { path = "../../xmpp-rs/parsers" }
-#xso = { path = "../../xmpp-rs/xso" }
+xmpp-parsers = { version = "0.21", features = ["disable-validation"] }
+xso = "0.1"
 
 [profile.release]
 lto = true

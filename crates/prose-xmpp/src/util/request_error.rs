@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use xmpp_parsers::stanza_error::{DefinedCondition, StanzaError};
+use xso::error::FromElementError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RequestError {
@@ -21,6 +22,8 @@ pub enum RequestError {
     Generic { msg: String },
     #[error(transparent)]
     ParseError(#[from] ParseError),
+    #[error(transparent)]
+    FromElementError(#[from] FromElementError),
 }
 
 #[derive(Debug, thiserror::Error)]
