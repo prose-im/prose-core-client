@@ -1,17 +1,18 @@
 use std::fmt::Debug;
+use std::future::IntoFuture;
 use std::marker::PhantomData;
 use std::ops::Bound;
 
 use async_trait::async_trait;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
+
 use gloo_utils::format::JsValueSerdeExt;
 use indexed_db_futures::js_sys::Array;
 use indexed_db_futures::prelude::*;
 use indexed_db_futures::web_sys::{DomException, IdbKeyRange};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-use wasm_bindgen::JsValue;
-
 use prose_wasm_utils::SendUnlessWasm;
+use wasm_bindgen::JsValue;
 
 use crate::driver::{Driver, ReadMode, ReadOnly, ReadWrite, WriteMode};
 use crate::{

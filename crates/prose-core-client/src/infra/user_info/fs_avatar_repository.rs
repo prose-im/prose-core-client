@@ -9,7 +9,8 @@ use std::{fs, io};
 use anyhow::Result;
 use async_trait::async_trait;
 use base64::DecodeError;
-use image::{guess_format, ImageError, ImageFormat, ImageOutputFormat};
+use image::codecs::jpeg::JpegEncoder;
+use image::{guess_format, ImageError, ImageFormat};
 use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
@@ -20,9 +21,6 @@ use crate::domain::user_info::repos::AvatarRepository;
 use crate::dtos::{Avatar, AvatarSource};
 
 use super::MAX_IMAGE_DIMENSIONS;
-
-pub const IMAGE_OUTPUT_FORMAT: ImageOutputFormat = ImageOutputFormat::Jpeg(94);
-pub const IMAGE_OUTPUT_MIME_TYPE: &str = "image/jpeg";
 
 pub struct FsAvatarRepository {
     path: PathBuf,
@@ -78,11 +76,11 @@ impl AvatarRepository for FsAvatarRepository {
         }
 
         let mut output_file = fs::File::create(&output_path)?;
+        let encoder = JpegEncoder::new_with_quality(&mut output_file, 94);
 
         // Sometimes we encounter e.g. rgb16 pngs and image-rs complains that the JPEG encoder
         // cannot save these, so we convert the image to rgb8.
-        img.into_rgb8()
-            .write_to(&mut output_file, IMAGE_OUTPUT_FORMAT)?;
+        img.into_rgb8().write_with_encoder(encoder)?;
         Ok(())
     }
 

@@ -172,11 +172,8 @@ impl AccountService {
 
     #[cfg(not(target_arch = "wasm32"))]
     pub async fn set_avatar_from_url(&self, image_path: &std::path::Path) -> Result<()> {
-        use crate::infra::constants::{
-            IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
-        };
-        use image::GenericImageView;
-        use std::io::Cursor;
+        use crate::infra::constants::MAX_IMAGE_DIMENSIONS;
+        use image::{codecs::jpeg::JpegEncoder, GenericImageView};
         use std::time::Instant;
 
         let now = Instant::now();
@@ -190,13 +187,14 @@ impl AccountService {
         );
 
         let mut image_data = Vec::new();
-        img.write_to(&mut Cursor::new(&mut image_data), IMAGE_OUTPUT_FORMAT)?;
+        let encoder = JpegEncoder::new_with_quality(&mut image_data, 94);
+        img.write_with_encoder(encoder)?;
 
         self.set_avatar(
             image_data,
             Some(img.dimensions().0),
             Some(img.dimensions().1),
-            IMAGE_OUTPUT_MIME_TYPE,
+            "image/jpeg",
         )
         .await
     }

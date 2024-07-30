@@ -20,7 +20,5 @@ pub mod xmpp;
 
 pub(crate) mod constants {
     #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) use super::user_info::{
-        IMAGE_OUTPUT_FORMAT, IMAGE_OUTPUT_MIME_TYPE, MAX_IMAGE_DIMENSIONS,
-    };
+    pub(crate) use super::user_info::MAX_IMAGE_DIMENSIONS;
 }

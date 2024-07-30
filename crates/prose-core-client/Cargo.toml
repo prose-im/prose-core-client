@@ -24,7 +24,7 @@ jid = { workspace = true, features = ["serde"] }
 mime = { workspace = true }
 mime_guess = { version = "2.0", default-features = false }
 minidom = { workspace = true }
-mockall = { version = "0.12.1", optional = true }
+mockall = { version = "0.13", optional = true }
 nanoid = "0.4"
 parking_lot = { workspace = true }
 paste = "1.0"
@@ -51,7 +51,7 @@ xmpp-parsers = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { workspace = true, features = ["serde"] }
 either = { version = "1.8" }
-image = { version = "0.24.5" }
+image = { version = "0.25" }
 libsignal-protocol = { git = "https://github.com/signalapp/libsignal.git", tag = "v0.41.2" }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
