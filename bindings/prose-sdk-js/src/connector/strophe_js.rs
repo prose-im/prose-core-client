@@ -74,8 +74,8 @@ pub struct EventHandler {
 }
 
 pub struct Connector {
-    provider: Rc<ProseConnectionProvider>,
-    config: ClientConfig,
+    pub(crate) provider: Rc<ProseConnectionProvider>,
+    pub(crate) config: ClientConfig,
 }
 
 impl Connector {
@@ -131,6 +131,7 @@ impl ConnectorTrait for Connector {
     }
 }
 
+#[derive(Clone)]
 pub struct Connection {
     client: Rc<JSConnection>,
 }
@@ -159,7 +160,7 @@ impl EventHandler {
     #[wasm_bindgen(js_name = "handleDisconnect")]
     pub fn handle_disconnect(&self, error: Option<String>) {
         let fut = (self.handler)(
-            &self.connection,
+            Box::new(self.connection.clone()),
             ConnectionEvent::Disconnected {
                 error: error.map(|error| ConnectionError::Generic { msg: error }),
             },
@@ -170,7 +171,7 @@ impl EventHandler {
     #[wasm_bindgen(js_name = "handleStanza")]
     pub fn handle_stanza(&self, stanza: String) {
         let fut = (self.handler)(
-            &self.connection,
+            Box::new(self.connection.clone()),
             ConnectionEvent::Stanza(
                 Element::from_str(&stanza).expect("Failed to parse received stanza"),
             ),
@@ -180,13 +181,19 @@ impl EventHandler {
 
     #[wasm_bindgen(js_name = "handlePingTimer")]
     pub fn handle_ping_timer(&self) {
-        let fut = (self.handler)(&self.connection, ConnectionEvent::PingTimer);
+        let fut = (self.handler)(
+            Box::new(self.connection.clone()),
+            ConnectionEvent::PingTimer,
+        );
         spawn_local(async move { fut.await })
     }
 
     #[wasm_bindgen(js_name = "handleTimeoutTimer")]
     pub fn handle_timeout_timer(&self) {
-        let fut = (self.handler)(&self.connection, ConnectionEvent::TimeoutTimer);
+        let fut = (self.handler)(
+            Box::new(self.connection.clone()),
+            ConnectionEvent::TimeoutTimer,
+        );
         spawn_local(async move { fut.await })
     }
 }

@@ -20,6 +20,8 @@ pub use infra::xmpp::event_parser::parse_xmpp_event;
 pub use prose_store::prelude::{PlatformDriver, Store};
 #[cfg(not(target_arch = "wasm32"))]
 pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient};
+#[cfg(feature = "debug")]
+pub use util::RandomDelayProxyTransformer;
 
 #[cfg(target_arch = "wasm32")]
 pub use crate::infra::user_info::StoreAvatarRepository;

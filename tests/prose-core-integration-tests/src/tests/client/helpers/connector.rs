@@ -50,8 +50,11 @@ impl Connector {
             panic!("Tried to receive next stanza, but no stanza is queued for reception. Try to call recv! first.");
         };
 
-        (connection.inner.event_handler)(&connection, ConnectionEvent::Stanza(received_element))
-            .await;
+        (connection.inner.event_handler)(
+            Box::new(connection.clone()),
+            ConnectionEvent::Stanza(received_element),
+        )
+        .await;
     }
 
     pub async fn send_disconnect(&self) {
@@ -61,7 +64,7 @@ impl Connector {
             .clone()
             .expect("Client is not connected");
         (connection.inner.event_handler)(
-            &connection,
+            Box::new(connection.clone()),
             ConnectionEvent::Disconnected { error: None },
         )
         .await;
@@ -73,7 +76,8 @@ impl Connector {
             .lock()
             .clone()
             .expect("Client is not connected");
-        (connection.inner.event_handler)(&connection, ConnectionEvent::PingTimer).await;
+        (connection.inner.event_handler)(Box::new(connection.clone()), ConnectionEvent::PingTimer)
+            .await;
     }
 
     pub async fn send_timeout_timer_event(&self) {
@@ -82,7 +86,11 @@ impl Connector {
             .lock()
             .clone()
             .expect("Client is not connected");
-        (connection.inner.event_handler)(&connection, ConnectionEvent::TimeoutTimer).await;
+        (connection.inner.event_handler)(
+            Box::new(connection.clone()),
+            ConnectionEvent::TimeoutTimer,
+        )
+        .await;
     }
 }
 
@@ -159,7 +167,10 @@ impl ConnectionTrait for Connection {
         );
 
         while let Some(received_element) = self.inner.messages.pop_receive() {
-            let fut = (self.inner.event_handler)(self, ConnectionEvent::Stanza(received_element));
+            let fut = (self.inner.event_handler)(
+                Box::new(self.clone()),
+                ConnectionEvent::Stanza(received_element),
+            );
             tokio::spawn(async move { fut.await });
         }
 

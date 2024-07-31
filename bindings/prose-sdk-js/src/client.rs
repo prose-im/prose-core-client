@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
+use cfg_if::cfg_if;
 use js_sys::Array;
 use tracing::{info, Level};
 use tracing_subscriber::prelude::*;
@@ -163,9 +164,30 @@ impl Client {
             os: config.client_os.clone(),
         };
 
+        cfg_if! {
+            if #[cfg(feature = "delay-requests")] {
+                tracing::warn!("Using RandomDelayProxyTransformer. Requests will be delayed.");
+                let provider: prose_xmpp::client::ConnectorProvider = Box::new({
+                    let connection_provider = alloc::rc::Rc::new(connection_provider);
+                    move || {
+                        let connector = Connector {
+                            provider: connection_provider.clone(),
+                            config: config.clone(),
+                        };
+                        Box::new(prose_xmpp::connector::ProxyConnector::new(
+                            connector,
+                            prose_core_client::RandomDelayProxyTransformer::new(100..2000),
+                        ))
+                    }
+                });
+            } else {
+                let provider = Connector::provider(connection_provider, config);
+            }
+        }
+
         let client = Client {
             client: ProseClient::builder()
-                .set_connector_provider(Connector::provider(connection_provider, config))
+                .set_connector_provider(provider)
                 .set_store(store.clone())
                 .set_avatar_repository(StoreAvatarRepository::new(store.clone()))
                 .set_encryption_service(Arc::new(EncryptionService::new(

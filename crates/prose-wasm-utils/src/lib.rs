@@ -3,11 +3,11 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::future::Future;
-use std::pin::Pin;
-
 pub use future_ext::ProseFutureExt;
 pub use receiver_stream::ReceiverStream;
+use std::future::Future;
+use std::pin::Pin;
+use std::time::Duration;
 pub use stream_ext::ProseStreamExt;
 
 mod future_ext;
@@ -54,4 +54,15 @@ where
     });
     #[cfg(all(not(target_arch = "wasm32")))]
     tokio::spawn(future);
+}
+
+pub async fn sleep(duration: Duration) {
+    #[cfg(target_arch = "wasm32")]
+    gloo_timers::future::TimeoutFuture::new(
+        duration.as_millis().try_into().expect("Invalid duration"),
+    )
+    .await;
+
+    #[cfg(not(target_arch = "wasm32"))]
+    tokio::time::sleep(duration).await;
 }

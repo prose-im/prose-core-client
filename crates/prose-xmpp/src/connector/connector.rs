@@ -21,10 +21,11 @@ pub enum ConnectionError {
 }
 
 #[cfg(target_arch = "wasm32")]
-pub type ConnectionEventHandler = Box<dyn Fn(&dyn Connection, ConnectionEvent) -> PinnedFuture<()>>;
+pub type ConnectionEventHandler =
+    Box<dyn Fn(Box<dyn Connection>, ConnectionEvent) -> PinnedFuture<()>>;
 #[cfg(not(target_arch = "wasm32"))]
 pub type ConnectionEventHandler =
-    Box<dyn Fn(&dyn Connection, ConnectionEvent) -> PinnedFuture<()> + Send + Sync>;
+    Box<dyn Fn(Box<dyn Connection>, ConnectionEvent) -> PinnedFuture<()> + Send + Sync>;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]

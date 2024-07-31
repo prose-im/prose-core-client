@@ -116,7 +116,7 @@ impl Connection {
         let conn = Connection {
             inner: self.inner.clone(),
         };
-        (event_handler)(&conn, ConnectionEvent::Stanza(stanza.into())).await
+        (event_handler)(Box::new(conn), ConnectionEvent::Stanza(stanza.into())).await
     }
 }
 
@@ -133,7 +133,7 @@ impl ConnectionTrait for Connection {
                 let conn = Connection {
                     inner: self.inner.clone(),
                 };
-                let fut = (event_handler)(&conn, ConnectionEvent::Stanza(response));
+                let fut = (event_handler)(Box::new(conn), ConnectionEvent::Stanza(response));
 
                 tokio::spawn(async move { fut.await });
             }

@@ -7,6 +7,8 @@ pub use coalesce_client_events::coalesce_client_events;
 pub use form_config::FormConfig;
 pub use join_all::join_all;
 pub use path_ext::PathExt;
+#[cfg(feature = "debug")]
+pub use proxy_transformer::RandomDelayProxyTransformer;
 pub use string_ext::StringExt;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -17,4 +19,5 @@ pub mod form_config;
 mod join_all;
 pub mod mime_serde_shim;
 mod path_ext;
+mod proxy_transformer;
 pub mod string_ext;

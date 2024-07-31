@@ -29,6 +29,9 @@ enum Command {
         /// Create a development build. Enable debug info, and disable optimizations
         #[arg(long)]
         dev: bool,
+        /// Creates artificial delays before sending stanzas to the server. Use for debugging only.
+        #[arg(long)]
+        delay_requests: bool,
     },
     Publish,
     BumpPatch,
@@ -44,7 +47,10 @@ impl Args {
         sh.change_dir(Path::new(paths::BINDINGS).join(paths::bindings::WASM));
 
         match self.cmd {
-            Command::Build { dev } => {
+            Command::Build {
+                dev,
+                delay_requests,
+            } => {
                 sh.remove_path("pkg")?;
                 run_wasm_pack(
                     &sh,
@@ -52,6 +58,7 @@ impl Args {
                         release: !dev,
                         dev,
                         target: WasmPackTarget::Web,
+                        delay_requests,
                     },
                 )
             }
@@ -66,6 +73,7 @@ enum WasmPackCommand {
         release: bool,
         dev: bool,
         target: WasmPackTarget,
+        delay_requests: bool,
     },
     Pack,
 }
@@ -103,6 +111,7 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
             release,
             dev,
             target,
+            delay_requests,
         } => {
             wasm_pack_cmd = "build";
             sh_args.extend_from_slice(&["--weak-refs", "--scope", NPM_SCOPE]);
@@ -123,6 +132,10 @@ fn run_wasm_pack(sh: &Shell, cmd: WasmPackCommand) -> Result<()> {
                 WasmPackTarget::NoModules => "no-modules",
             };
             sh_args.push(target_str);
+
+            if delay_requests {
+                sh_args.extend_from_slice(&["--", "--features", "delay-requests"])
+            }
         }
     }
 
@@ -261,6 +274,7 @@ async fn publish(sh: &Shell) -> Result<()> {
             release: true,
             dev: false,
             target: WasmPackTarget::Web,
+            delay_requests: false,
         },
     )?;
     run_wasm_pack(&sh, WasmPackCommand::Pack)?;
