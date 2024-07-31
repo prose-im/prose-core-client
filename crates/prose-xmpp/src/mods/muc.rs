@@ -570,9 +570,12 @@ impl RequestFuture<JoinRoomState, (Presence, Vec<Presence>, Vec<Message>, Option
             },
             |state| {
                 (
-                    state
-                        .self_presence
-                        .expect("Internal error. Missing response in PresenceFutureState."),
+                    state.self_presence.unwrap_or_else(|| {
+                        panic!(
+                            "Internal error. Missing response in JoinRoomState for room {}.",
+                            state.room_jid
+                        )
+                    }),
                     state.presences,
                     state.message_history,
                     state.subject,
