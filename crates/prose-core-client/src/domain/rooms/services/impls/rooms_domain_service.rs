@@ -674,11 +674,14 @@ impl RoomsDomainService {
         user_id: &UserId,
         sidebar_state: RoomSidebarState,
     ) -> Result<RoomStatus, RoomError> {
-        let room_is_new = match self.connected_rooms_repo.get(account, user_id.as_ref()) {
+        let (room_is_new, existing_room) = match self
+            .connected_rooms_repo
+            .get(account, user_id.as_ref())
+        {
             Some(room) if room.state() == RoomState::Pending || room.state().is_disconnected() => {
-                false
+                (false, Some(room))
             }
-            None => true,
+            None => (true, None),
             Some(room) => return Ok(RoomStatus::Exists(room)),
         };
 
@@ -696,6 +699,7 @@ impl RoomsDomainService {
             .load_settings(&room_id)
             .await
             .unwrap_or_default()
+            .or(existing_room.map(|room| room.settings()))
             .unwrap_or_else(|| SyncedRoomSettings::new(room_id));
 
         let features = self.ctx.server_features()?;
