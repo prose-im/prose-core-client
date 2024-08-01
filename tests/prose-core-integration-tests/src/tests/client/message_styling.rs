@@ -128,7 +128,9 @@ async fn test_receive_basic_message() -> Result<()> {
         client,
         r#"
         <message xmlns="jabber:client" from="them@prose.org/res" id="my-message-id" to="{{USER_RESOURCE_ID}}" type="chat">
-          <body>Some *bold* text.</body>
+          <body>Some *bold* text.
+And a new line
+And another newline</body>
           <markable xmlns="urn:xmpp:chat-markers:0" />
           <store xmlns="urn:xmpp:hints" />
         </message>
@@ -152,8 +154,14 @@ async fn test_receive_basic_message() -> Result<()> {
 
     let message = messages.first().unwrap();
 
-    assert_eq!(&message.body.raw, "Some *bold* text.");
-    assert_eq!(message.body.html.as_ref(), "<p>Some *bold* text.</p>");
+    assert_eq!(
+        "Some *bold* text.\nAnd a new line\nAnd another newline",
+        &message.body.raw,
+    );
+    assert_eq!(
+        "<p>Some *bold* text.<br/>And a new line<br/>And another newline</p>",
+        message.body.html.as_ref(),
+    );
 
     Ok(())
 }

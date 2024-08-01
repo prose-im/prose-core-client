@@ -60,7 +60,10 @@ impl StyledMessage {
 
     pub fn into_html(self) -> HTML {
         // We're not parsing the message styling format yet.
-        HTML(format!("<p>{}</p>", self.0))
+        HTML(format!(
+            "<p>{}</p>",
+            self.0.lines().collect::<Vec<_>>().join("<br/>")
+        ))
     }
 }
 
