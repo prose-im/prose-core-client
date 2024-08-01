@@ -1141,8 +1141,7 @@ impl RoomsDomainService {
             .synced_room_settings_service
             .load_settings(&room_id)
             .await
-            .unwrap_or_default()
-            .unwrap_or_else(|| SyncedRoomSettings::new(room_id));
+            .unwrap_or_default();
 
         let Some(room) = self
             .connected_rooms_repo
@@ -1153,6 +1152,9 @@ impl RoomsDomainService {
                         warn!("Not resolving freshly connected room, since it has been modified in the meanwhile. Current state is {:?}", room.state());
                         return room;
                     }
+
+                    let settings = settings
+                        .unwrap_or_else(|| room.settings());
 
                     // Convert the temporary room to its final form…
                     let room = room.by_resolving_with_info(
