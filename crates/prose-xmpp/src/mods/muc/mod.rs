@@ -30,6 +30,7 @@ use crate::stanza::{muc, Message};
 use crate::util::{RequestError, RequestFuture};
 
 mod join_room_future;
+mod send_muc_message_future;
 
 /// XEP-0045: Multi-User Chat
 /// https://xmpp.org/extensions/xep-0045.html#disco-rooms
@@ -105,6 +106,22 @@ impl Module for MUC {
 }
 
 impl MUC {
+    pub async fn send_raw_message(&self, message: Message) -> Result<Message, RequestError> {
+        let room_jid = message
+            .to
+            .clone()
+            .expect("Missing `to` in MUC message")
+            .into_bare();
+        let message_id = message.id.clone().expect("Missing `id` in MUC message");
+
+        self.ctx
+            .send_stanza_with_future(
+                message,
+                RequestFuture::new_send_muc_message(room_jid, message_id),
+            )
+            .await
+    }
+
     /// Loads public rooms in a MUC service.
     /// https://xmpp.org/extensions/xep-0045.html#disco-rooms
     pub async fn load_public_rooms(&self, service: &BareJid) -> Result<Vec<Room>> {
