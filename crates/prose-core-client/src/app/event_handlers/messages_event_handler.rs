@@ -18,17 +18,16 @@ use prose_xmpp::stanza::Message;
 
 use crate::app::deps::{
     DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
-    DynEncryptionDomainService, DynMessagesRepository, DynOfflineMessagesRepository,
+    DynEncryptionDomainService, DynIDProvider, DynMessagesRepository, DynOfflineMessagesRepository,
     DynSidebarDomainService, DynTimeProvider,
 };
 use crate::app::event_handlers::{MessageEvent, MessageEventType, ServerEvent, ServerEventHandler};
 use crate::domain::messaging::models::{
-    MessageLike, MessageLikeError, MessageLikeId, MessageLikePayload, MessageParser,
-    MessageTargetId,
+    MessageId, MessageLike, MessageLikeError, MessageLikePayload, MessageParser, MessageTargetId,
 };
 use crate::domain::rooms::models::Room;
 use crate::domain::shared::models::{AccountId, ConnectionState, RoomId, UserEndpointId};
-use crate::dtos::{MessageRemoteId, OccupantId, ParticipantId};
+use crate::dtos::{OccupantId, ParticipantId};
 use crate::infra::xmpp::util::MessageExt;
 use crate::ClientRoomEventType;
 
@@ -40,6 +39,8 @@ pub struct MessagesEventHandler {
     connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     encryption_domain_service: DynEncryptionDomainService,
+    #[inject]
+    id_provider: DynIDProvider,
     #[inject]
     messages_repo: DynMessagesRepository,
     #[inject]
@@ -227,6 +228,7 @@ impl MessagesEventHandler {
                 .unwrap_or_else(|| TimeDelta::zero());
 
         let parser = MessageParser::new(
+            MessageId::from(self.id_provider.new_id()),
             room.clone(),
             server_time,
             self.encryption_domain_service.clone(),
@@ -294,6 +296,7 @@ impl MessagesEventHandler {
         };
 
         let parser = MessageParser::new(
+            MessageId::from(self.id_provider.new_id()),
             Some(room.clone()),
             room.features
                 .local_time_to_server_time(self.time_provider.now()),
@@ -329,14 +332,16 @@ impl MessagesEventHandler {
         room: Room,
         message: MessageLike,
     ) -> Result<()> {
-        let is_message_update = if let Some(message_id) = message.id.original_id() {
-            self.messages_repo
-                .contains(account, &room.room_id, message_id)
-                .await
-                .unwrap_or(false)
-        } else {
-            false
-        };
+        todo!("Check if message is update");
+        let is_message_update = false;
+        // let is_message_update = if let Some(message_id) = message.id.original_id() {
+        //     self.messages_repo
+        //         .contains(account, &room.room_id, message_id)
+        //         .await
+        //         .unwrap_or(false)
+        // } else {
+        //     false
+        // };
 
         let messages = [message];
         self.messages_repo
@@ -346,12 +351,12 @@ impl MessagesEventHandler {
 
         if is_message_update {
             let message_id = if let Some(target_id) = message.target {
-                self.resolve_message_target_id(account, &room.room_id, &message.id, target_id)
+                self.resolve_message_target_id(account, &room.room_id, target_id)
                     .await
             } else {
                 None
             }
-            .unwrap_or_else(|| message.id.id().clone());
+            .unwrap_or_else(|| message.id.clone());
 
             self.client_event_dispatcher.dispatch_room_event(
                 room.clone(),
@@ -364,7 +369,7 @@ impl MessagesEventHandler {
 
         let event_type = if let Some(target) = message.target {
             let Some(message_id) = self
-                .resolve_message_target_id(account, &room.room_id, &message.id, target)
+                .resolve_message_target_id(account, &room.room_id, target)
                 .await
             else {
                 return Ok(());
@@ -381,7 +386,7 @@ impl MessagesEventHandler {
             }
         } else {
             ClientRoomEventType::MessagesAppended {
-                message_ids: vec![message.id.id().as_ref().into()],
+                message_ids: vec![message.id.clone()],
             }
         };
 
@@ -395,27 +400,30 @@ impl MessagesEventHandler {
         &self,
         account: &AccountId,
         room_id: &RoomId,
-        message_id: &MessageLikeId,
         target_id: MessageTargetId,
-    ) -> Option<MessageRemoteId> {
-        match target_id {
-            MessageTargetId::RemoteId(id) => Some(id),
-            MessageTargetId::ServerId(stanza_id) => {
-                match self
-                    .messages_repo
-                    .resolve_message_id(account, &room_id, &stanza_id)
+    ) -> Option<MessageId> {
+        let result = match &target_id {
+            MessageTargetId::RemoteId(remote_id) => {
+                self.messages_repo
+                    .resolve_remote_id_to_message_id(account, &room_id, remote_id)
                     .await
-                {
-                    Ok(Some(id)) => Some(id),
-                    Ok(None) => {
-                        warn!("Not dispatching event for message with id '{}'. Failed to look up targeted MessageId from StanzaId '{}'.", message_id, stanza_id);
-                        None
-                    }
-                    Err(err) => {
-                        error!("Not dispatching event for message with id '{}'. Encountered error while looking up StanzaId '{}': {}", message_id, stanza_id, err.to_string());
-                        None
-                    }
-                }
+            }
+            MessageTargetId::ServerId(server_id) => {
+                self.messages_repo
+                    .resolve_server_id_to_message_id(account, &room_id, server_id)
+                    .await
+            }
+        };
+
+        match result {
+            Ok(Some(id)) => Some(id),
+            Ok(None) => {
+                warn!("Not dispatching event for message. Failed to look up targeted MessageId from {:?}.", target_id);
+                None
+            }
+            Err(err) => {
+                error!("Not dispatching event for message. Encountered error while looking up {:?}: {}", target_id, err.to_string());
+                None
             }
         }
     }

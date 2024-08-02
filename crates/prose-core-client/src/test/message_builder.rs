@@ -3,8 +3,6 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use std::str::FromStr;
-
 use chrono::{DateTime, Duration, Utc};
 use jid::BareJid;
 use minidom::Element;
@@ -18,23 +16,14 @@ use prose_xmpp::stanza::message::{Forwarded, MucUser, Reactions};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
-    Body, Message, MessageLike, MessageLikeBody, MessageLikeId, MessageLikePayload,
-    MessageRemoteId, MessageServerId, Reaction,
+    Body, Message, MessageId, MessageLike, MessageLikeBody, MessageLikePayload, MessageRemoteId,
+    MessageServerId, Reaction,
 };
 use crate::domain::shared::models::AnonOccupantId;
 use crate::dtos::{
     Mention, Message as MessageDTO, MessageSender, ParticipantId, Reaction as ReactionDTO,
 };
 use crate::test::mock_data;
-
-impl<T> From<T> for MessageLikeId
-where
-    T: Into<String>,
-{
-    fn from(s: T) -> MessageLikeId {
-        MessageLikeId::from_str(&s.into()).unwrap()
-    }
-}
 
 pub struct MessageBuilder {
     id: MessageRemoteId,
@@ -53,7 +42,11 @@ pub struct MessageBuilder {
 }
 
 impl MessageBuilder {
-    pub fn id_for_index(idx: u32) -> MessageRemoteId {
+    pub fn id_for_index(idx: u32) -> MessageId {
+        format!("msg-{}", idx).into()
+    }
+
+    pub fn remote_id_for_index(idx: u32) -> MessageRemoteId {
         format!("msg-{}", idx).into()
     }
 
@@ -97,7 +90,7 @@ impl MessageLikeBody {
 impl MessageBuilder {
     pub fn new_with_index(idx: u32) -> Self {
         Self::new_with_id(
-            Self::id_for_index(idx),
+            Self::remote_id_for_index(idx),
             mock_data::reference_date() + Duration::minutes(idx.into()),
             MessageLikePayload::message(format!("Message {}", idx)),
         )
@@ -174,6 +167,7 @@ impl MessageBuilder {
         };
 
         Message {
+            id: self.id.clone().into_inner().into(),
             remote_id: Some(self.id),
             server_id: self.stanza_id,
             from: self.from,
@@ -199,8 +193,7 @@ impl MessageBuilder {
         };
 
         MessageDTO {
-            id: Some(self.id),
-            stanza_id: self.stanza_id,
+            id: self.id.into_inner().into(),
             from: MessageSender {
                 id: self.from,
                 name: self
@@ -243,11 +236,12 @@ impl MessageBuilder {
 
     pub fn build_message_like(self) -> MessageLike {
         MessageLike {
-            id: MessageLikeId::new(Some(self.id)),
-            stanza_id: self.stanza_id,
+            id: MessageId::from(self.id.clone().into_inner()),
+            remote_id: Some(self.id),
+            server_id: self.stanza_id,
             target: self
                 .target_message_idx
-                .map(|idx| Self::id_for_index(idx).into()),
+                .map(|idx| Self::remote_id_for_index(idx).into()),
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
@@ -328,7 +322,7 @@ impl MessageBuilder {
             MessageLikePayload::Message { body, .. } => message = message.set_body(body.raw),
             MessageLikePayload::Reaction { emojis } => {
                 message = message.set_message_reactions(Reactions {
-                    id: Self::id_for_index(
+                    id: Self::remote_id_for_index(
                         self.target_message_idx.expect("Missing target_message_idx"),
                     )
                     .as_ref()

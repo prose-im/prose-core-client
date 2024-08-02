@@ -8,7 +8,7 @@ use std::fmt::{Debug, Formatter};
 use prose_xmpp::ConnectionError;
 
 use crate::app::dtos::RoomEnvelope;
-use crate::domain::messaging::models::MessageRemoteId;
+use crate::domain::messaging::models::MessageId;
 use crate::domain::shared::models::UserId;
 
 #[derive(Clone, PartialEq)]
@@ -46,13 +46,13 @@ pub enum ClientEvent {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ClientRoomEventType {
     /// One or many messages were either received or sent.
-    MessagesAppended { message_ids: Vec<MessageRemoteId> },
+    MessagesAppended { message_ids: Vec<MessageId> },
 
     /// One or many messages were received that affected earlier messages (e.g. a reaction).
-    MessagesUpdated { message_ids: Vec<MessageRemoteId> },
+    MessagesUpdated { message_ids: Vec<MessageId> },
 
     /// A message was deleted.
-    MessagesDeleted { message_ids: Vec<MessageRemoteId> },
+    MessagesDeleted { message_ids: Vec<MessageId> },
 
     /// The room went offline, came back online and contains new messages.
     MessagesNeedReload,

@@ -25,10 +25,10 @@ use crate::app::deps::{
     DynSyncedRoomSettingsService, DynTimeProvider, DynUserInfoDomainService,
 };
 use crate::domain::messaging::models::{
-    send_message_request, ArchivedMessageRef, Emoji, Message, MessageLike, MessageLikeBody,
-    MessageLikeError, MessageParser, MessageRemoteId, MessageTargetId,
+    send_message_request, ArchivedMessageRef, Emoji, Message, MessageId, MessageLike,
+    MessageLikeBody, MessageLikeError, MessageParser, MessageRemoteId, MessageTargetId,
 };
-use crate::domain::messaging::models::{MessageLikeId, MessageLikePayload, SendMessageRequest};
+use crate::domain::messaging::models::{MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
 use crate::domain::settings::models::SyncedRoomSettings;
 use crate::domain::shared::models::{
@@ -248,8 +248,9 @@ impl<Kind> Room<Kind> {
                 &self.ctx.connected_account()?,
                 &self.data.room_id,
                 &[MessageLike {
-                    id: MessageLikeId::new(Some(message_id.clone())),
-                    stanza_id: None,
+                    id: message_id.clone(),
+                    remote_id: Some(message_id.to_string().into()),
+                    server_id: None,
                     target: None,
                     to: None,
                     from: self.ctx.connected_id()?.into_user_id().into(),
@@ -275,13 +276,23 @@ impl<Kind> Room<Kind> {
 
     pub async fn update_message(
         &self,
-        id: MessageRemoteId,
+        id: MessageId,
         request: SendMessageRequestDTO,
     ) -> Result<()> {
         if request.is_empty() {
             warn!("Ignoring empty SendMessageRequest");
             return Ok(());
         }
+
+        let account = self.ctx.connected_account()?;
+
+        let Some(target_id) = self
+            .message_repo
+            .resolve_message_id_to_remote_id(&account, &self.data.room_id, &id)
+            .await?
+        else {
+            bail!("Failed to resolve message id '{id}' to a server id")
+        };
 
         let (payload, body) = if let Some(body) = request.body {
             let parser = MarkdownParser::new(body.text.as_ref());
@@ -327,12 +338,13 @@ impl<Kind> Room<Kind> {
         // Save the unencrypted message so that we can look it up later…
         self.message_repo
             .append(
-                &self.ctx.connected_account()?,
+                &account,
                 &self.data.room_id,
                 &[MessageLike {
-                    id: MessageLikeId::new(Some(message_id.clone())),
-                    stanza_id: None,
-                    target: Some(id.clone().into()),
+                    id: message_id.clone(),
+                    remote_id: Some(message_id.to_string().into()),
+                    server_id: None,
+                    target: Some(target_id.clone().into()),
                     to: None,
                     from: self.ctx.connected_id()?.into_user_id().into(),
                     timestamp: self.time_provider.now(),
@@ -342,7 +354,7 @@ impl<Kind> Room<Kind> {
             .await?;
 
         self.messaging_service
-            .update_message(&self.data.room_id, &id, request)
+            .update_message(&self.data.room_id, &target_id, request)
             .await?;
 
         self.client_event_dispatcher.dispatch_room_event(
@@ -355,11 +367,7 @@ impl<Kind> Room<Kind> {
         Ok(())
     }
 
-    pub async fn toggle_reaction_to_message(
-        &self,
-        id: MessageRemoteId,
-        emoji: Emoji,
-    ) -> Result<()> {
+    pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
         let account = self.ctx.connected_account()?;
         let messages = self
             .message_repo
@@ -379,8 +387,11 @@ impl<Kind> Room<Kind> {
 
         match &self.data.room_id {
             RoomId::User(room_id) => {
+                let Some(remote_id) = &message.remote_id else {
+                    bail!("Cannot react to message for which we do not have a RemoteId.")
+                };
                 self.messaging_service
-                    .react_to_chat_message(room_id, &id, &all_emojis)
+                    .react_to_chat_message(room_id, remote_id, &all_emojis)
                     .await
             }
             RoomId::Muc(room_id) => {
@@ -400,7 +411,7 @@ impl<Kind> Room<Kind> {
             .await
     }
 
-    pub async fn load_messages_with_ids(&self, ids: &[MessageRemoteId]) -> Result<Vec<MessageDTO>> {
+    pub async fn load_messages_with_ids(&self, ids: &[MessageId]) -> Result<Vec<MessageDTO>> {
         let account = self.ctx.connected_account()?;
         let messages = self
             .message_repo
@@ -471,7 +482,7 @@ impl<Kind> Room<Kind> {
         })
     }
 
-    pub async fn set_last_read_message(&self, id: &MessageRemoteId) -> Result<()> {
+    pub async fn set_last_read_message(&self, id: &MessageId) -> Result<()> {
         let account = self.ctx.connected_account()?;
 
         let mut messages = self
@@ -485,7 +496,7 @@ impl<Kind> Room<Kind> {
 
         let message = messages.swap_remove(0);
 
-        if let Some(stanza_id) = message.stanza_id {
+        if let Some(stanza_id) = message.server_id {
             return self
                 .set_last_read_message_ref(
                     &account,
@@ -570,6 +581,7 @@ impl<Kind> Room<Kind> {
             // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
                 let parsed_message = match MessageParser::new(
+                    MessageId::from(self.id_provider.new_id()),
                     Some(self.data.clone()),
                     Default::default(),
                     self.encryption_domain_service.clone(),
@@ -599,11 +611,12 @@ impl<Kind> Room<Kind> {
 
                 if parsed_message.payload.is_message() {
                     num_text_messages += 1;
-                    if let Some(message_id) = parsed_message.id.original_id().cloned() {
-                        text_message_ids.push(MessageTargetId::RemoteId(message_id))
+
+                    if let Some(remote_id) = parsed_message.remote_id.clone() {
+                        text_message_ids.push(MessageTargetId::RemoteId(remote_id))
                     }
-                    if let Some(stanza_id) = parsed_message.stanza_id.as_ref() {
-                        text_message_ids.push(MessageTargetId::ServerId(stanza_id.clone()))
+                    if let Some(stanza_id) = parsed_message.server_id.clone() {
+                        text_message_ids.push(MessageTargetId::ServerId(stanza_id))
                     }
                 }
 
@@ -718,8 +731,7 @@ impl<Kind> Room<Kind> {
                 message.server_id.is_some() && message.server_id == last_read_message_id;
 
             message_dtos.push(MessageDTO {
-                id: message.remote_id,
-                stanza_id: message.server_id,
+                id: message.id,
                 from,
                 body: message.body,
                 timestamp: message.timestamp,
@@ -782,7 +794,7 @@ impl<Kind> Room<Kind> {
     }
 
     async fn show_system_message(&self, message: impl Into<String>) -> Result<()> {
-        let id = MessageLikeId::new(Some(self.id_provider.new_id().into()));
+        let id = MessageId::from(self.id_provider.new_id());
         let message = message.into();
 
         self.message_repo
@@ -791,7 +803,8 @@ impl<Kind> Room<Kind> {
                 &self.data.room_id,
                 &[MessageLike {
                     id: id.clone(),
-                    stanza_id: None,
+                    remote_id: Some(id.to_string().into()),
+                    server_id: None,
                     target: None,
                     to: None,
                     from: ParticipantId::User("prose-bot@prose.org".parse()?),
@@ -813,7 +826,7 @@ impl<Kind> Room<Kind> {
         self.client_event_dispatcher.dispatch_room_event(
             self.data.clone(),
             ClientRoomEventType::MessagesAppended {
-                message_ids: vec![id.id().clone()],
+                message_ids: vec![id.into()],
             },
         );
 
@@ -827,7 +840,7 @@ impl<Kind> Room<Kind> {
     ) -> Result<SendMessageRequest> {
         let Some((message, fallback, mentions)) = body else {
             return Ok(SendMessageRequest {
-                id: MessageRemoteId::from(self.id_provider.new_id()),
+                id: MessageId::from(self.id_provider.new_id()),
                 body: None,
                 attachments,
             });
@@ -859,7 +872,7 @@ impl<Kind> Room<Kind> {
         };
 
         Ok(SendMessageRequest {
-            id: MessageRemoteId::from(self.id_provider.new_id()),
+            id: MessageId::from(self.id_provider.new_id()),
             body: Some(send_message_request::Body { payload, mentions }),
             attachments,
         })
@@ -900,7 +913,7 @@ impl<Kind> Room<Kind> {
         message_ref: Option<ArchivedMessageRef>,
         send_message_changed_events: bool,
     ) -> Result<()> {
-        let mut updated_stanza_ids = vec![];
+        let mut updated_server_ids = vec![];
 
         self.update_synced_settings(|settings| {
             if settings.last_read_message == message_ref {
@@ -908,28 +921,28 @@ impl<Kind> Room<Kind> {
             }
 
             if let Some(former_message_ref) = settings.last_read_message.take() {
-                updated_stanza_ids.push(former_message_ref.stanza_id);
+                updated_server_ids.push(former_message_ref.stanza_id);
             }
 
             if let Some(stanza_id) = message_ref.as_ref().map(|r| r.stanza_id.clone()) {
-                updated_stanza_ids.push(stanza_id);
+                updated_server_ids.push(stanza_id);
             }
 
             settings.last_read_message = message_ref;
         })
         .await;
 
-        if updated_stanza_ids.is_empty() {
+        if updated_server_ids.is_empty() {
             return Ok(());
         }
 
         if send_message_changed_events {
             let mut updated_message_ids = vec![];
 
-            for id in updated_stanza_ids {
+            for id in updated_server_ids {
                 if let Some(message_id) = self
                     .message_repo
-                    .resolve_message_id(&account, &self.data.room_id, &id)
+                    .resolve_server_id_to_message_id(&account, &self.data.room_id, &id)
                     .await?
                 {
                     updated_message_ids.push(message_id);

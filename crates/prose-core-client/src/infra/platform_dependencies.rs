@@ -70,7 +70,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 29;
+const DB_VERSION: u32 = 30;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -202,6 +202,11 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
             create_collection::<D, MessageRecord>(&tx)?;
         }
 
+        if event.old_version < 30 {
+            tx.delete_collection(MessageRecord::collection())?;
+            create_collection::<D, MessageRecord>(&tx)?;
+        }
+
         Ok(())
     })
     .await?;
@@ -280,6 +285,7 @@ impl From<PlatformDependencies> for AppDependencies {
         let message_archive_domain_service_dependencies = MessageArchiveDomainServiceDependencies {
             ctx: ctx.clone(),
             encryption_domain_service: encryption_domain_service.clone(),
+            id_provider: id_provider.clone(),
             local_room_settings_repo: local_room_settings_repo.clone(),
             message_archive_service: d.xmpp.clone(),
             message_repo: messages_repo.clone(),

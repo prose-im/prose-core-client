@@ -76,7 +76,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
         repo.get_all(
             &account_id!("account@prose.org"),
             &room_id,
-            &[MessageBuilder::id_for_index(1)]
+            &[MessageBuilder::remote_id_for_index(1)]
         )
         .await?
     );
@@ -85,7 +85,7 @@ async fn test_loads_message_with_reactions() -> Result<()> {
         repo.get_all(
             &account_id!("other_account@prose.org"),
             &room_id,
-            &[MessageBuilder::id_for_index(1)]
+            &[MessageBuilder::remote_id_for_index(1)]
         )
         .await?
     );
@@ -125,7 +125,7 @@ async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
         repo.get_all(
             &account_id!("account@prose.org"),
             &room_id,
-            &[MessageBuilder::id_for_index(1)]
+            &[MessageBuilder::remote_id_for_index(1)]
         )
         .await?
     );
@@ -174,9 +174,9 @@ async fn test_load_messages_targeting() -> Result<()> {
             &account_id!("account@prose.org"),
             &room_id,
             &[
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2),
-                MessageBuilder::id_for_index(5)
+                MessageBuilder::remote_id_for_index(1),
+                MessageBuilder::remote_id_for_index(2),
+                MessageBuilder::remote_id_for_index(5)
             ]
         )
         .await?
@@ -244,9 +244,9 @@ async fn test_load_only_messages_targeting() -> Result<()> {
             &account_id!("account@prose.org"),
             &room_id,
             &[
-                MessageTargetId::RemoteId(MessageBuilder::id_for_index(1)),
+                MessageTargetId::RemoteId(MessageBuilder::remote_id_for_index(1)),
                 MessageTargetId::ServerId(MessageBuilder::stanza_id_for_index(1)),
-                MessageTargetId::RemoteId(MessageBuilder::id_for_index(2)),
+                MessageTargetId::RemoteId(MessageBuilder::remote_id_for_index(2)),
                 MessageTargetId::ServerId(MessageBuilder::stanza_id_for_index(2)),
             ],
             &Utc.with_ymd_and_hms(2024, 02, 22, 0, 0, 0).unwrap()
@@ -291,7 +291,9 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
         repo.get_messages_targeting(
             &account_id!("account@prose.org"),
             &room_id,
-            &[MessageTargetId::RemoteId(MessageBuilder::id_for_index(100))],
+            &[MessageTargetId::RemoteId(
+                MessageBuilder::remote_id_for_index(100)
+            )],
             &DateTime::<Utc>::default()
         )
         .await?
@@ -311,7 +313,7 @@ async fn test_resolves_message_id() -> Result<()> {
         .await?;
 
     assert_eq!(
-        Some(MessageBuilder::id_for_index(101)),
+        Some(MessageBuilder::remote_id_for_index(101)),
         repo.resolve_message_id(
             &account_id!("account@prose.org"),
             &room_id,
@@ -383,9 +385,9 @@ async fn test_get_messages_after() -> Result<()> {
 
     assert_eq!(
         vec![
-            MessageBuilder::id_for_index(1),
-            MessageBuilder::id_for_index(2),
-            MessageBuilder::id_for_index(3)
+            MessageBuilder::remote_id_for_index(1),
+            MessageBuilder::remote_id_for_index(2),
+            MessageBuilder::remote_id_for_index(3)
         ],
         repo.get_messages_after(
             &account_id!("a@prose.org"),
@@ -399,7 +401,7 @@ async fn test_get_messages_after() -> Result<()> {
     );
 
     assert_eq!(
-        vec![MessageBuilder::id_for_index(3)],
+        vec![MessageBuilder::remote_id_for_index(3)],
         repo.get_messages_after(
             &account_id!("a@prose.org"),
             &muc_id!("room2@prose.org").into(),
@@ -449,8 +451,8 @@ async fn test_clears_cache() -> Result<()> {
             &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into(),
             &[
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2)
+                MessageBuilder::remote_id_for_index(1),
+                MessageBuilder::remote_id_for_index(2)
             ]
         )
         .await?
@@ -461,8 +463,8 @@ async fn test_clears_cache() -> Result<()> {
             &account_id!("a@prose.org"),
             &user_id!("room2@prose.org").into(),
             &[
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2)
+                MessageBuilder::remote_id_for_index(1),
+                MessageBuilder::remote_id_for_index(2)
             ]
         )
         .await?
@@ -475,8 +477,8 @@ async fn test_clears_cache() -> Result<()> {
             &account_id!("a@prose.org"),
             &user_id!("room1@prose.org").into(),
             &[
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2)
+                MessageBuilder::remote_id_for_index(1),
+                MessageBuilder::remote_id_for_index(2)
             ]
         )
         .await?
@@ -486,8 +488,8 @@ async fn test_clears_cache() -> Result<()> {
             &account_id!("a@prose.org"),
             &user_id!("room2@prose.org").into(),
             &[
-                MessageBuilder::id_for_index(1),
-                MessageBuilder::id_for_index(2),
+                MessageBuilder::remote_id_for_index(1),
+                MessageBuilder::remote_id_for_index(2),
             ],
         )
         .await?
@@ -498,7 +500,7 @@ async fn test_clears_cache() -> Result<()> {
         repo.get_all(
             &account_id!("b@prose.org"),
             &user_id!("room1@prose.org").into(),
-            &[MessageBuilder::id_for_index(1)]
+            &[MessageBuilder::remote_id_for_index(1)]
         )
         .await?
     );
@@ -507,7 +509,7 @@ async fn test_clears_cache() -> Result<()> {
         repo.get_all(
             &account_id!("b@prose.org"),
             &user_id!("room2@prose.org").into(),
-            &[MessageBuilder::id_for_index(2)]
+            &[MessageBuilder::remote_id_for_index(2)]
         )
         .await?
     );
