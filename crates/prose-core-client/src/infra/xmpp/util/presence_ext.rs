@@ -13,7 +13,7 @@ use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::shared::models::{AnonOccupantId, Availability, AvatarId, ParticipantId};
 use crate::domain::user_info::models::Presence;
-use crate::dtos::{Avatar, AvatarSource};
+use crate::dtos::{Avatar, AvatarSource, UserId};
 use crate::infra::xmpp::util::CapsExt;
 
 pub trait PresenceExt {
@@ -24,7 +24,11 @@ pub trait PresenceExt {
     fn caps(&self) -> Option<Caps>;
     fn muc_user(&self) -> Option<MucUser>;
 
-    fn to_domain_presence(&self, participant: impl Into<ParticipantId>) -> Presence;
+    fn to_domain_presence(
+        &self,
+        participant: impl Into<ParticipantId>,
+        real_id: Option<UserId>,
+    ) -> Presence;
 }
 
 impl PresenceExt for presence::Presence {
@@ -85,11 +89,16 @@ impl PresenceExt for presence::Presence {
             .and_then(|p| MucUser::try_from(p).ok())
     }
 
-    fn to_domain_presence(&self, participant: impl Into<ParticipantId>) -> Presence {
+    fn to_domain_presence(
+        &self,
+        participant: impl Into<ParticipantId>,
+        real_id: Option<UserId>,
+    ) -> Presence {
         let avatar = self.avatar_id().map(|avatar_id| Avatar {
             id: avatar_id,
             source: AvatarSource::Vcard {
                 owner: participant.into(),
+                real_id,
             },
         });
 

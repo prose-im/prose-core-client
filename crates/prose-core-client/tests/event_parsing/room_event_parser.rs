@@ -73,7 +73,7 @@ async fn test_room_destroyed() -> Result<()> {
         </presence>
       "#,
         )
-        .await?;
+            .await?;
 
     assert_eq!(
         events,
@@ -264,7 +264,8 @@ async fn test_user_entered_room() -> Result<()> {
                         avatar: Some(Avatar {
                             id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
                             source: AvatarSource::Vcard {
-                                owner: user_id!("user@prose.org").into()
+                                owner: occupant_id!("room@prose.org/nick").into(),
+                                real_id: Some(user_id!("user@prose.org")),
                             },
                         }),
                         client: Some("https://cheogram.com".parse()?),
@@ -320,7 +321,6 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
         .await?;
 
     assert_eq!(
-        events,
         vec![
             ServerEvent::UserStatus(UserStatusEvent {
                 user_id: occupant_id!("room@prose.org/nick").into(),
@@ -330,8 +330,9 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
                         avatar: Some(Avatar {
                             id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
                             source: AvatarSource::Vcard {
-                                owner: user_id!("user@prose.org").into(),
-                            }
+                                owner: occupant_id!("room@prose.org/nick").into(),
+                                real_id: Some(user_id!("user@prose.org")),
+                            },
                         }),
                         ..Default::default()
                     }
@@ -348,7 +349,8 @@ async fn test_affiliation_change_with_multiple_resources() -> Result<()> {
                     affiliation: RoomAffiliation::None
                 },
             }),
-        ]
+        ],
+        events
     );
 
     Ok(())

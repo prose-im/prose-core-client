@@ -121,7 +121,27 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
     async fn load_avatar_image(&self, avatar: &Avatar) -> Result<Option<PlatformImage>> {
         let account = self.ctx.connected_account()?;
 
-        if let Some(image) = self.avatar_repo.get(&account, avatar).await? {
+        // If we have a real id for the requested avatar, let's use that one. This fixes at least
+        // an issue where a contact published a vCard avatar in a MUC room but only had the avatar
+        // set on their PEP node and not on the vCard itself.
+        if let Some(real_id) = avatar.real_id() {
+            if let Ok(Some(info)) = self
+                .get_user_info(&real_id, CachePolicy::ReturnCacheDataDontLoad)
+                .await
+            {
+                if let Some(avatar) = info.avatar {
+                    if let Ok(Some(image)) = self.load_avatar_image(&avatar).await {
+                        return Ok(Some(image));
+                    }
+                }
+            }
+        }
+
+        if let Some(image) = self
+            .avatar_repo
+            .get(&account, avatar.owner(), &avatar.id)
+            .await?
+        {
             return Ok(Some(image));
         }
 
@@ -138,6 +158,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
             // a PEP avatar for the same id…
             AvatarSource::Vcard {
                 owner: ParticipantId::User(user_id),
+                ..
             } => {
                 if let Some(avatar) = self
                     .user_info_repo
@@ -161,7 +182,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
                 .await
                 .map_err(Into::into)
                 .map(|data| data.map(|data| (data, mime_type.clone()))),
-            AvatarSource::Vcard { owner } => self
+            AvatarSource::Vcard { owner, .. } => self
                 .load_user_profile_and_update_user_info(
                     owner.to_ref(),
                     CachePolicy::ReturnCacheDataElseLoad,
@@ -206,7 +227,9 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
             )
             .await?;
 
-        self.avatar_repo.get(&account, &avatar).await
+        self.avatar_repo
+            .get(&account, avatar.owner(), &avatar.id)
+            .await
     }
 
     async fn handle_user_presence_changed(

@@ -9,8 +9,14 @@ use crate::domain::shared::models::{AvatarId, ParticipantId, ParticipantIdRef, U
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AvatarSource {
-    Pep { owner: UserId, mime_type: String },
-    Vcard { owner: ParticipantId },
+    Pep {
+        owner: UserId,
+        mime_type: String,
+    },
+    Vcard {
+        owner: ParticipantId,
+        real_id: Option<UserId>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -23,7 +29,18 @@ impl Avatar {
     pub fn owner(&self) -> ParticipantIdRef {
         match &self.source {
             AvatarSource::Pep { owner, .. } => owner.into(),
-            AvatarSource::Vcard { owner } => owner.to_ref(),
+            AvatarSource::Vcard { owner, .. } => owner.to_ref(),
+        }
+    }
+
+    pub fn real_id(&self) -> Option<UserId> {
+        match &self.source {
+            AvatarSource::Pep { .. } => None,
+            AvatarSource::Vcard {
+                real_id: Some(real_id),
+                ..
+            } => Some(real_id.clone()),
+            AvatarSource::Vcard { .. } => None,
         }
     }
 

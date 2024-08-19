@@ -18,7 +18,6 @@ use prose_xmpp::mods::AvatarData;
 use crate::domain::shared::models::{AccountId, AvatarId, ParticipantIdRef};
 use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 use crate::domain::user_info::repos::AvatarRepository;
-use crate::dtos::{Avatar, AvatarSource};
 
 use super::MAX_IMAGE_DIMENSIONS;
 
@@ -84,13 +83,13 @@ impl AvatarRepository for FsAvatarRepository {
         Ok(())
     }
 
-    async fn get(&self, _account: &AccountId, avatar: &Avatar) -> Result<Option<PlatformImage>> {
-        let participant_id = match &avatar.source {
-            AvatarSource::Pep { owner, .. } => ParticipantIdRef::User(owner),
-            AvatarSource::Vcard { owner } => owner.to_ref(),
-        };
-
-        let path = self.filename_for(participant_id, &avatar.id);
+    async fn get(
+        &self,
+        _account: &AccountId,
+        participant_id: ParticipantIdRef<'_>,
+        avatar_id: &AvatarId,
+    ) -> Result<Option<PlatformImage>> {
+        let path = self.filename_for(participant_id, &avatar_id);
         if path.exists() {
             return Ok(Some(path));
         }

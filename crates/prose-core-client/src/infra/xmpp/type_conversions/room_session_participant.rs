@@ -11,7 +11,7 @@ use prose_xmpp::ns;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::rooms::models::RoomSessionParticipant;
-use crate::dtos::{OccupantId, ParticipantId, UserId};
+use crate::dtos::{OccupantId, UserId};
 use crate::infra::xmpp::util::PresenceExt;
 
 impl TryFrom<Presence> for RoomSessionParticipant {
@@ -43,18 +43,13 @@ impl TryFrom<Presence> for RoomSessionParticipant {
         let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
         let is_self = muc_user.status.contains(&Status::SelfPresence);
 
-        let avatar_id = real_id
-            .clone()
-            .map(ParticipantId::from)
-            .unwrap_or_else(|| occupant_id.clone().into());
-
         Ok(RoomSessionParticipant {
-            id: occupant_id,
+            id: occupant_id.clone(),
             is_self,
             anon_id: anon_occupant_id,
-            real_id,
+            real_id: real_id.clone(),
             affiliation: item.affiliation.clone().into(),
-            presence: value.to_domain_presence(avatar_id),
+            presence: value.to_domain_presence(occupant_id, real_id),
         })
     }
 }

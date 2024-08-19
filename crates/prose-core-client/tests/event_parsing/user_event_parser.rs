@@ -47,7 +47,7 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
     // User comes online
     // https://xmpp.org/extensions/xep-0115.html
     let events = parse_xml(
-    r#"
+        r#"
         <presence xmlns="jabber:client" from="user@prose.org/res">
             <priority>5</priority>
             <show>chat</show>
@@ -58,8 +58,8 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
             <delay xmlns="urn:xmpp:delay" from="prose.org" stamp="2023-11-30T20:11:37Z" />
         </presence>
         "#,
-  )
-      .await?;
+    )
+        .await?;
 
     assert_eq!(
         events,
@@ -76,6 +76,7 @@ async fn test_user_presence_and_capabilities_changed() -> Result<()> {
                         id: "cdc05cb9c48d5e817a36d462fe0470a0579e570a".parse()?,
                         source: AvatarSource::Vcard {
                             owner: user_id!("user@prose.org").into(),
+                            real_id: None
                         }
                     }),
                     client: Some("https://prose.org".parse()?),

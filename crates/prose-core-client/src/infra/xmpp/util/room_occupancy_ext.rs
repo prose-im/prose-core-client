@@ -12,7 +12,7 @@ use prose_xmpp::mods::muc::RoomOccupancy;
 use prose_xmpp::stanza::muc::MucUser;
 
 use crate::domain::rooms::models::RoomSessionParticipant;
-use crate::dtos::{OccupantId, ParticipantId, UserId};
+use crate::dtos::{OccupantId, UserId};
 use crate::infra::xmpp::util::PresenceExt;
 
 pub trait RoomOccupancyExt {
@@ -57,18 +57,14 @@ fn self_participant(
 
     let occupant_id = OccupantId::from(from.clone());
     let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
-    let avatar_id = real_id
-        .clone()
-        .map(ParticipantId::from)
-        .unwrap_or_else(|| occupant_id.clone().into());
 
     Ok(RoomSessionParticipant {
         id: occupant_id.clone(),
         is_self: muc_user.status.contains(&Status::SelfPresence),
         anon_id: presence.anon_occupant_id(),
-        real_id,
+        real_id: real_id.clone(),
         affiliation: item.affiliation.clone().into(),
-        presence: presence.to_domain_presence(avatar_id),
+        presence: presence.to_domain_presence(occupant_id, real_id),
     })
 }
 

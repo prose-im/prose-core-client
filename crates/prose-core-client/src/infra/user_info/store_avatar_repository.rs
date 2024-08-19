@@ -12,7 +12,7 @@ use prose_store::{define_entity, RawKey};
 use prose_xmpp::mods::AvatarData;
 
 use crate::domain::shared::models::{AccountId, AvatarId, ParticipantId, ParticipantIdRef};
-use crate::domain::user_info::models::{Avatar, AvatarInfo, AvatarSource, PlatformImage};
+use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 use crate::domain::user_info::repos::AvatarRepository;
 
 pub struct StoreAvatarRepository {
@@ -75,20 +75,21 @@ impl KeyType for AvatarId {
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl AvatarRepository for StoreAvatarRepository {
-    async fn get(&self, account: &AccountId, avatar: &Avatar) -> Result<Option<PlatformImage>> {
+    async fn get(
+        &self,
+        account: &AccountId,
+        participant_id: ParticipantIdRef<'_>,
+        avatar_id: &AvatarId,
+    ) -> anyhow::Result<Option<PlatformImage>> {
         let tx = self
             .store
             .transaction_for_reading(&[AvatarRecord::collection()])
             .await?;
         let collection = tx.readable_collection(AvatarRecord::collection())?;
         let idx = collection.index(&AvatarRecord::avatar_idx())?;
-        let participant_id = match &avatar.source {
-            AvatarSource::Pep { owner, .. } => ParticipantIdRef::User(owner),
-            AvatarSource::Vcard { owner } => owner.to_ref(),
-        };
 
         return Ok(idx
-            .get::<_, AvatarRecord>(&(account, participant_id, &avatar.id))
+            .get::<_, AvatarRecord>(&(account, participant_id, &avatar_id))
             .await?
             .map(|record| format!("data:{};base64,{}", record.mime_type, record.base64_data)));
     }

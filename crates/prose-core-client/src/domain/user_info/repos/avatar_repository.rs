@@ -9,15 +9,20 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, ParticipantIdRef};
-use crate::domain::user_info::models::{Avatar, AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{AccountId, AvatarId, ParticipantIdRef};
+use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {
     /// Returns the cached avatar.
-    async fn get(&self, account: &AccountId, avatar: &Avatar) -> Result<Option<PlatformImage>>;
+    async fn get(
+        &self,
+        account: &AccountId,
+        participant_id: ParticipantIdRef<'_>,
+        avatar_id: &AvatarId,
+    ) -> Result<Option<PlatformImage>>;
 
     /// Saves the avatar to the local cache.
     async fn set(

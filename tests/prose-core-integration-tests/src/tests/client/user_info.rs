@@ -223,7 +223,8 @@ async fn test_joins_room() -> Result<()> {
         avatar: Some(Avatar {
             id: "ff04ffad2762376b8de08504ced6260553b15eed".parse()?,
             source: AvatarSource::Vcard {
-                owner: user_id!("john@prose.org").into(),
+                owner: room_id.occupant_id_with_nickname("user1")?.into(),
+                real_id: Some(user_id!("john@prose.org")),
             },
         }),
         client: Some("https://cheogram.com".parse()?),
@@ -291,7 +292,8 @@ async fn test_joins_room() -> Result<()> {
                 avatar: Some(Avatar {
                     id: "ff04ffad2762376b8de08504ced6260553b15eed".parse()?,
                     source: AvatarSource::Vcard {
-                        owner: user_id!("jim@prose.org").into()
+                        owner: room_id.occupant_id_with_nickname("user2")?.into(),
+                        real_id: user_id!("jim@prose.org").into(),
                     },
                 }),
                 client: Some("http://conversations.im".parse()?),

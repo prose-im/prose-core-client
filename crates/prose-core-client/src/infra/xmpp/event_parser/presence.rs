@@ -15,7 +15,7 @@ use crate::app::event_handlers::{
     UserStatusEventType,
 };
 use crate::domain::shared::models::{MucId, OccupantId, UserEndpointId};
-use crate::dtos::{Availability, ParticipantId, UserId, UserResourceId};
+use crate::dtos::{Availability, UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::{missing_attribute, missing_element, Context};
 use crate::infra::xmpp::util::PresenceExt;
 
@@ -37,7 +37,7 @@ pub fn parse_presence(ctx: &mut Context, presence: Presence) -> Result<()> {
     ctx.push_event(UserStatusEvent {
         user_id: endpoint_id,
         r#type: UserStatusEventType::PresenceChanged {
-            presence: presence.to_domain_presence(user_id),
+            presence: presence.to_domain_presence(user_id, None),
         },
     });
 
@@ -74,15 +74,11 @@ fn parse_muc_presence(
 
     let anon_occupant_id = presence.anon_occupant_id();
     let real_id = item.jid.clone().map(|jid| UserId::from(jid.into_bare()));
-    let avatar_id = real_id
-        .clone()
-        .map(ParticipantId::from)
-        .unwrap_or_else(|| occupant_id.clone().into());
 
     ctx.push_event(UserStatusEvent {
         user_id: UserEndpointId::Occupant(occupant_id.clone()),
         r#type: UserStatusEventType::PresenceChanged {
-            presence: presence.to_domain_presence(avatar_id),
+            presence: presence.to_domain_presence(occupant_id.clone(), real_id.clone()),
         },
     });
 
