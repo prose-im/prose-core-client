@@ -208,14 +208,6 @@ impl ParticipantList {
         participant.is_self = is_self;
     }
 
-    /// Modifies the participant's avatar or inserts a new participant with the avatar
-    /// if it didn't exist.
-    pub fn set_avatar(&mut self, id: &ParticipantId, is_self: bool, avatar: Option<&Avatar>) {
-        let participant = self.participants_map.entry(id.clone()).or_default();
-        participant.avatar = avatar.cloned();
-        participant.is_self = is_self;
-    }
-
     /// Sets the participant's compose state. Does nothing if the participant doesn't exist.
     pub fn set_compose_state(
         &mut self,
