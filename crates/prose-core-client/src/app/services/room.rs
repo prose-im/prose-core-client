@@ -739,17 +739,18 @@ impl<Kind> Room<Kind> {
     }
 
     async fn resolve_message_sender(&self, id: &ParticipantId) -> MessageSender {
-        let (name, mut real_id) = self
+        let (name, avatar, mut real_id) = self
             .data
             .with_participants(|p| {
                 p.get(id).map(|p| {
                     (
                         Some(p.name().unwrap_or_participant_id(id)),
+                        p.avatar.clone(),
                         p.real_id.clone(),
                     )
                 })
             })
-            .unwrap_or_else(|| (None, None));
+            .unwrap_or_else(|| (None, None, None));
 
         real_id = real_id.or_else(|| id.to_user_id());
 
@@ -757,6 +758,7 @@ impl<Kind> Room<Kind> {
             return MessageSender {
                 id: id.clone(),
                 name,
+                avatar,
             };
         }
 
@@ -764,6 +766,7 @@ impl<Kind> Room<Kind> {
             return MessageSender {
                 id: id.clone(),
                 name: ContactNameBuilder::new().unwrap_or_participant_id(id),
+                avatar,
             };
         };
 
@@ -778,6 +781,7 @@ impl<Kind> Room<Kind> {
         MessageSender {
             id: id.clone(),
             name,
+            avatar,
         }
     }
 

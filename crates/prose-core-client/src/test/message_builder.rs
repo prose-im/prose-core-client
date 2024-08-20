@@ -206,6 +206,7 @@ impl MessageBuilder {
                 name: self
                     .from_name
                     .expect("You must set a name when building a MessageDTO"),
+                avatar: None,
             },
             body: Body {
                 raw: body.raw,
@@ -232,6 +233,7 @@ impl MessageBuilder {
                                 .to_user_id()
                                 .map(|user_id| user_id.formatted_username())
                                 .unwrap_or(sender.to_opaque_identifier()),
+                            avatar: None,
                         })
                         .collect(),
                 })

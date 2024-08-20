@@ -6,7 +6,7 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::shared::models::ParticipantId;
-use crate::dtos::{Attachment, Body, Emoji, Mention, MessageRemoteId, MessageServerId};
+use crate::dtos::{Attachment, Avatar, Body, Emoji, Mention, MessageRemoteId, MessageServerId};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
@@ -31,6 +31,7 @@ pub struct Message {
 pub struct MessageSender {
     pub id: ParticipantId,
     pub name: String,
+    pub avatar: Option<Avatar>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

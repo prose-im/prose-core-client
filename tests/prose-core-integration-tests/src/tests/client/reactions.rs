@@ -103,11 +103,13 @@ async fn test_reactions() -> Result<()> {
                 from: vec![
                     MessageSender {
                         id: occupant_id!("room@conf.prose.org/drs").into(),
-                        name: "Drs".to_string()
+                        name: "Drs".to_string(),
+                        avatar: None,
                     },
                     MessageSender {
                         id: occupant_id!("room@conf.prose.org/huxx").into(),
-                        name: "Huxx".to_string()
+                        name: "Huxx".to_string(),
+                        avatar: None,
                     }
                 ]
             },
@@ -115,7 +117,8 @@ async fn test_reactions() -> Result<()> {
                 emoji: "👍🏽".into(),
                 from: vec![MessageSender {
                     id: occupant_id!("room@conf.prose.org/flux").into(),
-                    name: "Flux".to_string()
+                    name: "Flux".to_string(),
+                    avatar: None,
                 }]
             }
         ],

@@ -10,7 +10,8 @@ use prose_core_client::dtos;
 use prose_core_client::dtos::{MessageServerId, ScalarRangeExt};
 
 use crate::types::{
-    Attachment, AttachmentsArray, BareJid, IntoJSArray, Mention, MentionsArray, MessageSendersArray,
+    Attachment, AttachmentsArray, Avatar, BareJid, IntoJSArray, Mention, MentionsArray,
+    MessageSendersArray,
 };
 
 use super::ReactionsArray;
@@ -218,6 +219,7 @@ impl Reaction {
 pub struct MessageSender {
     id: dtos::ParticipantId,
     name: String,
+    avatar: Option<Avatar>,
 }
 
 impl From<dtos::MessageSender> for MessageSender {
@@ -225,6 +227,7 @@ impl From<dtos::MessageSender> for MessageSender {
         Self {
             id: value.id,
             name: value.name,
+            avatar: value.avatar.map(Into::into),
         }
     }
 }
@@ -251,6 +254,12 @@ impl MessageSender {
     #[wasm_bindgen(getter, js_name = "name")]
     pub fn name(&self) -> String {
         self.name.clone()
+    }
+
+    /// The avatar of the message sender.
+    #[wasm_bindgen(getter)]
+    pub fn avatar(&self) -> Option<Avatar> {
+        self.avatar.clone()
     }
 }
 
