@@ -280,7 +280,9 @@ pub struct SqliteTransaction<'db, Mode> {
 
 impl<'db> UpgradeTransaction<'db> for SqliteTransaction<'db, Upgrade> {
     type Error = Error;
-    type ReadWriteTransaction<'tx> = SqliteTransaction<'tx, ReadWrite> where Self: 'tx;
+    type ReadWriteTransaction<'tx> = SqliteTransaction<'tx, ReadWrite>
+    where
+        Self: 'tx;
 
     fn collection_names(&self) -> Result<Vec<String>, Self::Error> {
         Ok(self.description.all_table_names())
@@ -339,7 +341,7 @@ impl<'db, Mode> SqliteTransaction<'db, Mode> {
                 TransactionBehavior::Deferred => "BEGIN DEFERRED",
                 TransactionBehavior::Immediate => "BEGIN IMMEDIATE",
                 TransactionBehavior::Exclusive => "BEGIN EXCLUSIVE",
-                _ => unreachable!(),
+                _ => unreachable!("Unexpected TransactionBehavior"),
             };
             conn.execute_batch(query)?;
         }
@@ -379,7 +381,7 @@ impl<'db, Mode> Drop for SqliteTransaction<'db, Mode> {
             DropBehavior::Rollback => _ = conn.execute_batch("ROLLBACK"),
             DropBehavior::Ignore => (),
             DropBehavior::Panic => panic!("Transaction dropped unexpectedly."),
-            _ => unreachable!(),
+            _ => unreachable!("Unexpected DropBehavior"),
         }
     }
 }
@@ -392,7 +394,9 @@ impl<'db, Mode: Send + Sync> ReadTransaction<'db> for SqliteTransaction<'db, Mod
 where
     Mode: ReadMode,
 {
-    type ReadableCollection<'tx> = SqliteCollection<'tx, ReadOnly> where Self: 'tx;
+    type ReadableCollection<'tx> = SqliteCollection<'tx, ReadOnly>
+    where
+        Self: 'tx;
 
     fn readable_collection(&self, name: &str) -> Result<Self::ReadableCollection<'_>, Self::Error> {
         if !self.member_collections.contains(name) {
@@ -413,7 +417,9 @@ impl<'db, Mode: Send + Sync> WriteTransaction<'db> for SqliteTransaction<'db, Mo
 where
     Mode: WriteMode + Sync,
 {
-    type WritableCollection<'tx> = SqliteCollection<'tx, ReadWrite> where Self: 'tx;
+    type WritableCollection<'tx> = SqliteCollection<'tx, ReadWrite>
+    where
+        Self: 'tx;
 
     fn writeable_collection(
         &self,
@@ -515,7 +521,9 @@ impl<'tx, Mode: Send> IndexedCollection<'tx> for SqliteCollection<'tx, Mode>
 where
     Mode: ReadMode + Sync,
 {
-    type Index<'coll> = SqliteCollection<'coll, Mode> where Self: 'coll;
+    type Index<'coll> = SqliteCollection<'coll, Mode>
+    where
+        Self: 'coll;
 
     fn index(&self, columns: &[&str]) -> Result<Self::Index<'_>, Self::Error> {
         let index_name = columns.join("_");

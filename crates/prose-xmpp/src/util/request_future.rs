@@ -99,8 +99,8 @@ impl<T: Send, U> RequestFuture<T, U> {
         RequestFuture {
             state: Arc::new(Mutex::new(ReducerFutureState {
                 identifier: "".to_string(),
-                reducer: Box::new(|_, _| unreachable!()),
-                transformer: |_| unreachable!(),
+                reducer: Box::new(|_, _| unreachable!("Executed reducer in RequestFuture")),
+                transformer: |_| unreachable!("Executed transformer in RequestFuture"),
                 value: None,
                 result: Some(Err(err)),
                 waker: None,

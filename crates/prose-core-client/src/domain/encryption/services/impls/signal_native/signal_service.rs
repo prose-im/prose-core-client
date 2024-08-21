@@ -219,7 +219,7 @@ impl SignalService {
                 data: message.serialized().into(),
             },
             CiphertextMessage::SenderKeyMessage(_) | CiphertextMessage::PlaintextContent(_) => {
-                unreachable!()
+                unreachable!("Unexpected CiphertextMessage")
             }
         };
 

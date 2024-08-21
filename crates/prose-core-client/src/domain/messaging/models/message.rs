@@ -194,7 +194,7 @@ impl Message {
                 MessageLikePayload::DeliveryReceipt => message.is_delivered = true,
                 MessageLikePayload::ReadReceipt => message.is_read = true,
                 MessageLikePayload::Message { .. } | MessageLikePayload::Error { .. } => {
-                    unreachable!()
+                    unreachable!("Unexpected MessageLikePayload")
                 }
                 MessageLikePayload::Reaction { mut emojis } => {
                     let modifier_from = ParticipantId::from(modifier.from);
