@@ -7,6 +7,9 @@ use anyhow::Result;
 use jid::BareJid;
 use pretty_assertions::assert_eq;
 
+use super::helpers::{JoinRoomStrategy, TestClient};
+use crate::{event, recv, room_event, send};
+use itertools::Itertools;
 use prose_core_client::domain::shared::models::AnonOccupantId;
 use prose_core_client::domain::sidebar::models::BookmarkType;
 use prose_core_client::dtos::{
@@ -14,10 +17,7 @@ use prose_core_client::dtos::{
 };
 use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
 use prose_proc_macros::mt_test;
-
-use crate::{event, recv, room_event, send};
-
-use super::helpers::TestClient;
+use prose_xmpp::bare;
 
 #[mt_test]
 async fn test_joins_room() -> Result<()> {
@@ -27,9 +27,28 @@ async fn test_joins_room() -> Result<()> {
         .expect_login(user_id!("user@prose.org"), "secret")
         .await?;
 
+    let strategy = JoinRoomStrategy::default().with_owners([
+        bare!("owner@prose.org"),
+        // Some rooms may have owners that where the JID doesn't have a node. These should
+        // be ignored for now.
+        bare!("prose.org"),
+    ]);
+
     client
-        .join_room(muc_id!("room@conference.prose.org"), "anon-id")
+        .join_room_with_strategy(muc_id!("room@conference.prose.org"), "anon-id", strategy)
         .await?;
+
+    let room = client.get_room(muc_id!("room@conference.prose.org")).await;
+
+    assert_eq!(
+        vec![user_id!("owner@prose.org"), user_id!("user@prose.org")],
+        room.to_generic_room()
+            .participants()
+            .into_iter()
+            .filter_map(|p| p.user_id)
+            .sorted()
+            .collect::<Vec<_>>()
+    );
 
     Ok(())
 }

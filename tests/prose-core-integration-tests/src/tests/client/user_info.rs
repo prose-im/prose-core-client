@@ -201,7 +201,7 @@ async fn test_joins_room() -> Result<()> {
             "#
         )
     }).with_members(
-        [user_id!("john@prose.org")]
+        [bare!("john@prose.org")]
     );
 
     client

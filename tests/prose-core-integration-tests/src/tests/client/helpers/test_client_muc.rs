@@ -5,6 +5,7 @@
 
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
+use jid::BareJid;
 use minidom::{Element, IntoAttributeValue};
 use xmpp_parsers::mam::QueryId;
 
@@ -26,9 +27,9 @@ pub struct JoinRoomStrategy {
     pub room_name: String,
     pub room_type: RoomType,
     pub room_settings: Option<SyncedRoomSettings>,
-    pub owners: Vec<UserId>,
-    pub members: Vec<UserId>,
-    pub admins: Vec<UserId>,
+    pub owners: Vec<BareJid>,
+    pub members: Vec<BareJid>,
+    pub admins: Vec<BareJid>,
     pub user_affiliation: RoomAffiliation,
     pub receive_occupant_presences: Box<dyn FnOnce(&TestClient, &MucId)>,
     pub expect_catchup: Box<dyn FnOnce(&TestClient, &MucId)>,
@@ -87,17 +88,17 @@ impl JoinRoomStrategy {
         self
     }
 
-    pub fn with_owners(mut self, owners: impl IntoIterator<Item = UserId>) -> Self {
+    pub fn with_owners(mut self, owners: impl IntoIterator<Item = BareJid>) -> Self {
         self.owners = owners.into_iter().collect();
         self
     }
 
-    pub fn with_admins(mut self, admins: impl IntoIterator<Item = UserId>) -> Self {
+    pub fn with_admins(mut self, admins: impl IntoIterator<Item = BareJid>) -> Self {
         self.admins = admins.into_iter().collect();
         self
     }
 
-    pub fn with_members(mut self, members: impl IntoIterator<Item = UserId>) -> Self {
+    pub fn with_members(mut self, members: impl IntoIterator<Item = BareJid>) -> Self {
         self.members = members.into_iter().collect();
         self
     }
@@ -262,7 +263,7 @@ impl TestClient {
         fn expect_load_affiliations(
             client: &TestClient,
             affiliation: RoomAffiliation,
-            users: impl IntoIterator<Item = UserId>,
+            users: impl IntoIterator<Item = BareJid>,
         ) {
             let users = users
                 .into_iter()
@@ -305,7 +306,7 @@ impl TestClient {
             RoomAffiliation::Owner,
             strategy.owners.into_iter().chain(
                 (strategy.user_affiliation == RoomAffiliation::Owner)
-                    .then_some(current_user_id.clone()),
+                    .then_some(current_user_id.clone().into_inner()),
             ),
         );
 
@@ -314,7 +315,7 @@ impl TestClient {
             RoomAffiliation::Member,
             strategy.members.into_iter().chain(
                 (strategy.user_affiliation == RoomAffiliation::Member)
-                    .then_some(current_user_id.clone()),
+                    .then_some(current_user_id.clone().into_inner()),
             ),
         );
 
@@ -323,7 +324,7 @@ impl TestClient {
             RoomAffiliation::Admin,
             strategy.admins.into_iter().chain(
                 (strategy.user_affiliation == RoomAffiliation::Admin)
-                    .then_some(current_user_id.clone()),
+                    .then_some(current_user_id.clone().into_inner()),
             ),
         );
 
@@ -789,7 +790,7 @@ impl RoomResponse for RoomType {
                   </query>
                 </iq>
                 "#
-            },
+            }
             RoomType::PrivateChannel => unimplemented!(),
             RoomType::PublicChannel => {
                 r#"
