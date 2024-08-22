@@ -287,9 +287,15 @@ impl XMPPClient {
                     .await
                     .unwrap_or(vec![])
                     .into_iter()
-                    .map(move |user| RoomSessionMember {
-                        id: UserId::from(user.jid.to_bare()),
-                        affiliation: domain_affiliation.clone(),
+                    .filter_map(move |user| {
+                        let user_jid = user.jid.to_bare();
+                        if user_jid.node().is_none() {
+                            return None;
+                        }
+                        Some(RoomSessionMember {
+                            id: UserId::from(user.jid.to_bare()),
+                            affiliation: domain_affiliation.clone(),
+                        })
                     }),
             )
         }
