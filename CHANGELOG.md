@@ -1,3 +1,11 @@
+## What's Changed in 0.1.96
+
+* Add avatar to MessageSender
+* Ignore MUC owners/admins/members without a node in their JID
+* Load avatar images in non-anonymous rooms
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.95...0.1.96)
+
 
 ## What's Changed in 0.1.95
 
