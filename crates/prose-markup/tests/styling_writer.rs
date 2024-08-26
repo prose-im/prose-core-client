@@ -60,3 +60,16 @@ fn test_plain_text() {
     assert_eq!("Hello World", parser.convert_to_message_styling());
     assert_eq!("<p>Hello World</p>", parser.convert_to_html());
 }
+
+#[test]
+fn test_fenced_url_is_not_converted_to_anchor() {
+    let parser = MarkdownParser::new("`https://www.example.com`");
+    assert_eq!(
+        "`https://www.example.com`",
+        parser.convert_to_message_styling()
+    );
+    assert_eq!(
+        "<p><code>https://www.example.com</code></p>",
+        parser.convert_to_html()
+    );
+}
