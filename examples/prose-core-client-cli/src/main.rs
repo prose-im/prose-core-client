@@ -7,7 +7,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::iter::once;
-use std::ops::Range;
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -18,7 +17,6 @@ use anyhow::{anyhow, format_err, Result};
 use dialoguer::{theme::ColorfulTheme, Input, Select};
 use jid::{BareJid, FullJid, Jid};
 use minidom::Element;
-use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, CONTENT_LENGTH};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumIter};
@@ -27,9 +25,8 @@ use url::Url;
 
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
-    Address, Attachment, AttachmentType, Availability, Avatar, Mention, ParticipantId,
-    RoomEnvelope, RoomId, SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt,
-    UploadSlot, UserId, Utf8Index,
+    Address, Attachment, AttachmentType, Availability, Avatar, ParticipantId, RoomEnvelope, RoomId,
+    SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt, UploadSlot, UserId,
 };
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
@@ -634,6 +631,8 @@ enum Selection {
     DeleteIndividualBookmarks,
     #[strum(serialize = "[Debug] Delete whole bookmarks PubSub node")]
     DeleteBookmarksPubSubNode,
+    #[strum(serialize = "[Debug] Disco anything")]
+    DiscoAnything,
     #[strum(serialize = "[Debug] Send raw XML")]
     SendRawXML,
     Disconnect,
@@ -1188,6 +1187,15 @@ async fn main() -> Result<()> {
             Selection::DeleteBookmarksPubSubNode => {
                 println!("Deleting PubSub node…");
                 client.debug.delete_bookmarks_pubsub_node().await?;
+            }
+            Selection::DiscoAnything => {
+                let jid = prompt_jid(None);
+                let caps = client.debug.xmpp_client().get_mod::<mods::Caps>();
+
+                let info = caps.query_disco_info(jid.clone(), None).await?;
+                let items = caps.query_disco_items(jid, None).await?;
+
+                println!("Info:\n{info:?}\n\nItems:\n{items:?}");
             }
             Selection::SendRawXML => {
                 let input = Input::<String>::with_theme(&ColorfulTheme::default())
