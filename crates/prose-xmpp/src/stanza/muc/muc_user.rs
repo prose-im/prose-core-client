@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::{ns, ElementExt, RequestError};
+use crate::{ns, ElementExt, ParseError, RequestError};
 use jid::BareJid;
 use minidom::Element;
 use std::str::FromStr;
@@ -103,7 +103,7 @@ impl From<MucUser> for Element {
 }
 
 impl TryFrom<Element> for Destroy {
-    type Error = RequestError;
+    type Error = ParseError;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         root.expect_is("destroy", ns::MUC_USER)?;

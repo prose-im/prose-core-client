@@ -10,7 +10,7 @@ use minidom::{Element, IntoAttributeValue};
 use xmpp_parsers::pubsub::PubSubPayload;
 
 use crate::domain::rooms::models::RoomSidebarState;
-use prose_xmpp::{ElementExt, ParseError, RequestError};
+use prose_xmpp::{ElementExt, ParseError};
 
 use crate::domain::shared::models::{MucId, RoomId};
 use crate::domain::sidebar::models::{Bookmark, BookmarkType};
@@ -21,7 +21,7 @@ pub mod ns {
 }
 
 impl TryFrom<Element> for Bookmark {
-    type Error = RequestError;
+    type Error = ParseError;
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         value.expect_is("bookmark", ns::PROSE_BOOKMARK)?;
@@ -94,7 +94,7 @@ impl IntoAttributeValue for BookmarkType {
 }
 
 impl FromStr for BookmarkType {
-    type Err = RequestError;
+    type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
@@ -103,9 +103,9 @@ impl FromStr for BookmarkType {
             "private-channel" => Ok(Self::PrivateChannel),
             "public-channel" => Ok(Self::PublicChannel),
             "generic" => Ok(Self::Generic),
-            _ => Err(RequestError::ParseError(ParseError::Generic {
+            _ => Err(ParseError::Generic {
                 msg: format!("Unknown RoomType {}", s),
-            })),
+            }),
         }
     }
 }

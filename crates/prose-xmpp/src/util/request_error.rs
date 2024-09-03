@@ -16,8 +16,6 @@ pub enum RequestError {
     UnexpectedResponse,
     #[error("XMPP Error: {err:?}")]
     XMPP { err: StanzaError },
-    #[error(transparent)]
-    JidError(#[from] jid::Error),
     #[error("Request error: {msg}")]
     Generic { msg: String },
     #[error(transparent)]
@@ -34,6 +32,8 @@ pub enum ParseError {
     XMPPParseError(#[from] xmpp_parsers::Error),
     #[error(transparent)]
     ParseIntError(#[from] std::num::ParseIntError),
+    #[error(transparent)]
+    JidError(#[from] jid::Error),
 }
 
 impl From<xmpp_parsers::Error> for RequestError {

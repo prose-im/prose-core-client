@@ -3,8 +3,8 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::ns;
 use crate::util::{ElementExt, RequestError};
+use crate::{ns, ParseError};
 use jid::{BareJid, Jid};
 use minidom::{Element, NSChoice};
 use std::str::FromStr;
@@ -128,7 +128,7 @@ impl ToString for Role {
 }
 
 impl TryFrom<Element> for Destroy {
-    type Error = RequestError;
+    type Error = ParseError;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         root.expect_is("destroy", ns::MUC_OWNER)?;
@@ -156,7 +156,7 @@ impl From<Destroy> for Element {
 }
 
 impl TryFrom<Element> for User {
-    type Error = RequestError;
+    type Error = ParseError;
 
     fn try_from(root: Element) -> Result<Self, Self::Error> {
         root.expect_is("item", NSChoice::AnyOf(&[ns::MUC_OWNER, ns::MUC_ADMIN]))?;
@@ -164,7 +164,7 @@ impl TryFrom<Element> for User {
         Ok(User {
             jid: Jid::from_str(root.attr_req("jid")?)?,
             affiliation: muc::user::Affiliation::from_str(root.attr_req("affiliation")?).map_err(
-                |err| RequestError::Generic {
+                |err| ParseError::Generic {
                     msg: err.to_string(),
                 },
             )?,
