@@ -16,12 +16,13 @@ use prose_xmpp::stanza::message::{Forwarded, MucUser, Reactions};
 use prose_xmpp::test::BareJidTestAdditions;
 
 use crate::domain::messaging::models::{
-    Body, Message, MessageId, MessageLike, MessageLikeBody, MessageLikePayload, MessageRemoteId,
-    MessageServerId, Reaction,
+    Body, Message, MessageFlags, MessageId, MessageLike, MessageLikeBody, MessageLikePayload,
+    MessageRemoteId, MessageServerId, Reaction,
 };
 use crate::domain::shared::models::AnonOccupantId;
 use crate::dtos::{
-    Mention, Message as MessageDTO, MessageSender, ParticipantId, Reaction as ReactionDTO,
+    Mention, Message as MessageDTO, MessageFlags as MessageFlagsDTO, MessageSender, ParticipantId,
+    Reaction as ReactionDTO,
 };
 use crate::test::mock_data;
 
@@ -198,11 +199,13 @@ impl MessageBuilder {
                 html: body.html,
             },
             timestamp: self.timestamp.into(),
-            is_read: self.is_read,
-            is_edited: self.is_edited,
-            is_delivered: self.is_delivered,
-            is_transient: false,
-            is_encrypted: false,
+            flags: MessageFlags {
+                is_read: self.is_read,
+                is_edited: self.is_edited,
+                is_delivered: self.is_delivered,
+                is_transient: false,
+                is_encrypted: false,
+            },
             reactions: self.reactions,
             attachments: vec![],
             mentions: vec![],
@@ -228,12 +231,14 @@ impl MessageBuilder {
                 html: body.html,
             },
             timestamp: self.timestamp.into(),
-            is_read: self.is_read,
-            is_edited: self.is_edited,
-            is_delivered: self.is_delivered,
-            is_transient: false,
-            is_encrypted: false,
-            is_last_read: false,
+            flags: MessageFlagsDTO {
+                is_read: self.is_read,
+                is_edited: self.is_edited,
+                is_delivered: self.is_delivered,
+                is_transient: false,
+                is_encrypted: false,
+                is_last_read: false,
+            },
             reactions: self
                 .reactions
                 .into_iter()

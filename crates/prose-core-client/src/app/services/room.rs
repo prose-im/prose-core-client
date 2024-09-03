@@ -37,9 +37,9 @@ use crate::domain::shared::models::{
 use crate::domain::shared::utils::ContactNameBuilder;
 use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{
-    Attachment, Markdown, Mention, Message as MessageDTO, MessageResultSet, MessageSender,
-    MessageServerId, ParticipantBasicInfo, Reaction as ReactionDTO, RoomState,
-    SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
+    Attachment, Markdown, Mention, Message as MessageDTO, MessageFlags as MessageFlagsDTO,
+    MessageResultSet, MessageSender, MessageServerId, ParticipantBasicInfo,
+    Reaction as ReactionDTO, RoomState, SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
 };
 use crate::infra::xmpp::util::MessageExt;
 use crate::{ClientEvent, ClientRoomEventType};
@@ -768,12 +768,14 @@ impl<Kind> Room<Kind> {
                 from,
                 body: message.body,
                 timestamp: message.timestamp,
-                is_read: message.is_read,
-                is_edited: message.is_edited,
-                is_delivered: message.is_delivered,
-                is_transient: message.is_transient,
-                is_encrypted: message.is_encrypted,
-                is_last_read: is_last_read_message,
+                flags: MessageFlagsDTO {
+                    is_read: message.flags.is_read,
+                    is_edited: message.flags.is_edited,
+                    is_delivered: message.flags.is_delivered,
+                    is_transient: message.flags.is_transient,
+                    is_encrypted: message.flags.is_encrypted,
+                    is_last_read: is_last_read_message,
+                },
                 reactions,
                 attachments: message.attachments,
                 mentions: message.mentions,

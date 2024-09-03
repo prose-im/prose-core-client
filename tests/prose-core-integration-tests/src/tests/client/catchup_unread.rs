@@ -760,10 +760,10 @@ async fn test_marks_first_unread_message() -> Result<()> {
     let messages = room.load_latest_messages().await?;
 
     assert_eq!(4, messages.messages.len());
-    assert_eq!(false, messages.messages[0].is_last_read);
-    assert_eq!(true, messages.messages[1].is_last_read);
-    assert_eq!(false, messages.messages[2].is_last_read);
-    assert_eq!(false, messages.messages[3].is_last_read);
+    assert_eq!(false, messages.messages[0].flags.is_last_read);
+    assert_eq!(true, messages.messages[1].flags.is_last_read);
+    assert_eq!(false, messages.messages[2].flags.is_last_read);
+    assert_eq!(false, messages.messages[3].flags.is_last_read);
 
     Ok(())
 }

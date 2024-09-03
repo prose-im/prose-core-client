@@ -103,10 +103,10 @@ impl From<dtos::Message> for Message {
             },
             timestamp: js_sys::Date::new(&JsValue::from(value.timestamp.timestamp_millis() as f64)),
             meta: MessageMetadata {
-                is_edited: value.is_edited,
-                is_transient: value.is_transient,
-                is_encrypted: value.is_encrypted,
-                is_last_read: value.is_last_read,
+                is_edited: value.flags.is_edited,
+                is_transient: value.flags.is_transient,
+                is_encrypted: value.flags.is_encrypted,
+                is_last_read: value.flags.is_last_read,
             },
             reactions: value
                 .reactions

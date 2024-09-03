@@ -31,6 +31,15 @@ pub struct Body {
     pub html: HTML,
 }
 
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct MessageFlags {
+    pub is_read: bool,
+    pub is_edited: bool,
+    pub is_delivered: bool,
+    pub is_transient: bool,
+    pub is_encrypted: bool,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     pub id: MessageId,
@@ -39,11 +48,7 @@ pub struct Message {
     pub from: ParticipantId,
     pub body: Body,
     pub timestamp: DateTime<Utc>,
-    pub is_read: bool,
-    pub is_edited: bool,
-    pub is_delivered: bool,
-    pub is_transient: bool,
-    pub is_encrypted: bool,
+    pub flags: MessageFlags,
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,
@@ -107,11 +112,13 @@ impl Message {
                         html: body.html,
                     },
                     timestamp: msg.timestamp.into(),
-                    is_read: false,
-                    is_edited: false,
-                    is_delivered: false,
-                    is_transient: is_private,
-                    is_encrypted: encryption_info.is_some(),
+                    flags: MessageFlags {
+                        is_read: false,
+                        is_edited: false,
+                        is_delivered: false,
+                        is_transient: is_private,
+                        is_encrypted: encryption_info.is_some(),
+                    },
                     reactions: vec![],
                     attachments,
                     mentions: body.mentions,
@@ -126,11 +133,7 @@ impl Message {
                         html: HTML::new(error),
                     },
                     timestamp: msg.timestamp.into(),
-                    is_read: false,
-                    is_edited: false,
-                    is_delivered: false,
-                    is_transient: false,
-                    is_encrypted: false,
+                    flags: MessageFlags::default(),
                     reactions: vec![],
                     attachments: vec![],
                     mentions: vec![],
@@ -191,12 +194,12 @@ impl Message {
                         html: body.html,
                     };
                     message.mentions = body.mentions;
-                    message.is_edited = true;
+                    message.flags.is_edited = true;
                     message.attachments = attachments;
-                    message.is_encrypted = encryption_info.is_some()
+                    message.flags.is_encrypted = encryption_info.is_some()
                 }
-                MessageLikePayload::DeliveryReceipt => message.is_delivered = true,
-                MessageLikePayload::ReadReceipt => message.is_read = true,
+                MessageLikePayload::DeliveryReceipt => message.flags.is_delivered = true,
+                MessageLikePayload::ReadReceipt => message.flags.is_read = true,
                 MessageLikePayload::Message { .. } | MessageLikePayload::Error { .. } => {
                     unreachable!("Unexpected MessageLikePayload")
                 }
@@ -305,11 +308,7 @@ mod tests {
                         html: "<p>Message 1</p>".to_string().into(),
                     },
                     timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 00).unwrap(),
-                    is_read: false,
-                    is_edited: false,
-                    is_delivered: false,
-                    is_transient: false,
-                    is_encrypted: false,
+                    flags: MessageFlags::default(),
                     reactions: vec![],
                     attachments: vec![],
                     mentions: vec![]
@@ -324,11 +323,7 @@ mod tests {
                         html: "<p>Message 2</p>".to_string().into(),
                     },
                     timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 01).unwrap(),
-                    is_read: false,
-                    is_edited: false,
-                    is_delivered: false,
-                    is_transient: false,
-                    is_encrypted: false,
+                    flags: MessageFlags::default(),
                     reactions: vec![],
                     attachments: vec![],
                     mentions: vec![]
@@ -548,11 +543,7 @@ mod tests {
                     .with_ymd_and_hms(2023, 04, 07, 16, 00, 00)
                     .unwrap()
                     .into(),
-                is_read: false,
-                is_edited: false,
-                is_delivered: false,
-                is_transient: false,
-                is_encrypted: false,
+                flags: MessageFlags::default(),
                 reactions: vec![
                     Reaction {
                         emoji: "👍".into(),

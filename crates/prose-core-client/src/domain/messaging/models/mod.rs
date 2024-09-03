@@ -10,7 +10,7 @@ pub use encrypted_message::{
 pub(crate) use error::StanzaParseError;
 pub use mention::Mention;
 #[allow(unused_imports)] // Reaction is required in unit tests
-pub use message::{Body, Emoji, Message, Reaction};
+pub use message::{Body, Emoji, Message, MessageFlags, Reaction};
 pub use message_id::{MessageId, MessageRemoteId, MessageServerId, MessageTargetId};
 pub use message_like::{
     Body as MessageLikeBody, EncryptionInfo as MessageLikeEncryptionInfo, MessageLike,

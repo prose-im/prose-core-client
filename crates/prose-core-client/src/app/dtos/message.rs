@@ -15,6 +15,14 @@ pub struct Message {
     pub from: MessageSender,
     pub body: Body,
     pub timestamp: DateTime<Utc>,
+    pub flags: MessageFlags,
+    pub reactions: Vec<Reaction>,
+    pub attachments: Vec<Attachment>,
+    pub mentions: Vec<Mention>,
+}
+
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct MessageFlags {
     pub is_read: bool,
     pub is_edited: bool,
     pub is_delivered: bool,
@@ -22,9 +30,6 @@ pub struct Message {
     pub is_encrypted: bool,
     /// When contained in a list, this message is the last message that our user has read.
     pub is_last_read: bool,
-    pub reactions: Vec<Reaction>,
-    pub attachments: Vec<Attachment>,
-    pub mentions: Vec<Mention>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

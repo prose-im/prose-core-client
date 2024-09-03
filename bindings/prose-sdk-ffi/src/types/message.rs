@@ -36,9 +36,9 @@ impl From<ProseMessage> for Message {
             from: value.from.id.to_user_id().map(|id| id.into_inner().into()),
             body: todo!(),
             timestamp: value.timestamp,
-            is_read: value.is_read,
-            is_edited: value.is_edited,
-            is_delivered: value.is_delivered,
+            is_read: value.flags.is_read,
+            is_edited: value.flags.is_edited,
+            is_delivered: value.flags.is_delivered,
             // reactions: value.reactions.into_iter().map(Into::into).collect(),
         }
     }
