@@ -65,23 +65,25 @@ impl MessagesRepository for CachingMessageRepository {
                 .get::<_, MessageRecord>(&(account, room_id, id))
                 .await?;
 
-            messages.extend(
-                &mut message_id_target_idx
-                    .get_all_values::<MessageRecord>(
-                        Query::Only((account.clone(), room_id.clone(), id.clone())),
-                        Default::default(),
-                        None,
-                    )
-                    .await?
-                    .into_iter()
-                    .map(MessageLike::from),
-            );
+            if let Some(remote_id) = message.as_ref().and_then(|m| m.remote_id.as_ref()) {
+                messages.extend(
+                    &mut message_id_target_idx
+                        .get_all_values::<MessageRecord>(
+                            Query::Only((account, room_id, remote_id)),
+                            Default::default(),
+                            None,
+                        )
+                        .await?
+                        .into_iter()
+                        .map(MessageLike::from),
+                );
+            }
 
             if let Some(stanza_id) = message.as_ref().and_then(|m| m.server_id.as_ref()) {
                 messages.extend(
                     &mut stanza_id_target_idx
                         .get_all_values::<MessageRecord>(
-                            Query::Only((account.clone(), room_id.clone(), stanza_id.clone())),
+                            Query::Only((account, room_id, stanza_id)),
                             Default::default(),
                             None,
                         )
@@ -122,7 +124,7 @@ impl MessagesRepository for CachingMessageRepository {
                 MessageTargetId::RemoteId(id) => {
                     message_idx
                         .get_all_values::<MessageRecord>(
-                            Query::Only((account.clone(), room_id.clone(), id.clone())),
+                            Query::Only((account, room_id, id)),
                             Default::default(),
                             None,
                         )
@@ -131,7 +133,7 @@ impl MessagesRepository for CachingMessageRepository {
                 MessageTargetId::ServerId(id) => {
                     stanza_idx
                         .get_all_values::<MessageRecord>(
-                            Query::Only((account.clone(), room_id.clone(), id.clone())),
+                            Query::Only((account, room_id, id)),
                             Default::default(),
                             None,
                         )
@@ -196,7 +198,7 @@ impl MessagesRepository for CachingMessageRepository {
             .await?;
         let collection = tx.writeable_collection(MessageRecord::collection())?;
         collection
-            .delete_all_in_index(&MessageRecord::account_idx(), Query::Only(account.clone()))
+            .delete_all_in_index(&MessageRecord::account_idx(), Query::Only(account))
             .await?;
         tx.commit().await?;
 
