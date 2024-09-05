@@ -39,7 +39,8 @@ use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{
     Attachment, Markdown, Mention, Message as MessageDTO, MessageFlags as MessageFlagsDTO,
     MessageResultSet, MessageSender, MessageServerId, ParticipantBasicInfo,
-    Reaction as ReactionDTO, RoomState, SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
+    Reaction as ReactionDTO, ReplyTo as ReplyToDTO, RoomState,
+    SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
 };
 use crate::infra::xmpp::util::MessageExt;
 use crate::{ClientEvent, ClientRoomEventType};
@@ -223,6 +224,7 @@ impl<Kind> Room<Kind> {
                     attachments: request.attachments.clone(),
                     encryption_info: None,
                     is_transient: false,
+                    reply_to: None,
                 },
                 Some((body.text, fallback, mentions)),
             )
@@ -233,6 +235,7 @@ impl<Kind> Room<Kind> {
                     attachments: request.attachments.clone(),
                     encryption_info: None,
                     is_transient: false,
+                    reply_to: None,
                 },
                 None,
             )
@@ -418,7 +421,9 @@ impl<Kind> Room<Kind> {
             .message_repo
             .get_all(&account, &self.data.room_id, ids)
             .await?;
-        Ok(self.reduce_messages_and_add_sender(messages).await)
+        Ok(self
+            .reduce_messages_and_add_sender(&account, messages)
+            .await)
     }
 
     pub async fn set_user_is_composing(&self, is_composing: bool) -> Result<()> {
@@ -478,7 +483,9 @@ impl<Kind> Room<Kind> {
             .await?;
 
         Ok(MessageResultSet {
-            messages: self.reduce_messages_and_add_sender(messages).await,
+            messages: self
+                .reduce_messages_and_add_sender(&account, messages)
+                .await,
             last_message_id: None,
         })
     }
@@ -699,6 +706,7 @@ impl<Kind> Room<Kind> {
         let result_set = MessageResultSet {
             messages: self
                 .reduce_messages_and_add_sender(
+                    &account,
                     messages
                         .into_iter()
                         .rev()
@@ -713,6 +721,7 @@ impl<Kind> Room<Kind> {
 
     async fn reduce_messages_and_add_sender(
         &self,
+        account: &AccountId,
         messages: impl IntoIterator<Item = MessageLike>,
     ) -> Vec<MessageDTO> {
         let messages = Message::reducing_messages(messages);
@@ -763,6 +772,65 @@ impl<Kind> Room<Kind> {
             let is_last_read_message =
                 message.server_id.is_some() && message.server_id == last_read_message_id;
 
+            let reply_to = 'outer: {
+                if let Some(reply_to) = message.reply_to {
+                    let message_id = match reply_to.id {
+                        MessageTargetId::ServerId(server_id) => {
+                            self.message_repo
+                                .resolve_server_id_to_message_id(
+                                    &account,
+                                    &self.data.room_id,
+                                    &server_id,
+                                )
+                                .await
+                        }
+                        MessageTargetId::RemoteId(remote_id) => {
+                            self.message_repo
+                                .resolve_remote_id_to_message_id(
+                                    &account,
+                                    &self.data.room_id,
+                                    &remote_id,
+                                )
+                                .await
+                        }
+                    }
+                    .unwrap_or_default();
+
+                    let replied_to_message = if let Some(message_id) = &message_id {
+                        let messages = self
+                            .message_repo
+                            .get(&account, &self.data.room_id, message_id)
+                            .await
+                            .unwrap_or_default();
+                        Message::reducing_messages(messages).into_iter().next()
+                    } else {
+                        None
+                    };
+
+                    let (replied_to_sender, body, timestamp) = replied_to_message
+                        .map(|m| (Some(m.from), Some(m.body.raw), Some(m.timestamp)))
+                        .unwrap_or_else(|| (reply_to.to, reply_to.quote, None));
+
+                    let Some(replied_to_sender) = replied_to_sender else {
+                        break 'outer None;
+                    };
+
+                    Some(ReplyToDTO {
+                        id: message_id,
+                        sender: resolve_message_sender(
+                            self,
+                            Cow::Borrowed(&replied_to_sender),
+                            &mut message_senders,
+                        )
+                        .await,
+                        timestamp,
+                        body,
+                    })
+                } else {
+                    None
+                }
+            };
+
             message_dtos.push(MessageDTO {
                 id: message.id,
                 from,
@@ -779,6 +847,7 @@ impl<Kind> Room<Kind> {
                 reactions,
                 attachments: message.attachments,
                 mentions: message.mentions,
+                reply_to,
             });
         }
 
@@ -857,6 +926,7 @@ impl<Kind> Room<Kind> {
                         attachments: vec![],
                         encryption_info: None,
                         is_transient: true,
+                        reply_to: None,
                     },
                 }],
             )

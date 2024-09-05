@@ -6,11 +6,12 @@
 pub use xmpp_parsers::message::MessageType;
 
 pub use content::Content;
-pub use fallback::Fallback;
+pub use fallback::{Fallback, Range};
 pub use forwarding::Forwarded;
 pub use message::{Id, Message};
 pub use muc_user::MucUser;
 pub use reactions::{Emoji, Reactions};
+pub use reply::Reply;
 
 mod builder;
 pub mod carbons;
@@ -24,5 +25,6 @@ mod message;
 mod muc_invite;
 mod muc_user;
 mod reactions;
+mod reply;
 pub mod retract;
 pub mod stanza_id;

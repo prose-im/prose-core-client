@@ -69,6 +69,7 @@ impl MessageLikePayload {
             attachments: vec![],
             encryption_info: None,
             is_transient: false,
+            reply_to: None,
         }
     }
 }
@@ -209,6 +210,7 @@ impl MessageBuilder {
             reactions: self.reactions,
             attachments: vec![],
             mentions: vec![],
+            reply_to: None,
         }
     }
 
@@ -260,6 +262,7 @@ impl MessageBuilder {
                 .collect(),
             attachments: vec![],
             mentions: vec![],
+            reply_to: None,
         }
     }
 

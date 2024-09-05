@@ -10,9 +10,7 @@ use pretty_assertions::assert_eq;
 use std::iter;
 use std::sync::Arc;
 
-use prose_core_client::domain::messaging::models::{
-    MessageLikeBody, MessageLikePayload, MessageTargetId, Reaction,
-};
+use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId, Reaction};
 use prose_core_client::domain::messaging::services::{MessagePage, WrappingMessageIdProvider};
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
@@ -393,21 +391,11 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(101)
                             .set_from(user_id!("a@prose.org"))
-                            .set_payload(MessageLikePayload::Message {
-                                body: MessageLikeBody::text("Message 101"),
-                                attachments: vec![],
-                                encryption_info: None,
-                                is_transient: false,
-                            })
+                            .set_payload("Message 101")
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(102)
                             .set_from(user_id!("b@prose.org"))
-                            .set_payload(MessageLikePayload::Message {
-                                body: MessageLikeBody::text("Message 102"),
-                                attachments: vec![],
-                                encryption_info: None,
-                                is_transient: false,
-                            })
+                            .set_payload("Message 102")
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(103)
                             .set_from(user_id!("a@prose.org"))
@@ -441,12 +429,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     messages: vec![
                         MessageBuilder::new_with_index(90)
                             .set_from(user_id!("a@prose.org"))
-                            .set_payload(MessageLikePayload::Message {
-                                body: MessageLikeBody::text("Message 90"),
-                                attachments: vec![],
-                                encryption_info: None,
-                                is_transient: false,
-                            })
+                            .set_payload("Message 90")
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(91)
                             .set_from(user_id!("a@prose.org"))
@@ -457,30 +440,15 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(92)
                             .set_from(user_id!("b@prose.org"))
-                            .set_payload(MessageLikePayload::Message {
-                                body: MessageLikeBody::text("Message 92"),
-                                attachments: vec![],
-                                encryption_info: None,
-                                is_transient: false,
-                            })
+                            .set_payload("Message 92")
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(93)
                             .set_from(user_id!("a@prose.org"))
-                            .set_payload(MessageLikePayload::Message {
-                                body: MessageLikeBody::text("Message 93"),
-                                attachments: vec![],
-                                encryption_info: None,
-                                is_transient: false,
-                            })
+                            .set_payload("Message 93")
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(94)
                             .set_from(user_id!("a@prose.org"))
-                            .set_payload(MessageLikePayload::Message {
-                                body: MessageLikeBody::text("Message 94"),
-                                attachments: vec![],
-                                encryption_info: None,
-                                is_transient: false,
-                            })
+                            .set_payload("Message 94")
                             .build_archived_message("q2", None),
                     ],
                     is_last: true,
@@ -515,12 +483,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_id("msg-id-10")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
-                .set_payload(MessageLikePayload::Message {
-                    body: MessageLikeBody::text("Message 90"),
-                    attachments: vec![],
-                    encryption_info: None,
-                    is_transient: false,
-                })
+                .set_payload("Message 90")
                 .set_reactions([Reaction {
                     emoji: "✅".into(),
                     from: vec![
@@ -533,45 +496,25 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_id("msg-id-8")
                 .set_from(user_id!("b@prose.org"))
                 .set_from_name("B")
-                .set_payload(MessageLikePayload::Message {
-                    body: MessageLikeBody::text("Message 92"),
-                    attachments: vec![],
-                    encryption_info: None,
-                    is_transient: false,
-                })
+                .set_payload("Message 92")
                 .build_message_dto(),
             MessageBuilder::new_with_index(93)
                 .set_id("msg-id-7")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
-                .set_payload(MessageLikePayload::Message {
-                    body: MessageLikeBody::text("Message 93"),
-                    attachments: vec![],
-                    encryption_info: None,
-                    is_transient: false,
-                })
+                .set_payload("Message 93")
                 .build_message_dto(),
             MessageBuilder::new_with_index(94)
                 .set_id("msg-id-6")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
-                .set_payload(MessageLikePayload::Message {
-                    body: MessageLikeBody::text("Message 94"),
-                    attachments: vec![],
-                    encryption_info: None,
-                    is_transient: false,
-                })
+                .set_payload("Message 94")
                 .build_message_dto(),
             MessageBuilder::new_with_index(101)
                 .set_id("msg-id-4")
                 .set_from(user_id!("a@prose.org"))
                 .set_from_name("A")
-                .set_payload(MessageLikePayload::Message {
-                    body: MessageLikeBody::text("Message 101"),
-                    attachments: vec![],
-                    encryption_info: None,
-                    is_transient: false,
-                })
+                .set_payload("Message 101")
                 .set_reactions([Reaction {
                     emoji: "🍕".into(),
                     from: vec![user_id!("a@prose.org").into()]
@@ -581,12 +524,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                 .set_id("msg-id-3")
                 .set_from(user_id!("b@prose.org"))
                 .set_from_name("B")
-                .set_payload(MessageLikePayload::Message {
-                    body: MessageLikeBody::text("Message 102"),
-                    attachments: vec![],
-                    encryption_info: None,
-                    is_transient: false,
-                })
+                .set_payload("Message 102")
                 .set_reactions([Reaction {
                     emoji: "🎉".into(),
                     from: vec![user_id!("a@prose.org").into(),]
@@ -627,12 +565,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                         .chain(iter::once(
                             MessageBuilder::new_with_index(100)
                                 .set_from(user_id!("a@prose.org"))
-                                .set_payload(MessageLikePayload::Message {
-                                    body: MessageLikeBody::text("Message 100"),
-                                    attachments: vec![],
-                                    encryption_info: None,
-                                    is_transient: false,
-                                })
+                                .set_payload("Message 100")
                                 .build_archived_message("q1", None),
                         ))
                         .collect(),
@@ -693,12 +626,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
             .set_id("msg-id-1")
             .set_from(user_id!("a@prose.org"))
             .set_from_name("A")
-            .set_payload(MessageLikePayload::Message {
-                body: MessageLikeBody::text("Message 100"),
-                attachments: vec![],
-                encryption_info: None,
-                is_transient: false,
-            })
+            .set_payload("Message 100")
             .build_message_dto()],
         result.messages
     );

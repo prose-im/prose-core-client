@@ -19,6 +19,7 @@ pub struct Message {
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,
+    pub reply_to: Option<ReplyTo>,
 }
 
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -43,4 +44,12 @@ pub struct MessageSender {
 pub struct Reaction {
     pub emoji: Emoji,
     pub from: Vec<MessageSender>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReplyTo {
+    pub id: Option<MessageId>,
+    pub sender: MessageSender,
+    pub timestamp: Option<DateTime<Utc>>,
+    pub body: Option<String>,
 }

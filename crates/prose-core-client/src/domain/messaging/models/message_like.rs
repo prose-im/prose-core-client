@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use prose_xmpp::stanza::message;
 
 use crate::domain::messaging::models::message_id::MessageId;
-use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId};
+use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId, ReplyTo};
 use crate::domain::shared::models::{ParticipantId, HTML};
 use crate::dtos::DeviceId;
 
@@ -82,6 +82,7 @@ pub enum Payload {
         // Set if the message was encrypted
         encryption_info: Option<EncryptionInfo>,
         is_transient: bool,
+        reply_to: Option<ReplyTo>,
     },
     Reaction {
         emojis: Vec<message::Emoji>,

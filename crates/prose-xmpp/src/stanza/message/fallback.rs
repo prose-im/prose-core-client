@@ -29,8 +29,8 @@ impl Fallback {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Range {
-    pub start: Option<i32>,
-    pub end: Option<i32>,
+    pub start: Option<usize>,
+    pub end: Option<usize>,
 }
 
 impl TryFrom<Element> for Fallback {
@@ -82,14 +82,8 @@ impl TryFrom<Element> for Range {
 
     fn try_from(value: Element) -> Result<Self, Self::Error> {
         Ok(Range {
-            start: value
-                .attr("start")
-                .map(|start| i32::from_str_radix(&start, 10))
-                .transpose()?,
-            end: value
-                .attr("end")
-                .map(|start| i32::from_str_radix(&start, 10))
-                .transpose()?,
+            start: value.attr("start").map(|start| start.parse()).transpose()?,
+            end: value.attr("end").map(|end| end.parse()).transpose()?,
         })
     }
 }

@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use tracing::error;
+use tracing_subscriber::fmt::format;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos;
@@ -49,14 +50,22 @@ pub struct Message {
     reactions: js_sys::Array,
     attachments: js_sys::Array,
     mentions: js_sys::Array,
+    reply_to: Option<ReplyTo>,
 }
 
 #[wasm_bindgen]
 pub struct Reaction {
-    #[wasm_bindgen(skip)]
-    pub emoji: String,
-    #[wasm_bindgen(skip)]
-    pub from: Vec<MessageSender>,
+    emoji: String,
+    from: Vec<MessageSender>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct ReplyTo {
+    id: Option<String>,
+    sender: MessageSender,
+    timestamp: Option<js_sys::Date>,
+    body: Option<String>,
 }
 
 #[wasm_bindgen]
@@ -119,6 +128,14 @@ impl From<dtos::Message> for Message {
                 .map(Attachment::from)
                 .collect_into_js_array(),
             mentions,
+            reply_to: value.reply_to.map(|reply| ReplyTo {
+                id: reply.id.map(|id| id.to_string()),
+                sender: reply.sender.into(),
+                timestamp: reply
+                    .timestamp
+                    .map(|ts| js_sys::Date::new(&JsValue::from(ts.timestamp_millis() as f64))),
+                body: reply.body.map(|s| format!("<p>{s}</p>")),
+            }),
         }
     }
 }
@@ -189,6 +206,12 @@ impl Message {
     pub fn mentions(&self) -> MentionsArray {
         self.mentions.clone().unchecked_into()
     }
+
+    #[wasm_bindgen(getter, js_name = "replyTo")]
+    /// A reference to a message that this message is in reply to.
+    pub fn reply_to(&self) -> Option<ReplyTo> {
+        self.reply_to.clone()
+    }
 }
 
 #[wasm_bindgen]
@@ -204,6 +227,33 @@ impl Reaction {
             .iter()
             .cloned()
             .collect_into_js_array::<MessageSendersArray>()
+    }
+}
+
+#[wasm_bindgen]
+impl ReplyTo {
+    #[wasm_bindgen(getter, js_name = "id")]
+    /// The ID of the replied-to message, if available.
+    pub fn id(&self) -> Option<String> {
+        self.id.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "sender")]
+    /// The sender of the replied-to message.
+    pub fn sender(&self) -> MessageSender {
+        self.sender.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "timestamp")]
+    /// The timestamp of the replied-to message, if available.
+    pub fn timestamp(&self) -> Option<js_sys::Date> {
+        self.timestamp.clone()
+    }
+
+    #[wasm_bindgen(getter, js_name = "body")]
+    /// The formatted HTML of the replied-to message, if available. Should be used for display.
+    pub fn body(&self) -> Option<String> {
+        self.body.clone()
     }
 }
 

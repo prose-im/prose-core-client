@@ -13,4 +13,5 @@ mod muc_omemo;
 mod omemo;
 mod reactions;
 mod reconnect;
+mod reply;
 mod user_info;

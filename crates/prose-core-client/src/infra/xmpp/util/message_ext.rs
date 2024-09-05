@@ -4,7 +4,8 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use minidom::Element;
-use tracing::error;
+use std::ops::Range;
+use tracing::{error, warn};
 use xmpp_parsers::message::MessageType;
 use xmpp_parsers::{eme, legacy_omemo};
 
@@ -13,9 +14,10 @@ use prose_xmpp::stanza::media_sharing::{MediaShare, OOB};
 use prose_xmpp::stanza::Message;
 
 use crate::domain::messaging::models::send_message_request::{Body, Payload};
-use crate::domain::messaging::models::Attachment;
-use crate::domain::shared::models::UserEndpointId;
-use crate::dtos::{MessageServerId, RoomId};
+use crate::domain::messaging::models::{Attachment, MessageTargetId, ReplyTo};
+use crate::domain::shared::models::{RustStringRangeExt, UserEndpointId};
+use crate::dtos::{MessageServerId, ParticipantId, RoomId, ScalarRangeExt, UnicodeScalarIndex};
+use crate::util::StringExt;
 
 pub trait MessageExt {
     /// Returns unique attachments. Either SIMS or OOB.
@@ -41,6 +43,10 @@ pub trait MessageExt {
 
     /// Returns the value of the `stanza-id` element converted to a `MessageServerId`.
     fn server_id(&self) -> Option<MessageServerId>;
+
+    fn reply_fallback_range(&self) -> Option<Range<UnicodeScalarIndex>>;
+
+    fn reply_to(&self, body: &str) -> Option<ReplyTo>;
 }
 
 impl MessageExt for Message {
@@ -173,6 +179,55 @@ impl MessageExt for Message {
     fn server_id(&self) -> Option<MessageServerId> {
         self.stanza_id()
             .map(|sid| MessageServerId::from(sid.id.as_ref()))
+    }
+
+    fn reply_fallback_range(&self) -> Option<Range<UnicodeScalarIndex>> {
+        self.fallback_for(Some(ns::REPLY))
+            .and_then(|fallback| {
+                fallback
+                    .bodies
+                    .first()
+                    .and_then(|range| range.start.and_then(|s| range.end.map(|e| (s, e))))
+            })
+            .map(|(start, end)| UnicodeScalarIndex::new(start)..UnicodeScalarIndex::new(end))
+    }
+
+    fn reply_to(&self, body: &str) -> Option<ReplyTo> {
+        let Some(reply) = self.reply() else {
+            return None;
+        };
+
+        let (id, to) = if self.is_groupchat_message() {
+            (
+                MessageTargetId::ServerId(reply.id.into()),
+                reply
+                    .to
+                    .and_then(|jid| {
+                        jid.try_into_full()
+                            .inspect_err(|_| warn!("Expected FullJid for 'to' in 'reply'."))
+                            .ok()
+                    })
+                    .map(|full_jid| ParticipantId::Occupant(full_jid.into())),
+            )
+        } else {
+            (
+                MessageTargetId::RemoteId(reply.id.into()),
+                reply
+                    .to
+                    .map(|jid| ParticipantId::User(jid.into_bare().into())),
+            )
+        };
+
+        let fallback_range = self
+            .reply_fallback_range()
+            .and_then(|range| range.to_utf8_range(body).ok());
+
+        Some(ReplyTo {
+            id,
+            to,
+            quote: fallback_range
+                .and_then(|range| body.safe_slice(range.to_range()).map(|s| s.trimmed_quote())),
+        })
     }
 }
 

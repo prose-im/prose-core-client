@@ -21,12 +21,14 @@ use crate::domain::messaging::models::{
     MessageServerId, MessageTargetId, StanzaParseError,
 };
 use crate::domain::rooms::models::Room;
-use crate::domain::shared::models::{AnonOccupantId, StyledMessage};
+use crate::domain::shared::models::{AnonOccupantId, RustStringRangeExt, StyledMessage};
 use crate::dtos::{
-    DeviceId, Markdown, Mention, MessageRemoteId, OccupantId, ParticipantId, RoomId, UserId,
+    DeviceId, Markdown, Mention, MessageRemoteId, OccupantId, ParticipantId, RoomId,
+    ScalarRangeExt, UserId,
 };
 use crate::infra::xmpp::type_conversions::stanza_error::StanzaErrorExt;
 use crate::infra::xmpp::util::MessageExt;
+use crate::util::StringExt;
 
 pub struct MessageParser {
     message_id: MessageId,
@@ -275,11 +277,29 @@ impl MessageParser {
                 })
                 .collect::<Vec<_>>();
 
-            let (raw, html) = if let Some(markdown) = body {
+            let (raw, html, reply_to) = if let Some(markdown) = body {
                 let html = markdown.to_html();
-                (markdown.into_string(), html)
+                (markdown.into_string(), html, None)
             } else {
-                (fallback.to_string(), fallback.into_html())
+                // So far replies don't work with anything other than plain <body>, or in other
+                // words: Not with our Markdown content…
+                let reply_to = message.reply_to(fallback.as_ref());
+
+                let fallback = if let Some(reply_fallback_range) = message
+                    .reply_fallback_range()
+                    .and_then(|range| range.to_utf8_range(fallback.as_ref()).ok())
+                {
+                    fallback
+                        .as_ref()
+                        .safe_slice(reply_fallback_range.to_range().end..)
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| fallback.to_string())
+                        .into()
+                } else {
+                    fallback
+                };
+
+                (fallback.to_string(), fallback.into_html(), reply_to)
             };
 
             if let Some(replace_id) = message.replace() {
@@ -310,6 +330,7 @@ impl MessageParser {
                     // A message that we consider a groupchat message but is of type 'chat' is
                     // usually a private message. We'll treat them as transient messages.
                     is_transient: is_groupchat_message && message.type_ == MessageType::Chat,
+                    reply_to,
                 },
             });
         }

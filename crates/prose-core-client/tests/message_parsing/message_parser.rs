@@ -18,7 +18,7 @@ use xmpp_parsers::muc::user::{Affiliation, Role};
 
 use prose_core_client::domain::encryption::services::mocks::MockEncryptionDomainService;
 use prose_core_client::domain::messaging::models::{
-    MessageLike, MessageLikeBody, MessageLikePayload, MessageParser,
+    MessageLike, MessageLikeBody, MessageLikePayload, MessageParser, MessageTargetId, ReplyTo,
 };
 use prose_core_client::dtos::{
     Attachment, AttachmentType, Mention, OccupantId, ParticipantId, UnicodeScalarIndex, UserId,
@@ -29,10 +29,10 @@ use prose_proc_macros::mt_test;
 use prose_xmpp::mods::chat::Carbon;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
 use prose_xmpp::stanza::message::stanza_id::StanzaId;
-use prose_xmpp::stanza::message::{Forwarded, MucUser};
+use prose_xmpp::stanza::message::{Fallback, Forwarded, MucUser, Range, Reply};
 use prose_xmpp::stanza::references::Reference;
 use prose_xmpp::stanza::Message;
-use prose_xmpp::{bare, full};
+use prose_xmpp::{bare, full, ns};
 
 #[mt_test]
 async fn test_parse_chat_message() -> Result<()> {
@@ -79,6 +79,7 @@ async fn test_parse_chat_message() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         },
         parsed_message
@@ -128,6 +129,7 @@ async fn test_parse_groupchat_message() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         },
         parsed_message
@@ -183,6 +185,7 @@ async fn test_parse_sent_carbon_message() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         },
         parsed_message
@@ -241,6 +244,7 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         },
         parsed_message
@@ -305,6 +309,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         }
     );
@@ -362,6 +367,7 @@ async fn test_parse_mam_chat_message() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         },
         parsed_message
@@ -412,6 +418,7 @@ async fn test_parse_delayed_message() -> Result<()> {
                 attachments: vec![],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
             },
         },
         parsed_message
@@ -469,6 +476,109 @@ async fn test_message_with_attachment_and_empty_body() -> Result<()> {
                 }],
                 encryption_info: None,
                 is_transient: false,
+                reply_to: None,
+            },
+        },
+        parsed_message
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_reply() -> Result<()> {
+    let message = Message::new()
+        .set_id("message-id-2".into())
+        .set_type(MessageType::Chat)
+        .set_to(bare!("me@prose.org"))
+        .set_from(full!("them@prose.org/resource"))
+        .set_body("> Hi 🏳️‍🌈!\n> First Line\n> Second Line\nHello there!")
+        .set_reply(Reply::new("message-id-1", Some(bare!("them@prose.org"))))
+        .set_fallback(Fallback {
+            r#for: Some(ns::REPLY.to_string()),
+            subjects: vec![],
+            bodies: vec![Range {
+                start: Some(0),
+                end: Some(38),
+            }],
+        });
+
+    let parsed_message = MessageParser::new(
+        "local-id-1".into(),
+        None,
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+        None,
+    )
+    .parse_message(message)
+    .await?;
+
+    assert_eq!(
+        MessageLike {
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-2".into()),
+            server_id: None,
+            target: None,
+            to: Some(bare!("me@prose.org")),
+            from: ParticipantId::User(user_id!("them@prose.org")),
+            timestamp: Default::default(),
+            payload: MessageLikePayload::Message {
+                body: MessageLikeBody::text("Hello there!"),
+                attachments: vec![],
+                encryption_info: None,
+                is_transient: false,
+                reply_to: Some(ReplyTo {
+                    id: MessageTargetId::RemoteId("message-id-1".into()),
+                    to: Some(ParticipantId::User(user_id!("them@prose.org"))),
+                    quote: Some("Hi 🏳️‍🌈!\nFirst Line\nSecond Line".to_string())
+                }),
+            },
+        },
+        parsed_message
+    );
+
+    Ok(())
+}
+
+#[mt_test]
+async fn test_reply_without_quote() -> Result<()> {
+    let message = Message::new()
+        .set_id("message-id-2".into())
+        .set_type(MessageType::Chat)
+        .set_to(bare!("me@prose.org"))
+        .set_from(full!("them@prose.org/resource"))
+        .set_body("Hello there!")
+        .set_reply(Reply::new("message-id-1", Some(bare!("them@prose.org"))));
+
+    let parsed_message = MessageParser::new(
+        "local-id-1".into(),
+        None,
+        Default::default(),
+        Arc::new(MockEncryptionDomainService::new()),
+        None,
+    )
+    .parse_message(message)
+    .await?;
+
+    assert_eq!(
+        MessageLike {
+            id: "local-id-1".into(),
+            remote_id: Some("message-id-2".into()),
+            server_id: None,
+            target: None,
+            to: Some(bare!("me@prose.org")),
+            from: ParticipantId::User(user_id!("them@prose.org")),
+            timestamp: Default::default(),
+            payload: MessageLikePayload::Message {
+                body: MessageLikeBody::text("Hello there!"),
+                attachments: vec![],
+                encryption_info: None,
+                is_transient: false,
+                reply_to: Some(ReplyTo {
+                    id: MessageTargetId::RemoteId("message-id-1".into()),
+                    to: Some(ParticipantId::User(user_id!("them@prose.org"))),
+                    quote: None
+                }),
             },
         },
         parsed_message

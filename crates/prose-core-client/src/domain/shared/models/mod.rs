@@ -20,7 +20,8 @@ pub use room_id::RoomId;
 pub use room_type::RoomType;
 pub use sender_id::SenderId;
 pub use string_index::{
-    ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex, Utf16Index, Utf8Index,
+    RustStringRangeExt, ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex, Utf16Index,
+    Utf8Index,
 };
 pub use user_endpoint_id::UserEndpointId;
 pub use user_id::UserId;

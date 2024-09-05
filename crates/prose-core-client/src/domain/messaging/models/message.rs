@@ -7,6 +7,7 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
 use prose_utils::id_string;
@@ -40,6 +41,13 @@ pub struct MessageFlags {
     pub is_encrypted: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ReplyTo {
+    pub id: MessageTargetId,
+    pub to: Option<ParticipantId>,
+    pub quote: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Message {
     pub id: MessageId,
@@ -52,6 +60,7 @@ pub struct Message {
     pub reactions: Vec<Reaction>,
     pub attachments: Vec<Attachment>,
     pub mentions: Vec<Mention>,
+    pub reply_to: Option<ReplyTo>,
 }
 
 impl Message {
@@ -102,6 +111,7 @@ impl Message {
                     attachments,
                     encryption_info,
                     is_transient: is_private,
+                    reply_to,
                 } => Message {
                     id: msg.id,
                     remote_id: msg.remote_id,
@@ -122,6 +132,7 @@ impl Message {
                     reactions: vec![],
                     attachments,
                     mentions: body.mentions,
+                    reply_to,
                 },
                 MessageLikePayload::Error { message: error } => Message {
                     id: msg.id,
@@ -137,6 +148,7 @@ impl Message {
                     reactions: vec![],
                     attachments: vec![],
                     mentions: vec![],
+                    reply_to: None,
                 },
                 _ => {
                     modifiers.push(msg);
@@ -311,7 +323,8 @@ mod tests {
                     flags: MessageFlags::default(),
                     reactions: vec![],
                     attachments: vec![],
-                    mentions: vec![]
+                    mentions: vec![],
+                    reply_to: None,
                 },
                 Message {
                     id: "id2".into(),
@@ -326,7 +339,8 @@ mod tests {
                     flags: MessageFlags::default(),
                     reactions: vec![],
                     attachments: vec![],
-                    mentions: vec![]
+                    mentions: vec![],
+                    reply_to: None,
                 }
             ],
             reduced_message,
@@ -464,6 +478,7 @@ mod tests {
                     attachments: vec![],
                     encryption_info: None,
                     is_transient: false,
+                    reply_to: None,
                 },
             },
             MessageLike {
@@ -559,7 +574,8 @@ mod tests {
                     }
                 ],
                 attachments: vec![],
-                mentions: vec![]
+                mentions: vec![],
+                reply_to: None,
             },
             reduced_message,
         )

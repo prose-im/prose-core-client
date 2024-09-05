@@ -17,6 +17,7 @@ use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::mam::ArchivedMessage;
 use crate::stanza::message::message::Message;
 use crate::stanza::message::muc_user::MucUser;
+use crate::stanza::message::reply::Reply;
 use crate::stanza::message::{carbons, chat_marker, Content, Fallback, Id, Reactions};
 use crate::stanza::references::Reference;
 
@@ -164,6 +165,11 @@ impl Message {
     pub fn add_references(mut self, reference: impl IntoIterator<Item = Reference>) -> Self {
         self.payloads
             .extend(reference.into_iter().map(Element::from));
+        self
+    }
+
+    pub fn set_reply(mut self, reply: Reply) -> Self {
+        self.payloads.push(reply.into());
         self
     }
 }

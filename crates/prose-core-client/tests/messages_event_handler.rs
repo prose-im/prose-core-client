@@ -258,6 +258,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
             attachments: vec![],
             encryption_info: None,
             is_transient: false,
+            reply_to: None,
         },
     };
 
@@ -374,6 +375,7 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
             attachments: vec![],
             encryption_info: None,
             is_transient: true,
+            reply_to: None,
         },
     };
 

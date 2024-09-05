@@ -90,6 +90,18 @@ impl UnicodeScalarIndex {
             string.chars().take(self.0).map(|c| c.len_utf16()).sum(),
         ))
     }
+
+    pub fn to_utf8_index(&self, string: &str) -> Result<Utf8Index> {
+        let iter = string.chars().take(self.0);
+
+        if iter.count() < self.0 {
+            bail!("UnicodeScalarIndex is out of bounds.")
+        }
+
+        Ok(Utf8Index(
+            string.chars().take(self.0).map(|c| c.len_utf8()).sum(),
+        ))
+    }
 }
 
 impl AsRef<usize> for Utf16Index {
@@ -108,8 +120,13 @@ pub trait StringIndexRangeExt {
     fn to_scalar_range(&self, string: &str) -> Result<Range<UnicodeScalarIndex>>;
 }
 
+pub trait RustStringRangeExt {
+    fn to_range(&self) -> Range<usize>;
+}
+
 pub trait ScalarRangeExt {
     fn to_utf16_range(&self, string: &str) -> Result<Range<Utf16Index>>;
+    fn to_utf8_range(&self, string: &str) -> Result<Range<Utf8Index>>;
 }
 
 impl StringIndexRangeExt for Range<Utf8Index> {
@@ -118,6 +135,12 @@ impl StringIndexRangeExt for Range<Utf8Index> {
             start: self.start.to_scalar_index(string)?,
             end: self.end.to_scalar_index(string)?,
         })
+    }
+}
+
+impl RustStringRangeExt for Range<Utf8Index> {
+    fn to_range(&self) -> Range<usize> {
+        self.start.0..self.end.0
     }
 }
 
@@ -135,6 +158,13 @@ impl ScalarRangeExt for Range<UnicodeScalarIndex> {
         Ok(Range {
             start: self.start.to_utf16_index(string)?,
             end: self.end.to_utf16_index(string)?,
+        })
+    }
+
+    fn to_utf8_range(&self, string: &str) -> Result<Range<Utf8Index>> {
+        Ok(Range {
+            start: self.start.to_utf8_index(string)?,
+            end: self.end.to_utf8_index(string)?,
         })
     }
 }

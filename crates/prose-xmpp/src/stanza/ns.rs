@@ -81,3 +81,6 @@ pub const AVATAR_PEP_VCARD_CONVERSION: &str = "urn:xmpp:pep-vcard-conversion:0";
 
 /// XEP-0481: Content Types in Messages
 pub const CONTENT: &str = "urn:xmpp:content";
+
+/// XEP-0461: Message Replies
+pub const REPLY: &str = "urn:xmpp:reply:0";

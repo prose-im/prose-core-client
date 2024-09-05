@@ -24,8 +24,9 @@ use crate::stanza::media_sharing::{MediaShare, OOB};
 use crate::stanza::message::fasten::ApplyTo;
 use crate::stanza::message::muc_invite::MucInvite;
 use crate::stanza::message::muc_user::MucUser;
+use crate::stanza::message::reply::Reply;
 use crate::stanza::message::stanza_id::StanzaId;
-use crate::stanza::message::{carbons, Content, Reactions};
+use crate::stanza::message::{carbons, Content, Fallback, Reactions};
 use crate::stanza::message::{chat_marker, mam};
 use crate::stanza::muc;
 use crate::stanza::references::Reference;
@@ -228,6 +229,19 @@ impl Message {
 
     pub fn omemo_element(&self) -> Option<legacy_omemo::Encrypted> {
         self.typed_payload("encrypted", ns::LEGACY_OMEMO)
+    }
+
+    pub fn reply(&self) -> Option<Reply> {
+        self.typed_payload("reply", ns::REPLY)
+    }
+
+    pub fn fallback_for(&self, ns: Option<&str>) -> Option<Fallback> {
+        self.typed_payload_with_predicate(|elem| {
+            if !elem.is("fallback", ns::FALLBACK) {
+                return false;
+            }
+            ns.map(|ns| elem.attr("for") == Some(ns)).unwrap_or(true)
+        })
     }
 }
 
