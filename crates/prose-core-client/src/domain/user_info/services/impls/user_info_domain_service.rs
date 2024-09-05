@@ -276,19 +276,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
             .await
     }
 
-    async fn handle_avatar_changed(
-        &self,
-        user_id: &UserId,
-        metadata: Option<AvatarMetadata>,
-    ) -> Result<()> {
-        let avatar = metadata.map(|metadata| Avatar {
-            id: metadata.checksum,
-            source: AvatarSource::Pep {
-                owner: user_id.clone(),
-                mime_type: metadata.mime_type,
-            },
-        });
-
+    async fn handle_avatar_changed(&self, user_id: &UserId, avatar: Option<Avatar>) -> Result<()> {
         self.update_user_info(user_id, |info| info.avatar = avatar)
             .await
     }

@@ -223,6 +223,15 @@ impl ParticipantList {
             });
     }
 
+    /// Sets the participant's avatar. Does nothing if the participant doesn't exist.
+    pub fn set_avatar(&mut self, id: &ParticipantId, avatar: Option<Avatar>) {
+        self.participants_map
+            .entry(id.clone())
+            .and_modify(|participant| {
+                participant.avatar = avatar;
+            });
+    }
+
     pub fn add_user(
         &mut self,
         real_id: &UserId,

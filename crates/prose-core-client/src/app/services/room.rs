@@ -868,8 +868,6 @@ impl<Kind> Room<Kind> {
             })
             .unwrap_or_else(|| (None, None, None));
 
-        real_id = real_id.or_else(|| id.to_user_id());
-
         if let Some(name) = name {
             return MessageSender {
                 id: id.clone(),
@@ -877,6 +875,8 @@ impl<Kind> Room<Kind> {
                 avatar,
             };
         }
+
+        real_id = real_id.or_else(|| id.to_user_id());
 
         let Some(real_id) = real_id else {
             return MessageSender {
@@ -886,13 +886,13 @@ impl<Kind> Room<Kind> {
             };
         };
 
-        let name = self
+        let (name, avatar) = self
             .user_info_domain_service
             .get_user_info(&real_id, CachePolicy::ReturnCacheDataDontLoad)
             .await
             .unwrap_or_default()
-            .display_name()
-            .unwrap_or_participant_id(id);
+            .map(|i| (i.display_name().unwrap_or_participant_id(id), i.avatar))
+            .unwrap_or_else(|| (ContactNameBuilder::new().unwrap_or_participant_id(id), None));
 
         MessageSender {
             id: id.clone(),

@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::shared::models::{AvatarId, ParticipantId, ParticipantIdRef, UserId};
+use crate::domain::user_info::models::AvatarMetadata;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AvatarSource {
@@ -23,6 +24,18 @@ pub enum AvatarSource {
 pub struct Avatar {
     pub id: AvatarId,
     pub source: AvatarSource,
+}
+
+impl Avatar {
+    pub fn from_metadata(user_id: UserId, metadata: AvatarMetadata) -> Self {
+        Self {
+            id: metadata.checksum,
+            source: AvatarSource::Pep {
+                owner: user_id,
+                mime_type: metadata.mime_type,
+            },
+        }
+    }
 }
 
 impl Avatar {

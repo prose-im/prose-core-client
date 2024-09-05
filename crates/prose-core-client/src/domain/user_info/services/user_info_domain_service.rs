@@ -11,8 +11,7 @@ use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use crate::domain::contacts::models::Contact;
 use crate::domain::shared::models::{CachePolicy, UserId, UserOrResourceId};
 use crate::domain::user_info::models::{
-    Avatar, AvatarMetadata, PlatformImage, Presence, UserInfo, UserMetadata, UserProfile,
-    UserStatus,
+    Avatar, PlatformImage, Presence, UserInfo, UserMetadata, UserProfile, UserStatus,
 };
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -47,11 +46,7 @@ pub trait UserInfoDomainService: SendUnlessWasm + SyncUnlessWasm {
         user_activity: Option<UserStatus>,
     ) -> Result<()>;
 
-    async fn handle_avatar_changed(
-        &self,
-        user_id: &UserId,
-        metadata: Option<AvatarMetadata>,
-    ) -> Result<()>;
+    async fn handle_avatar_changed(&self, user_id: &UserId, avatar: Option<Avatar>) -> Result<()>;
 
     async fn handle_user_profile_changed(
         &self,

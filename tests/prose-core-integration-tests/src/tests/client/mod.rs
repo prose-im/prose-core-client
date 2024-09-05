@@ -3,6 +3,7 @@
 // Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+mod avatar;
 mod catchup_unread;
 mod contact_list;
 mod helpers;

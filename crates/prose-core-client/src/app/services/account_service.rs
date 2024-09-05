@@ -12,7 +12,7 @@ use prose_xmpp::mods::AvatarData;
 use crate::app::deps::*;
 use crate::domain::account::services::UserProfileFormat;
 use crate::domain::shared::models::{Availability, AvatarId, CachePolicy, ParticipantIdRef};
-use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
+use crate::domain::user_info::models::{Avatar, AvatarMetadata, UserProfile, UserStatus};
 use crate::dtos::{AccountInfo, DeviceId, DeviceInfo, UserProfile as UserProfileDTO};
 use crate::ClientEvent;
 
@@ -164,7 +164,10 @@ impl AccountService {
 
         debug!("Caching avatar metadata");
         self.user_info_domain_service
-            .handle_avatar_changed(&user_id, Some(metadata))
+            .handle_avatar_changed(
+                &user_id,
+                Some(Avatar::from_metadata(user_id.clone(), metadata)),
+            )
             .await?;
 
         Ok(())

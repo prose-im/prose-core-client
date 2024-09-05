@@ -6,15 +6,26 @@
 use anyhow::Result;
 use async_trait::async_trait;
 
-use prose_proc_macros::InjectDependencies;
-
-use crate::app::deps::DynUserInfoDomainService;
+use crate::app::deps::{
+    DynAppContext, DynClientEventDispatcher, DynConnectedRoomsReadOnlyRepository,
+    DynUserInfoDomainService,
+};
 use crate::app::event_handlers::{
     ServerEvent, ServerEventHandler, UserInfoEvent, UserInfoEventType,
 };
+use crate::domain::user_info::models::Avatar;
+use crate::dtos::ParticipantId;
+use crate::ClientEvent;
+use prose_proc_macros::InjectDependencies;
 
 #[derive(InjectDependencies)]
 pub struct UserInfoEventHandler {
+    #[inject]
+    client_event_dispatcher: DynClientEventDispatcher,
+    #[inject]
+    ctx: DynAppContext,
+    #[inject]
+    connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
     #[inject]
     user_info_domain_service: DynUserInfoDomainService,
 }
@@ -41,9 +52,22 @@ impl UserInfoEventHandler {
     async fn handle_user_info_event(&self, event: UserInfoEvent) -> Result<()> {
         match event.r#type {
             UserInfoEventType::AvatarChanged { metadata } => {
+                let avatar = Avatar::from_metadata(event.user_id.clone(), metadata);
+
                 self.user_info_domain_service
-                    .handle_avatar_changed(&event.user_id, Some(metadata))
+                    .handle_avatar_changed(&event.user_id, Some(avatar.clone()))
                     .await?;
+
+                if let Some(room) = self
+                    .connected_rooms_repo
+                    .get(&self.ctx.connected_account()?, event.user_id.as_ref())
+                {
+                    room.with_participants_mut(|p| {
+                        p.set_avatar(&ParticipantId::User(event.user_id), Some(avatar));
+                    });
+                    self.client_event_dispatcher
+                        .dispatch_event(ClientEvent::SidebarChanged);
+                }
             }
             UserInfoEventType::ProfileChanged { profile } => {
                 self.user_info_domain_service
