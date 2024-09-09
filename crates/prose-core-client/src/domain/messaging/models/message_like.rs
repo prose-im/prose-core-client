@@ -26,7 +26,6 @@ pub struct MessageLike {
     pub id: MessageId,
     pub remote_id: Option<MessageRemoteId>,
     pub server_id: Option<MessageServerId>,
-    pub target: Option<MessageTargetId>,
     pub to: Option<BareJid>,
     pub from: ParticipantId,
     pub timestamp: DateTime<Utc>,
@@ -69,13 +68,18 @@ pub enum Payload {
         message: String,
     },
     Correction {
+        target_id: MessageTargetId,
         body: Body,
         attachments: Vec<Attachment>,
         // Set if the message was encrypted
         encryption_info: Option<EncryptionInfo>,
     },
-    DeliveryReceipt,
-    ReadReceipt,
+    DeliveryReceipt {
+        target_id: MessageTargetId,
+    },
+    ReadReceipt {
+        target_id: MessageTargetId,
+    },
     Message {
         body: Body,
         attachments: Vec<Attachment>,
@@ -85,9 +89,12 @@ pub enum Payload {
         reply_to: Option<ReplyTo>,
     },
     Reaction {
+        target_id: MessageTargetId,
         emojis: Vec<message::Emoji>,
     },
-    Retraction,
+    Retraction {
+        target_id: MessageTargetId,
+    },
 }
 
 impl Payload {
@@ -102,6 +109,18 @@ impl Payload {
         match self {
             Self::Error { .. } => true,
             _ => false,
+        }
+    }
+
+    pub fn target_id(&self) -> Option<&MessageTargetId> {
+        match self {
+            Payload::Error { .. } => None,
+            Payload::Correction { target_id, .. } => Some(target_id),
+            Payload::DeliveryReceipt { target_id } => Some(target_id),
+            Payload::ReadReceipt { target_id } => Some(target_id),
+            Payload::Message { .. } => None,
+            Payload::Reaction { target_id, .. } => Some(target_id),
+            Payload::Retraction { target_id } => Some(target_id),
         }
     }
 }

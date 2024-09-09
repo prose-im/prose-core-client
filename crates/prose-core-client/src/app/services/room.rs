@@ -35,7 +35,6 @@ use crate::domain::shared::models::{
     AccountId, CachePolicy, MucId, ParticipantId, ParticipantInfo, RoomId, RoomType, StyledMessage,
 };
 use crate::domain::shared::utils::ContactNameBuilder;
-use crate::domain::user_info::models::UserInfoOptExt;
 use crate::dtos::{
     Attachment, Markdown, Mention, Message as MessageDTO, MessageFlags as MessageFlagsDTO,
     MessageResultSet, MessageSender, MessageServerId, ParticipantBasicInfo,
@@ -255,7 +254,6 @@ impl<Kind> Room<Kind> {
                     id: message_id.clone(),
                     remote_id: Some(message_id.to_string().into()),
                     server_id: None,
-                    target: None,
                     to: None,
                     from: self.ctx.connected_id()?.into_user_id().into(),
                     timestamp: self.time_provider.now(),
@@ -313,6 +311,7 @@ impl<Kind> Room<Kind> {
 
             (
                 MessageLikePayload::Correction {
+                    target_id: target_id.clone().into(),
                     body: MessageLikeBody {
                         raw: body.text.to_string(),
                         html,
@@ -326,6 +325,7 @@ impl<Kind> Room<Kind> {
         } else {
             (
                 MessageLikePayload::Correction {
+                    target_id: target_id.clone().into(),
                     body: MessageLikeBody::default(),
                     attachments: request.attachments.clone(),
                     encryption_info: None,
@@ -348,7 +348,6 @@ impl<Kind> Room<Kind> {
                     id: message_id.clone(),
                     remote_id: Some(message_id.to_string().into()),
                     server_id: None,
-                    target: Some(target_id.clone().into()),
                     to: None,
                     from: self.ctx.connected_id()?.into_user_id().into(),
                     timestamp: self.time_provider.now(),
@@ -913,7 +912,6 @@ impl<Kind> Room<Kind> {
                     id: id.clone(),
                     remote_id: Some(id.to_string().into()),
                     server_id: None,
-                    target: None,
                     to: None,
                     from: ParticipantId::User("prose-bot@prose.org".parse()?),
                     timestamp: self.time_provider.now(),

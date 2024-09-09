@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use prose_utils::id_string;
 
@@ -100,8 +100,7 @@ impl Message {
         messages: impl IntoIterator<Item = MessageLike>,
     ) -> Vec<Message> {
         let mut messages_map = IndexMap::new();
-        let mut remote_id_to_id_map = HashMap::new();
-        let mut server_id_to_id_map = HashMap::new();
+        let mut target_id_to_message_id_map = HashMap::new();
         let mut modifiers: Vec<MessageLike> = vec![];
 
         for msg in messages.into_iter() {
@@ -150,47 +149,40 @@ impl Message {
                     mentions: vec![],
                     reply_to: None,
                 },
-                _ => {
+                MessageLikePayload::Correction { .. }
+                | MessageLikePayload::DeliveryReceipt { .. }
+                | MessageLikePayload::ReadReceipt { .. }
+                | MessageLikePayload::Reaction { .. }
+                | MessageLikePayload::Retraction { .. } => {
                     modifiers.push(msg);
                     continue;
                 }
             };
 
             if let Some(remote_id) = message.remote_id.clone() {
-                remote_id_to_id_map.insert(remote_id, message.id.clone());
+                target_id_to_message_id_map
+                    .insert(MessageTargetId::RemoteId(remote_id), message.id.clone());
             }
 
-            if let Some(stanza_id) = message.server_id.clone() {
-                server_id_to_id_map.insert(stanza_id, message.id.clone());
+            if let Some(server_id) = message.server_id.clone() {
+                target_id_to_message_id_map
+                    .insert(MessageTargetId::ServerId(server_id), message.id.clone());
             }
 
             messages_map.insert(message.id.clone(), Some(message));
         }
 
         for modifier in modifiers.into_iter() {
-            let Some(target_id) = modifier.target else {
-                error!("Missing target in modifier {:?}", modifier);
+            let Some(target_id) = modifier.payload.target_id() else {
+                unreachable!("Message which is not a modifier was pushed in the initial loop.");
+            };
+
+            let Some(message_id) = target_id_to_message_id_map.get(target_id) else {
+                info!("Could not resolve {target_id:?} to a MessageId");
                 continue;
             };
 
-            let message_id = match target_id {
-                MessageTargetId::RemoteId(remote_id) => {
-                    let Some(id) = remote_id_to_id_map.get(&remote_id) else {
-                        info!("Could not resolve RemoteId '{remote_id}' to a MessageId");
-                        continue;
-                    };
-                    id.clone()
-                }
-                MessageTargetId::ServerId(stanza_id) => {
-                    let Some(id) = server_id_to_id_map.get(&stanza_id) else {
-                        info!("Could not resolve StanzaId '{stanza_id}' to a MessageId");
-                        continue;
-                    };
-                    id.clone()
-                }
-            };
-
-            let Some(Some(message)) = messages_map.get_mut(&message_id) else {
+            let Some(Some(message)) = messages_map.get_mut(message_id) else {
                 warn!("Ignoring message modifier targeting unknown message '{message_id}'.");
                 continue;
             };
@@ -200,6 +192,7 @@ impl Message {
                     body,
                     attachments,
                     encryption_info,
+                    ..
                 } => {
                     message.body = Body {
                         raw: body.raw,
@@ -210,12 +203,9 @@ impl Message {
                     message.attachments = attachments;
                     message.flags.is_encrypted = encryption_info.is_some()
                 }
-                MessageLikePayload::DeliveryReceipt => message.flags.is_delivered = true,
-                MessageLikePayload::ReadReceipt => message.flags.is_read = true,
-                MessageLikePayload::Message { .. } | MessageLikePayload::Error { .. } => {
-                    unreachable!("Unexpected MessageLikePayload")
-                }
-                MessageLikePayload::Reaction { mut emojis } => {
+                MessageLikePayload::DeliveryReceipt { .. } => message.flags.is_delivered = true,
+                MessageLikePayload::ReadReceipt { .. } => message.flags.is_read = true,
+                MessageLikePayload::Reaction { mut emojis, .. } => {
                     let modifier_from = ParticipantId::from(modifier.from);
 
                     // Iterate over all existing reactions
@@ -257,8 +247,11 @@ impl Message {
                         })
                     }
                 }
-                MessageLikePayload::Retraction => {
-                    messages_map.insert(message_id, None);
+                MessageLikePayload::Retraction { .. } => {
+                    messages_map.insert(message_id.clone(), None);
+                }
+                MessageLikePayload::Message { .. } | MessageLikePayload::Error { .. } => {
+                    unreachable!("Unexpected MessageLikePayload")
                 }
             }
         }
@@ -288,7 +281,6 @@ mod tests {
                 id: "id1".into(),
                 remote_id: Some("mid1".into()),
                 server_id: Some("sid1".into()),
-                target: None,
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 00).unwrap(),
@@ -298,7 +290,6 @@ mod tests {
                 id: "id2".into(),
                 remote_id: Some("mid1".into()),
                 server_id: Some("sid1".into()),
-                target: None,
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc.with_ymd_and_hms(2023, 04, 07, 16, 00, 01).unwrap(),
@@ -462,7 +453,6 @@ mod tests {
                 id: "id1".into(),
                 remote_id: Some("1".into()),
                 server_id: Some("stanza-id-1".into()),
-                target: None,
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -485,7 +475,6 @@ mod tests {
                 id: "id2".into(),
                 remote_id: Some("2".into()),
                 server_id: None,
-                target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -493,6 +482,7 @@ mod tests {
                     .unwrap()
                     .into(),
                 payload: MessageLikePayload::Reaction {
+                    target_id: MessageTargetId::RemoteId("1".into()),
                     emojis: vec!["👍".into()],
                 },
             },
@@ -500,7 +490,6 @@ mod tests {
                 id: "id3".into(),
                 remote_id: Some("3".into()),
                 server_id: None,
-                target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("c@prose.org").into(),
                 timestamp: Utc
@@ -508,6 +497,7 @@ mod tests {
                     .unwrap()
                     .into(),
                 payload: MessageLikePayload::Reaction {
+                    target_id: MessageTargetId::RemoteId("1".into()),
                     emojis: vec!["👍".into()],
                 },
             },
@@ -515,7 +505,6 @@ mod tests {
                 id: "id4".into(),
                 remote_id: Some("4".into()),
                 server_id: None,
-                target: Some(MessageTargetId::RemoteId("1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -523,6 +512,7 @@ mod tests {
                     .unwrap()
                     .into(),
                 payload: MessageLikePayload::Reaction {
+                    target_id: MessageTargetId::RemoteId("1".into()),
                     emojis: vec!["👍".into(), "📼".into(), "🍿".into(), "☕️".into()],
                 },
             },
@@ -530,7 +520,6 @@ mod tests {
                 id: "id5".into(),
                 remote_id: Some("5".into()),
                 server_id: None,
-                target: Some(MessageTargetId::ServerId("stanza-id-1".into())),
                 to: Some(bare!("a@prose.org")),
                 from: user_id!("b@prose.org").into(),
                 timestamp: Utc
@@ -538,6 +527,7 @@ mod tests {
                     .unwrap()
                     .into(),
                 payload: MessageLikePayload::Reaction {
+                    target_id: MessageTargetId::ServerId("stanza-id-1".into()),
                     emojis: vec!["📼".into(), "🍿".into()],
                 },
             },

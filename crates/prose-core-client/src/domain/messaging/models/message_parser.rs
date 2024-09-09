@@ -102,7 +102,7 @@ impl MessageParser {
             .as_ref()
             .map(|room| room.room_id.clone())
             .unwrap_or_else(|| participant_id.to_room_id());
-        let TargetedPayload { target, payload } = self
+        let payload = self
             .parse_message_payload(user_id.as_ref(), &room_id, &message)
             .await?;
         let timestamp = message
@@ -117,7 +117,6 @@ impl MessageParser {
             id: self.message_id,
             remote_id: message.id.map(MessageRemoteId::from),
             server_id: stanza_id,
-            target,
             to,
             from: user_id.map(ParticipantId::User).unwrap_or(participant_id),
             timestamp,
@@ -170,11 +169,6 @@ impl MessageParser {
     }
 }
 
-struct TargetedPayload {
-    target: Option<MessageTargetId>,
-    payload: Payload,
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum MessageLikeError {
     #[error("No payload in message")]
@@ -187,59 +181,51 @@ impl MessageParser {
         sender_id: Option<&UserId>,
         room_id: &RoomId,
         message: &Message,
-    ) -> Result<TargetedPayload> {
+    ) -> Result<Payload> {
         if let Some(error) = &message.error() {
-            return Ok(TargetedPayload {
-                target: None,
-                payload: Payload::Error {
-                    message: error.to_string(),
-                },
+            return Ok(Payload::Error {
+                message: error.to_string(),
             });
         }
 
         let is_groupchat_message = message.is_groupchat_message();
 
         if let Some(reactions) = message.reactions() {
-            return Ok(TargetedPayload {
-                target: Some(if is_groupchat_message {
+            return Ok(Payload::Reaction {
+                target_id: if is_groupchat_message {
                     MessageTargetId::ServerId(reactions.id.into())
                 } else {
                     MessageTargetId::RemoteId(reactions.id.into())
-                }),
-                payload: Payload::Reaction {
-                    emojis: reactions.reactions,
                 },
+                emojis: reactions.reactions,
             });
         };
 
         if let Some(fastening) = message.fastening() {
             if fastening.retract() {
-                return Ok(TargetedPayload {
-                    target: Some(MessageTargetId::RemoteId(fastening.id.as_ref().into())),
-                    payload: Payload::Retraction,
+                return Ok(Payload::Retraction {
+                    target_id: MessageTargetId::RemoteId(fastening.id.as_ref().into()),
                 });
             }
         }
 
         if let Some(marker) = message.received_marker() {
-            return Ok(TargetedPayload {
-                target: Some(if is_groupchat_message {
+            return Ok(Payload::DeliveryReceipt {
+                target_id: if is_groupchat_message {
                     MessageTargetId::ServerId(marker.id.as_ref().into())
                 } else {
                     MessageTargetId::RemoteId(marker.id.as_ref().into())
-                }),
-                payload: Payload::DeliveryReceipt,
+                },
             });
         }
 
         if let Some(marker) = message.displayed_marker() {
-            return Ok(TargetedPayload {
-                target: Some(if is_groupchat_message {
+            return Ok(Payload::ReadReceipt {
+                target_id: if is_groupchat_message {
                     MessageTargetId::ServerId(marker.id.as_ref().into())
                 } else {
                     MessageTargetId::RemoteId(marker.id.as_ref().into())
-                }),
-                payload: Payload::ReadReceipt,
+                },
             });
         }
 
@@ -303,23 +289,8 @@ impl MessageParser {
             };
 
             if let Some(replace_id) = message.replace() {
-                return Ok(TargetedPayload {
-                    target: Some(MessageTargetId::RemoteId(replace_id.as_ref().into())),
-                    payload: Payload::Correction {
-                        body: MessageLikeBody {
-                            raw,
-                            html,
-                            mentions,
-                        },
-                        attachments: message.attachments(),
-                        encryption_info,
-                    },
-                });
-            }
-
-            return Ok(TargetedPayload {
-                target: None,
-                payload: Payload::Message {
+                return Ok(Payload::Correction {
+                    target_id: MessageTargetId::RemoteId(replace_id.as_ref().into()),
                     body: MessageLikeBody {
                         raw,
                         html,
@@ -327,11 +298,21 @@ impl MessageParser {
                     },
                     attachments: message.attachments(),
                     encryption_info,
-                    // A message that we consider a groupchat message but is of type 'chat' is
-                    // usually a private message. We'll treat them as transient messages.
-                    is_transient: is_groupchat_message && message.type_ == MessageType::Chat,
-                    reply_to,
+                });
+            }
+
+            return Ok(Payload::Message {
+                body: MessageLikeBody {
+                    raw,
+                    html,
+                    mentions,
                 },
+                attachments: message.attachments(),
+                encryption_info,
+                // A message that we consider a groupchat message but is of type 'chat' is
+                // usually a private message. We'll treat them as transient messages.
+                is_transient: is_groupchat_message && message.type_ == MessageType::Chat,
+                reply_to,
             });
         }
 

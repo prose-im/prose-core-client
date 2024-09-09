@@ -103,10 +103,8 @@ async fn test_loads_groupchat_message_with_reactions() -> Result<()> {
         .build_message_like();
 
     // Reactions in MUC rooms target other messages by their StanzaId.
-    message2.target = Some(MessageTargetId::ServerId(
-        MessageBuilder::stanza_id_for_index(1),
-    ));
     message2.payload = MessageLikePayload::Reaction {
+        target_id: MessageBuilder::stanza_id_for_index(1).into(),
         emojis: vec!["🍿".into(), "📼".into()],
     };
 
@@ -140,8 +138,9 @@ async fn test_load_messages_targeting() -> Result<()> {
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
     let message2 = MessageBuilder::new_with_index(2).build_message_like();
     let message3 = MessageBuilder::new_with_index(3)
-        .set_target_message_idx(1)
-        .set_payload(MessageLikePayload::Retraction {})
+        .set_payload(MessageLikePayload::Retraction {
+            target_id: MessageBuilder::remote_id_for_index(1).into(),
+        })
         .build_message_like();
     let message4 = MessageBuilder::new_with_index(4)
         .set_from(user_id!("b@prose.org"))
@@ -151,8 +150,9 @@ async fn test_load_messages_targeting() -> Result<()> {
         .set_from(user_id!("c@prose.org"))
         .build_reaction_to(2, &["🍕".into()]);
     let message7 = MessageBuilder::new_with_index(7)
-        .set_target_message_idx(5)
-        .set_payload(MessageLikePayload::ReadReceipt)
+        .set_payload(MessageLikePayload::ReadReceipt {
+            target_id: MessageBuilder::remote_id_for_index(5).into(),
+        })
         .build_message_like();
 
     let messages = vec![
@@ -193,8 +193,9 @@ async fn test_load_only_messages_targeting() -> Result<()> {
     let message2 = MessageBuilder::new_with_index(2).build_message_like();
 
     let message3 = MessageBuilder::new_with_index(3)
-        .set_target_message_idx(1)
-        .set_payload(MessageLikePayload::Retraction {})
+        .set_payload(MessageLikePayload::Retraction {
+            target_id: MessageBuilder::remote_id_for_index(1).into(),
+        })
         .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 01, 0, 0, 0).unwrap())
         .build_message_like();
     let message4 = MessageBuilder::new_with_index(4)
@@ -209,16 +210,15 @@ async fn test_load_only_messages_targeting() -> Result<()> {
         .set_from(user_id!("c@prose.org"))
         .set_timestamp(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap())
         .build_message_like();
-    message6.target = Some(MessageTargetId::ServerId(
-        MessageBuilder::stanza_id_for_index(2),
-    ));
     message6.payload = MessageLikePayload::Reaction {
+        target_id: MessageBuilder::stanza_id_for_index(2).into(),
         emojis: vec!["🍕".into()],
     };
 
     let message7 = MessageBuilder::new_with_index(7)
-        .set_target_message_idx(5)
-        .set_payload(MessageLikePayload::ReadReceipt)
+        .set_payload(MessageLikePayload::ReadReceipt {
+            target_id: MessageBuilder::remote_id_for_index(5).into(),
+        })
         .build_message_like();
 
     repo.append(
@@ -262,18 +262,21 @@ async fn test_load_only_messages_targeting_sort_order() -> Result<()> {
     let room_id = RoomId::from(user_id!("a@prose.org"));
 
     let message1 = MessageBuilder::new_with_index(1)
-        .set_target_message_idx(100)
-        .set_payload(MessageLikePayload::Retraction {})
+        .set_payload(MessageLikePayload::Retraction {
+            target_id: MessageBuilder::remote_id_for_index(100).into(),
+        })
         .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 02, 0, 0, 0).unwrap())
         .build_message_like();
     let message2 = MessageBuilder::new_with_index(2)
-        .set_target_message_idx(100)
-        .set_payload(MessageLikePayload::Retraction {})
+        .set_payload(MessageLikePayload::Retraction {
+            target_id: MessageBuilder::remote_id_for_index(100).into(),
+        })
         .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 03, 0, 0, 0).unwrap())
         .build_message_like();
     let message3 = MessageBuilder::new_with_index(3)
-        .set_target_message_idx(100)
-        .set_payload(MessageLikePayload::Retraction {})
+        .set_payload(MessageLikePayload::Retraction {
+            target_id: MessageBuilder::remote_id_for_index(100).into(),
+        })
         .set_timestamp(Utc.with_ymd_and_hms(2024, 01, 01, 0, 0, 0).unwrap())
         .build_message_like();
 

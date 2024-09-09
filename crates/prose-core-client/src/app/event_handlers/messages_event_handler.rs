@@ -354,15 +354,15 @@ impl MessagesEventHandler {
             .await?;
         let [message] = messages;
 
-        let event_type = if let Some(target) = message.target {
+        let event_type = if let Some(target_id) = message.payload.target_id() {
             let Some(message_id) = self
-                .resolve_message_target_id(account, &room.room_id, target)
+                .resolve_message_target_id(account, &room.room_id, target_id.clone())
                 .await
             else {
                 return Ok(());
             };
 
-            if message.payload == MessageLikePayload::Retraction {
+            if matches!(message.payload, MessageLikePayload::Retraction { .. }) {
                 ClientRoomEventType::MessagesDeleted {
                     message_ids: vec![message_id],
                 }

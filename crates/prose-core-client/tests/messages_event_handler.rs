@@ -245,7 +245,6 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         id: "msg-id-1".into(),
         remote_id: Some("message-id".into()),
         server_id: Some("stanza-id".into()),
-        target: None,
         to: Some(bare!("room@conference.prose.org")),
         from: ParticipantId::User(user_id!("from@prose.org")), // Resource should be dropped
         timestamp: Utc.with_ymd_and_hms(2023, 09, 11, 0, 0, 0).unwrap(),
@@ -362,7 +361,6 @@ async fn test_parses_private_message_in_muc_room() -> Result<()> {
         id: "msg-id-1".into(),
         remote_id: Some("message-id".into()),
         server_id: Some("stanza-id".into()),
-        target: None,
         to: Some(bare!("user@prose.org")),
         from: ParticipantId::Occupant(occupant_id!("room@conference.prose.org/other-user")),
         timestamp: Utc.with_ymd_and_hms(2023, 09, 11, 0, 0, 0).unwrap(),

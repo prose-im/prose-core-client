@@ -34,7 +34,6 @@ pub struct MessageBuilder {
     from_anon: Option<AnonOccupantId>,
     from_name: Option<String>,
     to: BareJid,
-    target_message_id: Option<MessageRemoteId>,
     payload: MessageLikePayload,
     timestamp: DateTime<Utc>,
     is_read: bool,
@@ -123,7 +122,6 @@ impl MessageBuilder {
             from_anon: None,
             from_name: None,
             to: BareJid::theirs(),
-            target_message_id: None,
             payload,
             timestamp,
             is_read: false,
@@ -170,11 +168,6 @@ impl MessageBuilder {
 
     pub fn set_payload(mut self, payload: impl Into<MessageLikePayload>) -> Self {
         self.payload = payload.into();
-        self
-    }
-
-    pub fn set_target_message_idx(mut self, idx: u32) -> Self {
-        self.target_message_id = Some(Self::remote_id_for_index(idx));
         self
     }
 
@@ -271,7 +264,6 @@ impl MessageBuilder {
             id: self.id,
             remote_id: self.remote_id,
             server_id: self.stanza_id,
-            target: self.target_message_id.map(Into::into),
             to: Some(self.to),
             from: self.from,
             timestamp: self.timestamp,
@@ -280,11 +272,11 @@ impl MessageBuilder {
     }
 
     pub fn build_reaction_to(self, target: u32, emoji: &[message::Emoji]) -> MessageLike {
-        self.set_target_message_idx(target)
-            .set_payload(MessageLikePayload::Reaction {
-                emojis: emoji.iter().cloned().collect(),
-            })
-            .build_message_like()
+        self.set_payload(MessageLikePayload::Reaction {
+            target_id: Self::remote_id_for_index(target).into(),
+            emojis: emoji.iter().cloned().collect(),
+        })
+        .build_message_like()
     }
 
     pub fn build_mam_message(
@@ -355,20 +347,16 @@ impl MessageBuilder {
                 message = message.set_body(format!("Error: {error}"))
             }
             MessageLikePayload::Message { body, .. } => message = message.set_body(body.raw),
-            MessageLikePayload::Reaction { emojis } => {
+            MessageLikePayload::Reaction { target_id, emojis } => {
                 message = message.set_message_reactions(Reactions {
-                    id: self
-                        .target_message_id
-                        .expect("Missing target_message_idx")
-                        .as_ref()
-                        .into(),
+                    id: target_id.into_string(),
                     reactions: emojis.into_iter().map(Into::into).collect(),
                 })
             }
-            MessageLikePayload::Retraction
+            MessageLikePayload::Retraction { .. }
             | MessageLikePayload::Correction { .. }
-            | MessageLikePayload::DeliveryReceipt
-            | MessageLikePayload::ReadReceipt => {
+            | MessageLikePayload::DeliveryReceipt { .. }
+            | MessageLikePayload::ReadReceipt { .. } => {
                 panic!("Cannot build ArchivedMessage from {:?}", self.payload)
             }
         }

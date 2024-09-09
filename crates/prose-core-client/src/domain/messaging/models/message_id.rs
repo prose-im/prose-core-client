@@ -22,7 +22,7 @@ id_string!(
     MessageId
 );
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash, Eq)]
 #[serde(tag = "type", content = "id")]
 pub enum MessageTargetId {
     RemoteId(MessageRemoteId),
@@ -38,5 +38,14 @@ impl From<MessageRemoteId> for MessageTargetId {
 impl From<MessageServerId> for MessageTargetId {
     fn from(value: MessageServerId) -> Self {
         Self::ServerId(value)
+    }
+}
+
+impl MessageTargetId {
+    pub fn into_string(self) -> String {
+        match self {
+            MessageTargetId::RemoteId(id) => id.to_string(),
+            MessageTargetId::ServerId(id) => id.to_string(),
+        }
     }
 }

@@ -75,7 +75,7 @@ impl KeyType for MessageServerId {
 
 impl MessageRecord {
     pub fn from_message(account: AccountId, room_id: RoomId, value: MessageLike) -> Self {
-        let (stanza_id_target, message_id_target) = match value.target {
+        let (stanza_id_target, message_id_target) = match value.payload.target_id() {
             Some(MessageTargetId::RemoteId(id)) => (None, Some(id)),
             Some(MessageTargetId::ServerId(id)) => (Some(id), None),
             None => (None, None),
@@ -89,9 +89,9 @@ impl MessageRecord {
             id,
             message_id: value.id,
             remote_id: value.remote_id,
-            remote_id_target: message_id_target,
+            remote_id_target: message_id_target.cloned(),
             server_id: value.server_id,
-            server_id_target: stanza_id_target,
+            server_id_target: stanza_id_target.cloned(),
             to: value.to,
             from: value.from,
             timestamp: value.timestamp,
@@ -102,17 +102,10 @@ impl MessageRecord {
 
 impl From<MessageRecord> for MessageLike {
     fn from(value: MessageRecord) -> Self {
-        let target = match (value.server_id_target, value.remote_id_target) {
-            (Some(id), _) => Some(MessageTargetId::ServerId(id)),
-            (_, Some(id)) => Some(MessageTargetId::RemoteId(id)),
-            (None, None) => None,
-        };
-
         Self {
             id: value.message_id,
             remote_id: value.remote_id,
             server_id: value.server_id,
-            target,
             to: value.to,
             from: value.from,
             timestamp: value.timestamp,

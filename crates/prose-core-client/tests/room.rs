@@ -10,7 +10,7 @@ use pretty_assertions::assert_eq;
 use std::iter;
 use std::sync::Arc;
 
-use prose_core_client::domain::messaging::models::{MessageLikePayload, MessageTargetId, Reaction};
+use prose_core_client::domain::messaging::models::{MessageLikePayload, Reaction};
 use prose_core_client::domain::messaging::services::{MessagePage, WrappingMessageIdProvider};
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
@@ -248,15 +248,15 @@ async fn test_toggle_reaction_in_direct_message() -> Result<()> {
                     MessageBuilder::new_with_index(1).build_message_like(),
                     MessageBuilder::new_with_index(2)
                         .set_from(mock_data::account_jid().into_user_id())
-                        .set_target_message_idx(1)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(1).into(),
                             emojis: vec!["🍻".into()],
                         })
                         .build_message_like(),
                     MessageBuilder::new_with_index(3)
                         .set_from(mock_data::account_jid().into_user_id())
-                        .set_target_message_idx(1)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(1).into(),
                             emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
                         })
                         .build_message_like(),
@@ -292,27 +292,21 @@ async fn test_toggle_reaction_in_muc_room() -> Result<()> {
 
     let message1 = MessageBuilder::new_with_index(1).build_message_like();
 
-    let mut message2 = MessageBuilder::new_with_index(2)
+    let message2 = MessageBuilder::new_with_index(2)
         .set_from(mock_data::account_jid().into_user_id())
-        .set_target_message_idx(1)
         .set_payload(MessageLikePayload::Reaction {
+            target_id: MessageBuilder::stanza_id_for_index(1).into(),
             emojis: vec!["🍻".into()],
         })
         .build_message_like();
-    message2.target = Some(MessageTargetId::ServerId(
-        MessageBuilder::stanza_id_for_index(1),
-    ));
 
-    let mut message3 = MessageBuilder::new_with_index(3)
+    let message3 = MessageBuilder::new_with_index(3)
         .set_from(mock_data::account_jid().into_user_id())
-        .set_target_message_idx(1)
         .set_payload(MessageLikePayload::Reaction {
+            target_id: MessageBuilder::stanza_id_for_index(1).into(),
             emojis: vec!["🍻".into(), "🍕".into(), "✅".into()],
         })
         .build_message_like();
-    message3.target = Some(MessageTargetId::ServerId(
-        MessageBuilder::stanza_id_for_index(1),
-    ));
 
     deps.message_repo
         .expect_get()
@@ -384,8 +378,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                     messages: vec![
                         MessageBuilder::new_with_index(100)
                             .set_from(user_id!("b@prose.org"))
-                            .set_target_message_idx(90)
                             .set_payload(MessageLikePayload::Reaction {
+                                target_id: MessageBuilder::remote_id_for_index(90).into(),
                                 emojis: vec!["✅".into()],
                             })
                             .build_archived_message("q1", None),
@@ -399,15 +393,15 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(103)
                             .set_from(user_id!("a@prose.org"))
-                            .set_target_message_idx(101)
                             .set_payload(MessageLikePayload::Reaction {
+                                target_id: MessageBuilder::remote_id_for_index(101).into(),
                                 emojis: vec!["🍕".into()],
                             })
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(104)
                             .set_from(user_id!("a@prose.org"))
-                            .set_target_message_idx(102)
                             .set_payload(MessageLikePayload::Reaction {
+                                target_id: MessageBuilder::remote_id_for_index(102).into(),
                                 emojis: vec!["🎉".into()],
                             })
                             .build_archived_message("q1", None),
@@ -433,8 +427,8 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
                             .build_archived_message("q2", None),
                         MessageBuilder::new_with_index(91)
                             .set_from(user_id!("a@prose.org"))
-                            .set_target_message_idx(90)
                             .set_payload(MessageLikePayload::Reaction {
+                                target_id: MessageBuilder::remote_id_for_index(90).into(),
                                 emojis: vec!["✅".into()],
                             })
                             .build_archived_message("q2", None),
@@ -558,8 +552,10 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                         .into_iter()
                         .map(|idx| {
                             MessageBuilder::new_with_index(idx)
-                                .set_target_message_idx(1001)
-                                .set_payload(MessageLikePayload::Reaction { emojis: vec![] })
+                                .set_payload(MessageLikePayload::Reaction {
+                                    target_id: MessageBuilder::remote_id_for_index(1001).into(),
+                                    emojis: vec![],
+                                })
                                 .build_archived_message("q1", None)
                         })
                         .chain(iter::once(
@@ -587,8 +583,10 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
                         .into_iter()
                         .map(|idx| {
                             MessageBuilder::new_with_index(idx)
-                                .set_target_message_idx(1001)
-                                .set_payload(MessageLikePayload::Reaction { emojis: vec![] })
+                                .set_payload(MessageLikePayload::Reaction {
+                                    target_id: MessageBuilder::remote_id_for_index(1001).into(),
+                                    emojis: vec![],
+                                })
                                 .build_archived_message("q1", None)
                         })
                         .collect(),
@@ -722,9 +720,9 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                             .set_from(user_id!("user@prose.org"))
                             .build_archived_message("q1", None),
                         MessageBuilder::new_with_index(3)
-                            .set_target_message_idx(2)
                             .set_from(user_id!("a@prose.org"))
                             .set_payload(MessageLikePayload::Reaction {
+                                target_id: MessageBuilder::remote_id_for_index(2).into(),
                                 emojis: vec!["🍕".into()],
                             })
                             .build_archived_message("q1", None),
@@ -764,15 +762,15 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                 Ok(vec![
                     MessageBuilder::new_with_index(6)
                         .set_from(user_id!("b@prose.org"))
-                        .set_target_message_idx(1)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(1).into(),
                             emojis: vec!["🧩".into()],
                         })
                         .build_message_like(),
                     MessageBuilder::new_with_index(7)
                         .set_from(user_id!("a@prose.org"))
-                        .set_target_message_idx(4)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(4).into(),
                             emojis: vec!["🍻".into()],
                         })
                         .build_message_like(),
@@ -780,23 +778,23 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
                     // returns newer messages.
                     MessageBuilder::new_with_index(8)
                         .set_from(user_id!("a@prose.org"))
-                        .set_target_message_idx(2)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(2).into(),
                             emojis: vec!["🍔".into()],
                         })
                         .build_message_like(),
                     MessageBuilder::new_with_index(9)
                         .set_from(user_id!("a@prose.org"))
-                        .set_target_message_idx(1)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(1).into(),
                             emojis: vec!["❌".into()],
                         })
                         .build_message_like(),
                     // This should win over message 9 since it is newer
                     MessageBuilder::new_with_index(10)
                         .set_from(user_id!("a@prose.org"))
-                        .set_target_message_idx(1)
                         .set_payload(MessageLikePayload::Reaction {
+                            target_id: MessageBuilder::remote_id_for_index(1).into(),
                             emojis: vec!["✅".into()],
                         })
                         .build_message_like(),
