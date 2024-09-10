@@ -36,10 +36,9 @@ use crate::domain::shared::models::{
 };
 use crate::domain::shared::utils::ContactNameBuilder;
 use crate::dtos::{
-    Attachment, Markdown, Mention, Message as MessageDTO, MessageFlags as MessageFlagsDTO,
-    MessageResultSet, MessageSender, MessageServerId, ParticipantBasicInfo,
-    Reaction as ReactionDTO, ReplyTo as ReplyToDTO, RoomState,
-    SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
+    Mention, Message as MessageDTO, MessageFlags as MessageFlagsDTO, MessageResultSet,
+    MessageSender, MessageServerId, ParticipantBasicInfo, Reaction as ReactionDTO,
+    ReplyTo as ReplyToDTO, RoomState, SendMessageRequest as SendMessageRequestDTO, UserId, HTML,
 };
 use crate::infra::xmpp::util::MessageExt;
 use crate::{ClientEvent, ClientRoomEventType};
@@ -186,6 +185,7 @@ impl<Kind> Room<Kind> {
             return Ok(());
         }
 
+        // Handle (temporary) slash commands…
         match request.body.as_ref().map(|body| body.text.as_ref()) {
             Some("/omemo enable") => {
                 self.set_encryption_enabled(true).await;
@@ -200,80 +200,12 @@ impl<Kind> Room<Kind> {
             _ => (),
         }
 
-        let (payload, body) = if let Some(body) = request.body {
-            let parser = MarkdownParser::new(body.text.as_ref());
-            let html = HTML::new(parser.convert_to_html());
-            let fallback = StyledMessage::new(parser.convert_to_message_styling());
-            let mentions = parser
-                .collect_mentions()
-                .into_iter()
-                .map(|jid| Mention {
-                    user: jid.into(),
-                    range: None,
-                })
-                .collect::<Vec<_>>();
-
-            (
-                MessageLikePayload::Message {
-                    body: MessageLikeBody {
-                        raw: body.text.to_string(),
-                        html,
-                        mentions: mentions.clone(),
-                    },
-                    attachments: request.attachments.clone(),
-                    encryption_info: None,
-                    is_transient: false,
-                    reply_to: None,
-                },
-                Some((body.text, fallback, mentions)),
-            )
-        } else {
-            (
-                MessageLikePayload::Message {
-                    body: MessageLikeBody::default(),
-                    attachments: request.attachments.clone(),
-                    encryption_info: None,
-                    is_transient: false,
-                    reply_to: None,
-                },
-                None,
-            )
-        };
-
-        let request = self
-            .encrypt_message_if_needed(body, request.attachments)
-            .await?;
-        let message_id = request.id.clone();
-
-        // Save the unencrypted message so that we can look it up later…
-        self.message_repo
-            .append(
-                &self.ctx.connected_account()?,
-                &self.data.room_id,
-                &[MessageLike {
-                    id: message_id.clone(),
-                    remote_id: Some(message_id.to_string().into()),
-                    server_id: None,
-                    to: None,
-                    from: self.ctx.connected_id()?.into_user_id().into(),
-                    timestamp: self.time_provider.now(),
-                    payload,
-                }],
-            )
-            .await?;
-
-        self.messaging_service
-            .send_message(&self.data.room_id, request)
-            .await?;
-
-        self.client_event_dispatcher.dispatch_room_event(
-            self.data.clone(),
-            ClientRoomEventType::MessagesAppended {
-                message_ids: vec![message_id],
-            },
-        );
-
-        Ok(())
+        self.process_send_message_request(
+            &self.ctx.connected_account()?,
+            request,
+            ProcessMessageAction::Send,
+        )
+        .await
     }
 
     pub async fn update_message(
@@ -288,6 +220,7 @@ impl<Kind> Room<Kind> {
 
         let account = self.ctx.connected_account()?;
 
+        // Resolve the external ID of the message…
         let Some(target_id) = self
             .message_repo
             .resolve_message_id_to_remote_id(&account, &self.data.room_id, &id)
@@ -296,78 +229,15 @@ impl<Kind> Room<Kind> {
             bail!("Failed to resolve message id '{id}' to a server id")
         };
 
-        let (payload, body) = if let Some(body) = request.body {
-            let parser = MarkdownParser::new(body.text.as_ref());
-            let html = HTML::new(parser.convert_to_html());
-            let fallback = StyledMessage::new(parser.convert_to_message_styling());
-            let mentions = parser
-                .collect_mentions()
-                .into_iter()
-                .map(|jid| Mention {
-                    user: jid.into(),
-                    range: None,
-                })
-                .collect::<Vec<_>>();
-
-            (
-                MessageLikePayload::Correction {
-                    target_id: target_id.clone().into(),
-                    body: MessageLikeBody {
-                        raw: body.text.to_string(),
-                        html,
-                        mentions: mentions.clone(),
-                    },
-                    attachments: request.attachments.clone(),
-                    encryption_info: None,
-                },
-                Some((body.text, fallback, mentions)),
-            )
-        } else {
-            (
-                MessageLikePayload::Correction {
-                    target_id: target_id.clone().into(),
-                    body: MessageLikeBody::default(),
-                    attachments: request.attachments.clone(),
-                    encryption_info: None,
-                },
-                None,
-            )
-        };
-
-        let request = self
-            .encrypt_message_if_needed(body, request.attachments)
-            .await?;
-        let message_id = request.id.clone();
-
-        // Save the unencrypted message so that we can look it up later…
-        self.message_repo
-            .append(
-                &account,
-                &self.data.room_id,
-                &[MessageLike {
-                    id: message_id.clone(),
-                    remote_id: Some(message_id.to_string().into()),
-                    server_id: None,
-                    to: None,
-                    from: self.ctx.connected_id()?.into_user_id().into(),
-                    timestamp: self.time_provider.now(),
-                    payload,
-                }],
-            )
-            .await?;
-
-        self.messaging_service
-            .update_message(&self.data.room_id, &target_id, request)
-            .await?;
-
-        self.client_event_dispatcher.dispatch_room_event(
-            self.data.clone(),
-            ClientRoomEventType::MessagesUpdated {
-                message_ids: vec![id],
+        self.process_send_message_request(
+            &account,
+            request,
+            ProcessMessageAction::Update {
+                target_message_id: id,
+                target_remote_id: target_id,
             },
-        );
-
-        Ok(())
+        )
+        .await
     }
 
     pub async fn toggle_reaction_to_message(&self, id: MessageId, emoji: Emoji) -> Result<()> {
@@ -554,7 +424,148 @@ impl<Kind> Room<Kind> {
     }
 }
 
+pub enum ProcessMessageAction {
+    Send,
+    Update {
+        target_message_id: MessageId,
+        target_remote_id: MessageRemoteId,
+    },
+}
+
 impl<Kind> Room<Kind> {
+    async fn process_send_message_request(
+        &self,
+        account: &AccountId,
+        request: SendMessageRequestDTO,
+        action: ProcessMessageAction,
+    ) -> Result<()> {
+        let mut message_body = MessageLikeBody::default();
+        let mut message_request = SendMessageRequest {
+            id: self.message_id_provider.new_id(),
+            body: None,
+            attachments: request.attachments.clone(),
+        };
+
+        // Process message body if there is one…
+        if let Some(body) = request.body {
+            // Parse markdown…
+            let parser = MarkdownParser::new(body.text.as_ref());
+            let html = HTML::new(parser.convert_to_html());
+            let fallback = StyledMessage::new(parser.convert_to_message_styling());
+            let mentions = parser
+                .collect_mentions()
+                .into_iter()
+                .map(|jid| Mention {
+                    user: jid.into(),
+                    range: None,
+                })
+                .collect::<Vec<_>>();
+
+            message_body = MessageLikeBody {
+                raw: body.text.to_string(),
+                html,
+                mentions: mentions.clone(),
+            };
+
+            // Encrypt message if needed…
+            let payload = match self.data.r#type {
+                RoomType::DirectMessage | RoomType::Group | RoomType::PrivateChannel
+                    if self.data.settings().encryption_enabled =>
+                {
+                    let user_ids = self.data.with_participants(|p| {
+                        p.iter()
+                            .filter_map(|(_, participant)| {
+                                if participant.is_self {
+                                    return None;
+                                }
+                                participant.real_id.clone()
+                            })
+                            .sorted()
+                            .collect::<Vec<_>>()
+                    });
+
+                    send_message_request::Payload::Encrypted(
+                        self.encryption_domain_service
+                            .encrypt_message(user_ids, fallback.into_string())
+                            .await?,
+                    )
+                }
+                _ => send_message_request::Payload::Unencrypted {
+                    message: body.text,
+                    fallback,
+                },
+            };
+
+            message_request.body = Some(send_message_request::Body { payload, mentions });
+        }
+
+        // Build appropriate payload…
+        let payload = match &action {
+            ProcessMessageAction::Send => MessageLikePayload::Message {
+                body: message_body,
+                attachments: request.attachments,
+                encryption_info: None,
+                is_transient: false,
+                reply_to: None,
+            },
+            ProcessMessageAction::Update {
+                target_remote_id, ..
+            } => MessageLikePayload::Correction {
+                target_id: target_remote_id.clone().into(),
+                body: message_body,
+                attachments: request.attachments,
+                encryption_info: None,
+            },
+        };
+
+        // Save the unencrypted message so that we can look it up later…
+        let message_id = message_request.id.clone();
+        self.message_repo
+            .append(
+                &account,
+                &self.data.room_id,
+                &[MessageLike {
+                    id: message_id.clone(),
+                    remote_id: Some(message_id.to_string().into()),
+                    server_id: None,
+                    to: None,
+                    from: account.to_user_id().into(),
+                    timestamp: self.time_provider.now(),
+                    payload,
+                }],
+            )
+            .await?;
+
+        // Pass message to MessagingService and build a ClientRoomEvent…
+        let event = match action {
+            ProcessMessageAction::Send => {
+                self.messaging_service
+                    .send_message(&self.data.room_id, message_request)
+                    .await?;
+                ClientRoomEventType::MessagesAppended {
+                    message_ids: vec![message_id],
+                }
+            }
+            ProcessMessageAction::Update {
+                target_message_id,
+                target_remote_id,
+            } => {
+                self.messaging_service
+                    .update_message(&self.data.room_id, &target_remote_id, message_request)
+                    .await?;
+                ClientRoomEventType::MessagesUpdated {
+                    message_ids: vec![target_message_id],
+                }
+            }
+        };
+
+        // Dispatch event to notify UI about changes…
+        self.client_event_dispatcher
+            .dispatch_room_event(self.data.clone(), event);
+
+        Ok(())
+    }
+
     async fn load_messages(&self, before: Option<&MessageServerId>) -> Result<MessageResultSet> {
         let account = self.ctx.connected_account()?;
         let message_page_size = self.ctx.config.message_page_size;
@@ -938,51 +949,6 @@ impl<Kind> Room<Kind> {
         );
 
         Ok(())
-    }
-
-    async fn encrypt_message_if_needed(
-        &self,
-        body: Option<(Markdown, StyledMessage, Vec<Mention>)>,
-        attachments: Vec<Attachment>,
-    ) -> Result<SendMessageRequest> {
-        let Some((message, fallback, mentions)) = body else {
-            return Ok(SendMessageRequest {
-                id: self.message_id_provider.new_id(),
-                body: None,
-                attachments,
-            });
-        };
-
-        let payload = match self.data.r#type {
-            RoomType::DirectMessage | RoomType::Group | RoomType::PrivateChannel
-                if self.data.settings().encryption_enabled =>
-            {
-                let user_ids = self.data.with_participants(|p| {
-                    p.iter()
-                        .filter_map(|(_, participant)| {
-                            if participant.is_self {
-                                return None;
-                            }
-                            participant.real_id.clone()
-                        })
-                        .sorted()
-                        .collect::<Vec<_>>()
-                });
-
-                send_message_request::Payload::Encrypted(
-                    self.encryption_domain_service
-                        .encrypt_message(user_ids, fallback.into_string())
-                        .await?,
-                )
-            }
-            _ => send_message_request::Payload::Unencrypted { message, fallback },
-        };
-
-        Ok(SendMessageRequest {
-            id: self.message_id_provider.new_id(),
-            body: Some(send_message_request::Body { payload, mentions }),
-            attachments,
-        })
     }
 
     async fn update_synced_settings(&self, handler: impl FnOnce(&mut SyncedRoomSettings)) {

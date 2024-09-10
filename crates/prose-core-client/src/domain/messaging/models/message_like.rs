@@ -11,10 +11,10 @@ use serde::{Deserialize, Serialize};
 
 use prose_xmpp::stanza::message;
 
+use crate::domain::encryption::models::DeviceId;
 use crate::domain::messaging::models::message_id::MessageId;
 use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId, ReplyTo};
 use crate::domain::shared::models::{ParticipantId, HTML};
-use crate::dtos::DeviceId;
 
 use super::{MessageRemoteId, MessageServerId};
 
