@@ -7,7 +7,7 @@ use jid::Jid;
 use minidom::Element;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::delay::Delay;
-use xmpp_parsers::message::{Body, MessagePayload, MessageType, Subject};
+use xmpp_parsers::message::{Body, MessagePayload, MessageType, Subject, Thread};
 use xmpp_parsers::message_correct::Replace;
 
 use crate::ns;
@@ -170,6 +170,11 @@ impl Message {
 
     pub fn set_reply(mut self, reply: Reply) -> Self {
         self.payloads.push(reply.into());
+        self
+    }
+
+    pub fn set_thread(mut self, thread: Thread) -> Self {
+        self.thread = Some(thread);
         self
     }
 }

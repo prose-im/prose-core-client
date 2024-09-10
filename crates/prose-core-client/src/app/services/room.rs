@@ -10,7 +10,7 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use anyhow::{anyhow, bail, format_err, Result};
+use anyhow::{anyhow, bail, ensure, format_err, Result};
 use chrono::Duration;
 use itertools::Itertools;
 use tracing::{debug, error, info, warn};
@@ -26,7 +26,7 @@ use crate::app::deps::{
 };
 use crate::domain::messaging::models::{
     send_message_request, ArchivedMessageRef, Emoji, Message, MessageId, MessageLike,
-    MessageLikeBody, MessageLikeError, MessageParser, MessageRemoteId, MessageTargetId,
+    MessageLikeBody, MessageLikeError, MessageParser, MessageRemoteId, MessageTargetId, ThreadId,
 };
 use crate::domain::messaging::models::{MessageLikePayload, SendMessageRequest};
 use crate::domain::rooms::models::{Room as DomainRoom, RoomAffiliation, RoomSpec};
@@ -180,10 +180,7 @@ impl<Kind> Room<Kind> {
 
 impl<Kind> Room<Kind> {
     pub async fn send_message(&self, request: SendMessageRequestDTO) -> Result<()> {
-        if request.is_empty() {
-            warn!("Ignoring empty SendMessageRequest");
-            return Ok(());
-        }
+        ensure!(!request.is_empty(), "SendMessageRequest is empty");
 
         // Handle (temporary) slash commands…
         match request.body.as_ref().map(|body| body.text.as_ref()) {
@@ -208,15 +205,45 @@ impl<Kind> Room<Kind> {
         .await
     }
 
+    pub async fn reply_to_message(
+        &self,
+        id: MessageId,
+        request: SendMessageRequestDTO,
+    ) -> Result<()> {
+        ensure!(!request.is_empty(), "SendMessageRequest is empty");
+
+        let account = self.ctx.connected_account()?;
+
+        let Some(message) = self
+            .message_repo
+            .get(&account, &self.data.room_id, &id)
+            .await?
+            .into_iter()
+            .next()
+        else {
+            bail!("Could not find message to reply to.")
+        };
+
+        let MessageLikePayload::Message { thread_id, .. } = message.payload else {
+            bail!("Message is not a regular message and cannot be replied to.")
+        };
+
+        let thread_id = thread_id.unwrap_or_else(|| ThreadId::from(message.id.into_inner()));
+
+        self.process_send_message_request(
+            &self.ctx.connected_account()?,
+            request,
+            ProcessMessageAction::ReplyInThread { thread_id },
+        )
+        .await
+    }
+
     pub async fn update_message(
         &self,
         id: MessageId,
         request: SendMessageRequestDTO,
     ) -> Result<()> {
-        if request.is_empty() {
-            warn!("Ignoring empty SendMessageRequest");
-            return Ok(());
-        }
+        ensure!(!request.is_empty(), "SendMessageRequest is empty");
 
         let account = self.ctx.connected_account()?;
 
@@ -426,6 +453,9 @@ impl<Kind> Room<Kind> {
 
 pub enum ProcessMessageAction {
     Send,
+    ReplyInThread {
+        thread_id: ThreadId,
+    },
     Update {
         target_message_id: MessageId,
         target_remote_id: MessageRemoteId,
@@ -507,6 +537,15 @@ impl<Kind> Room<Kind> {
                 encryption_info: None,
                 is_transient: false,
                 reply_to: None,
+                thread_id: None,
+            },
+            ProcessMessageAction::ReplyInThread { thread_id } => MessageLikePayload::Message {
+                body: message_body,
+                attachments: request.attachments,
+                encryption_info: None,
+                is_transient: false,
+                reply_to: None,
+                thread_id: Some(thread_id.clone()),
             },
             ProcessMessageAction::Update {
                 target_remote_id, ..
@@ -542,6 +581,15 @@ impl<Kind> Room<Kind> {
                 self.messaging_service
                     .send_message(&self.data.room_id, message_request)
                     .await?;
+                ClientRoomEventType::MessagesAppended {
+                    message_ids: vec![message_id],
+                }
+            }
+            ProcessMessageAction::ReplyInThread { thread_id } => {
+                self.messaging_service
+                    .send_message_to_thread(&self.data.room_id, &thread_id, message_request)
+                    .await?;
+                // TODO: Add parent message to this event?
                 ClientRoomEventType::MessagesAppended {
                     message_ids: vec![message_id],
                 }
@@ -936,6 +984,7 @@ impl<Kind> Room<Kind> {
                         encryption_info: None,
                         is_transient: true,
                         reply_to: None,
+                        thread_id: None,
                     },
                 }],
             )

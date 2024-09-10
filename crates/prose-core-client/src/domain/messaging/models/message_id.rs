@@ -22,6 +22,11 @@ id_string!(
     MessageId
 );
 
+id_string!(
+    /// An ID to identify a set of messages that are related to each other (a thread).
+    ThreadId
+);
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash, Eq)]
 #[serde(tag = "type", content = "id")]
 pub enum MessageTargetId {

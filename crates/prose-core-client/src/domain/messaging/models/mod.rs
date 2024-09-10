@@ -11,7 +11,7 @@ pub(crate) use error::StanzaParseError;
 pub use mention::Mention;
 #[allow(unused_imports)] // Reaction is required in unit tests
 pub use message::{Body, Emoji, Message, MessageFlags, Reaction, ReplyTo};
-pub use message_id::{MessageId, MessageRemoteId, MessageServerId, MessageTargetId};
+pub use message_id::{MessageId, MessageRemoteId, MessageServerId, MessageTargetId, ThreadId};
 pub use message_like::{
     Body as MessageLikeBody, EncryptionInfo as MessageLikeEncryptionInfo, MessageLike,
     Payload as MessageLikePayload,
