@@ -34,6 +34,7 @@ impl<'a> MakeWriter<'a> for MakeJSLogWriter {
         JSLogWriter {
             buffer: vec![],
             level: Level::TRACE,
+            panic: false,
             js_logger: self.js_logger.clone(),
         }
     }
@@ -42,6 +43,7 @@ impl<'a> MakeWriter<'a> for MakeJSLogWriter {
         JSLogWriter {
             buffer: vec![],
             level: *meta.level(),
+            panic: meta.fields().field("panic").is_some(),
             js_logger: self.js_logger.clone(),
         }
     }
@@ -50,6 +52,7 @@ impl<'a> MakeWriter<'a> for MakeJSLogWriter {
 pub struct JSLogWriter {
     buffer: Vec<u8>,
     level: Level,
+    panic: bool,
     js_logger: Rc<JSLogger>,
 }
 
@@ -72,6 +75,9 @@ impl Drop for JSLogWriter {
             _ if self.level == Level::DEBUG => self.js_logger.log_debug(message.as_ref()),
             _ if self.level == Level::INFO => self.js_logger.log_info(message.as_ref()),
             _ if self.level == Level::WARN => self.js_logger.log_warn(message.as_ref()),
+            _ if self.level == Level::ERROR && self.panic => {
+                self.js_logger.log_panic(message.as_ref())
+            }
             _ if self.level == Level::ERROR => self.js_logger.log_error(message.as_ref()),
             _ => self.js_logger.log_debug(message.as_ref()),
         }

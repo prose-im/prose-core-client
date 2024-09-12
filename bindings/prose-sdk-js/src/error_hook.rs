@@ -74,7 +74,7 @@
 
 use cfg_if::cfg_if;
 use std::panic;
-use tracing::error;
+use tracing::{error, event, Level};
 
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
@@ -120,7 +120,7 @@ cfg_if! {
             msg.push_str("\n\n");
 
             // Finally, log the panic with `console.error`!
-            error!("{}", msg);
+            event!(Level::ERROR, msg, panic = 1);
         }
     } else {
         use std::io::{self, Write};

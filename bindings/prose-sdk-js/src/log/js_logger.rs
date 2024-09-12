@@ -31,4 +31,7 @@ extern "C" {
 
     #[wasm_bindgen(method, js_name = "logError")]
     pub fn log_error(this: &JSLogger, msg: &str);
+
+    #[wasm_bindgen(method, js_name = "logPanic")]
+    pub fn log_panic(this: &JSLogger, msg: &str);
 }
