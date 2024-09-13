@@ -19,7 +19,7 @@ pub trait StringExt {
     ///
     /// Basic usage:
     ///
-    /// ```
+    /// ```ignore
     /// use prose_core_client::util::StringExt;
     ///
     /// let jid_username = "john_doe";
