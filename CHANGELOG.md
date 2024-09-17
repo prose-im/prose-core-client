@@ -1,3 +1,12 @@
+## What's Changed in 0.1.97
+
+* Parse message replies XEP-0461
+* Add method to send message to MUC that returns the echoed message
+* Log panics to a separate method in JSLogger
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.96...0.1.97)
+
+
 ## What's Changed in 0.1.96
 
 * Add avatar to MessageSender
