@@ -635,6 +635,12 @@ impl Client {
             .map_err(WasmError::from)?;
         Ok(slot.into())
     }
+
+    /// Converts a Markdown string to HTML for preview purposes.
+    #[wasm_bindgen(js_name = "previewMarkdown")]
+    pub fn preview_markdown(&self, markdown: &str) -> String {
+        self.client.preview.preview_markdown(markdown)
+    }
 }
 
 impl From<ProseClient> for Client {

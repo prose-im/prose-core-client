@@ -10,6 +10,7 @@ pub use connection_service::ConnectionService;
 pub use contact_list_service::ContactListService;
 #[cfg(feature = "debug")]
 pub use debug_service::DebugService;
+pub use preview_service::PreviewService;
 pub(crate) use room::RoomInner;
 pub use room::{DirectMessage, Generic, Group, PrivateChannel, PublicChannel, Room};
 pub use rooms_service::RoomsService;
@@ -24,6 +25,7 @@ mod connection_service;
 mod contact_list_service;
 #[cfg(feature = "debug")]
 mod debug_service;
+mod preview_service;
 pub(crate) mod room;
 mod rooms_service;
 mod sidebar_service;

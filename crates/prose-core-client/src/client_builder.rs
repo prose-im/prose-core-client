@@ -30,7 +30,9 @@ use crate::domain::user_info::repos::AvatarRepository;
 use crate::infra::general::{NanoIDProvider, OsRngProvider, RngProvider};
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
-use crate::services::{BlockListService, CacheService, SidebarService, UploadService};
+use crate::services::{
+    BlockListService, CacheService, PreviewService, SidebarService, UploadService,
+};
 use crate::{Client, ClientDelegate};
 
 pub struct UndefinedStore;
@@ -310,6 +312,7 @@ impl<A: AvatarRepository + 'static> ClientBuilder<Store<PlatformDriver>, A, DynE
             ctx: dependencies.ctx.clone(),
             #[cfg(feature = "debug")]
             debug: crate::services::DebugService::new(xmpp_client.as_ref().clone()),
+            preview: PreviewService::from(&dependencies),
             rooms: RoomsService::from(&dependencies),
             sidebar: SidebarService::from(&dependencies),
             uploads: UploadService::from(&dependencies),

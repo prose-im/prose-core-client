@@ -20,7 +20,7 @@ use crate::domain::shared::models::UserId;
 use crate::dtos::UserResourceId;
 use crate::services::{
     AccountService, BlockListService, CacheService, ConnectionService, ContactListService,
-    RoomsService, SidebarService, UploadService, UserDataService,
+    PreviewService, RoomsService, SidebarService, UploadService, UserDataService,
 };
 use crate::ClientEvent;
 
@@ -48,6 +48,7 @@ pub struct ClientInner {
     pub(crate) ctx: DynAppContext,
     #[cfg(feature = "debug")]
     pub debug: crate::services::DebugService,
+    pub preview: PreviewService,
     pub rooms: RoomsService,
     pub sidebar: SidebarService,
     pub uploads: UploadService,
