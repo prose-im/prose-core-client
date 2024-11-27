@@ -1,3 +1,10 @@
+## What's Changed in 0.1.98
+
+* Added method to preview Markdown
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.97...0.1.98)
+
+
 ## What's Changed in 0.1.97
 
 * Parse message replies XEP-0461
