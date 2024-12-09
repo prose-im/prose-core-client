@@ -1,3 +1,12 @@
+## What's Changed in 0.1.99
+
+* Let API clients only deal with MessageIds
+* Simplify resolving message IDs by returning an id triple
+* Remove unused dependencies
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.98...0.1.99)
+
+
 ## What's Changed in 0.1.98
 
 * Added method to preview Markdown
