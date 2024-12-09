@@ -106,8 +106,14 @@ pub struct IndexedDB {
 impl Database for IndexedDB {
     type Error = Error;
 
-    type ReadTransaction<'db> = IndexedDBTransaction<'db, ReadOnly> where Self: 'db;
-    type ReadWriteTransaction<'db> = IndexedDBTransaction<'db, ReadWrite> where Self: 'db;
+    type ReadTransaction<'db>
+        = IndexedDBTransaction<'db, ReadOnly>
+    where
+        Self: 'db;
+    type ReadWriteTransaction<'db>
+        = IndexedDBTransaction<'db, ReadWrite>
+    where
+        Self: 'db;
 
     async fn collection_names(&self) -> Result<Vec<String>, Self::Error> {
         Ok(self.db.object_store_names().collect())
@@ -134,7 +140,10 @@ pub struct IndexedDBUpgradeTransaction<'db> {
 
 impl<'db> UpgradeTransaction<'db> for IndexedDBUpgradeTransaction<'db> {
     type Error = Error;
-    type ReadWriteTransaction<'tx> = IndexedDBTransaction<'tx, ReadWrite> where Self: 'tx;
+    type ReadWriteTransaction<'tx>
+        = IndexedDBTransaction<'tx, ReadWrite>
+    where
+        Self: 'tx;
 
     fn collection_names(&self) -> Result<Vec<String>, Self::Error> {
         Ok(self.db.object_store_names().collect())
@@ -179,7 +188,10 @@ impl<'db, Mode> ReadTransaction<'db> for IndexedDBTransaction<'db, Mode>
 where
     Mode: ReadMode,
 {
-    type ReadableCollection<'tx> = IndexedDBCollection<'tx, IdbObjectStore<'tx>, ReadOnly> where Self: 'tx;
+    type ReadableCollection<'tx>
+        = IndexedDBCollection<'tx, IdbObjectStore<'tx>, ReadOnly>
+    where
+        Self: 'tx;
 
     fn readable_collection(&self, name: &str) -> Result<Self::ReadableCollection<'_>, Self::Error> {
         Ok(IndexedDBCollection::new(self.tx.object_store(name)?))
@@ -191,7 +203,10 @@ impl<'db, Mode> WriteTransaction<'db> for IndexedDBTransaction<'db, Mode>
 where
     Mode: WriteMode,
 {
-    type WritableCollection<'tx> = IndexedDBCollection<'tx, IdbObjectStore<'tx>, ReadWrite> where Self: 'tx;
+    type WritableCollection<'tx>
+        = IndexedDBCollection<'tx, IdbObjectStore<'tx>, ReadWrite>
+    where
+        Self: 'tx;
 
     fn writeable_collection(
         &self,
@@ -236,7 +251,10 @@ impl<'tx, Mode> IndexedCollection<'tx> for IndexedDBCollection<'tx, IdbObjectSto
 where
     Mode: ReadMode,
 {
-    type Index<'coll> = IndexedDBCollection<'coll, IdbIndex<'coll>, Mode> where Self: 'coll;
+    type Index<'coll>
+        = IndexedDBCollection<'coll, IdbIndex<'coll>, Mode>
+    where
+        Self: 'coll;
 
     fn index(&self, columns: &[&str]) -> Result<Self::Index<'_>, Self::Error> {
         let index_name = columns.join("_");

@@ -280,7 +280,8 @@ pub struct SqliteTransaction<'db, Mode> {
 
 impl<'db> UpgradeTransaction<'db> for SqliteTransaction<'db, Upgrade> {
     type Error = Error;
-    type ReadWriteTransaction<'tx> = SqliteTransaction<'tx, ReadWrite>
+    type ReadWriteTransaction<'tx>
+        = SqliteTransaction<'tx, ReadWrite>
     where
         Self: 'tx;
 
@@ -394,7 +395,8 @@ impl<'db, Mode: Send + Sync> ReadTransaction<'db> for SqliteTransaction<'db, Mod
 where
     Mode: ReadMode,
 {
-    type ReadableCollection<'tx> = SqliteCollection<'tx, ReadOnly>
+    type ReadableCollection<'tx>
+        = SqliteCollection<'tx, ReadOnly>
     where
         Self: 'tx;
 
@@ -417,7 +419,8 @@ impl<'db, Mode: Send + Sync> WriteTransaction<'db> for SqliteTransaction<'db, Mo
 where
     Mode: WriteMode + Sync,
 {
-    type WritableCollection<'tx> = SqliteCollection<'tx, ReadWrite>
+    type WritableCollection<'tx>
+        = SqliteCollection<'tx, ReadWrite>
     where
         Self: 'tx;
 
@@ -521,7 +524,8 @@ impl<'tx, Mode: Send> IndexedCollection<'tx> for SqliteCollection<'tx, Mode>
 where
     Mode: ReadMode + Sync,
 {
-    type Index<'coll> = SqliteCollection<'coll, Mode>
+    type Index<'coll>
+        = SqliteCollection<'coll, Mode>
     where
         Self: 'coll;
 
