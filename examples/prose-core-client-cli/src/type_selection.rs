@@ -199,7 +199,7 @@ pub fn select_file(prompt: &str) -> Option<PathBuf> {
 }
 
 pub async fn load_messages(room: &Room<Generic>, pages: u32) -> Result<Vec<Message>> {
-    let mut stanza_id: Option<MessageServerId> = None;
+    let mut stanza_id: Option<MessageId> = None;
     let mut messages = vec![];
     let mut page = 0;
 

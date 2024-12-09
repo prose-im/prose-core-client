@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use super::Message;
-use crate::dtos::MessageServerId;
+use crate::dtos::MessageId;
 
 #[derive(Debug, PartialEq)]
 pub struct MessageResultSet {
@@ -12,7 +12,7 @@ pub struct MessageResultSet {
     pub messages: Vec<Message>,
     /// Can be used to load more messages. `last_message_id` might not be contained in `messages`.
     /// If not set there are no more messages to load.
-    pub last_message_id: Option<MessageServerId>,
+    pub last_message_id: Option<MessageId>,
 }
 
 impl IntoIterator for MessageResultSet {

@@ -279,9 +279,20 @@ impl<Kind> Room<Kind> {
         }
     }
 
-    pub async fn retract_message(&self, id: MessageRemoteId) -> Result<()> {
+    pub async fn retract_message(&self, id: MessageId) -> Result<()> {
+        let account = self.ctx.connected_account()?;
+
+        let Some(remote_id) = self
+            .message_repo
+            .resolve_message_id(&account, &self.data.room_id, &id)
+            .await?
+            .and_then(|t| t.remote_id)
+        else {
+            bail!("Failed to resolve message id '{id}' to a remote id")
+        };
+
         self.messaging_service
-            .retract_message(&self.data.room_id, &id)
+            .retract_message(&self.data.room_id, &remote_id)
             .await
     }
 
@@ -332,12 +343,20 @@ impl<Kind> Room<Kind> {
         Ok(messages)
     }
 
-    pub async fn load_messages_before(
-        &self,
-        stanza_id: &MessageServerId,
-    ) -> Result<MessageResultSet> {
+    pub async fn load_messages_before(&self, stanza_id: &MessageId) -> Result<MessageResultSet> {
+        let account = self.ctx.connected_account()?;
+
+        let Some(server_id) = self
+            .message_repo
+            .resolve_message_id(&account, &self.data.room_id, stanza_id)
+            .await?
+            .and_then(|t| t.server_id)
+        else {
+            bail!("Failed to resolve message id '{stanza_id}' to a server id")
+        };
+
         debug!("Loading latest messages before '{stanza_id}' from server…");
-        self.load_messages(Some(stanza_id)).await
+        self.load_messages(Some(&server_id)).await
     }
 
     pub async fn load_unread_messages(&self) -> Result<MessageResultSet> {
@@ -574,6 +593,7 @@ impl<Kind> Room<Kind> {
 
         let mut messages = vec![];
         let mut last_message_id: Option<MessageServerId> = before.cloned();
+        let mut last_local_message_id: Option<MessageId> = None;
         let mut num_text_messages = 0;
         let mut text_message_ids = vec![];
         let mut loaded_pages = 0;
@@ -633,6 +653,12 @@ impl<Kind> Room<Kind> {
                 }
                 .unwrap_or_else(|| self.message_id_provider.new_id());
 
+                if Some(archive_message.id.as_ref())
+                    == last_message_id.as_ref().map(|id| id.as_ref())
+                {
+                    last_local_message_id = Some(message_id.clone())
+                }
+
                 let parsed_message = match MessageParser::new(
                     message_id,
                     Some(self.data.clone()),
@@ -679,7 +705,7 @@ impl<Kind> Room<Kind> {
             loaded_pages += 1;
 
             if page.is_last {
-                last_message_id = None;
+                last_local_message_id = None;
                 break;
             }
         }
@@ -726,7 +752,7 @@ impl<Kind> Room<Kind> {
                         .chain(later_targeting_earlier_messages.into_iter()),
                 )
                 .await,
-            last_message_id,
+            last_message_id: last_local_message_id,
         };
 
         Ok(result_set)

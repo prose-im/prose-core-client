@@ -10,13 +10,15 @@ use pretty_assertions::assert_eq;
 use std::iter;
 use std::sync::Arc;
 
-use prose_core_client::domain::messaging::models::{MessageLikePayload, Reaction};
+use prose_core_client::domain::messaging::models::{MessageIdTriple, MessageLikePayload, Reaction};
 use prose_core_client::domain::messaging::services::{MessagePage, WrappingMessageIdProvider};
 use prose_core_client::domain::rooms::models::{RegisteredMember, Room, RoomAffiliation};
 use prose_core_client::domain::rooms::services::RoomFactory;
 use prose_core_client::domain::shared::models::{CachePolicy, MucId, OccupantId, RoomId, UserId};
 use prose_core_client::domain::user_info::models::{UserInfo, UserName};
-use prose_core_client::dtos::{Availability, MessageResultSet, MessageServerId, Participant};
+use prose_core_client::dtos::{
+    Availability, MessageId, MessageResultSet, MessageServerId, Participant,
+};
 use prose_core_client::test::{mock_data, MessageBuilder, MockRoomFactoryDependencies};
 use prose_core_client::{muc_id, occupant_id, user_id};
 use prose_xmpp::jid;
@@ -614,10 +616,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
 
     let result = room.load_latest_messages().await?;
 
-    assert_eq!(
-        Some(MessageBuilder::stanza_id_for_index(91).as_ref()),
-        result.last_message_id.as_ref().map(|id| id.as_ref())
-    );
+    assert_eq!(Some(MessageId::from("msg-id-10")), result.last_message_id);
 
     assert_eq!(
         vec![MessageBuilder::new_with_index(100)
@@ -703,6 +702,24 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
     let mut deps = MockRoomFactoryDependencies::default();
     deps.ctx.config.max_message_pages_to_load = 1;
     deps.message_id_provider = Arc::new(WrappingMessageIdProvider::incrementing("msg-id"));
+
+    deps.message_repo
+        .expect_resolve_message_id()
+        .once()
+        .with(
+            predicate::always(),
+            predicate::always(),
+            predicate::eq(MessageId::from("some-stanza-id")),
+        )
+        .return_once(move |_, _, _| {
+            Box::pin(async {
+                Ok(Some(MessageIdTriple {
+                    id: "some-stanza-id".into(),
+                    remote_id: None,
+                    server_id: Some("some-server-id".into()),
+                }))
+            })
+        });
 
     deps.message_archive_service
         .expect_load_messages_before()
@@ -820,7 +837,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .to_generic_room();
 
     let result = room
-        .load_messages_before(&MessageServerId::from("some-stanza-id"))
+        .load_messages_before(&MessageId::from("some-stanza-id"))
         .await?;
 
     assert_eq!(

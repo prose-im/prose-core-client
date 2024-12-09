@@ -4,11 +4,10 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use tracing::error;
-use tracing_subscriber::fmt::format;
 use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos;
-use prose_core_client::dtos::{MessageServerId, ScalarRangeExt};
+use prose_core_client::dtos::ScalarRangeExt;
 
 use crate::types::{
     Attachment, AttachmentsArray, Avatar, BareJid, IntoJSArray, Mention, MentionsArray,
@@ -16,22 +15,6 @@ use crate::types::{
 };
 
 use super::ReactionsArray;
-
-#[wasm_bindgen]
-#[derive(Clone)]
-pub struct ArchiveID(MessageServerId);
-
-impl From<MessageServerId> for ArchiveID {
-    fn from(value: MessageServerId) -> Self {
-        Self(value)
-    }
-}
-
-impl AsRef<MessageServerId> for ArchiveID {
-    fn as_ref(&self) -> &MessageServerId {
-        &self.0
-    }
-}
 
 pub struct Body {
     /// The original raw message. Can be used for copying the message.

@@ -5,7 +5,6 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use crate::types::message::ArchiveID;
 use prose_core_client::dtos::MessageResultSet as CoreMessageResultSet;
 
 use crate::types::MessagesArray;
@@ -24,8 +23,8 @@ impl MessageResultSet {
     /// Can be used to load more messages. `lastMessageId` might not be contained in `messages`.
     /// If not set there are no more messages to load.
     #[wasm_bindgen(getter, js_name = "lastMessageId")]
-    pub fn last_message_id(&self) -> Option<ArchiveID> {
-        self.0.last_message_id.clone().map(Into::into)
+    pub fn last_message_id(&self) -> Option<String> {
+        self.0.last_message_id.clone().map(|id| id.to_string())
     }
 }
 

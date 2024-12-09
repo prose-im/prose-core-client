@@ -14,7 +14,6 @@ use prose_core_client::services::{
 };
 
 use crate::error::WasmError;
-use crate::types::message::ArchiveID;
 use crate::types::{
     try_user_id_vec_from_string_array, MessageResultSet, MessagesArray, ParticipantBasicInfo,
     ParticipantBasicInfoArray, ParticipantInfo, ParticipantInfoArray, SendMessageRequest,
@@ -60,7 +59,7 @@ export interface RoomBase {
     toggleReactionToMessage(id: string, emoji: string): Promise<void>;
     
     loadLatestMessages(): Promise<MessageResultSet>;
-    loadMessagesBefore(before: ArchiveId): Promise<MessageResultSet>;
+    loadMessagesBefore(before: string): Promise<MessageResultSet>;
     loadMessagesWithIDs(messageIDs: string[]): Promise<Message[]>;
     loadUnreadMessages(): Promise<MessageResultSet>;
     
@@ -307,13 +306,10 @@ macro_rules! base_room_impl {
             }
 
             #[wasm_bindgen(js_name = "loadMessagesBefore")]
-            pub async fn load_messages_before(
-                &self,
-                archive_id: &ArchiveID,
-            ) -> Result<MessageResultSet> {
+            pub async fn load_messages_before(&self, message_id: &str) -> Result<MessageResultSet> {
                 let messages = self
                     .room
-                    .load_messages_before(archive_id.as_ref())
+                    .load_messages_before(&message_id.into())
                     .await
                     .map_err(WasmError::from)?;
 
