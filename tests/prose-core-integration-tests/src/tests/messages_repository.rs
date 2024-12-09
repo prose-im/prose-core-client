@@ -315,22 +315,24 @@ async fn test_resolves_server_id_to_message_id() -> Result<()> {
 
     assert_eq!(
         Some(MessageBuilder::id_for_index(101)),
-        repo.resolve_server_id_to_message_id(
+        repo.resolve_server_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::stanza_id_for_index(101)
         )
         .await?
+        .map(|t| t.id)
     );
 
     assert_eq!(
         None,
-        repo.resolve_server_id_to_message_id(
+        repo.resolve_server_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::stanza_id_for_index(1)
         )
         .await?
+        .map(|t| t.id)
     );
 
     Ok(())
@@ -348,22 +350,24 @@ async fn test_resolves_remote_id_to_message_id() -> Result<()> {
 
     assert_eq!(
         Some(MessageBuilder::id_for_index(101)),
-        repo.resolve_remote_id_to_message_id(
+        repo.resolve_remote_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::remote_id_for_index(101)
         )
         .await?
+        .map(|t| t.id)
     );
 
     assert_eq!(
         None,
-        repo.resolve_remote_id_to_message_id(
+        repo.resolve_remote_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::remote_id_for_index(1)
         )
         .await?
+        .map(|t| t.id)
     );
 
     Ok(())
@@ -381,22 +385,24 @@ async fn test_resolves_message_id_to_remote_id() -> Result<()> {
 
     assert_eq!(
         Some(MessageBuilder::remote_id_for_index(101)),
-        repo.resolve_message_id_to_remote_id(
+        repo.resolve_message_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::id_for_index(101)
         )
         .await?
+        .and_then(|t| t.remote_id)
     );
 
     assert_eq!(
         None,
-        repo.resolve_message_id_to_remote_id(
+        repo.resolve_message_id(
             &account_id!("account@prose.org"),
             &room_id,
             &MessageBuilder::id_for_index(1)
         )
         .await?
+        .and_then(|t| t.remote_id)
     );
 
     Ok(())

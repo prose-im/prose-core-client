@@ -10,7 +10,8 @@ use chrono::{DateTime, Utc};
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageId, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
+    ArchivedMessageRef, MessageId, MessageIdTriple, MessageLike, MessageRemoteId, MessageServerId,
+    MessageTargetId,
 };
 use crate::domain::shared::models::{AccountId, RoomId};
 
@@ -55,26 +56,26 @@ pub trait MessagesRepository: SendUnlessWasm + SyncUnlessWasm {
     ) -> Result<()>;
     async fn clear_cache(&self, account: &AccountId) -> Result<()>;
 
-    async fn resolve_server_id_to_message_id(
+    async fn resolve_server_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
         server_id: &MessageServerId,
-    ) -> Result<Option<MessageId>>;
+    ) -> Result<Option<MessageIdTriple>>;
 
-    async fn resolve_remote_id_to_message_id(
+    async fn resolve_remote_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
         remote_id: &MessageRemoteId,
-    ) -> Result<Option<MessageId>>;
+    ) -> Result<Option<MessageIdTriple>>;
 
-    async fn resolve_message_id_to_remote_id(
+    async fn resolve_message_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
         id: &MessageId,
-    ) -> Result<Option<MessageRemoteId>>;
+    ) -> Result<Option<MessageIdTriple>>;
 
     /// Returns the latest message, if available, that has a `stanza_id` set and was received
     /// before `before` (if set).

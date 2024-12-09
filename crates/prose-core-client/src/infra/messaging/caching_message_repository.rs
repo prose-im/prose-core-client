@@ -12,7 +12,8 @@ use chrono::{DateTime, Utc};
 use prose_store::prelude::*;
 
 use crate::domain::messaging::models::{
-    ArchivedMessageRef, MessageId, MessageLike, MessageRemoteId, MessageServerId, MessageTargetId,
+    ArchivedMessageRef, MessageId, MessageIdTriple, MessageLike, MessageRemoteId, MessageServerId,
+    MessageTargetId,
 };
 use crate::domain::messaging::repos::MessagesRepository;
 use crate::domain::shared::models::{AccountId, RoomId};
@@ -205,12 +206,12 @@ impl MessagesRepository for CachingMessageRepository {
         Ok(())
     }
 
-    async fn resolve_server_id_to_message_id(
+    async fn resolve_server_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
         server_id: &MessageServerId,
-    ) -> Result<Option<MessageId>> {
+    ) -> Result<Option<MessageIdTriple>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
@@ -220,15 +221,19 @@ impl MessagesRepository for CachingMessageRepository {
         let message = stanza_idx
             .get::<_, MessageRecord>(&(account, room_id, server_id))
             .await?;
-        Ok(message.map(|m| m.message_id))
+        Ok(message.map(|m| MessageIdTriple {
+            id: m.message_id,
+            remote_id: m.remote_id,
+            server_id: m.server_id,
+        }))
     }
 
-    async fn resolve_remote_id_to_message_id(
+    async fn resolve_remote_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
         remote_id: &MessageRemoteId,
-    ) -> Result<Option<MessageId>> {
+    ) -> Result<Option<MessageIdTriple>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
@@ -238,15 +243,19 @@ impl MessagesRepository for CachingMessageRepository {
         let message = remote_id_idx
             .get::<_, MessageRecord>(&(account, room_id, remote_id))
             .await?;
-        Ok(message.map(|m| m.message_id))
+        Ok(message.map(|m| MessageIdTriple {
+            id: m.message_id,
+            remote_id: m.remote_id,
+            server_id: m.server_id,
+        }))
     }
 
-    async fn resolve_message_id_to_remote_id(
+    async fn resolve_message_id(
         &self,
         account: &AccountId,
         room_id: &RoomId,
         id: &MessageId,
-    ) -> Result<Option<MessageRemoteId>> {
+    ) -> Result<Option<MessageIdTriple>> {
         let tx = self
             .store
             .transaction_for_reading(&[MessageRecord::collection()])
@@ -256,7 +265,11 @@ impl MessagesRepository for CachingMessageRepository {
         let message = message_id_idx
             .get::<_, MessageRecord>(&(account, room_id, id))
             .await?;
-        Ok(message.and_then(|m| m.remote_id))
+        Ok(message.map(|m| MessageIdTriple {
+            id: m.message_id,
+            remote_id: m.remote_id,
+            server_id: m.server_id,
+        }))
     }
 
     async fn get_last_received_message(

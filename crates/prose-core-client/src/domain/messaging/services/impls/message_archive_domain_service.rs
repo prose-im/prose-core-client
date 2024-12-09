@@ -161,25 +161,27 @@ impl MessageArchiveDomainService {
                     .and_then(|m| m.id.clone())
                 {
                     self.message_repo
-                        .resolve_remote_id_to_message_id(
+                        .resolve_remote_id(
                             &account,
                             &room.room_id,
                             &MessageRemoteId::from(remote_id),
                         )
                         .await
                         .unwrap_or_default()
+                        .map(|t| t.id)
                 } else {
                     None
                 }
             } else {
                 self.message_repo
-                    .resolve_server_id_to_message_id(
+                    .resolve_server_id(
                         &account,
                         &room.room_id,
                         &MessageServerId::from(archive_message.id.as_ref()),
                     )
                     .await
                     .unwrap_or_default()
+                    .map(|t| t.id)
             }
             .unwrap_or_else(|| self.message_id_provider.new_id());
 

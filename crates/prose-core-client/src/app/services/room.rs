@@ -223,8 +223,9 @@ impl<Kind> Room<Kind> {
         // Resolve the external ID of the message…
         let Some(target_id) = self
             .message_repo
-            .resolve_message_id_to_remote_id(&account, &self.data.room_id, &id)
+            .resolve_message_id(&account, &self.data.room_id, &id)
             .await?
+            .and_then(|t| t.remote_id)
         else {
             bail!("Failed to resolve message id '{id}' to a server id")
         };
@@ -608,25 +609,27 @@ impl<Kind> Room<Kind> {
                 let message_id = if is_our_message {
                     if let Some(remote_id) = inner_message.and_then(|m| m.id.clone()) {
                         self.message_repo
-                            .resolve_remote_id_to_message_id(
+                            .resolve_remote_id(
                                 &account,
                                 &self.data.room_id,
                                 &MessageRemoteId::from(remote_id),
                             )
                             .await
                             .unwrap_or_default()
+                            .map(|t| t.id)
                     } else {
                         None
                     }
                 } else {
                     self.message_repo
-                        .resolve_server_id_to_message_id(
+                        .resolve_server_id(
                             &account,
                             &self.data.room_id,
                             &MessageServerId::from(archive_message.id.as_ref()),
                         )
                         .await
                         .unwrap_or_default()
+                        .map(|t| t.id)
                 }
                 .unwrap_or_else(|| self.message_id_provider.new_id());
 
@@ -787,24 +790,17 @@ impl<Kind> Room<Kind> {
                     let message_id = match reply_to.id {
                         MessageTargetId::ServerId(server_id) => {
                             self.message_repo
-                                .resolve_server_id_to_message_id(
-                                    &account,
-                                    &self.data.room_id,
-                                    &server_id,
-                                )
+                                .resolve_server_id(&account, &self.data.room_id, &server_id)
                                 .await
                         }
                         MessageTargetId::RemoteId(remote_id) => {
                             self.message_repo
-                                .resolve_remote_id_to_message_id(
-                                    &account,
-                                    &self.data.room_id,
-                                    &remote_id,
-                                )
+                                .resolve_remote_id(&account, &self.data.room_id, &remote_id)
                                 .await
                         }
                     }
-                    .unwrap_or_default();
+                    .unwrap_or_default()
+                    .map(|t| t.id);
 
                     let replied_to_message = if let Some(message_id) = &message_id {
                         let messages = self
@@ -1015,8 +1011,9 @@ impl<Kind> Room<Kind> {
             for id in updated_server_ids {
                 if let Some(message_id) = self
                     .message_repo
-                    .resolve_server_id_to_message_id(&account, &self.data.room_id, &id)
+                    .resolve_server_id(&account, &self.data.room_id, &id)
                     .await?
+                    .map(|t| t.id)
                 {
                     updated_message_ids.push(message_id);
                 }

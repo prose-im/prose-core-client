@@ -187,7 +187,7 @@ async fn test_load_latest_messages_resolves_real_jids() -> Result<()> {
         });
 
     deps.message_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .times(4)
         .returning(|_, _, _| Box::pin(async { Ok(None) }));
 
@@ -455,7 +455,7 @@ async fn test_fills_result_set_when_loading_messages() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .times(10)
         .returning(|_, _, _| Box::pin(async { Ok(None) }));
 
@@ -600,7 +600,7 @@ async fn test_stops_at_max_message_pages_to_load() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .times(10)
         .returning(|_, _, _| Box::pin(async { Ok(None) }));
 
@@ -678,7 +678,7 @@ async fn test_stops_at_last_page() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .times(8)
         .returning(|_, _, _| Box::pin(async { Ok(None) }));
 
@@ -807,7 +807,7 @@ async fn test_resolves_targeted_messages_when_loading_messages() -> Result<()> {
         .returning(|_, _| Box::pin(async { Ok(None) }));
 
     deps.message_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .times(5)
         .returning(|_, _, _| Box::pin(async { Ok(None) }));
 

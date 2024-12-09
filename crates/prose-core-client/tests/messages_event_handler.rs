@@ -16,7 +16,7 @@ use prose_core_client::app::event_handlers::{
 };
 use prose_core_client::domain::connection::models::ConnectionProperties;
 use prose_core_client::domain::messaging::models::{
-    MessageLike, MessageLikeBody, MessageLikePayload,
+    MessageIdTriple, MessageLike, MessageLikeBody, MessageLikePayload,
 };
 use prose_core_client::domain::messaging::services::WrappingMessageIdProvider;
 use prose_core_client::domain::rooms::models::{Room, RoomInfo};
@@ -287,7 +287,7 @@ async fn test_parses_user_id_from_in_sent_groupchat_message() -> Result<()> {
         .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
-        .expect_resolve_remote_id_to_message_id()
+        .expect_resolve_remote_id()
         .with(
             predicate::always(),
             predicate::always(),
@@ -530,7 +530,7 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
         .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
-        .expect_resolve_remote_id_to_message_id()
+        .expect_resolve_remote_id()
         .with(
             predicate::always(),
             predicate::always(),
@@ -618,7 +618,7 @@ async fn test_dispatches_messages_appended_for_muc_carbon() -> Result<()> {
         .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
-        .expect_resolve_remote_id_to_message_id()
+        .expect_resolve_remote_id()
         .with(
             predicate::always(),
             predicate::always(),
@@ -730,13 +730,21 @@ async fn test_looks_up_message_id_when_dispatching_message_event() -> Result<()>
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .with(
             predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
             predicate::eq(MessageServerId::from("stanza-id-100")),
         )
-        .return_once(|_, _, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
+        .return_once(|_, _, _| {
+            Box::pin(async {
+                Ok(Some(MessageIdTriple {
+                    id: MessageId::from("message-id-100"),
+                    remote_id: None,
+                    server_id: None,
+                }))
+            })
+        });
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()
@@ -799,7 +807,7 @@ async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_m
         .return_once(|_, _, _| Box::pin(async { Ok(false) }));
 
     deps.messages_repo
-        .expect_resolve_remote_id_to_message_id()
+        .expect_resolve_remote_id()
         .with(
             predicate::always(),
             predicate::always(),
@@ -814,13 +822,21 @@ async fn test_looks_up_message_id_for_sent_groupchat_messages_when_dispatching_m
         .return_once(|_, _, _| Box::pin(async { Ok(()) }));
 
     deps.messages_repo
-        .expect_resolve_server_id_to_message_id()
+        .expect_resolve_server_id()
         .with(
             predicate::always(),
             predicate::eq(RoomId::Muc(muc_id!("group@prose.org"))),
             predicate::eq(MessageServerId::from("stanza-id-100")),
         )
-        .return_once(|_, _, _| Box::pin(async { Ok(Some(MessageId::from("message-id-100"))) }));
+        .return_once(|_, _, _| {
+            Box::pin(async {
+                Ok(Some(MessageIdTriple {
+                    id: MessageId::from("message-id-100"),
+                    remote_id: None,
+                    server_id: None,
+                }))
+            })
+        });
 
     deps.client_event_dispatcher
         .expect_dispatch_room_event()

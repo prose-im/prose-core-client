@@ -22,6 +22,13 @@ id_string!(
     MessageId
 );
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MessageIdTriple {
+    pub id: MessageId,
+    pub remote_id: Option<MessageRemoteId>,
+    pub server_id: Option<MessageServerId>,
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash, Eq)]
 #[serde(tag = "type", content = "id")]
 pub enum MessageTargetId {

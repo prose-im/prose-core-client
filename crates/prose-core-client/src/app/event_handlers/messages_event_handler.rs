@@ -292,11 +292,11 @@ impl MessagesEventHandler {
         };
 
         let existing_message_id = match message.remote_id() {
-            Some(remote_id) => {
-                self.messages_repo
-                    .resolve_remote_id_to_message_id(&account, &room_id, &remote_id)
-                    .await?
-            }
+            Some(remote_id) => self
+                .messages_repo
+                .resolve_remote_id(&account, &room_id, &remote_id)
+                .await?
+                .map(|t| t.id),
             None => None,
         };
 
@@ -392,18 +392,18 @@ impl MessagesEventHandler {
         let result = match &target_id {
             MessageTargetId::RemoteId(remote_id) => {
                 self.messages_repo
-                    .resolve_remote_id_to_message_id(account, &room_id, remote_id)
+                    .resolve_remote_id(account, &room_id, remote_id)
                     .await
             }
             MessageTargetId::ServerId(server_id) => {
                 self.messages_repo
-                    .resolve_server_id_to_message_id(account, &room_id, server_id)
+                    .resolve_server_id(account, &room_id, server_id)
                     .await
             }
         };
 
         match result {
-            Ok(Some(id)) => Some(id),
+            Ok(Some(triple)) => Some(triple.id),
             Ok(None) => {
                 warn!("Not dispatching event for message. Failed to look up targeted MessageId from {:?}.", target_id);
                 None
