@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use chrono::{DateTime, Utc};
-use secrecy::Secret;
+use secrecy::SecretString;
 use tracing::{error, info, warn};
 
 use prose_proc_macros::InjectDependencies;
@@ -60,7 +60,7 @@ impl ConnectionService {
     pub async fn connect(
         &self,
         user_id: &UserId,
-        password: Secret<String>,
+        password: SecretString,
     ) -> Result<(), ConnectionError> {
         self.ctx.set_connection_state(ConnectionState::Connecting);
         self.offline_messages_repo.drain();

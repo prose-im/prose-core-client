@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::ConnectionError;
@@ -20,7 +20,7 @@ pub trait ConnectionService: SendUnlessWasm + SyncUnlessWasm {
     async fn connect(
         &self,
         jid: &UserResourceId,
-        password: Secret<String>,
+        password: SecretString,
     ) -> Result<(), ConnectionError>;
     async fn disconnect(&self);
 

@@ -9,7 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use prose_wasm_utils::{spawn, SendUnlessWasm, SyncUnlessWasm};
 
@@ -50,7 +50,7 @@ impl<C: Connector, T: ProxyTransformer + SendUnlessWasm + 'static> Connector
     async fn connect(
         &self,
         jid: &FullJid,
-        password: Secret<String>,
+        password: SecretString,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn Connection>, ConnectionError> {
         let orig_event_handler = Arc::new(event_handler);

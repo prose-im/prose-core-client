@@ -16,9 +16,7 @@ use wasm_bindgen::prelude::*;
 
 use prose_core_client::dtos::{MucId, SoftwareVersion, UserStatus};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
-use prose_core_client::{
-    open_store, Client as ProseClient, PlatformDriver, Secret, StoreAvatarRepository,
-};
+use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarRepository};
 
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
@@ -208,9 +206,7 @@ impl Client {
         jid: &BareJid,
         password: &str,
     ) -> std::result::Result<(), ConnectionError> {
-        self.client
-            .connect(&jid.into(), Secret::new(password.to_string()))
-            .await?;
+        self.client.connect(&jid.into(), password.into()).await?;
         Ok(())
     }
 

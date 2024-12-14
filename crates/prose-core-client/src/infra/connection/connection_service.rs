@@ -6,7 +6,7 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::Utc;
-use secrecy::Secret;
+use secrecy::SecretString;
 use tracing::{info, warn};
 
 use prose_xmpp::{mods, ns, ConnectionError};
@@ -23,7 +23,7 @@ impl ConnectionService for XMPPClient {
     async fn connect(
         &self,
         jid: &UserResourceId,
-        password: Secret<String>,
+        password: SecretString,
     ) -> Result<(), ConnectionError> {
         self.client.connect(jid.as_ref(), password).await
     }
