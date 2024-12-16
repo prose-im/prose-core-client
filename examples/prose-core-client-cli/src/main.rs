@@ -35,7 +35,7 @@ use prose_core_client::{
     open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, PlatformDriver,
     SignalServiceHandle,
 };
-use prose_xmpp::{connector, mods, Secret};
+use prose_xmpp::{connector, mods};
 
 use crate::type_display::{
     ConnectedRoomEnvelope, DeviceInfoEnvelope, JidWithName, MessageEnvelope, ParticipantEnvelope,
@@ -78,7 +78,7 @@ async fn configure_client() -> Result<(BareJid, Client)> {
 
     println!("Connecting to server as {}…", jid);
     client
-        .connect(&UserId::from(jid.to_bare()), Secret::new(password))
+        .connect(&UserId::from(jid.to_bare()), password.into())
         .await?;
     println!("Connected.");
 

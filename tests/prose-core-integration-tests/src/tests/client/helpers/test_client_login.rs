@@ -11,7 +11,7 @@ use xmpp_parsers::roster::Item as RosterItem;
 
 use prose_core_client::domain::user_info::models::UserProfile;
 use prose_core_client::dtos::{Bookmark, DeviceBundle, DeviceId, UserId};
-use prose_core_client::{ClientEvent, ConnectionEvent, Secret};
+use prose_core_client::{ClientEvent, ConnectionEvent};
 use prose_xmpp::stanza::vcard4::Nickname;
 use prose_xmpp::stanza::VCard4;
 use prose_xmpp::IDProvider;
@@ -201,8 +201,7 @@ impl TestClient {
 
         event!(self, ClientEvent::AccountInfoChanged);
 
-        self.connect(&user, Secret::new(password.as_ref().to_string()))
-            .await?;
+        self.connect(&user, password.as_ref().into()).await?;
 
         if let Some(vcard) = strategy.user_vcard {
             self.push_ctx([("VCARD", String::from(&Element::from(vcard)))]);

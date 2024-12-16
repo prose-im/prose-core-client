@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime};
 use anyhow::Result;
 use jid::FullJid;
 use minidom::Element;
-use secrecy::Secret;
+use secrecy::SecretString;
 use tracing::{error, warn};
 
 use prose_wasm_utils::PinnedFuture;
@@ -46,7 +46,7 @@ impl Client {
     pub async fn connect(
         &self,
         jid: &FullJid,
-        password: Secret<String>,
+        password: SecretString,
     ) -> Result<(), ConnectionError> {
         self.inner.clone().connect(jid, password).await
     }
@@ -79,7 +79,7 @@ impl ClientInner {
     async fn connect(
         self: Arc<Self>,
         jid: &FullJid,
-        password: Secret<String>,
+        password: SecretString,
     ) -> Result<(), ConnectionError> {
         self.disconnect();
 

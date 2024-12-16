@@ -15,7 +15,7 @@ use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepo
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
     open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarRepository,
-    PlatformDriver, Secret, SignalServiceHandle,
+    PlatformDriver, SignalServiceHandle,
 };
 use prose_xmpp::{connector, ConnectionError};
 
@@ -85,7 +85,7 @@ impl Client {
         self.client()
             .await
             .map_err(|e| ConnectionError::Generic { msg: e.to_string() })?
-            .connect(&self.jid.to_bare().unwrap().into(), Secret::new(password))
+            .connect(&self.jid.to_bare().unwrap().into(), password.into())
             .await?;
         Ok(())
     }

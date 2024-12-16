@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use jid::FullJid;
 use minidom::Element;
 use parking_lot::{Mutex, RwLock};
-use secrecy::Secret;
+use secrecy::SecretString;
 use xmpp_parsers::disco::DiscoItemsResult;
 use xmpp_parsers::iq::Iq;
 
@@ -39,7 +39,7 @@ impl ConnectorTrait for Connector {
     async fn connect(
         &self,
         _jid: &FullJid,
-        _password: Secret<String>,
+        _password: SecretString,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
         *self.connection.inner.event_handler.write() = Some(event_handler);

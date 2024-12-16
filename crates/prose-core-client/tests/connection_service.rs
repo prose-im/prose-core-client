@@ -7,7 +7,7 @@ use std::sync::{Arc, OnceLock};
 
 use anyhow::Result;
 use mockall::predicate;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretString};
 
 use prose_core_client::app::deps::DynAppContext;
 use prose_core_client::app::services::ConnectionService;
@@ -65,7 +65,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
         .once()
         .with(
             predicate::eq(user_resource_id!("jane.doe@prose.org/resource-id")),
-            predicate::function(|pw: &Secret<String>| pw.expose_secret().as_str() == "my-password"),
+            predicate::function(|pw: &SecretString| pw.expose_secret() == "my-password"),
         )
         .return_once(|_, _| Box::pin(async { Ok(Default::default()) }));
     deps.contact_list_domain_service
@@ -138,10 +138,7 @@ async fn test_starts_available_and_generates_resource() -> Result<()> {
     assert!(deps.ctx.muc_service().is_err());
 
     service
-        .connect(
-            &user_id!("jane.doe@prose.org"),
-            Secret::new("my-password".to_string()),
-        )
+        .connect(&user_id!("jane.doe@prose.org"), "my-password".into())
         .await?;
 
     assert_eq!(
@@ -268,10 +265,7 @@ async fn test_restores_availability_and_resource() -> Result<()> {
     let service = ConnectionService::from(&deps);
 
     service
-        .connect(
-            &user_id!("jane.doe@prose.org"),
-            Secret::new("my-password".to_string()),
-        )
+        .connect(&user_id!("jane.doe@prose.org"), "my-password".into())
         .await?;
 
     Ok(())
@@ -325,10 +319,7 @@ async fn test_connection_failure() -> Result<()> {
     assert!(deps.ctx.muc_service().is_err());
 
     assert!(service
-        .connect(
-            &user_id!("jane.doe@prose.org"),
-            Secret::new("my-password".to_string())
-        )
+        .connect(&user_id!("jane.doe@prose.org"), "my-password".into())
         .await
         .is_err());
 

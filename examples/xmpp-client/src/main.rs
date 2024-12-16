@@ -10,7 +10,7 @@ use tracing::info;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_xmpp::mods::{chat, Chat, Profile, Status};
 use prose_xmpp::stanza::presence::Show;
-use prose_xmpp::{connector, Client, Event, Secret};
+use prose_xmpp::{connector, Client, Event};
 
 // This example starts a XMPP client and listens for messages. If a message is received it loads
 // the sender's vCard and response with a greeting and some text.
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
     let (jid, password) = load_credentials();
 
     info!("Connecting…");
-    client.connect(&jid, Secret::new(password)).await?;
+    client.connect(&jid, password.into()).await?;
     info!("Connected.");
 
     client

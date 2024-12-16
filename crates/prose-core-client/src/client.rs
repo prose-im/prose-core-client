@@ -7,7 +7,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 use anyhow::Result;
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use crate::app::deps::DynAppContext;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
@@ -74,7 +74,7 @@ impl Client {
     pub async fn connect(
         &self,
         id: &UserId,
-        password: Secret<String>,
+        password: SecretString,
     ) -> Result<(), ConnectionError> {
         self.connection.connect(id, password).await
     }
