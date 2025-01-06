@@ -5,7 +5,7 @@
 
 extern crate core;
 
-pub use secrecy::Secret;
+pub use secrecy::SecretString;
 
 pub use app::deps::{DynEncryptionKeysRepository, DynSessionRepository};
 pub use app::{dtos, services};

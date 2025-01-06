@@ -13,7 +13,7 @@ use parking_lot::Mutex;
 use pretty_assertions::assert_eq;
 
 use crate::tests::client::helpers::test_message_queue::MessageType;
-use prose_core_client::Secret;
+use prose_core_client::SecretString;
 use prose_xmpp::client::ConnectorProvider;
 use prose_xmpp::connector::{
     Connection as ConnectionTrait, ConnectionError, ConnectionEvent, ConnectionEventHandler,
@@ -99,7 +99,7 @@ impl ConnectorTrait for Connector {
     async fn connect(
         &self,
         _jid: &FullJid,
-        _password: Secret<String>,
+        _password: SecretString,
         event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn ConnectionTrait>, ConnectionError> {
         let connection = Connection {

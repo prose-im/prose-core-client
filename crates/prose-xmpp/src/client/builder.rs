@@ -13,7 +13,7 @@ use jid::FullJid;
 use minidom::Element;
 use parking_lot::RwLock;
 use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
-use secrecy::Secret;
+use secrecy::SecretString;
 
 use crate::client::client::ClientInner;
 use crate::client::module_context::ModuleContextInner;
@@ -147,7 +147,7 @@ impl Connector for UndefinedConnector {
     async fn connect(
         &self,
         _jid: &FullJid,
-        _password: Secret<String>,
+        _password: SecretString,
         _event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn Connection>, ConnectionError> {
         panic!("Client doesn't have a connector. Provide one before calling connect()")
