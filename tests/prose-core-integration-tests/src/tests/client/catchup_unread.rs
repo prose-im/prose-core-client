@@ -579,6 +579,7 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
                         encryption_info: None,
                         is_transient: false,
                         reply_to: None,
+                        thread_id: None,
                     })
                     .build_message_like(),
                 MessageBuilder::new_with_index(2)
@@ -601,6 +602,7 @@ async fn test_updates_unread_count_after_sync() -> Result<()> {
                         encryption_info: None,
                         is_transient: false,
                         reply_to: None,
+                        thread_id: None,
                     })
                     .build_message_like(),
             ],

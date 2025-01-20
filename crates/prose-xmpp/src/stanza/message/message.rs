@@ -295,8 +295,13 @@ impl Message {
 }
 
 impl From<Message> for Element {
-    fn from(value: Message) -> Self {
-        value.0.into()
+    fn from(mut value: Message) -> Self {
+        let thread = value.thread.take();
+        let mut elem = Element::from(value.0);
+        if let Some(thread) = thread {
+            elem.append_child(thread.into());
+        }
+        elem
     }
 }
 

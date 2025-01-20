@@ -26,10 +26,11 @@ use url::Url;
 use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
     Address, Attachment, AttachmentType, Availability, Avatar, ParticipantId, RoomEnvelope, RoomId,
-    SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt, UploadSlot, UserId,
+    SendMessageRequest, SendMessageRequestBody, UploadSlot, UserId,
 };
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
+use prose_core_client::services::{Generic, Room};
 use prose_core_client::FsAvatarRepository;
 use prose_core_client::{
     open_store, Client, ClientDelegate, ClientEvent, ClientRoomEventType, PlatformDriver,
@@ -378,20 +379,59 @@ async fn send_message(client: &Client) -> Result<()> {
         return Ok(());
     };
 
-    let participant_ids = room
-        .to_generic_room()
-        .participants()
-        .into_iter()
-        .filter_map(|p| p.user_id)
-        .collect::<Vec<_>>();
+    let Some(request) = collect_send_message_request(client, &room.to_generic_room()).await? else {
+        return Ok(());
+    };
 
+    println!("Sending message…");
+    room.to_generic_room().send_message(request).await
+}
+
+async fn reply_to_message(client: &Client) -> Result<()> {
+    let Some(room) = select_room(&client, |_| true).await? else {
+        return Ok(());
+    };
+
+    let messages = load_messages(&room.to_generic_room(), 1).await?;
+
+    let Some(message) = select_item_from_list(messages, |msg| {
+        format!(
+            "{ts} | {id:<36} | {from:<20} | {text}",
+            ts = msg.timestamp.format("%Y/%m/%d %H:%M:%S"),
+            id = msg.id,
+            from = msg.from.id.to_opaque_identifier().truncate_to(20),
+            text = msg
+                .body
+                .raw
+                .truncate_to(80)
+                .split('\n')
+                .next()
+                .unwrap_or_default()
+        )
+    }) else {
+        return Ok(());
+    };
+
+    let Some(request) = collect_send_message_request(client, &room.to_generic_room()).await? else {
+        return Ok(());
+    };
+
+    room.to_generic_room()
+        .reply_to_message(message.id, request)
+        .await
+}
+
+async fn collect_send_message_request(
+    client: &Client,
+    room: &Room<Generic>,
+) -> Result<Option<SendMessageRequest>> {
     let message: String = Input::with_theme(&ColorfulTheme::default())
         .with_prompt("Enter message (leave empty to send a file without a message)")
         .allow_empty(true)
         .interact_text()
         .unwrap();
 
-    let mut body = SendMessageRequestBody {
+    let body = SendMessageRequestBody {
         text: message.into(),
     };
 
@@ -412,9 +452,7 @@ async fn send_message(client: &Client) -> Result<()> {
         });
     }
 
-    println!("Sending message…");
-    room.to_generic_room().send_message(request).await?;
-    Ok(())
+    Ok(Some(request))
 }
 
 fn format_opt<T: Display>(value: Option<T>) -> String {
@@ -567,6 +605,8 @@ enum Selection {
     ListPresenceSubRequests,
     #[strum(serialize = "Send message to contact or room")]
     SendMessageToRoom,
+    #[strum(serialize = "Reply to message")]
+    ReplyToMessage,
     #[strum(serialize = "Send continuous messages to a room")]
     SendContinuousMessagesToRoom,
     #[strum(serialize = "Send message to anyhow")]
@@ -783,6 +823,9 @@ async fn main() -> Result<()> {
             }
             Selection::SendMessageToRoom => {
                 send_message(&client).await?;
+            }
+            Selection::ReplyToMessage => {
+                reply_to_message(&client).await?;
             }
             Selection::SendContinuousMessagesToRoom => {
                 let Some(room) = select_room(&client, |_| true).await? else {

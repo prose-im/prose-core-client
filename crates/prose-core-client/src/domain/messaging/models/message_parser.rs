@@ -313,6 +313,7 @@ impl MessageParser {
                 // usually a private message. We'll treat them as transient messages.
                 is_transient: is_groupchat_message && message.type_ == MessageType::Chat,
                 reply_to,
+                thread_id: message.thread.as_ref().map(|t| t.0.clone().into()),
             });
         }
 

@@ -111,6 +111,7 @@ impl Message {
                     encryption_info,
                     is_transient: is_private,
                     reply_to,
+                    thread_id: _thread_id,
                 } => Message {
                     id: msg.id,
                     remote_id: msg.remote_id,
@@ -469,6 +470,7 @@ mod tests {
                     encryption_info: None,
                     is_transient: false,
                     reply_to: None,
+                    thread_id: None,
                 },
             },
             MessageLike {

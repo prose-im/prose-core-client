@@ -69,6 +69,7 @@ impl MessageLikePayload {
             encryption_info: None,
             is_transient: false,
             reply_to: None,
+            thread_id: None,
         }
     }
 }

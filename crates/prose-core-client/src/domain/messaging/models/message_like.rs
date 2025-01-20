@@ -13,7 +13,7 @@ use prose_xmpp::stanza::message;
 
 use crate::domain::encryption::models::DeviceId;
 use crate::domain::messaging::models::message_id::MessageId;
-use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId, ReplyTo};
+use crate::domain::messaging::models::{Attachment, Mention, MessageTargetId, ReplyTo, ThreadId};
 use crate::domain::shared::models::{ParticipantId, HTML};
 
 use super::{MessageRemoteId, MessageServerId};
@@ -87,6 +87,7 @@ pub enum Payload {
         encryption_info: Option<EncryptionInfo>,
         is_transient: bool,
         reply_to: Option<ReplyTo>,
+        thread_id: Option<ThreadId>,
     },
     Reaction {
         target_id: MessageTargetId,

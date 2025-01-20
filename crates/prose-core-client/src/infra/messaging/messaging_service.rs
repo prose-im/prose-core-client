@@ -7,7 +7,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use xmpp_parsers::chatstates::ChatState;
 use xmpp_parsers::delay::Delay;
-use xmpp_parsers::message::MessageType;
+use xmpp_parsers::message::{MessageType, Thread};
 
 use prose_xmpp::mods;
 use prose_xmpp::stanza::message::mam::ArchivedMessage;
@@ -15,7 +15,7 @@ use prose_xmpp::stanza::Message;
 
 use crate::domain::messaging::models::{
     Emoji, KeyTransportPayload, MessageRemoteId, MessageServerId, SendMessageRequest,
-    StanzaParseError,
+    StanzaParseError, ThreadId,
 };
 use crate::domain::messaging::services::MessagingService;
 use crate::dtos::{MucId, RoomId, UserId};
@@ -34,10 +34,40 @@ impl MessagingService for XMPPClient {
 
         let mut message = Message::new()
             .set_type(room_id.message_type())
+            .set_id(request.id.clone().into_inner().into())
+            .set_thread(Thread(request.id.into_inner()))
+            .set_from(from)
+            .set_to(room_id.clone().into_bare())
+            .set_message_body(request.body)
+            .set_chat_state(Some(ChatState::Active))
+            .set_markable()
+            .set_store(true);
+        message.append_attachments(request.attachments);
+
+        chat.send_raw_message(message, false)?;
+
+        Ok(())
+    }
+
+    async fn send_message_to_thread(
+        &self,
+        room_id: &RoomId,
+        thread_id: &ThreadId,
+        request: SendMessageRequest,
+    ) -> Result<()> {
+        let chat = self.client.get_mod::<mods::Chat>();
+
+        let from = self.connected_jid().ok_or(anyhow::anyhow!(
+            "Failed to read the user's JID since the client is not connected."
+        ))?;
+
+        let mut message = Message::new()
+            .set_type(room_id.message_type())
             .set_id(request.id.into_inner().into())
             .set_from(from)
             .set_to(room_id.clone().into_bare())
             .set_message_body(request.body)
+            .set_thread(Thread(thread_id.clone().into_inner()))
             .set_chat_state(Some(ChatState::Active))
             .set_markable()
             .set_store(true);
