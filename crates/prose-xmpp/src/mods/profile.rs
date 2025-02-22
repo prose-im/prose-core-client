@@ -174,6 +174,28 @@ impl Module for Profile {
 }
 
 impl Profile {
+    pub async fn change_password(
+        &self,
+        new_password: impl Into<String>,
+    ) -> Result<(), RequestError> {
+        let account_jid = self.ctx.bare_jid();
+        let iq = Iq {
+            from: None,
+            to: Some(BareJid::from_parts(None, account_jid.domain()).into()),
+            id: self.ctx.generate_id(),
+            payload: IqType::Set(
+                Element::builder("query", ns::REGISTER)
+                    .append_all(account_jid.node().map(|username| {
+                        Element::builder("username", ns::REGISTER).append(username.as_str())
+                    }))
+                    .append(Element::builder("password", ns::REGISTER).append(new_password.into()))
+                    .build(),
+            ),
+        };
+        self.ctx.send_iq(iq).await?;
+        Ok(())
+    }
+
     pub async fn load_vcard4(
         &self,
         from: impl Into<BareJid>,

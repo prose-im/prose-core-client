@@ -362,6 +362,18 @@ impl Client {
         Ok(())
     }
 
+    /// XEP-0077: In-Band Registration
+    /// https://xmpp.org/extensions/xep-0077.html#usecases-changepw
+    #[wasm_bindgen(js_name = "changePassword")]
+    pub async fn change_password(&self, new_password: &str) -> Result<()> {
+        Ok(self
+            .client
+            .account
+            .change_password(new_password)
+            .await
+            .map_err(WasmError::from)?)
+    }
+
     /// XEP-0108: User Activity
     /// https://xmpp.org/extensions/xep-0108.html
     #[wasm_bindgen(js_name = "sendActivity")]

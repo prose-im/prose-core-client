@@ -20,6 +20,12 @@ use crate::infra::xmpp::XMPPClient;
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
 impl UserAccountService for XMPPClient {
+    async fn change_password(&self, new_password: &str) -> Result<()> {
+        let profile = self.client.get_mod::<mods::Profile>();
+        profile.change_password(new_password).await?;
+        Ok(())
+    }
+
     async fn set_avatar_metadata(&self, metadata: &AvatarMetadata) -> Result<()> {
         let profile = self.client.get_mod::<mods::Profile>();
         profile

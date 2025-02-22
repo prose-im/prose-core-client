@@ -37,6 +37,13 @@ pub struct AccountService {
 }
 
 impl AccountService {
+    pub async fn change_password(&self, new_password: impl AsRef<str>) -> Result<()> {
+        self.user_account_service
+            .change_password(new_password.as_ref())
+            .await?;
+        Ok(())
+    }
+
     pub async fn account_info(&self) -> Result<AccountInfo> {
         let account = self.ctx.connected_account()?;
         let user_id = account.to_user_id();

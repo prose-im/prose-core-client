@@ -539,6 +539,8 @@ async fn list_connected_rooms(client: &Client) -> Result<()> {
 
 #[derive(EnumIter, Display, Clone)]
 enum Selection {
+    #[strum(serialize = "Change password")]
+    ChangePassword,
     #[strum(serialize = "Load profile")]
     LoadUserProfile,
     #[strum(serialize = "Update profile")]
@@ -651,6 +653,12 @@ async fn main() -> Result<()> {
         println!();
 
         match select_command() {
+            Selection::ChangePassword => {
+                let Some(new_password) = prompt_opt_string("Enter password", None) else {
+                    continue;
+                };
+                client.account.change_password(&new_password).await?;
+            }
             Selection::LoadUserProfile => {
                 let jid = prompt_bare_jid(&jid);
                 load_user_profile(&client, &jid.into()).await?;

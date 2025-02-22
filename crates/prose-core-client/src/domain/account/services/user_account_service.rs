@@ -23,6 +23,7 @@ pub enum UserProfileFormat {
 #[async_trait]
 #[cfg_attr(feature = "test", mockall::automock)]
 pub trait UserAccountService: SendUnlessWasm + SyncUnlessWasm {
+    async fn change_password(&self, new_password: &str) -> Result<()>;
     async fn set_avatar_metadata(&self, metadata: &AvatarMetadata) -> Result<()>;
     async fn set_avatar_image(&self, checksum: &AvatarId, base64_image_data: String) -> Result<()>;
 
