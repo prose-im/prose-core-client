@@ -129,7 +129,7 @@ impl RoomSpec {
         form: &DataForm,
     ) -> Result<DataForm, form_config::Error> {
         let mut form_values = vec![
-            FormValue::optional(cfg::ALLOW_PM, Value::TextSingle("none".to_string())),
+            FormValue::optional(cfg::ALLOW_PM, Value::ListSingle("none".to_string())),
             FormValue::optional(cfg::CHANGE_SUBJECT, Value::Boolean(true)),
             FormValue::optional(
                 cfg::DEFAULT_HISTORY_MESSAGES,
