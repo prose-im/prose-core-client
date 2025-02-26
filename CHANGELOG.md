@@ -1,3 +1,12 @@
+## What's Changed in 0.1.100
+
+* Specify transient dependency explicity and enable js feature to fix wasm build
+* Support changing password
+* Issue when joining room
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.99...0.1.100)
+
+
 ## What's Changed in 0.1.99
 
 * Let API clients only deal with MessageIds
