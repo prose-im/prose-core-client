@@ -73,3 +73,18 @@ fn test_fenced_url_is_not_converted_to_anchor() {
         parser.convert_to_html()
     );
 }
+
+#[test]
+fn test_encodable_entities() {
+    let parser = MarkdownParser::new(
+        "Already did, it's done by switching the type attribute between text <> password",
+    );
+    assert_eq!(
+        "Already did, it's done by switching the type attribute between text <> password",
+        parser.convert_to_message_styling()
+    );
+    assert_eq!(
+        "<p>Already did, it's done by switching the type attribute between text &lt;&gt; password</p>",
+        parser.convert_to_html()
+    )
+}

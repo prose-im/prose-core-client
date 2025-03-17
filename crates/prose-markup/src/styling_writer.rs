@@ -5,7 +5,7 @@
 
 use jid::BareJid;
 use pulldown_cmark::{CodeBlockKind, Event, Tag, TagEnd};
-use pulldown_cmark_escape::{escape_html, escape_html_body_text, StrWrite};
+use pulldown_cmark_escape::StrWrite;
 
 #[derive(Default)]
 struct ListState {
@@ -282,7 +282,9 @@ where
 
     #[inline]
     fn write_html(&mut self, s: &str) -> Result<(), W::Error> {
-        escape_html(&mut self.writer, &s)?;
+        // We're not escaping with escape_html here since this will be done by
+        // rxml before sending the message…
+        self.writer.write_str(s)?;
         if !s.is_empty() {
             self.is_at_start = false;
             self.end_newline = s.ends_with('\n');
@@ -292,7 +294,9 @@ where
 
     #[inline]
     fn write_html_body(&mut self, s: &str) -> Result<(), W::Error> {
-        escape_html_body_text(&mut self.writer, &s)?;
+        // We're not escaping with escape_html_body_text here since this will be done by
+        // rxml before sending the message…
+        self.writer.write_str(s)?;
         if !s.is_empty() {
             self.is_at_start = false;
             self.end_newline = s.ends_with('\n');
