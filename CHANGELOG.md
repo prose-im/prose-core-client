@@ -1,3 +1,11 @@
+## What's Changed in 0.1.101
+
+* Specify transient dependency explicity and enable js feature to fix wasm build
+* Prevent doubly escaped HTML entities in Message Styling text
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.100...0.1.101)
+
+
 ## What's Changed in 0.1.100
 
 * Specify transient dependency explicity and enable js feature to fix wasm build
