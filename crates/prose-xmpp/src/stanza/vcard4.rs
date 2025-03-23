@@ -3,6 +3,10 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use std::collections::hash_map::IntoIter;
+use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
+
 use anyhow::Result;
 use minidom::{Element, ElementBuilder};
 use xmpp_parsers::iq::IqSetPayload;
@@ -24,6 +28,7 @@ pub struct VCard4 {
     pub tel: Vec<Tel>,
     pub title: Vec<Title>,
     pub url: Vec<URL>,
+    pub extensions: Extensions,
 }
 
 impl VCard4 {
@@ -44,6 +49,7 @@ impl VCard4 {
             && self.tel.is_empty()
             && self.title.is_empty()
             && self.url.is_empty()
+            && self.extensions.is_empty()
     }
 }
 
@@ -100,6 +106,44 @@ pub struct Note {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Org {
     pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct Extensions(HashMap<String, String>);
+
+impl Deref for Extensions {
+    type Target = HashMap<String, String>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for Extensions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl Into<HashMap<String, String>> for Extensions {
+    fn into(self) -> HashMap<String, String> {
+        self.0
+    }
+}
+
+impl IntoIterator for Extensions {
+    type Item = (String, String);
+    type IntoIter = IntoIter<String, String>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl FromIterator<(String, String)> for Extensions {
+    fn from_iter<T: IntoIterator<Item = (String, String)>>(iter: T) -> Self {
+        Self(HashMap::from_iter(iter))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -161,6 +205,11 @@ impl TryFrom<Element> for VCard4 {
                 "role" => vcard.role.push(Role {
                     value: child.text_value()?,
                 }),
+                key if key.starts_with("x-") => {
+                    vcard
+                        .extensions
+                        .insert(key.to_string(), child.text_value()?);
+                }
                 _ => (),
             }
         }
@@ -184,6 +233,10 @@ impl From<VCard4> for Element {
             .append_all_values(vcard.title, "title", "text", |v| v.value)
             .append_all_values(vcard.tel, "tel", "text", |v| v.value)
             .append_all_values(vcard.url, "url", "uri", |v| v.value)
+            .append_all(vcard.extensions.iter().map(|(key, value)| {
+                Element::builder(key, ns::VCARD4)
+                    .append(Element::builder("text", ns::VCARD4).append(value.clone()))
+            }))
             .build()
     }
 }
@@ -459,13 +512,9 @@ mod tests {
     fn test_serialize_vcard() -> Result<()> {
         let vcard = VCard4 {
             adr: vec![Adr {
-                code: vec![],
                 country: vec!["France, French Republic".to_string()],
-                ext: vec![],
                 locality: vec!["Nantes".to_string()],
-                pobox: vec![],
-                region: vec![],
-                street: vec![],
+                ..Default::default()
             }],
             email: vec![Email {
                 value: "valerian@prose.org".to_string(),
@@ -476,7 +525,7 @@ mod tests {
             n: vec![Name {
                 surname: Some("Saliou".to_string()),
                 given: Some("Valerian".to_string()),
-                additional: None,
+                ..Default::default()
             }],
             impp: vec![Impp {
                 value: "xmpp:valerian@prose.org".to_string(),
@@ -489,17 +538,37 @@ mod tests {
                     value: "Another nickname".to_string(),
                 },
             ],
-            note: vec![],
-            org: vec![],
-            tel: vec![],
-            title: vec![],
-            role: vec![],
             url: vec![URL {
                 value: "https://prose.org/".to_string(),
             }],
+            ..Default::default()
         };
 
         assert_eq!(VCard4::try_from(Element::from(vcard.clone()))?, vcard);
+        Ok(())
+    }
+
+    /// We store workspace details in a vCard4, and need to store non-standard properties.
+    /// This test ensures extensions are parsed correctly.
+    #[test]
+    fn test_extensions() -> Result<()> {
+        let vcard = VCard4 {
+            fn_: vec![Fn_ {
+                value: "Prose".to_string(),
+            }],
+            extensions: vec![("x-accent-color", "#2d8deb")]
+                .into_iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+            ..Default::default()
+        };
+
+        assert_eq!(VCard4::try_from(Element::from(vcard.clone()))?, vcard);
+        // Check that values can be read
+        assert_eq!(
+            vcard.extensions.get(&"x-accent-color".to_string()),
+            Some(&"#2d8deb".to_string())
+        );
         Ok(())
     }
 }

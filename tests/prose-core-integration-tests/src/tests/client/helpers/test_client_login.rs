@@ -35,20 +35,10 @@ impl Default for LoginStrategy {
             offline_messages: vec![],
             bookmarks_handler: Box::new(|client| client.expect_load_bookmarks(None)),
             user_vcard: Some(VCard4 {
-                adr: vec![],
-                email: vec![],
-                fn_: vec![],
-                n: vec![],
-                impp: vec![],
                 nickname: vec![Nickname {
                     value: "Jane Doe".to_string(),
                 }],
-                note: vec![],
-                org: vec![],
-                role: vec![],
-                tel: vec![],
-                title: vec![],
-                url: vec![],
+                ..Default::default()
             }),
             roster_items: vec![],
         }
