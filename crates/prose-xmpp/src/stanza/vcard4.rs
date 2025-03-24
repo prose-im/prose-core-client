@@ -1,11 +1,9 @@
 // prose-core-client/prose-xmpp
 //
-// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// Copyright:
+//   - 2023, Marc Bauer <mb@nesium.com>
+//   - 2025, Rémi Bardon <remi@remibardon.name>
 // License: Mozilla Public License v2.0 (MPL v2.0)
-
-use std::collections::hash_map::IntoIter;
-use std::collections::HashMap;
-use std::ops::{Deref, DerefMut};
 
 use anyhow::Result;
 use minidom::{Element, ElementBuilder};
@@ -28,7 +26,10 @@ pub struct VCard4 {
     pub tel: Vec<Tel>,
     pub title: Vec<Title>,
     pub url: Vec<URL>,
-    pub extensions: Extensions,
+    /// Unsupported standard properties, defined in [RFC 6350 - vCard Format Specification, section 3.3](https://datatracker.ietf.org/doc/html/rfc6350#section-3.3) or by IANA (see [vCard Elements](https://www.iana.org/assignments/vcard-elements/vcard-elements.xhtml)).
+    pub unknown_: UnsupportedProperties,
+    /// Extended properties, as defined in [RFC 6350 - vCard Format Specification, section 6.10](https://datatracker.ietf.org/doc/html/rfc6350#section-6.10).
+    pub extensions: UnsupportedProperties,
 }
 
 impl VCard4 {
@@ -49,6 +50,7 @@ impl VCard4 {
             && self.tel.is_empty()
             && self.title.is_empty()
             && self.url.is_empty()
+            && self.unknown_.is_empty()
             && self.extensions.is_empty()
     }
 }
@@ -109,40 +111,46 @@ pub struct Org {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct Extensions(HashMap<String, String>);
+pub struct UnsupportedProperties(Vec<Element>);
 
-impl Deref for Extensions {
-    type Target = HashMap<String, String>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for Extensions {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Into<HashMap<String, String>> for Extensions {
-    fn into(self) -> HashMap<String, String> {
+impl UnsupportedProperties {
+    pub fn get<K: Into<String>>(&self, key: K) -> Vec<&Element> {
+        let key = key.into();
         self.0
+            .iter()
+            .filter_map(|e| {
+                if e.name() == &key {
+                    Some(e.children())
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect()
+    }
+    pub fn push(&mut self, value: Element) {
+        self.0.push(value);
+    }
+    pub fn iter(&self) -> std::slice::Iter<'_, <Self as IntoIterator>::Item> {
+        self.0.iter()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 }
 
-impl IntoIterator for Extensions {
-    type Item = (String, String);
-    type IntoIter = IntoIter<String, String>;
+impl IntoIterator for UnsupportedProperties {
+    type Item = Element;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl FromIterator<(String, String)> for Extensions {
-    fn from_iter<T: IntoIterator<Item = (String, String)>>(iter: T) -> Self {
-        Self(HashMap::from_iter(iter))
+impl<V: Into<Element>> FromIterator<V> for UnsupportedProperties {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        Self(Vec::from_iter(iter.into_iter().map(Into::into)))
     }
 }
 
@@ -206,11 +214,11 @@ impl TryFrom<Element> for VCard4 {
                     value: child.text_value()?,
                 }),
                 key if key.starts_with("x-") => {
-                    vcard
-                        .extensions
-                        .insert(key.to_string(), child.text_value()?);
+                    vcard.extensions.push(child.clone());
                 }
-                _ => (),
+                _ => {
+                    vcard.unknown_.push(child.clone());
+                }
             }
         }
 
@@ -233,10 +241,10 @@ impl From<VCard4> for Element {
             .append_all_values(vcard.title, "title", "text", |v| v.value)
             .append_all_values(vcard.tel, "tel", "text", |v| v.value)
             .append_all_values(vcard.url, "url", "uri", |v| v.value)
-            .append_all(vcard.extensions.iter().map(|(key, value)| {
-                Element::builder(key, ns::VCARD4)
-                    .append(Element::builder("text", ns::VCARD4).append(value.clone()))
-            }))
+            // See [RFC 6351 - xCard: vCard XML Representation, section 6](https://datatracker.ietf.org/doc/html/rfc6351#section-6).
+            .append_all(vcard.unknown_.into_iter())
+            // See [RFC 6351 - xCard: vCard XML Representation, section 6](https://datatracker.ietf.org/doc/html/rfc6351#section-6).
+            .append_all(vcard.extensions.into_iter())
             .build()
     }
 }
@@ -388,7 +396,9 @@ impl VCardBuilderExt for ElementBuilder {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::str::FromStr as _;
+
+    use crate::test::ElementExt;
 
     use super::*;
 
@@ -552,22 +562,58 @@ mod tests {
     /// This test ensures extensions are parsed correctly.
     #[test]
     fn test_extensions() -> Result<()> {
-        let vcard = VCard4 {
-            fn_: vec![Fn_ {
-                value: "Prose".to_string(),
-            }],
-            extensions: vec![("x-accent-color", "#2d8deb")]
-                .into_iter()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect(),
-            ..Default::default()
-        };
+        let xml = r#"<vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
+            <x-color-text><text>#2d8deb</text></x-color-text>
+            <x-color-unknown><unknown>#2d8deb</unknown></x-color-unknown>
+        </vcard>
+        "#;
+        let element = Element::from_pretty_printed_xml(xml)?;
+        let vcard = VCard4::try_from(element.clone())?;
+
+        assert_eq!(Element::from(vcard.clone()), element);
+        // Check that values can be read
+        assert_eq!(
+            vcard
+                .extensions
+                .get("x-color-text")
+                .first()
+                .map(|v| v.text()),
+            Some("#2d8deb".to_owned()),
+            "{:#?}",
+            vcard.extensions.get("x-color-text")
+        );
+        assert_eq!(
+            vcard
+                .extensions
+                .get("x-color-unknown")
+                .first()
+                .map(|v| v.text()),
+            Some("#2d8deb".to_owned()),
+            "{:#?}",
+            vcard.extensions.get("x-color-unknown")
+        );
+        Ok(())
+    }
+
+    /// vCard4 standard properties can be extended by IANA, and we shouldn’t drop their value
+    /// during a parse/print loop. This test ensures unsupported —yet standard— properties are
+    /// kept in such scenario.
+    #[test]
+    fn test_unknown_properties() -> Result<()> {
+        let xml = r#"<vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
+            <lang><text>en</text></lang>
+        </vcard>
+        "#;
+        let element = Element::from_pretty_printed_xml(xml)?;
+        let vcard = VCard4::try_from(element.clone())?;
 
         assert_eq!(VCard4::try_from(Element::from(vcard.clone()))?, vcard);
         // Check that values can be read
         assert_eq!(
-            vcard.extensions.get(&"x-accent-color".to_string()),
-            Some(&"#2d8deb".to_string())
+            vcard.unknown_.get("lang").first().map(|v| v.text()),
+            Some("en".to_string()),
+            "{:#?}",
+            vcard.unknown_.get("lang")
         );
         Ok(())
     }
