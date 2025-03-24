@@ -32,6 +32,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+xml-rs = { version = "0.8", optional = true }
 xmpp-parsers = { workspace = true }
 xso = { workspace = true }
 
@@ -49,5 +50,5 @@ uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics"] }
 
 [features]
 default = []
-test = ["dep:insta"]
+test = ["dep:insta", "dep:xml-rs"]
 trace-stanzas = []

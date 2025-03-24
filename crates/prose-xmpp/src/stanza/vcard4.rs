@@ -1,6 +1,8 @@
 // prose-core-client/prose-xmpp
 //
-// Copyright: 2023, Marc Bauer <mb@nesium.com>
+// Copyright:
+//   - 2023, Marc Bauer <mb@nesium.com>
+//   - 2025, Rémi Bardon <remi@remibardon.name>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::Result;
@@ -24,6 +26,11 @@ pub struct VCard4 {
     pub tel: Vec<Tel>,
     pub title: Vec<Title>,
     pub url: Vec<URL>,
+    /// Container for:
+    ///
+    /// - Unsupported standard properties, defined in [RFC 6350 - vCard Format Specification, section 3.3](https://datatracker.ietf.org/doc/html/rfc6350#section-3.3) or by IANA (see [vCard Elements](https://www.iana.org/assignments/vcard-elements/vcard-elements.xhtml)).
+    /// - Extended properties, as defined in [RFC 6350 - vCard Format Specification, section 6.10](https://datatracker.ietf.org/doc/html/rfc6350#section-6.10).
+    pub unknown_properties: PropertyContainer,
 }
 
 impl VCard4 {
@@ -44,6 +51,7 @@ impl VCard4 {
             && self.tel.is_empty()
             && self.title.is_empty()
             && self.url.is_empty()
+            && self.unknown_properties.is_empty()
     }
 }
 
@@ -100,6 +108,50 @@ pub struct Note {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Org {
     pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct PropertyContainer(Vec<Element>);
+
+impl PropertyContainer {
+    pub fn get<K: Into<String>>(&self, key: K) -> Vec<&Element> {
+        let key = key.into();
+        self.0
+            .iter()
+            .filter_map(|e| {
+                if e.name() == &key {
+                    Some(e.children())
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect()
+    }
+    pub fn push(&mut self, value: Element) {
+        self.0.push(value);
+    }
+    pub fn iter(&self) -> std::slice::Iter<'_, <Self as IntoIterator>::Item> {
+        self.0.iter()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl IntoIterator for PropertyContainer {
+    type Item = Element;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<V: Into<Element>> FromIterator<V> for PropertyContainer {
+    fn from_iter<T: IntoIterator<Item = V>>(iter: T) -> Self {
+        Self(Vec::from_iter(iter.into_iter().map(Into::into)))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -161,7 +213,9 @@ impl TryFrom<Element> for VCard4 {
                 "role" => vcard.role.push(Role {
                     value: child.text_value()?,
                 }),
-                _ => (),
+                _ => {
+                    vcard.unknown_properties.push(child.clone());
+                }
             }
         }
 
@@ -184,6 +238,8 @@ impl From<VCard4> for Element {
             .append_all_values(vcard.title, "title", "text", |v| v.value)
             .append_all_values(vcard.tel, "tel", "text", |v| v.value)
             .append_all_values(vcard.url, "url", "uri", |v| v.value)
+            // See [RFC 6351 - xCard: vCard XML Representation, section 6](https://datatracker.ietf.org/doc/html/rfc6351#section-6).
+            .append_all(vcard.unknown_properties.into_iter())
             .build()
     }
 }
@@ -337,6 +393,8 @@ impl VCardBuilderExt for ElementBuilder {
 mod tests {
     use std::str::FromStr;
 
+    use crate::test::ElementExt;
+
     use super::*;
 
     #[test]
@@ -459,13 +517,9 @@ mod tests {
     fn test_serialize_vcard() -> Result<()> {
         let vcard = VCard4 {
             adr: vec![Adr {
-                code: vec![],
                 country: vec!["France, French Republic".to_string()],
-                ext: vec![],
                 locality: vec!["Nantes".to_string()],
-                pobox: vec![],
-                region: vec![],
-                street: vec![],
+                ..Default::default()
             }],
             email: vec![Email {
                 value: "valerian@prose.org".to_string(),
@@ -476,7 +530,7 @@ mod tests {
             n: vec![Name {
                 surname: Some("Saliou".to_string()),
                 given: Some("Valerian".to_string()),
-                additional: None,
+                ..Default::default()
             }],
             impp: vec![Impp {
                 value: "xmpp:valerian@prose.org".to_string(),
@@ -489,17 +543,77 @@ mod tests {
                     value: "Another nickname".to_string(),
                 },
             ],
-            note: vec![],
-            org: vec![],
-            tel: vec![],
-            title: vec![],
-            role: vec![],
             url: vec![URL {
                 value: "https://prose.org/".to_string(),
             }],
+            ..Default::default()
         };
 
         assert_eq!(VCard4::try_from(Element::from(vcard.clone()))?, vcard);
+        Ok(())
+    }
+
+    /// We store workspace details in a vCard4, and need to store non-standard properties.
+    /// This test ensures extensions are parsed correctly.
+    #[test]
+    fn test_extensions() -> Result<()> {
+        let xml = r#"<vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
+            <x-color-text><text>#2d8deb</text></x-color-text>
+            <x-color-unknown><unknown>#2d8deb</unknown></x-color-unknown>
+        </vcard>
+        "#;
+        let element = Element::from_pretty_printed_xml(xml)?;
+        let vcard = VCard4::try_from(element.clone())?;
+
+        assert_eq!(Element::from(vcard.clone()), element);
+        // Check that values can be read
+        assert_eq!(
+            vcard
+                .unknown_properties
+                .get("x-color-text")
+                .first()
+                .map(|v| v.text()),
+            Some("#2d8deb".to_owned()),
+            "{:#?}",
+            vcard.unknown_properties.get("x-color-text")
+        );
+        assert_eq!(
+            vcard
+                .unknown_properties
+                .get("x-color-unknown")
+                .first()
+                .map(|v| v.text()),
+            Some("#2d8deb".to_owned()),
+            "{:#?}",
+            vcard.unknown_properties.get("x-color-unknown")
+        );
+        Ok(())
+    }
+
+    /// vCard4 standard properties can be extended by IANA, and we shouldn’t drop their value
+    /// during a parse/print loop. This test ensures unsupported —yet standard— properties are
+    /// kept in such scenario.
+    #[test]
+    fn test_unknown_properties() -> Result<()> {
+        let xml = r#"<vcard xmlns="urn:ietf:params:xml:ns:vcard-4.0">
+            <lang><text>en</text></lang>
+        </vcard>
+        "#;
+        let element = Element::from_pretty_printed_xml(xml)?;
+        let vcard = VCard4::try_from(element.clone())?;
+
+        assert_eq!(VCard4::try_from(Element::from(vcard.clone()))?, vcard);
+        // Check that values can be read
+        assert_eq!(
+            vcard
+                .unknown_properties
+                .get("lang")
+                .first()
+                .map(|v| v.text()),
+            Some("en".to_string()),
+            "{:#?}",
+            vcard.unknown_properties.get("lang")
+        );
         Ok(())
     }
 }

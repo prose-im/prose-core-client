@@ -10,6 +10,7 @@ pub use connected_client::{ClientTestAdditions, ConnectedClient};
 #[cfg(not(target_arch = "wasm32"))]
 pub use connector::{Connection, Connector};
 pub use constant_id_provider::ConstantIDProvider;
+pub use element_ext::ElementExt;
 pub use incrementing_id_provider::IncrementingIDProvider;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -17,6 +18,7 @@ mod connected_client;
 #[cfg(not(target_arch = "wasm32"))]
 mod connector;
 mod constant_id_provider;
+mod element_ext;
 mod incrementing_id_provider;
 
 pub trait StrExt {
