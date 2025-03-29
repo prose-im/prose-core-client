@@ -1,3 +1,10 @@
+## What's Changed in 0.1.102
+
+* Store unknown properties as-is in vCard4
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.101...0.1.102)
+
+
 ## What's Changed in 0.1.101
 
 * Specify transient dependency explicity and enable js feature to fix wasm build
