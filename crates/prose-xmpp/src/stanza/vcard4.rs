@@ -617,19 +617,16 @@ mod tests {
 
         // Test x-name values
         assert_eq!(
-            Kind::from_str("x-company").unwrap(),
+            Kind::from_str("x-company")?,
             Kind::XName("x-company".to_string())
         );
         assert_eq!(
-            Kind::from_str("x-school").unwrap(),
+            Kind::from_str("x-school")?,
             Kind::XName("x-school".to_string())
         );
 
         // Test IANA values
-        assert_eq!(
-            Kind::from_str("thing").unwrap(),
-            Kind::Iana("thing".to_string())
-        );
+        assert_eq!(Kind::from_str("thing")?, Kind::Iana("thing".to_string()));
 
         // Test standard values
         assert_eq!(Kind::Individual.to_string(), "individual");
