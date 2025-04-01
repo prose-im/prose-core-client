@@ -7,6 +7,8 @@
 
 use anyhow::Result;
 use minidom::{Element, ElementBuilder};
+use std::fmt::Display;
+use std::str::FromStr;
 use xmpp_parsers::iq::IqSetPayload;
 
 use crate::util::ElementExt;
@@ -26,6 +28,7 @@ pub struct VCard4 {
     pub tel: Vec<Tel>,
     pub title: Vec<Title>,
     pub url: Vec<URL>,
+    pub kind: Option<Kind>,
     /// Container for:
     ///
     /// - Unsupported standard properties, defined in [RFC 6350 - vCard Format Specification, section 3.3](https://datatracker.ietf.org/doc/html/rfc6350#section-3.3) or by IANA (see [vCard Elements](https://www.iana.org/assignments/vcard-elements/vcard-elements.xhtml)).
@@ -108,6 +111,26 @@ pub struct Note {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Org {
     pub value: String,
+}
+
+/// Specifies the kind of object the vCard represents.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum Kind {
+    /// An individual person
+    #[default]
+    Individual,
+    /// A group of individuals
+    Group,
+    /// An organization
+    Organization,
+    /// A physical location
+    Location,
+    /// A software application (https://datatracker.ietf.org/doc/html/rfc6473)
+    Application,
+    /// A custom kind value (x-name)
+    XName(String),
+    /// An IANA-registered kind value
+    Iana(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -213,6 +236,7 @@ impl TryFrom<Element> for VCard4 {
                 "role" => vcard.role.push(Role {
                     value: child.text_value()?,
                 }),
+                "kind" => vcard.kind = Some(child.text_value()?.parse()?),
                 _ => {
                     vcard.unknown_properties.push(child.clone());
                 }
@@ -238,6 +262,7 @@ impl From<VCard4> for Element {
             .append_all_values(vcard.title, "title", "text", |v| v.value)
             .append_all_values(vcard.tel, "tel", "text", |v| v.value)
             .append_all_values(vcard.url, "url", "uri", |v| v.value)
+            .append_all_values(vcard.kind, "kind", "text", |v| v.to_string())
             // See [RFC 6351 - xCard: vCard XML Representation, section 6](https://datatracker.ietf.org/doc/html/rfc6351#section-6).
             .append_all(vcard.unknown_properties.into_iter())
             .build()
@@ -324,21 +349,46 @@ impl From<Adr> for Element {
     }
 }
 
+impl FromStr for Kind {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "individual" => Ok(Kind::Individual),
+            "group" => Ok(Kind::Group),
+            "org" => Ok(Kind::Organization),
+            "location" => Ok(Kind::Location),
+            "application" => Ok(Kind::Application),
+            s if s.starts_with("x-") => Ok(Kind::XName(s.to_string())),
+            s => Ok(Kind::Iana(s.to_string())),
+        }
+    }
+}
+
+impl Display for Kind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Kind::Individual => "individual",
+            Kind::Group => "group",
+            Kind::Organization => "org",
+            Kind::Location => "location",
+            Kind::Application => "application",
+            Kind::XName(s) => s,
+            Kind::Iana(s) => s,
+        })
+    }
+}
+
 trait VCardExt {
     fn text_value(&self) -> Result<String, ParseError>;
     fn uri_value(&self) -> Result<String, ParseError>;
 }
 
 trait VCardBuilderExt {
-    fn append_all_values<T, F>(
-        self,
-        vec: Vec<T>,
-        name: &str,
-        value_name: &str,
-        transform: F,
-    ) -> Self
+    fn append_all_values<I, F>(self, values: I, name: &str, value_name: &str, transform: F) -> Self
     where
-        F: Fn(T) -> String;
+        I: IntoIterator,
+        F: Fn(I::Item) -> String;
     fn append_all_strings(self, vec: Vec<String>, name: &str) -> Self;
 }
 
@@ -361,21 +411,20 @@ impl VCardExt for Element {
 }
 
 impl VCardBuilderExt for ElementBuilder {
-    fn append_all_values<T, F>(
-        self,
-        vec: Vec<T>,
-        name: &str,
-        value_name: &str,
-        transform: F,
-    ) -> Self
+    fn append_all_values<I, F>(self, values: I, name: &str, value_name: &str, transform: F) -> Self
     where
-        F: Fn(T) -> String,
+        I: IntoIterator,
+        F: Fn(I::Item) -> String,
     {
-        if vec.is_empty() {
+        let iter = values.into_iter();
+
+        // We'll use peekable to check if the iterator is empty
+        let mut peekable = iter.peekable();
+        if peekable.peek().is_none() {
             return self;
         }
 
-        self.append_all(vec.into_iter().map(|value| {
+        self.append_all(peekable.map(|value| {
             Element::builder(name, ns::VCARD4)
                 .append(Element::builder(value_name, ns::VCARD4).append(transform(value)))
         }))
@@ -422,6 +471,7 @@ mod tests {
             <locality>Nantes</locality>
             <country>France, French Republic</country>
           </adr>
+          <kind><text>individual</text></kind>
         </vcard>
         "#;
 
@@ -489,6 +539,7 @@ mod tests {
                 street: vec![],
             }]
         );
+        assert_eq!(vcard.kind, Some(Kind::Individual));
 
         Ok(())
     }
@@ -546,10 +597,57 @@ mod tests {
             url: vec![URL {
                 value: "https://prose.org/".to_string(),
             }],
+            kind: Some(Kind::Organization),
             ..Default::default()
         };
 
         assert_eq!(VCard4::try_from(Element::from(vcard.clone()))?, vcard);
+        Ok(())
+    }
+
+    #[test]
+    fn test_kind() -> Result<()> {
+        // Test standard values
+        assert_eq!(Kind::from_str("individual")?, Kind::Individual);
+        assert_eq!(Kind::from_str("INDIVIDUAL")?, Kind::Individual);
+        assert_eq!(Kind::from_str("group")?, Kind::Group);
+        assert_eq!(Kind::from_str("org")?, Kind::Organization);
+        assert_eq!(Kind::from_str("location")?, Kind::Location);
+        assert_eq!(Kind::from_str("application")?, Kind::Application);
+
+        // Test x-name values
+        assert_eq!(
+            Kind::from_str("x-company").unwrap(),
+            Kind::XName("x-company".to_string())
+        );
+        assert_eq!(
+            Kind::from_str("x-school").unwrap(),
+            Kind::XName("x-school".to_string())
+        );
+
+        // Test IANA values
+        assert_eq!(
+            Kind::from_str("thing").unwrap(),
+            Kind::Iana("thing".to_string())
+        );
+
+        // Test standard values
+        assert_eq!(Kind::Individual.to_string(), "individual");
+        assert_eq!(Kind::Group.to_string(), "group");
+        assert_eq!(Kind::Organization.to_string(), "org");
+        assert_eq!(Kind::Location.to_string(), "location");
+        assert_eq!(Kind::Application.to_string(), "application");
+
+        // Test x-name values
+        assert_eq!(
+            Kind::XName("x-company".to_string()).to_string(),
+            "x-company"
+        );
+        assert_eq!(Kind::XName("x-school".to_string()).to_string(), "x-school");
+
+        // Test IANA values
+        assert_eq!(Kind::Iana("thing".to_string()).to_string(), "thing");
+
         Ok(())
     }
 
