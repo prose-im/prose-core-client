@@ -39,7 +39,6 @@ pub use crate::domain::{
     },
     uploads::models::UploadHeader,
     user_info::models::{JabberClient, LastActivity, UserInfo, UserMetadata, UserStatus},
-    workspace::models::Workspace,
 };
 
 mod account_info;
