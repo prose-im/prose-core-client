@@ -16,10 +16,10 @@ use crate::domain::user_info::models::Presence;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
     shared::models::{
-        AnonOccupantId, CapabilitiesId, OccupantId, RequestId, SenderId, UserEndpointId, UserId,
-        UserResourceId,
+        AnonOccupantId, AvatarMetadata, CapabilitiesId, OccupantId, RequestId, SenderId,
+        UserEndpointId, UserId, UserResourceId,
     },
-    user_info::models::{AvatarMetadata, UserProfile, UserStatus},
+    user_info::models::{UserProfile, UserStatus},
 };
 use crate::dtos::RoomId;
 

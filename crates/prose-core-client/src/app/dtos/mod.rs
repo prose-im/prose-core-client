@@ -32,14 +32,14 @@ pub use crate::domain::{
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        AccountId, Availability, Markdown, MucId, OccupantId, ParticipantBasicInfo, ParticipantId,
-        ParticipantInfo, RoomId, ScalarRangeExt, StringIndexRangeExt, UnicodeScalarIndex,
-        UserBasicInfo, UserId, UserPresenceInfo, UserResourceId, Utf16Index, Utf8Index, HTML,
+        AccountId, Availability, Avatar, AvatarSource, Markdown, MucId, OccupantId,
+        ParticipantBasicInfo, ParticipantId, ParticipantInfo, RoomId, ScalarRangeExt,
+        StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId, UserPresenceInfo,
+        UserResourceId, Utf16Index, Utf8Index, HTML,
     },
     uploads::models::UploadHeader,
-    user_info::models::{
-        Avatar, AvatarSource, JabberClient, LastActivity, UserInfo, UserMetadata, UserStatus,
-    },
+    user_info::models::{JabberClient, LastActivity, UserInfo, UserMetadata, UserStatus},
+    workspace::models::Workspace,
 };
 
 mod account_info;

@@ -11,8 +11,10 @@ use prose_store::prelude::*;
 use prose_store::{define_entity, RawKey};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, AvatarId, ParticipantId, ParticipantIdRef};
-use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{
+    AccountId, AvatarId, AvatarInfo, ParticipantId, ParticipantIdRef,
+};
+use crate::domain::user_info::models::PlatformImage;
 use crate::domain::user_info::repos::AvatarRepository;
 
 pub struct StoreAvatarRepository {

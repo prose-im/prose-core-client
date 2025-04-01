@@ -12,7 +12,8 @@ use prose_xmpp::mods::AvatarData;
 use crate::app::deps::*;
 use crate::domain::account::services::UserProfileFormat;
 use crate::domain::shared::models::{Availability, AvatarId, CachePolicy, ParticipantIdRef};
-use crate::domain::user_info::models::{Avatar, AvatarMetadata, UserProfile, UserStatus};
+use crate::domain::shared::models::{Avatar, AvatarMetadata};
+use crate::domain::user_info::models::{UserProfile, UserStatus};
 use crate::dtos::{AccountInfo, DeviceId, DeviceInfo, UserProfile as UserProfileDTO};
 use crate::ClientEvent;
 

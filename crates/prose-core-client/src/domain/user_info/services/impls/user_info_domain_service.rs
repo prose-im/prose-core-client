@@ -21,11 +21,11 @@ use crate::app::deps::{
 };
 use crate::domain::contacts::models::Contact;
 use crate::domain::shared::models::{
-    CachePolicy, ConnectionState, ParticipantIdRef, UserId, UserOrResourceId,
+    Avatar, AvatarInfo, AvatarSource, CachePolicy, ConnectionState, ParticipantIdRef, UserId,
+    UserOrResourceId,
 };
 use crate::domain::user_info::models::{
-    Avatar, AvatarInfo, AvatarSource, Image, PlatformImage, Presence, ProfileName, UserInfo,
-    UserMetadata, UserProfile, UserStatus,
+    Image, PlatformImage, Presence, ProfileName, UserInfo, UserMetadata, UserProfile, UserStatus,
 };
 use crate::domain::user_info::services::UserInfoDomainService as UserInfoDomainServiceTrait;
 use crate::dtos::ParticipantId;

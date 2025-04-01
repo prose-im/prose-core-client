@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, AvatarId, ParticipantIdRef};
-use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{AccountId, AvatarId, AvatarInfo, ParticipantIdRef};
+use crate::domain::user_info::models::PlatformImage;
 use crate::domain::user_info::repos::AvatarRepository;
 
 use super::MAX_IMAGE_DIMENSIONS;

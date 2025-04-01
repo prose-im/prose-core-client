@@ -13,7 +13,7 @@ use crate::app::deps::{
 use crate::app::event_handlers::{
     ServerEvent, ServerEventHandler, UserInfoEvent, UserInfoEventType,
 };
-use crate::domain::user_info::models::Avatar;
+use crate::domain::shared::models::Avatar;
 use crate::dtos::ParticipantId;
 use crate::ClientEvent;
 use prose_proc_macros::InjectDependencies;

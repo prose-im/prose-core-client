@@ -6,9 +6,9 @@
 use serde::{Deserialize, Serialize};
 
 use crate::domain::shared::models::{Availability, CapabilitiesId};
+use crate::domain::shared::models::{Avatar, UserBasicInfo, UserId, UserPresenceInfo};
 use crate::domain::shared::utils::ContactNameBuilder;
-use crate::domain::user_info::models::{Avatar, JabberClient, UserStatus};
-use crate::dtos::{UserBasicInfo, UserId, UserPresenceInfo};
+use crate::domain::user_info::models::{JabberClient, UserStatus};
 
 #[derive(Clone, PartialEq, Debug, Default, Serialize, Deserialize)]
 pub struct UserName {

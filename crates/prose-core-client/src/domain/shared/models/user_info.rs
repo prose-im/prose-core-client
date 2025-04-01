@@ -5,7 +5,8 @@
 
 use super::{Availability, ParticipantId, UserId};
 use crate::domain::rooms::models::{Participant, RoomAffiliation};
-use crate::domain::user_info::models::{Avatar, JabberClient};
+use crate::domain::shared::models::Avatar;
+use crate::domain::user_info::models::JabberClient;
 use crate::dtos::UserStatus;
 
 #[derive(Debug, Clone, PartialEq)]
