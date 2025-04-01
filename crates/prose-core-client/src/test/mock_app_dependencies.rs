@@ -63,6 +63,8 @@ use crate::domain::user_info::repos::mocks::{
 };
 use crate::domain::user_info::services::impls::UserInfoDomainServiceDependencies;
 use crate::domain::user_info::services::mocks::{MockUserInfoDomainService, MockUserInfoService};
+use crate::domain::workspace::repos::mocks::MockWorkspaceInfoRepository;
+use crate::domain::workspace::services::mocks::MockWorkspaceInfoDomainService;
 use crate::dtos::{DecryptionContext, UserResourceId};
 use crate::infra::general::mocks::StepRngProvider;
 use crate::infra::general::OsRngProvider;
@@ -152,6 +154,8 @@ pub struct MockAppDependencies {
     pub user_account_service: MockUserAccountService,
     pub user_device_repo: MockUserDeviceRepository,
     pub user_info_domain_service: MockUserInfoDomainService,
+    pub workspace_info_domain_service: MockWorkspaceInfoDomainService,
+    pub workspace_info_repo: MockWorkspaceInfoRepository,
 }
 
 impl MockAppDependencies {
@@ -246,8 +250,10 @@ impl From<MockAppDependencies> for AppDependencies {
             user_account_service: Arc::new(mock.user_account_service),
             user_device_repo: Arc::new(mock.user_device_repo),
             user_info_domain_service,
+            workspace_info_domain_service: Arc::new(mock.workspace_info_domain_service),
             contact_list_domain_service: Arc::new(mock.contact_list_domain_service),
             rng_provider: Arc::new(OsRngProvider),
+            workspace_info_repo: Arc::new(mock.workspace_info_repo),
         }
     }
 }

@@ -111,14 +111,14 @@ async fn test_resolves_avatars_in_dm_messages_with_avatars_received_before_start
     let our_avatar = Avatar {
         id: AvatarId::from_str_unchecked("user-avatar-id"),
         source: AvatarSource::Pep {
-            owner: user_id!("user@prose.org"),
+            owner: user_id!("user@prose.org").into(),
             mime_type: "image/gif".to_string(),
         },
     };
     let their_avatar = Avatar {
         id: AvatarId::from_str_unchecked("their-avatar-id"),
         source: AvatarSource::Pep {
-            owner: user_id!("them@prose.org"),
+            owner: user_id!("them@prose.org").into(),
             mime_type: "image/gif".to_string(),
         },
     };
@@ -228,14 +228,14 @@ async fn test_resolves_avatars_in_dm_messages_with_avatars_received_after_start(
     let our_avatar = Avatar {
         id: AvatarId::from_str_unchecked("user-avatar-id"),
         source: AvatarSource::Pep {
-            owner: user_id!("user@prose.org"),
+            owner: user_id!("user@prose.org").into(),
             mime_type: "image/gif".to_string(),
         },
     };
     let their_avatar = Avatar {
         id: AvatarId::from_str_unchecked("their-avatar-id"),
         source: AvatarSource::Pep {
-            owner: user_id!("them@prose.org"),
+            owner: user_id!("them@prose.org").into(),
             mime_type: "image/gif".to_string(),
         },
     };

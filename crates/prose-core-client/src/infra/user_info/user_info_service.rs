@@ -15,7 +15,7 @@ use xmpp_parsers::hashes::Sha1HexAttribute;
 use prose_xmpp::mods::AvatarData;
 use prose_xmpp::{mods, RequestError};
 
-use crate::domain::shared::models::{AvatarId, ParticipantIdRef, UserId, UserResourceId};
+use crate::domain::shared::models::{AvatarId, BareEntityId, ParticipantIdRef, UserResourceId};
 use crate::domain::user_info::models::{LastActivity, UserMetadata, UserProfile};
 use crate::domain::user_info::services::UserInfoService;
 use crate::infra::xmpp::XMPPClient;
@@ -25,7 +25,7 @@ use crate::infra::xmpp::XMPPClient;
 impl UserInfoService for XMPPClient {
     async fn load_avatar_image(
         &self,
-        from: &UserId,
+        from: &BareEntityId,
         image_id: &AvatarId,
     ) -> Result<Option<AvatarData>, RequestError> {
         let profile = self.client.get_mod::<mods::Profile>();

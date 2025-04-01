@@ -22,12 +22,15 @@ use crate::app::event_handlers::{
     BlockListEvent, BlockListEventType, ConnectionEvent, ContactListEvent, ContactListEventType,
     MessageEvent, MessageEventType, OccupantEvent, RequestEvent, RequestEventType, RoomEvent,
     RoomEventType, ServerEvent, SyncedRoomSettingsEvent, UserDeviceEvent, UserInfoEvent,
-    UserInfoEventType, UserStatusEvent, UserStatusEventType,
+    UserInfoEventType, UserStatusEvent, UserStatusEventType, WorkspaceInfoEvent,
+    WorkspaceInfoEventType,
 };
 use crate::app::event_handlers::{SidebarBookmarkEvent, XMPPEvent};
 use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::rooms::models::ComposeState;
-use crate::domain::shared::models::{CapabilitiesId, MucId, RequestId, SenderId, UserEndpointId};
+use crate::domain::shared::models::{
+    CapabilitiesId, MucId, RequestId, SenderId, ServerId, UserEndpointId,
+};
 use crate::dtos::{UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::presence::parse_presence;
 use crate::infra::xmpp::event_parser::pubsub::parse_pubsub_event;
@@ -208,23 +211,47 @@ fn parse_caps_event(ctx: &mut Context, event: XMPPCapsEvent) -> Result<()> {
 
 fn parse_profile_event(ctx: &mut Context, event: XMPPProfileEvent) -> Result<()> {
     match event {
-        XMPPProfileEvent::Vcard { from, vcard } => ctx.push_event(UserInfoEvent {
-            user_id: UserId::from(from.into_bare()),
-            r#type: UserInfoEventType::ProfileChanged {
-                profile: vcard.try_into()?,
-            },
-        }),
+        XMPPProfileEvent::Vcard { from, vcard } => {
+            let bare_jid = from.into_bare();
+
+            if bare_jid.node().is_some() {
+                ctx.push_event(UserInfoEvent {
+                    user_id: UserId::from(bare_jid),
+                    r#type: UserInfoEventType::ProfileChanged {
+                        profile: vcard.try_into()?,
+                    },
+                })
+            } else {
+                ctx.push_event(WorkspaceInfoEvent {
+                    server_id: ServerId::from(bare_jid),
+                    r#type: WorkspaceInfoEventType::InfoChanged {
+                        info: vcard.try_into()?,
+                    },
+                })
+            }
+        }
         XMPPProfileEvent::AvatarMetadata { from, metadata } => {
             let Some(info) = metadata.infos.first() else {
                 return missing_element(ctx, "info", metadata);
             };
 
-            ctx.push_event(UserInfoEvent {
-                user_id: UserId::from(from.into_bare()),
-                r#type: UserInfoEventType::AvatarChanged {
-                    metadata: info.clone().into(),
-                },
-            })
+            let bare_jid = from.into_bare();
+
+            if bare_jid.node().is_some() {
+                ctx.push_event(UserInfoEvent {
+                    user_id: UserId::from(bare_jid),
+                    r#type: UserInfoEventType::AvatarChanged {
+                        metadata: info.clone().into(),
+                    },
+                })
+            } else {
+                ctx.push_event(WorkspaceInfoEvent {
+                    server_id: ServerId::from(bare_jid),
+                    r#type: WorkspaceInfoEventType::AvatarChanged {
+                        metadata: info.clone().into(),
+                    },
+                })
+            }
         }
         XMPPProfileEvent::EntityTimeQuery { from, id } => ctx.push_event(RequestEvent {
             sender_id: SenderId::from(from),
@@ -342,6 +369,11 @@ impl From<UserStatusEvent> for ServerEvent {
 impl From<UserInfoEvent> for ServerEvent {
     fn from(value: UserInfoEvent) -> Self {
         Self::UserInfo(value)
+    }
+}
+impl From<WorkspaceInfoEvent> for ServerEvent {
+    fn from(value: WorkspaceInfoEvent) -> Self {
+        Self::WorkspaceInfo(value)
     }
 }
 impl From<RoomEvent> for ServerEvent {

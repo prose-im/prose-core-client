@@ -41,6 +41,8 @@ pub fn coalesce_client_events(events: &mut Vec<ClientEvent>) {
                 r#type: type_b,
             },
         ) => should_dedup_room_events(room_a, room_b, type_a, type_b),
+        (ClientEvent::WorkspaceIconChanged, ClientEvent::WorkspaceIconChanged) => true,
+        (ClientEvent::WorkspaceInfoChanged, ClientEvent::WorkspaceInfoChanged) => true,
 
         (ClientEvent::ConnectionStatusChanged { .. }, _) => false,
         (ClientEvent::SidebarChanged, _) => false,
@@ -51,6 +53,8 @@ pub fn coalesce_client_events(events: &mut Vec<ClientEvent>) {
         (ClientEvent::AvatarChanged { .. }, _) => false,
         (ClientEvent::AccountInfoChanged, _) => false,
         (ClientEvent::RoomChanged { .. }, _) => false,
+        (ClientEvent::WorkspaceIconChanged, _) => false,
+        (ClientEvent::WorkspaceInfoChanged, _) => false,
     });
 }
 
@@ -135,13 +139,15 @@ fn order_key_for_client_event(event: &ClientEvent) -> i32 {
     match event {
         ClientEvent::ConnectionStatusChanged { .. } => 0,
         ClientEvent::SidebarChanged => 1,
-        ClientEvent::ContactChanged { .. } => 2,
-        ClientEvent::ContactListChanged => 3,
-        ClientEvent::PresenceSubRequestsChanged => 4,
-        ClientEvent::BlockListChanged => 5,
-        ClientEvent::AvatarChanged { .. } => 6,
-        ClientEvent::AccountInfoChanged => 7,
-        ClientEvent::RoomChanged { .. } => 8,
+        ClientEvent::WorkspaceInfoChanged => 2,
+        ClientEvent::ContactChanged { .. } => 3,
+        ClientEvent::ContactListChanged => 4,
+        ClientEvent::PresenceSubRequestsChanged => 5,
+        ClientEvent::BlockListChanged => 6,
+        ClientEvent::WorkspaceIconChanged => 7,
+        ClientEvent::AvatarChanged { .. } => 8,
+        ClientEvent::AccountInfoChanged => 9,
+        ClientEvent::RoomChanged { .. } => 10,
     }
 }
 
@@ -169,11 +175,15 @@ mod tests {
         let mut events = vec![
             ClientEvent::SidebarChanged,
             ClientEvent::SidebarChanged,
+            ClientEvent::WorkspaceInfoChanged,
+            ClientEvent::WorkspaceIconChanged,
             ClientEvent::ContactListChanged,
+            ClientEvent::WorkspaceIconChanged,
             ClientEvent::AvatarChanged {
                 ids: vec![user_id!("a@prose.org")],
             },
             ClientEvent::AccountInfoChanged,
+            ClientEvent::WorkspaceInfoChanged,
             ClientEvent::SidebarChanged,
             ClientEvent::AvatarChanged {
                 ids: vec![user_id!("b@prose.org")],
@@ -185,7 +195,9 @@ mod tests {
             events,
             vec![
                 ClientEvent::SidebarChanged,
+                ClientEvent::WorkspaceInfoChanged,
                 ClientEvent::ContactListChanged,
+                ClientEvent::WorkspaceIconChanged,
                 ClientEvent::AvatarChanged {
                     ids: vec![user_id!("a@prose.org"), user_id!("b@prose.org")],
                 },

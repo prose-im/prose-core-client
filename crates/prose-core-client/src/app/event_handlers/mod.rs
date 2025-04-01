@@ -20,6 +20,7 @@ pub use server_event::*;
 pub use synced_room_settings_event_handler::SyncedRoomSettingsEventHandler;
 pub use user_devices_event_handler::UserDevicesEventHandler;
 pub use user_info_event_handler::UserInfoEventHandler;
+pub use workspace_info_event_handler::WorkspaceInfoEventHandler;
 
 use crate::domain::rooms::models::Room;
 use crate::{ClientEvent, ClientRoomEventType};
@@ -36,6 +37,7 @@ mod server_event;
 mod synced_room_settings_event_handler;
 mod user_devices_event_handler;
 mod user_info_event_handler;
+mod workspace_info_event_handler;
 
 /// `ServerEventHandler` is a trait representing a handler for XMPP events.
 ///

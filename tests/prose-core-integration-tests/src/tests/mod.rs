@@ -20,6 +20,7 @@ mod drafts_repository;
 mod local_room_settings_repository;
 mod messages_repository;
 mod user_info_repository;
+mod workspace_info_repository;
 
 #[cfg(target_arch = "wasm32")]
 type PlatformDriver = IndexedDBDriver;

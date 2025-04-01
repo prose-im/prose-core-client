@@ -33,6 +33,9 @@ use crate::domain::sidebar::services::impls::{
 use crate::domain::user_info::services::impls::{
     UserInfoDomainService, UserInfoDomainServiceDependencies,
 };
+use crate::domain::workspace::services::impls::{
+    WorkspaceInfoDomainService, WorkspaceInfoDomainServiceDependencies,
+};
 use crate::infra::contacts::{
     CachingBlockListRepository, CachingContactsRepository, PresenceSubRequestsRepository,
 };
@@ -53,6 +56,7 @@ use crate::infra::settings::{
 use crate::infra::user_info::{
     InMemoryUserInfoRepository, UserProfileRecord, UserProfileRepository,
 };
+use crate::infra::workspace::{WorkspaceInfoRecord, WorkspaceInfoRepository};
 use crate::infra::xmpp::XMPPClient;
 
 pub(crate) struct PlatformDependencies {
@@ -71,7 +75,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 31;
+const DB_VERSION: u32 = 32;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -201,6 +205,16 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         if event.old_version < 31 {
             tx.delete_collection(MessageRecord::collection())?;
             create_collection::<D, MessageRecord>(&tx)?;
+        }
+
+        if event.old_version < 31 {
+            #[cfg(target_arch = "wasm32")]
+            {
+                tx.delete_collection(crate::infra::user_info::AvatarRecord::collection())?;
+                create_collection::<D, crate::infra::user_info::AvatarRecord>(&tx)?;
+            }
+
+            create_collection::<D, WorkspaceInfoRecord>(&tx)?;
         }
 
         Ok(())
@@ -348,6 +362,18 @@ impl From<PlatformDependencies> for AppDependencies {
             block_list_domain_service_dependencies,
         ));
 
+        let workspace_info_repo = Arc::new(WorkspaceInfoRepository::new(d.store.clone()));
+        let workspace_info_domain_service_dependencies = WorkspaceInfoDomainServiceDependencies {
+            avatar_repo: avatar_repo.clone(),
+            client_event_dispatcher: client_event_dispatcher.clone(),
+            ctx: ctx.clone(),
+            user_info_service: d.xmpp.clone(),
+            workspace_info_repo: workspace_info_repo.clone(),
+        };
+        let workspace_info_domain_service = Arc::new(WorkspaceInfoDomainService::from(
+            workspace_info_domain_service_dependencies,
+        ));
+
         let room_factory = {
             let client_event_dispatcher = client_event_dispatcher.clone();
             let ctx = ctx.clone();
@@ -415,6 +441,8 @@ impl From<PlatformDependencies> for AppDependencies {
             user_account_service: d.xmpp.clone(),
             user_device_repo,
             user_info_domain_service,
+            workspace_info_domain_service,
+            workspace_info_repo,
         }
     }
 }

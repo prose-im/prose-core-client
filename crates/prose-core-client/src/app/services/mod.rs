@@ -17,6 +17,7 @@ pub use rooms_service::RoomsService;
 pub use sidebar_service::SidebarService;
 pub use upload_service::UploadService;
 pub use user_data_service::UserDataService;
+pub use workspace_service::WorkspaceService;
 
 mod account_service;
 mod block_list_service;
@@ -31,3 +32,4 @@ mod rooms_service;
 mod sidebar_service;
 mod upload_service;
 mod user_data_service;
+mod workspace_service;

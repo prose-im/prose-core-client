@@ -25,3 +25,4 @@ pub(crate) mod upload_slot;
 pub(crate) mod user_activity;
 pub(crate) mod user_device;
 pub(crate) mod user_profile;
+pub(crate) mod workspace_info;

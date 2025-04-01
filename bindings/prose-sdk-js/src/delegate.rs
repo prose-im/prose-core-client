@@ -41,6 +41,15 @@ export interface ProseClientDelegate {
     /// A user in `conversation` started or stopped typing.
     composingUsersChanged(client: ProseClient, room: Room): void
 
+    /// Infos about the server/workspace have changed.
+    workspaceInfoChanged(client: ProseClient): void
+
+    /// The server/workspace icon has changed.
+    workspaceIconChanged(client: ProseClient): void
+
+    /// The avatar of a user changed.
+    avatarChanged(client: ProseClient, ids: JID[]): void
+
     /// Infos about a contact have changed.
     contactChanged(client: ProseClient, ids: JID[]): void
 
@@ -106,6 +115,12 @@ extern "C" {
 
     #[wasm_bindgen(method, catch, js_name = "sidebarChanged")]
     fn sidebar_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "workspaceInfoChanged")]
+    fn workspace_info_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
+
+    #[wasm_bindgen(method, catch, js_name = "workspaceIconChanged")]
+    fn workspace_icon_changed(this: &JSDelegate, client: Client) -> Result<(), JsValue>;
 
     #[wasm_bindgen(method, catch, js_name = "contactChanged")]
     fn contact_changed(
@@ -261,6 +276,8 @@ impl Delegate {
                 .inner
                 .client_disconnected(client, error.map(Into::into))?,
             ClientEvent::SidebarChanged => self.inner.sidebar_changed(client)?,
+            ClientEvent::WorkspaceInfoChanged => self.inner.workspace_info_changed(client)?,
+            ClientEvent::WorkspaceIconChanged => self.inner.workspace_icon_changed(client)?,
             ClientEvent::ContactChanged { ids } => self.inner.contact_changed(
                 client,
                 ids.into_iter()
