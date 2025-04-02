@@ -9,9 +9,9 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::contacts::models::Contact;
-use crate::domain::shared::models::{CachePolicy, UserId, UserOrResourceId};
+use crate::domain::shared::models::{Avatar, CachePolicy, UserId, UserOrResourceId};
 use crate::domain::user_info::models::{
-    Avatar, PlatformImage, Presence, UserInfo, UserMetadata, UserProfile, UserStatus,
+    PlatformImage, Presence, UserInfo, UserMetadata, UserProfile, UserStatus,
 };
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

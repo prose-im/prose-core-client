@@ -17,6 +17,7 @@ use crate::app::event_handlers::{
     BlockListEventHandler, BookmarksEventHandler, ConnectionEventHandler, ContactListEventHandler,
     MessagesEventHandler, RequestsEventHandler, RoomsEventHandler, ServerEventHandlerQueue,
     SyncedRoomSettingsEventHandler, UserDevicesEventHandler, UserInfoEventHandler,
+    WorkspaceInfoEventHandler,
 };
 use crate::app::services::{
     AccountService, ConnectionService, ContactListService, RoomsService, UserDataService,
@@ -31,7 +32,7 @@ use crate::infra::general::{NanoIDProvider, OsRngProvider, RngProvider};
 use crate::infra::platform_dependencies::PlatformDependencies;
 use crate::infra::xmpp::{XMPPClient, XMPPClientBuilder};
 use crate::services::{
-    BlockListService, CacheService, PreviewService, SidebarService, UploadService,
+    BlockListService, CacheService, PreviewService, SidebarService, UploadService, WorkspaceService,
 };
 use crate::{Client, ClientDelegate};
 
@@ -303,6 +304,7 @@ impl<A: AvatarRepository + 'static> ClientBuilder<Store<PlatformDriver>, A, DynE
             Box::new(BlockListEventHandler::from(&dependencies)),
             Box::new(UserDevicesEventHandler::from(&dependencies)),
             Box::new(SyncedRoomSettingsEventHandler::from(&dependencies)),
+            Box::new(WorkspaceInfoEventHandler::from(&dependencies)),
         ]);
 
         let client_inner = Arc::new(ClientInner {
@@ -319,6 +321,7 @@ impl<A: AvatarRepository + 'static> ClientBuilder<Store<PlatformDriver>, A, DynE
             user_data: UserDataService::from(&dependencies),
             cache: CacheService::from(&dependencies),
             block_list: BlockListService::from(&dependencies),
+            workspace: WorkspaceService::from(&dependencies),
         });
 
         event_dispatcher.set_client_inner(Arc::downgrade(&client_inner));

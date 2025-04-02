@@ -15,5 +15,6 @@ pub mod shared;
 pub mod sidebar;
 pub mod uploads;
 pub mod user_info;
+pub mod workspace;
 
 mod models {}

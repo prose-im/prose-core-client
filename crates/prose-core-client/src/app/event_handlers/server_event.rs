@@ -10,18 +10,18 @@ use prose_xmpp::ConnectionError;
 use crate::domain::contacts::models::PresenceSubscription;
 use crate::domain::encryption::models::DeviceList;
 use crate::domain::settings::models::SyncedRoomSettings;
-use crate::domain::shared::models::MucId;
+use crate::domain::shared::models::{MucId, ServerId};
 use crate::domain::sidebar::models::Bookmark;
 use crate::domain::user_info::models::Presence;
 use crate::domain::{
     rooms::models::{ComposeState, RoomAffiliation},
     shared::models::{
-        AnonOccupantId, CapabilitiesId, OccupantId, RequestId, SenderId, UserEndpointId, UserId,
-        UserResourceId,
+        AnonOccupantId, AvatarMetadata, CapabilitiesId, OccupantId, RequestId, RoomId, SenderId,
+        UserEndpointId, UserId, UserResourceId,
     },
-    user_info::models::{AvatarMetadata, UserProfile, UserStatus},
+    user_info::models::{UserProfile, UserStatus},
+    workspace::models::WorkspaceInfo,
 };
-use crate::dtos::RoomId;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ServerEvent {
@@ -35,6 +35,8 @@ pub enum ServerEvent {
     UserStatus(UserStatusEvent),
     /// Events that affect the information about the user globally.
     UserInfo(UserInfoEvent),
+    /// Events that affect the information about the server/workspace
+    WorkspaceInfo(WorkspaceInfoEvent),
     /// Events about changes to a MUC room.
     Room(RoomEvent),
     /// Events about changes to an occupant of a MUC room.
@@ -84,6 +86,18 @@ pub enum UserInfoEventType {
     ProfileChanged { profile: UserProfile },
     StatusChanged { status: Option<UserStatus> },
     NicknameChanged { nickname: Option<String> },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct WorkspaceInfoEvent {
+    pub server_id: ServerId,
+    pub r#type: WorkspaceInfoEventType,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum WorkspaceInfoEventType {
+    InfoChanged { info: WorkspaceInfo },
+    AvatarChanged { metadata: AvatarMetadata },
 }
 
 #[derive(Debug, Clone, PartialEq)]

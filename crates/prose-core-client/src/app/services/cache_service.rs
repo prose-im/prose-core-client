@@ -6,7 +6,7 @@ use crate::app::deps::{
     DynAccountSettingsRepository, DynAppContext, DynAvatarRepository, DynBlockListDomainService,
     DynContactListDomainService, DynDraftsRepository, DynEncryptionDomainService,
     DynLocalRoomSettingsRepository, DynMessagesRepository, DynSidebarDomainService,
-    DynUserInfoDomainService,
+    DynUserInfoDomainService, DynWorkspaceInfoDomainService,
 };
 
 #[derive(InjectDependencies)]
@@ -33,6 +33,8 @@ pub struct CacheService {
     sidebar_domain_service: DynSidebarDomainService,
     #[inject]
     user_info_domain_service: DynUserInfoDomainService,
+    #[inject]
+    workspace_info_domain_service: DynWorkspaceInfoDomainService,
 }
 
 impl CacheService {
@@ -50,6 +52,7 @@ impl CacheService {
         self.encryption_domain_service.clear_cache().await?;
         self.sidebar_domain_service.clear_cache().await?;
         self.user_info_domain_service.clear_cache().await?;
+        self.workspace_info_domain_service.clear_cache().await?;
 
         Ok(())
     }

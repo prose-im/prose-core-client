@@ -12,10 +12,8 @@ use prose_core_client::app::event_handlers::{
     ServerEvent, UserInfoEvent, UserInfoEventType, UserStatusEvent, UserStatusEventType,
 };
 use prose_core_client::domain::rooms::models::ComposeState;
-use prose_core_client::domain::shared::models::{AvatarId, CapabilitiesId};
-use prose_core_client::domain::user_info::models::{
-    Address, AvatarMetadata, Presence, UserProfile,
-};
+use prose_core_client::domain::shared::models::{AvatarId, AvatarMetadata, CapabilitiesId};
+use prose_core_client::domain::user_info::models::{Address, Presence, UserProfile};
 use prose_core_client::dtos::*;
 use prose_core_client::test::parse_xml;
 use prose_core_client::{occupant_id, user_id, user_resource_id};

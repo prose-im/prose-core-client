@@ -5,8 +5,7 @@
 
 use prose_xmpp::stanza::avatar;
 
-use crate::domain::shared::models::AvatarId;
-use crate::domain::user_info::models::AvatarMetadata;
+use crate::domain::shared::models::{AvatarId, AvatarMetadata};
 
 impl From<avatar::Info> for AvatarMetadata {
     fn from(value: avatar::Info) -> Self {

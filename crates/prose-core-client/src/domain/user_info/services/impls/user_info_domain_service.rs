@@ -21,11 +21,11 @@ use crate::app::deps::{
 };
 use crate::domain::contacts::models::Contact;
 use crate::domain::shared::models::{
-    CachePolicy, ConnectionState, ParticipantIdRef, UserId, UserOrResourceId,
+    Avatar, AvatarInfo, AvatarSource, BareEntityId, CachePolicy, ConnectionState, EntityIdRef,
+    ParticipantIdRef, UserId, UserOrResourceId,
 };
 use crate::domain::user_info::models::{
-    Avatar, AvatarInfo, AvatarSource, Image, PlatformImage, Presence, ProfileName, UserInfo,
-    UserMetadata, UserProfile, UserStatus,
+    Image, PlatformImage, Presence, ProfileName, UserInfo, UserMetadata, UserProfile, UserStatus,
 };
 use crate::domain::user_info::services::UserInfoDomainService as UserInfoDomainServiceTrait;
 use crate::dtos::ParticipantId;
@@ -139,7 +139,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
 
         if let Some(image) = self
             .avatar_repo
-            .get(&account, avatar.owner(), &avatar.id)
+            .get(&account, EntityIdRef::from(avatar.owner()), &avatar.id)
             .await?
         {
             return Ok(Some(image));
@@ -178,7 +178,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
         let result: Result<Option<(AvatarData, String)>> = match &avatar.source {
             AvatarSource::Pep { owner, mime_type } => self
                 .user_info_service
-                .load_avatar_image(owner, &avatar.id)
+                .load_avatar_image(&BareEntityId::User(owner.clone()), &avatar.id)
                 .await
                 .map_err(Into::into)
                 .map(|data| data.map(|data| (data, mime_type.clone()))),
@@ -218,7 +218,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
         self.avatar_repo
             .set(
                 &account,
-                avatar.owner(),
+                EntityIdRef::from(avatar.owner()),
                 &AvatarInfo {
                     checksum: avatar.id.clone(),
                     mime_type: mime_type.clone(),
@@ -228,7 +228,7 @@ impl UserInfoDomainServiceTrait for UserInfoDomainService {
             .await?;
 
         self.avatar_repo
-            .get(&account, avatar.owner(), &avatar.id)
+            .get(&account, EntityIdRef::from(avatar.owner()), &avatar.id)
             .await
     }
 

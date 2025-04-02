@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 
 use crate::domain::general::models::Capabilities;
-use crate::domain::shared::models::{Availability, AvatarId};
-use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
+use crate::domain::shared::models::{Availability, AvatarId, AvatarMetadata};
+use crate::domain::user_info::models::{UserProfile, UserStatus};
 use crate::dtos::OccupantId;
 
 #[derive(Debug, Clone, PartialEq, Copy)]

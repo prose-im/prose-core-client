@@ -8,11 +8,12 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 
+use crate::domain::shared::models::Avatar;
 use crate::domain::shared::models::{
     AnonOccupantId, Availability, CapabilitiesId, ParticipantBasicInfo, ParticipantId, UserId,
 };
 use crate::domain::shared::utils::ContactNameBuilder;
-use crate::domain::user_info::models::{Avatar, JabberClient, Presence};
+use crate::domain::user_info::models::{JabberClient, Presence};
 
 use super::{ComposeState, RoomAffiliation, RoomSessionParticipant};
 

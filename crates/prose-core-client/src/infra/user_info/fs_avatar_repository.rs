@@ -15,8 +15,8 @@ use thiserror::Error;
 
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, AvatarId, ParticipantIdRef};
-use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{AccountId, AvatarId, AvatarInfo, EntityIdRef};
+use crate::domain::user_info::models::PlatformImage;
 use crate::domain::user_info::repos::AvatarRepository;
 
 use super::MAX_IMAGE_DIMENSIONS;
@@ -52,7 +52,7 @@ impl AvatarRepository for FsAvatarRepository {
     async fn set(
         &self,
         _account: &AccountId,
-        participant_id: ParticipantIdRef<'_>,
+        entity_id: EntityIdRef<'_>,
         info: &AvatarInfo,
         image_data: &AvatarData,
     ) -> Result<()> {
@@ -64,9 +64,7 @@ impl AvatarRepository for FsAvatarRepository {
         let img = image::load_from_memory_with_format(&image_buf, image_format)?
             .thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);
 
-        let output_path = self
-            .path
-            .join(self.filename_for(participant_id, &info.checksum));
+        let output_path = self.path.join(self.filename_for(entity_id, &info.checksum));
 
         if let Some(parent_dir) = output_path.parent() {
             if !parent_dir.exists() {
@@ -86,10 +84,10 @@ impl AvatarRepository for FsAvatarRepository {
     async fn get(
         &self,
         _account: &AccountId,
-        participant_id: ParticipantIdRef<'_>,
+        entity_id: EntityIdRef<'_>,
         avatar_id: &AvatarId,
     ) -> Result<Option<PlatformImage>> {
-        let path = self.filename_for(participant_id, &avatar_id);
+        let path = self.filename_for(entity_id, &avatar_id);
         if path.exists() {
             return Ok(Some(path));
         }
@@ -114,14 +112,11 @@ impl AvatarRepository for FsAvatarRepository {
 }
 
 impl FsAvatarRepository {
-    fn filename_for(
-        &self,
-        participant_id: ParticipantIdRef<'_>,
-        image_checksum: &AvatarId,
-    ) -> PathBuf {
-        match participant_id {
-            ParticipantIdRef::User(id) => self.path.join(format!("{id}-{image_checksum}.jpg")),
-            ParticipantIdRef::Occupant(id) => self
+    fn filename_for(&self, entity_id: EntityIdRef<'_>, image_checksum: &AvatarId) -> PathBuf {
+        match entity_id {
+            EntityIdRef::User(id) => self.path.join(format!("{id}-{image_checksum}.jpg")),
+            EntityIdRef::Server(id) => self.path.join(format!("{id}-{image_checksum}.jpg")),
+            EntityIdRef::Occupant(id) => self
                 .path
                 .join(id.muc_id().as_ref().to_string())
                 .join(format!("{}-{image_checksum}.jpg", id.nickname())),

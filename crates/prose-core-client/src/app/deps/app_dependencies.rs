@@ -44,6 +44,8 @@ use crate::domain::user_info::repos::{
     AvatarRepository, UserInfoRepository, UserProfileRepository,
 };
 use crate::domain::user_info::services::{UserInfoDomainService, UserInfoService};
+use crate::domain::workspace::repos::WorkspaceInfoRepository;
+use crate::domain::workspace::services::WorkspaceInfoDomainService;
 use crate::infra::general::RngProvider;
 
 pub type DynAccountSettingsRepository = Arc<dyn AccountSettingsRepository>;
@@ -95,6 +97,8 @@ pub type DynUserInfoDomainService = Arc<dyn UserInfoDomainService>;
 pub type DynUserInfoRepository = Arc<dyn UserInfoRepository>;
 pub type DynUserInfoService = Arc<dyn UserInfoService>;
 pub type DynUserProfileRepository = Arc<dyn UserProfileRepository>;
+pub type DynWorkspaceInfoDomainService = Arc<dyn WorkspaceInfoDomainService>;
+pub type DynWorkspaceInfoRepository = Arc<dyn WorkspaceInfoRepository>;
 
 pub struct AppDependencies {
     pub account_settings_repo: DynAccountSettingsRepository,
@@ -108,9 +112,9 @@ pub struct AppDependencies {
     pub drafts_repo: DynDraftsRepository,
     pub encryption_domain_service: DynEncryptionDomainService,
     pub id_provider: DynIDProvider,
-    pub message_id_provider: DynMessageIdProvider,
     pub local_room_settings_repo: DynLocalRoomSettingsRepository,
     pub message_archive_service: DynMessageArchiveService,
+    pub message_id_provider: DynMessageIdProvider,
     pub messages_repo: DynMessagesRepository,
     pub messaging_service: DynMessagingService,
     pub offline_messages_repo: DynOfflineMessagesRepository,
@@ -129,4 +133,6 @@ pub struct AppDependencies {
     pub user_account_service: DynUserAccountService,
     pub user_device_repo: DynUserDeviceRepository,
     pub user_info_domain_service: DynUserInfoDomainService,
+    pub workspace_info_domain_service: DynWorkspaceInfoDomainService,
+    pub workspace_info_repo: DynWorkspaceInfoRepository,
 }

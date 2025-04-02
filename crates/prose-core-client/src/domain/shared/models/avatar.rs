@@ -5,8 +5,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::shared::models::{AvatarId, ParticipantId, ParticipantIdRef, UserId};
-use crate::domain::user_info::models::AvatarMetadata;
+use crate::domain::shared::models::{
+    AvatarId, AvatarMetadata, ParticipantId, ParticipantIdRef, UserId,
+};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum AvatarSource {

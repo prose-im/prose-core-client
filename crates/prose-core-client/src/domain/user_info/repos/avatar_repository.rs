@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use prose_wasm_utils::{SendUnlessWasm, SyncUnlessWasm};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{AccountId, AvatarId, ParticipantIdRef};
-use crate::domain::user_info::models::{AvatarInfo, PlatformImage};
+use crate::domain::shared::models::{AccountId, AvatarId, AvatarInfo, EntityIdRef};
+use crate::domain::user_info::models::PlatformImage;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]
@@ -20,7 +20,7 @@ pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn get(
         &self,
         account: &AccountId,
-        participant_id: ParticipantIdRef<'_>,
+        entity_id: EntityIdRef<'_>,
         avatar_id: &AvatarId,
     ) -> Result<Option<PlatformImage>>;
 
@@ -28,7 +28,7 @@ pub trait AvatarRepository: SendUnlessWasm + SyncUnlessWasm {
     async fn set(
         &self,
         account: &AccountId,
-        participant_id: ParticipantIdRef<'_>,
+        entity_id: EntityIdRef<'_>,
         metadata: &AvatarInfo,
         image: &AvatarData,
     ) -> Result<()>;

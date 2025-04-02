@@ -11,10 +11,9 @@ use prose_xmpp::mods;
 
 use crate::domain::account::services::{UserAccountService, UserProfileFormat};
 use crate::domain::general::models::Capabilities;
-use crate::domain::shared::models::{Availability, AvatarId};
+use crate::domain::shared::models::{Availability, AvatarId, AvatarMetadata, OccupantId, UserId};
 use crate::domain::shared::utils::ContactNameBuilder;
-use crate::domain::user_info::models::{AvatarMetadata, UserProfile, UserStatus};
-use crate::dtos::{OccupantId, UserId};
+use crate::domain::user_info::models::{UserProfile, UserStatus};
 use crate::infra::xmpp::XMPPClient;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]

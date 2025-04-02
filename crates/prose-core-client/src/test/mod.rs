@@ -51,6 +51,13 @@ macro_rules! user_id {
 }
 
 #[macro_export]
+macro_rules! server_id {
+    ($jid:expr) => {
+        ServerId::from($jid.parse::<jid::BareJid>().unwrap())
+    };
+}
+
+#[macro_export]
 macro_rules! account_id {
     ($jid:expr) => {
         AccountId::from($jid.parse::<jid::BareJid>().unwrap())
