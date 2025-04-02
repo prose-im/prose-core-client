@@ -55,15 +55,15 @@ impl AvatarRecord {
 
 mod columns {
     pub const ACCOUNT: &str = "account";
-    pub const PARTICIPANT_ID: &str = "participant_id";
+    pub const ENTITY_ID: &str = "entity_id";
     pub const AVATAR_ID: &str = "avatar_id";
 }
 
 define_entity!(AvatarRecord, "avatar",
     account_idx => { columns: [columns::ACCOUNT], unique: false },
     // We're only saving one avatar per user
-    user_idx => { columns: [columns::ACCOUNT, columns::PARTICIPANT_ID], unique: true },
-    avatar_idx => { columns: [columns::ACCOUNT, columns::PARTICIPANT_ID, columns::AVATAR_ID], unique: true }
+    user_idx => { columns: [columns::ACCOUNT, columns::ENTITY_ID], unique: true },
+    avatar_idx => { columns: [columns::ACCOUNT, columns::ENTITY_ID, columns::AVATAR_ID], unique: true }
 );
 
 impl KeyType for AvatarId {
