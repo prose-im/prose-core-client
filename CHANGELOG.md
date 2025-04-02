@@ -1,3 +1,12 @@
+## What's Changed in 0.1.103
+
+* Support vCard kind
+* Remove import that slipped in
+* Handle workspace info & icon
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.102...0.1.103)
+
+
 ## What's Changed in 0.1.102
 
 * Store unknown properties as-is in vCard4
