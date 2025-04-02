@@ -37,6 +37,12 @@ pub enum ClientEvent {
     /// Infos related to the logged-in user have changed.
     AccountInfoChanged,
 
+    /// Infos related to the server/workspace have changed.
+    WorkspaceInfoChanged,
+
+    /// The avatar of the server/workspace has changed.
+    WorkspaceIconChanged,
+
     RoomChanged {
         room: RoomEnvelope,
         r#type: ClientRoomEventType,
@@ -93,6 +99,8 @@ impl Debug for ClientEvent {
                 f.debug_struct("AvatarChanged").field("ids", &ids).finish()
             }
             ClientEvent::AccountInfoChanged => f.debug_struct("AccountInfoChanged").finish(),
+            ClientEvent::WorkspaceInfoChanged => f.debug_struct("WorkspaceInfoChanged").finish(),
+            ClientEvent::WorkspaceIconChanged => f.debug_struct("WorkspaceAvatarChanged").finish(),
             ClientEvent::RoomChanged { room, r#type } => f
                 .debug_struct("RoomChanged")
                 .field("room", &room.to_generic_room().jid())

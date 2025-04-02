@@ -5,11 +5,11 @@
 
 use std::fmt::{Debug, Display, Formatter};
 
+use crate::domain::shared::models::ServerId;
+use crate::dtos::UserId;
 use jid::BareJid;
 use prose_store::{KeyType, RawKey};
 use serde::{Deserialize, Serialize};
-
-use crate::dtos::UserId;
 
 #[derive(Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -23,6 +23,10 @@ impl AccountId {
 
     pub fn to_user_id(&self) -> UserId {
         UserId::from(self.0.clone())
+    }
+
+    pub fn to_server_id(&self) -> ServerId {
+        ServerId::from(BareJid::from_parts(None, self.0.as_ref().domain()))
     }
 }
 

@@ -15,7 +15,7 @@ use crate::app::deps::{
     DynClientEventDispatcher, DynConnectionService, DynContactListDomainService,
     DynEncryptionDomainService, DynIDProvider, DynOfflineMessagesRepository,
     DynServerEventHandlerQueue, DynSidebarDomainService, DynTimeProvider, DynUserAccountService,
-    DynUserInfoDomainService,
+    DynUserInfoDomainService, DynWorkspaceInfoDomainService,
 };
 use crate::app::event_handlers::ServerEvent;
 use crate::client_event::ConnectionEvent;
@@ -54,6 +54,8 @@ pub struct ConnectionService {
     offline_messages_repo: DynOfflineMessagesRepository,
     #[inject]
     server_event_handler_queue: DynServerEventHandlerQueue,
+    #[inject]
+    workspace_info_domain_service: DynWorkspaceInfoDomainService,
 }
 
 impl ConnectionService {
@@ -248,6 +250,16 @@ impl ConnectionService {
             .inspect_err(|err| {
                 warn!(
                     "Failed to reset EncryptionDomainService after reconnect. {}",
+                    err.to_string()
+                )
+            });
+        _ = self
+            .workspace_info_domain_service
+            .reset_before_reconnect()
+            .await
+            .inspect_err(|err| {
+                warn!(
+                    "Failed to reset WorkspaceInfoDomainService after reconnect. {}",
                     err.to_string()
                 )
             });

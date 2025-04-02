@@ -24,6 +24,7 @@ pub use user_info::{
 };
 pub use user_metadata::UserMetadata;
 pub use user_profile::UserProfile;
+pub use workspace_info::{WorkspaceIcon, WorkspaceInfo};
 
 mod account_info;
 mod attachment;
@@ -43,3 +44,4 @@ mod upload_slot;
 mod user_info;
 mod user_metadata;
 mod user_profile;
+mod workspace_info;

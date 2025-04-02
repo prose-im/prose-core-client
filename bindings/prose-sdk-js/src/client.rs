@@ -27,7 +27,7 @@ use crate::types::{
     try_user_id_vec_from_string_array, AccountInfo, Availability, Avatar, BareJid, Channel,
     ChannelsArray, ConnectionError, Contact, ContactsArray, IntoJSArray, PresenceSubRequest,
     PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UploadSlot,
-    UserBasicInfo, UserBasicInfoArray, UserMetadata, UserProfile,
+    UserBasicInfo, UserBasicInfoArray, UserMetadata, UserProfile, WorkspaceIcon, WorkspaceInfo,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -481,6 +481,28 @@ impl Client {
             .await
             .map_err(WasmError::from)?;
         Ok(())
+    }
+
+    #[wasm_bindgen(js_name = "loadWorkspaceIcon")]
+    pub async fn load_workspace_icon(&self, icon: &WorkspaceIcon) -> Result<Option<String>> {
+        let icon = self
+            .client
+            .workspace
+            .load_workspace_icon(&icon.clone().into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(icon)
+    }
+
+    #[wasm_bindgen(js_name = "loadWorkspaceInfo")]
+    pub async fn load_workspace_info(&self) -> Result<WorkspaceInfo> {
+        let info = self
+            .client
+            .workspace
+            .load_workspace_info()
+            .await
+            .map_err(WasmError::from)?;
+        Ok(info.into())
     }
 
     /// XEP-0084: User Avatar

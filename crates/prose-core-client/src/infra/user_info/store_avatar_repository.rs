@@ -11,9 +11,7 @@ use prose_store::prelude::*;
 use prose_store::{define_entity, RawKey};
 use prose_xmpp::mods::AvatarData;
 
-use crate::domain::shared::models::{
-    AccountId, AvatarId, AvatarInfo, ParticipantId, ParticipantIdRef,
-};
+use crate::domain::shared::models::{AccountId, AvatarId, AvatarInfo, EntityId, EntityIdRef};
 use crate::domain::user_info::models::PlatformImage;
 use crate::domain::user_info::repos::AvatarRepository;
 
@@ -31,7 +29,7 @@ impl StoreAvatarRepository {
 pub struct AvatarRecord {
     id: String,
     account: AccountId,
-    participant_id: ParticipantId,
+    entity_id: EntityId,
     avatar_id: AvatarId,
     mime_type: String,
     base64_data: String,
@@ -40,14 +38,14 @@ pub struct AvatarRecord {
 impl AvatarRecord {
     fn new(
         account: &AccountId,
-        participant_id: ParticipantId,
+        entity_id: EntityId,
         image: &AvatarData,
         metadata: &AvatarInfo,
     ) -> Self {
         Self {
-            id: format!("{account}.{}", participant_id.to_ref().to_raw_key_string()),
+            id: format!("{account}.{}", entity_id.to_ref().to_raw_key_string()),
             account: account.clone(),
-            participant_id,
+            entity_id: entity_id,
             avatar_id: metadata.checksum.clone(),
             mime_type: metadata.mime_type.clone(),
             base64_data: image.base64().to_string(),
@@ -80,7 +78,7 @@ impl AvatarRepository for StoreAvatarRepository {
     async fn get(
         &self,
         account: &AccountId,
-        participant_id: ParticipantIdRef<'_>,
+        entity_id: EntityIdRef<'_>,
         avatar_id: &AvatarId,
     ) -> anyhow::Result<Option<PlatformImage>> {
         let tx = self
@@ -91,7 +89,7 @@ impl AvatarRepository for StoreAvatarRepository {
         let idx = collection.index(&AvatarRecord::avatar_idx())?;
 
         return Ok(idx
-            .get::<_, AvatarRecord>(&(account, participant_id, &avatar_id))
+            .get::<_, AvatarRecord>(&(account, entity_id, &avatar_id))
             .await?
             .map(|record| format!("data:{};base64,{}", record.mime_type, record.base64_data)));
     }
@@ -99,7 +97,7 @@ impl AvatarRepository for StoreAvatarRepository {
     async fn set(
         &self,
         account: &AccountId,
-        participant_id: ParticipantIdRef<'_>,
+        entity_id: EntityIdRef<'_>,
         metadata: &AvatarInfo,
         image: &AvatarData,
     ) -> Result<()> {
@@ -110,7 +108,7 @@ impl AvatarRepository for StoreAvatarRepository {
         let collection = tx.writeable_collection(AvatarRecord::collection())?;
         collection.put_entity(&AvatarRecord::new(
             account,
-            participant_id.to_owned(),
+            entity_id.to_owned(),
             image,
             metadata,
         ))?;

@@ -20,7 +20,7 @@ use crate::domain::shared::models::UserId;
 use crate::dtos::UserResourceId;
 use crate::services::{
     AccountService, BlockListService, CacheService, ConnectionService, ContactListService,
-    PreviewService, RoomsService, SidebarService, UploadService, UserDataService,
+    PreviewService, RoomsService, SidebarService, UploadService, UserDataService, WorkspaceService,
 };
 use crate::ClientEvent;
 
@@ -53,6 +53,7 @@ pub struct ClientInner {
     pub sidebar: SidebarService,
     pub uploads: UploadService,
     pub user_data: UserDataService,
+    pub workspace: WorkspaceService,
     pub(crate) connection: ConnectionService,
 }
 

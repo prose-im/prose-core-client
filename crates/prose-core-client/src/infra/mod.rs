@@ -16,6 +16,7 @@ pub mod settings;
 pub mod sidebar;
 pub mod uploads;
 pub mod user_info;
+pub mod workspace;
 pub mod xmpp;
 
 pub(crate) mod constants {
