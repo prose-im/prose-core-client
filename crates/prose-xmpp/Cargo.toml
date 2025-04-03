@@ -52,3 +52,4 @@ uuid = { workspace = true, features = ["v4", "fast-rng", "macro-diagnostics"] }
 default = []
 test = ["dep:insta", "dep:xml-rs"]
 trace-stanzas = []
+insecure-tcp = ["tokio-xmpp/insecure-tcp"]

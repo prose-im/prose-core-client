@@ -12,3 +12,6 @@ futures = { workspace = true }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
+
+[features]
+insecure-tcp = ["prose-xmpp/insecure-tcp"]

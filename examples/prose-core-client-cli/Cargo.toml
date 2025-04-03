@@ -19,3 +19,6 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 url = { workspace = true }
+
+[features]
+insecure-tcp = ["prose-core-client/insecure-tcp"]

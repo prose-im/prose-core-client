@@ -17,7 +17,6 @@ use tokio::sync::mpsc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 use tokio::{task, time};
-use tokio_xmpp::starttls::ServerConfig;
 use tokio_xmpp::{AsyncClient, Error, Event, Packet};
 use tracing::error;
 
@@ -46,8 +45,8 @@ impl ConnectorTrait for Connector {
         async fn connect(
             jid: &FullJid,
             password: SecretString,
-        ) -> Result<AsyncClient<ServerConfig>, ConnectionError> {
-            let mut client = AsyncClient::new(jid.clone(), password.expose_secret());
+        ) -> Result<XMPPClient, ConnectionError> {
+            let mut client = init_client(jid, password);
             client.set_reconnect(false);
 
             while let Some(event) = client.next().await {
@@ -85,7 +84,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    fn new(client: AsyncClient<ServerConfig>, event_handler: ConnectionEventHandler) -> Self {
+    fn new(client: XMPPClient, event_handler: ConnectionEventHandler) -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel();
 
         let sender = Arc::new(tx);
@@ -197,4 +196,26 @@ impl ConnectionTrait for Connection {
     fn disconnect(&self) {
         self.sender.send(Packet::StreamEnd).unwrap()
     }
+}
+
+#[cfg(feature = "insecure-tcp")]
+type XMPPClient = AsyncClient<tokio_xmpp::tcp::TcpServerConnector>;
+#[cfg(not(feature = "insecure-tcp"))]
+type XMPPClient = AsyncClient<tokio_xmpp::starttls::ServerConfig>;
+
+#[cfg(feature = "insecure-tcp")]
+fn init_client(jid: &FullJid, password: SecretString) -> XMPPClient {
+    AsyncClient::new_with_config(tokio_xmpp::AsyncConfig {
+        jid: jid.clone().into(),
+        password: password.expose_secret().to_string(),
+        server: tokio_xmpp::tcp::TcpServerConnector::new(format!(
+            "{}:5222",
+            jid.domain().to_string()
+        )),
+    })
+}
+
+#[cfg(not(feature = "insecure-tcp"))]
+fn init_client(jid: &FullJid, password: SecretString) -> XMPPClient {
+    AsyncClient::new(jid.clone(), password.expose_secret())
 }
