@@ -1,4 +1,12 @@
 
+## What's Changed in 0.1.105
+
+* Support prose-workspace JID instead of bare server JID by @nesium
+* Allow dealing with self-signed certificates for debugging by @nesium
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.104...0.1.105)
+
+
 ## What's Changed in 0.1.104
 
 * Update AvatarRecord index with new columns by @nesium
