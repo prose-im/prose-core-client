@@ -4,6 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use anyhow::{anyhow, bail, Result};
+use jid::BareJid;
 use minidom::Element;
 use tracing::info;
 use xmpp_parsers::message::MessageType;
@@ -34,6 +35,7 @@ use crate::domain::shared::models::{
 use crate::dtos::{UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::presence::parse_presence;
 use crate::infra::xmpp::event_parser::pubsub::parse_pubsub_event;
+use crate::util::jid_ext::ProseWorkspaceJid;
 
 mod message;
 mod presence;
@@ -214,18 +216,18 @@ fn parse_profile_event(ctx: &mut Context, event: XMPPProfileEvent) -> Result<()>
         XMPPProfileEvent::Vcard { from, vcard } => {
             let bare_jid = from.into_bare();
 
-            if bare_jid.node().is_some() {
+            if bare_jid.is_prose_workspace() {
+                ctx.push_event(WorkspaceInfoEvent {
+                    server_id: ServerId::from(BareJid::from_parts(None, bare_jid.domain())),
+                    r#type: WorkspaceInfoEventType::InfoChanged {
+                        info: vcard.try_into()?,
+                    },
+                })
+            } else {
                 ctx.push_event(UserInfoEvent {
                     user_id: UserId::from(bare_jid),
                     r#type: UserInfoEventType::ProfileChanged {
                         profile: vcard.try_into()?,
-                    },
-                })
-            } else {
-                ctx.push_event(WorkspaceInfoEvent {
-                    server_id: ServerId::from(bare_jid),
-                    r#type: WorkspaceInfoEventType::InfoChanged {
-                        info: vcard.try_into()?,
                     },
                 })
             }
@@ -237,17 +239,17 @@ fn parse_profile_event(ctx: &mut Context, event: XMPPProfileEvent) -> Result<()>
 
             let bare_jid = from.into_bare();
 
-            if bare_jid.node().is_some() {
-                ctx.push_event(UserInfoEvent {
-                    user_id: UserId::from(bare_jid),
-                    r#type: UserInfoEventType::AvatarChanged {
+            if bare_jid.is_prose_workspace() {
+                ctx.push_event(WorkspaceInfoEvent {
+                    server_id: ServerId::from(BareJid::from_parts(None, bare_jid.domain())),
+                    r#type: WorkspaceInfoEventType::AvatarChanged {
                         metadata: info.clone().into(),
                     },
                 })
             } else {
-                ctx.push_event(WorkspaceInfoEvent {
-                    server_id: ServerId::from(bare_jid),
-                    r#type: WorkspaceInfoEventType::AvatarChanged {
+                ctx.push_event(UserInfoEvent {
+                    user_id: UserId::from(bare_jid),
+                    r#type: UserInfoEventType::AvatarChanged {
                         metadata: info.clone().into(),
                     },
                 })

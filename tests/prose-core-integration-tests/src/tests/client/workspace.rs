@@ -29,7 +29,7 @@ async fn test_receives_server_vcard() -> anyhow::Result<()> {
         client.workspace.load_workspace_info().await?
     );
 
-    client.push_ctx([("SERVER_ID", "prose.org".to_string())]);
+    client.push_ctx([("SERVER_ID", "prose-workspace@prose.org".to_string())]);
 
     {
         recv!(

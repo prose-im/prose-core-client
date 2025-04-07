@@ -16,6 +16,7 @@ pub mod account_bookmarks_client;
 
 mod coalesce_client_events;
 pub mod form_config;
+pub mod jid_ext;
 mod join_all;
 pub mod mime_serde_shim;
 mod path_ext;
