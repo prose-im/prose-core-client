@@ -1,4 +1,13 @@
 
+## What's Changed in 0.1.106
+
+* Prepend workspace node when loading workspace icon by @nesium
+* Filter workspace from contact list by @nesium
+* Always send at least one workspace info changed event on startup by @nesium
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.105...0.1.106)
+
+
 ## What's Changed in 0.1.105
 
 * Support prose-workspace JID instead of bare server JID by @nesium
