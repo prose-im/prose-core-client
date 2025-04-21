@@ -26,6 +26,7 @@ pub struct WorkspaceInfoDomainService {
     workspace_info_repo: DynWorkspaceInfoRepository,
 
     workspace_icon_loaded: AtomicBool,
+    initial_info_change_event_sent: AtomicBool,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
@@ -95,7 +96,11 @@ impl WorkspaceInfoDomainServiceTrait for WorkspaceInfoDomainService {
             )
             .await?;
 
-        if info_changed {
+        let initial_change_event_sent = self
+            .initial_info_change_event_sent
+            .swap(true, Ordering::SeqCst);
+
+        if info_changed || !initial_change_event_sent {
             self.client_event_dispatcher
                 .dispatch_event(ClientEvent::WorkspaceInfoChanged);
         }
