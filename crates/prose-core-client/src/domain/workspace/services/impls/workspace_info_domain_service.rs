@@ -7,7 +7,7 @@ use crate::app::deps::{
     DynAppContext, DynAvatarRepository, DynClientEventDispatcher, DynUserInfoService,
     DynWorkspaceInfoRepository,
 };
-use crate::domain::shared::models::{AvatarInfo, BareEntityId, CachePolicy, EntityIdRef};
+use crate::domain::shared::models::{AvatarInfo, CachePolicy, EntityIdRef};
 use crate::domain::user_info::models::PlatformImage;
 use crate::domain::workspace::models::{WorkspaceIcon, WorkspaceInfo};
 use crate::domain::workspace::services::WorkspaceInfoDomainService as WorkspaceInfoDomainServiceTrait;
@@ -60,7 +60,7 @@ impl WorkspaceInfoDomainServiceTrait for WorkspaceInfoDomainService {
 
         let image_data = self
             .user_info_service
-            .load_avatar_image(&BareEntityId::from(icon.owner.clone()), &icon.id)
+            .load_avatar_image(&icon.owner.to_workspace_entity_id(), &icon.id)
             .await?;
 
         let Some(image_data) = image_data else {

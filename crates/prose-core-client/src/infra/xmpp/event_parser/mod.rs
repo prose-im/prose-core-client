@@ -35,7 +35,7 @@ use crate::domain::shared::models::{
 use crate::dtos::{UserId, UserResourceId};
 use crate::infra::xmpp::event_parser::presence::parse_presence;
 use crate::infra::xmpp::event_parser::pubsub::parse_pubsub_event;
-use crate::util::jid_ext::ProseWorkspaceJid;
+use crate::util::jid_workspace::ProseWorkspaceJid;
 
 mod message;
 mod presence;

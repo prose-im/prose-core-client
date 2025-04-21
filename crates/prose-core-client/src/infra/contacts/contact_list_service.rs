@@ -12,7 +12,7 @@ use crate::domain::contacts::models::Contact;
 use crate::domain::contacts::services::ContactListService;
 use crate::dtos::UserId;
 use crate::infra::xmpp::XMPPClient;
-use crate::util::jid_ext::ProseWorkspaceJid;
+use crate::util::jid_workspace::ProseWorkspaceJid;
 
 #[cfg_attr(target_arch = "wasm32", async_trait(? Send))]
 #[async_trait]

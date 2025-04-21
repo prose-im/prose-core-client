@@ -27,6 +27,7 @@ use common::{enable_debug_logging, load_credentials, Level};
 use prose_core_client::dtos::{
     Address, Attachment, AttachmentType, Availability, Avatar, ParticipantId, RoomEnvelope, RoomId,
     SendMessageRequest, SendMessageRequestBody, StringIndexRangeExt, UploadSlot, UserId,
+    WorkspaceIcon,
 };
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
@@ -226,6 +227,15 @@ async fn load_avatar(client: &Client, avatar: &Avatar) -> Result<()> {
     match client.user_data.load_avatar(avatar).await? {
         Some(path) => println!("Saved avatar image to {:?}.", path),
         None => println!("No avatar found."),
+    }
+    Ok(())
+}
+
+async fn load_workspace_icon(client: &Client, icon: &WorkspaceIcon) -> Result<()> {
+    println!("Loading workspace icon {icon:?}…");
+    match client.workspace.load_workspace_icon(icon).await? {
+        Some(path) => println!("Saved workspace icon to {:?}.", path),
+        None => println!("No workspace icon found."),
     }
     Ok(())
 }
@@ -619,6 +629,11 @@ enum Selection {
     InviteUserToPrivateChannel,
     #[strum(serialize = "Convert group to private channel")]
     ConvertGroupToPrivateChannel,
+
+    #[strum(serialize = "Load workspace info")]
+    LoadWorkspaceInfo,
+    #[strum(serialize = "Load workspace icon")]
+    LoadWorkspaceIcon,
 
     #[strum(serialize = "[OMEMO] List user devices")]
     ListUserDevices,
@@ -1204,6 +1219,18 @@ async fn main() -> Result<()> {
                 let items = caps.query_disco_items(jid, None).await?;
 
                 println!("Info:\n{info:?}\n\nItems:\n{items:?}");
+            }
+            Selection::LoadWorkspaceInfo => {
+                let info = client.workspace.load_workspace_info().await?;
+                println!("Info: \n{info:?}")
+            }
+            Selection::LoadWorkspaceIcon => {
+                let info = client.workspace.load_workspace_info().await?;
+                let Some(icon) = info.icon else {
+                    println!("Workspace doesn't have an icon");
+                    continue;
+                };
+                client.workspace.load_workspace_icon(&icon).await?;
             }
             Selection::SendRawXML => {
                 let input = Input::<String>::with_theme(&ColorfulTheme::default())
