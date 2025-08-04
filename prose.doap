@@ -29,6 +29,7 @@
     <programming-language>Rust</programming-language>
     <os>Browser</os>
     <os>macOS</os>
+    <os>Windows</os>
 
     <repository>
       <GitRepository>
