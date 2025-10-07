@@ -4,40 +4,43 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
 use parking_lot::{Mutex, RwLock};
 use tracing::info;
 
-use prose_core_client::dtos::{Availability, Emoji, MessageId, UserProfile};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
     open_store, Client as ProseClient, ClientDelegate as ProseClientDelegate, FsAvatarRepository,
     PlatformDriver, SignalServiceHandle,
 };
-use prose_xmpp::{connector, ConnectionError};
+use prose_xmpp::connector;
 
-use crate::types::{ClientEvent, Message, JID};
-use crate::{ClientError, Contact};
+use crate::types::{Availability, ClientError, ConnectionError, Message, UserProfile};
+use crate::{ClientEvent, Contact, Emoji, MessageId, PathBuf, JID};
 
+#[uniffi::export(with_foreign)]
 pub trait ClientDelegate: Send + Sync {
     fn handle_event(&self, event: ClientEvent);
 }
 
+#[derive(uniffi::Object)]
 pub struct Client {
     jid: JID,
     client: RwLock<Option<ProseClient>>,
-    cache_dir: PathBuf,
+    cache_dir: std::path::PathBuf,
     delegate: Mutex<Option<Box<dyn ProseClientDelegate>>>,
 }
 
+#[uniffi::export]
 impl Client {
+    #[uniffi::constructor]
     pub fn new(
         jid: JID,
         cache_dir: String,
-        delegate: Option<Box<dyn ClientDelegate>>,
+        delegate: Option<Arc<dyn ClientDelegate>>,
     ) -> Result<Self, ClientError> {
         let cache_dir = Path::new(&cache_dir).join(jid.to_string());
 
@@ -107,11 +110,16 @@ impl Client {
             .user_data
             .load_user_profile(&from.to_bare().unwrap().into())
             .await?;
-        Ok(profile)
+        Ok(profile.map(Into::into))
     }
 
     pub async fn save_profile(&self, profile: UserProfile) -> Result<(), ClientError> {
-        let profile = self.client().await?.account.set_profile(profile).await?;
+        let profile = self
+            .client()
+            .await?
+            .account
+            .set_profile(profile.into())
+            .await?;
         Ok(profile)
     }
 
@@ -250,7 +258,7 @@ impl Client {
         self.client()
             .await?
             .account
-            .set_availability(availability)
+            .set_availability(availability.into())
             .await?;
         Ok(())
     }
@@ -286,7 +294,7 @@ impl Client {
     }
 }
 
-struct DelegateWrapper(Box<dyn ClientDelegate>);
+struct DelegateWrapper(Arc<dyn ClientDelegate>);
 
 impl ProseClientDelegate for DelegateWrapper {
     fn handle_event(&self, _client: ProseClient, event: prose_core_client::ClientEvent) {

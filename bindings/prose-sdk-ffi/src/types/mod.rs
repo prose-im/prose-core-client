@@ -5,12 +5,16 @@
 
 pub use account_bookmark::AccountBookmark;
 pub use client_event::ClientEvent;
-pub use contact::{Contact, Group};
+pub use contact::{Availability, Contact, Group};
+pub use errors::{ClientError, ClientResult, ConnectionError, JidParseError};
 pub use jid::{parse_jid, JID};
-pub use message::{DateTime, Message, Reaction};
+pub use message::{Message, Reaction};
+pub use user_profile::UserProfile;
 
 mod account_bookmark;
 mod client_event;
 mod contact;
+mod errors;
 mod jid;
 mod message;
+mod user_profile;

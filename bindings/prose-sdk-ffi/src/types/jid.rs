@@ -3,9 +3,10 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use jid::{BareJid, DomainPart, Error as JidParseError, NodePart};
+use crate::types::JidParseError;
+use jid::{BareJid, DomainPart, NodePart};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(uniffi::Record, Debug, Clone, PartialEq)]
 pub struct JID {
     pub node: Option<String>,
     pub domain: String,

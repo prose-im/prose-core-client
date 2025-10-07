@@ -3,10 +3,16 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::uniffi_types::JID;
-use prose_core_client::dtos::MessageId;
-use prose_core_client::ConnectionEvent;
+use crate::types::ConnectionError;
+use crate::uniffi_types::{MessageId, JID};
 
+#[derive(uniffi::Enum)]
+pub enum ConnectionEvent {
+    Connect,
+    Disconnect { error: Option<ConnectionError> },
+}
+
+#[derive(uniffi::Enum)]
 pub enum ClientEvent {
     /// A user in `conversation` started or stopped typing.
     ComposingUsersChanged { conversation: JID },
