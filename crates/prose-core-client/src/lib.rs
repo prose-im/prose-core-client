@@ -17,7 +17,7 @@ pub use domain::encryption::services::EncryptionService;
 pub use infra::platform_dependencies::open_store;
 #[cfg(feature = "test")]
 pub use infra::xmpp::event_parser::parse_xmpp_event;
-pub use prose_store::prelude::{PlatformDriver, Store};
+pub use prose_store::prelude::{Error as StoreError, PlatformDriver, Store};
 #[cfg(not(target_arch = "wasm32"))]
 pub use util::account_bookmarks_client::{AccountBookmark, AccountBookmarksClient};
 #[cfg(feature = "debug")]

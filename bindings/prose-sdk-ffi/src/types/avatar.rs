@@ -24,8 +24,8 @@ impl From<CoreAvatar> for Avatar {
     }
 }
 
-impl From<Avatar> for CoreAvatar {
-    fn from(avatar: Avatar) -> Self {
-        avatar.0
+impl AsRef<CoreAvatar> for Avatar {
+    fn as_ref(&self) -> &CoreAvatar {
+        &self.0
     }
 }

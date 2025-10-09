@@ -92,3 +92,12 @@ impl From<CoreUserStatus> for UserStatus {
         }
     }
 }
+
+impl From<UserStatus> for CoreUserStatus {
+    fn from(value: UserStatus) -> Self {
+        CoreUserStatus {
+            emoji: value.emoji,
+            status: value.status,
+        }
+    }
+}

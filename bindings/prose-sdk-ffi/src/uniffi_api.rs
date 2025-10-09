@@ -5,34 +5,48 @@
 
 pub use crate::types::{AccountBookmark, ClientError, ClientEvent, Contact, Group, Message, JID};
 pub use crate::{account_bookmarks_client::AccountBookmarksClient, client::*, logger::*};
+use jid::BareJid as CoreBareJid;
 use mime::Mime as CoreMime;
 use prose_core_client::dtos::{
-    Emoji as CoreEmoji, MessageId as CoreMessageId, MucId as CoreMucId,
-    OccupantId as CoreOccupantId, ParticipantId as CoreParticipantId, RoomId as CoreRoomId,
-    UnicodeScalarIndex as CoreUnicodeScalarIndex, Url as CoreUrl, UserId as CoreUserId,
+    AvatarId as CoreAvatarId, Emoji as CoreEmoji, MessageId as CoreMessageId, MucId as CoreMucId,
+    OccupantId as CoreOccupantId, ParticipantId as CoreParticipantId,
+    PresenceSubRequestId as CorePresenceSubRequestId, RoomId as CoreRoomId,
+    ServerId as CoreServerId, UnicodeScalarIndex as CoreUnicodeScalarIndex, Url as CoreUrl,
+    UserId as CoreUserId,
 };
+use std::path::PathBuf as CorePathBuf;
 
 pub struct PathBuf(String);
 pub struct Url(String);
 pub struct Emoji(String);
 pub struct MessageId(String);
-pub struct UserId(String);
+pub struct BareJid(String);
+pub struct UserId(BareJid);
 pub struct OccupantId(String);
-pub struct MucId(String);
+pub struct MucId(BareJid);
 pub struct DateTime(i64);
+pub struct DateTimeFixed(i64);
 pub struct Mime(String);
 pub struct UnicodeScalarIndex(u64);
+pub struct PresenceSubRequestId(UserId);
+pub struct AvatarId(String);
+pub struct ServerId(BareJid);
 
 uniffi::custom_newtype!(PathBuf, String);
 uniffi::custom_newtype!(Url, String);
 uniffi::custom_newtype!(Emoji, String);
 uniffi::custom_newtype!(MessageId, String);
-uniffi::custom_newtype!(UserId, String);
+uniffi::custom_newtype!(BareJid, String);
+uniffi::custom_newtype!(UserId, BareJid);
 uniffi::custom_newtype!(OccupantId, String);
-uniffi::custom_newtype!(MucId, String);
+uniffi::custom_newtype!(MucId, BareJid);
 uniffi::custom_newtype!(DateTime, i64);
+uniffi::custom_newtype!(DateTimeFixed, i64);
 uniffi::custom_newtype!(Mime, String);
 uniffi::custom_newtype!(UnicodeScalarIndex, u64);
+uniffi::custom_newtype!(PresenceSubRequestId, UserId);
+uniffi::custom_newtype!(AvatarId, String);
+uniffi::custom_newtype!(ServerId, BareJid);
 
 #[derive(uniffi::Enum)]
 pub enum RoomId {
@@ -66,7 +80,29 @@ impl From<MessageId> for CoreMessageId {
 
 impl From<CoreMucId> for MucId {
     fn from(value: CoreMucId) -> Self {
-        MucId(value.to_string())
+        MucId(value.into_inner().into())
+    }
+}
+
+impl From<CoreBareJid> for BareJid {
+    fn from(value: CoreBareJid) -> Self {
+        BareJid(value.to_string())
+    }
+}
+
+impl From<BareJid> for CoreBareJid {
+    fn from(value: BareJid) -> Self {
+        value
+            .0
+            .as_str()
+            .parse::<CoreBareJid>()
+            .expect("BareJid is invalid")
+    }
+}
+
+impl From<MucId> for CoreMucId {
+    fn from(value: MucId) -> Self {
+        CoreBareJid::from(value.0).into()
     }
 }
 
@@ -90,17 +126,25 @@ impl From<CoreParticipantId> for ParticipantId {
 
 impl From<CoreUserId> for UserId {
     fn from(value: CoreUserId) -> Self {
-        UserId(value.to_string())
+        UserId(value.into_inner().into())
     }
 }
 
 impl From<UserId> for CoreUserId {
     fn from(value: UserId) -> Self {
-        value
-            .0
-            .as_str()
-            .parse::<CoreUserId>()
-            .expect("UserId is invalid")
+        CoreBareJid::from(value.0).into()
+    }
+}
+
+impl From<CorePresenceSubRequestId> for PresenceSubRequestId {
+    fn from(value: CorePresenceSubRequestId) -> Self {
+        PresenceSubRequestId(value.to_user_id().into())
+    }
+}
+
+impl From<PresenceSubRequestId> for CorePresenceSubRequestId {
+    fn from(value: PresenceSubRequestId) -> Self {
+        CoreUserId::from(value.0).into()
     }
 }
 
@@ -113,6 +157,12 @@ impl From<CoreOccupantId> for OccupantId {
 impl From<chrono::DateTime<chrono::Utc>> for DateTime {
     fn from(value: chrono::DateTime<chrono::Utc>) -> Self {
         DateTime(value.timestamp_millis())
+    }
+}
+
+impl From<chrono::DateTime<chrono::FixedOffset>> for DateTimeFixed {
+    fn from(value: chrono::DateTime<chrono::FixedOffset>) -> Self {
+        DateTimeFixed(value.timestamp_millis())
     }
 }
 
@@ -159,12 +209,47 @@ impl From<Emoji> for CoreEmoji {
     }
 }
 
+impl From<CoreServerId> for ServerId {
+    fn from(value: CoreServerId) -> Self {
+        ServerId(value.into_inner().into())
+    }
+}
+
+impl From<ServerId> for CoreServerId {
+    fn from(value: ServerId) -> Self {
+        CoreBareJid::from(value.0).into()
+    }
+}
+
+impl From<CoreAvatarId> for AvatarId {
+    fn from(value: CoreAvatarId) -> Self {
+        AvatarId(value.to_string())
+    }
+}
+
+impl From<AvatarId> for CoreAvatarId {
+    fn from(value: AvatarId) -> Self {
+        CoreAvatarId::from_str_unchecked(value.0)
+    }
+}
+
+impl From<CorePathBuf> for PathBuf {
+    fn from(value: CorePathBuf) -> Self {
+        PathBuf(
+            value
+                .to_str()
+                .expect("Could not convert path to str")
+                .to_owned(),
+        )
+    }
+}
+
 pub mod uniffi_types {
     pub use crate::{
         client::Client,
         types::{parse_jid, AccountBookmark, Message, Reaction, UserProfile, JID},
-        ClientError, Contact, Emoji, MessageId, MucId, ParticipantId, PathBuf, RoomId,
-        UnicodeScalarIndex, Url, UserId,
+        AvatarId, ClientError, Contact, DateTimeFixed, Emoji, MessageId, MucId, ParticipantId,
+        PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url, UserId,
     };
 }
 

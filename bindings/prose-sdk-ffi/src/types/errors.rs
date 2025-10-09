@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use prose_core_client::FsAvatarRepositoryError;
+use prose_core_client::{FsAvatarRepositoryError, StoreError};
 
 pub type ClientResult<T> = Result<T, ClientError>;
 
@@ -108,5 +108,11 @@ impl From<jid::Error> for JidParseError {
             jid::Error::ResourceMissingInFullJid => Self::ResourceMissingInFullJid,
             jid::Error::ResourceInBareJid => Self::ResourceInBareJid,
         }
+    }
+}
+
+impl From<StoreError> for ClientError {
+    fn from(e: StoreError) -> Self {
+        ClientError::Generic { msg: e.to_string() }
     }
 }

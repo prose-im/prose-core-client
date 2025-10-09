@@ -33,8 +33,8 @@ pub use crate::domain::{
     },
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
-        AccountId, Availability, Avatar, AvatarSource, Markdown, MucId, OccupantId,
-        ParticipantBasicInfo, ParticipantId, ParticipantInfo, RoomId, ScalarRangeExt,
+        AccountId, Availability, Avatar, AvatarId, AvatarSource, Markdown, MucId, OccupantId,
+        ParticipantBasicInfo, ParticipantId, ParticipantInfo, RoomId, ScalarRangeExt, ServerId,
         StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId, UserPresenceInfo,
         UserResourceId, Utf16Index, Utf8Index, HTML,
     },
