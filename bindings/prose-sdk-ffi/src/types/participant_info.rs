@@ -5,7 +5,10 @@
 
 use crate::types::{Availability, Avatar};
 use crate::{ParticipantId, UserId};
-use prose_core_client::dtos::JabberClient as CoreJabberClient;
+use prose_core_client::dtos::{
+    JabberClient as CoreJabberClient, ParticipantBasicInfo as CoreParticipantBasicInfo,
+    ParticipantInfo as CoreParticipantInfo, RoomAffiliation as CoreRoomAffiliation,
+};
 use std::sync::Arc;
 
 #[derive(uniffi::Record)]
@@ -48,6 +51,44 @@ impl From<CoreJabberClient> for JabberClient {
         JabberClient {
             name: client.to_string(),
             is_prose: client.is_prose(),
+        }
+    }
+}
+
+impl From<CoreParticipantInfo> for ParticipantInfo {
+    fn from(value: CoreParticipantInfo) -> Self {
+        ParticipantInfo {
+            id: value.id.into(),
+            user_id: value.user_id.map(Into::into),
+            name: value.name,
+            is_self: value.is_self,
+            availability: value.availability.into(),
+            affiliation: value.affiliation.into(),
+            avatar: value.avatar.map(|a| Arc::new(a.into())),
+            client: value.client.map(Into::into),
+            status: value.status,
+        }
+    }
+}
+
+impl From<CoreRoomAffiliation> for RoomAffiliation {
+    fn from(value: CoreRoomAffiliation) -> Self {
+        match value {
+            CoreRoomAffiliation::Outcast => RoomAffiliation::Outcast,
+            CoreRoomAffiliation::None => RoomAffiliation::None,
+            CoreRoomAffiliation::Member => RoomAffiliation::Member,
+            CoreRoomAffiliation::Admin => RoomAffiliation::Admin,
+            CoreRoomAffiliation::Owner => RoomAffiliation::Owner,
+        }
+    }
+}
+
+impl From<CoreParticipantBasicInfo> for ParticipantBasicInfo {
+    fn from(value: CoreParticipantBasicInfo) -> Self {
+        ParticipantBasicInfo {
+            id: value.id.into(),
+            name: value.name,
+            avatar: value.avatar.map(|a| Arc::new(a.into())),
         }
     }
 }

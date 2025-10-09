@@ -58,6 +58,12 @@ impl From<CoreMessageId> for MessageId {
     }
 }
 
+impl From<MessageId> for CoreMessageId {
+    fn from(value: MessageId) -> Self {
+        value.0.into()
+    }
+}
+
 impl From<CoreMucId> for MucId {
     fn from(value: CoreMucId) -> Self {
         MucId(value.to_string())
@@ -85,6 +91,16 @@ impl From<CoreParticipantId> for ParticipantId {
 impl From<CoreUserId> for UserId {
     fn from(value: CoreUserId) -> Self {
         UserId(value.to_string())
+    }
+}
+
+impl From<UserId> for CoreUserId {
+    fn from(value: UserId) -> Self {
+        value
+            .0
+            .as_str()
+            .parse::<CoreUserId>()
+            .expect("UserId is invalid")
     }
 }
 
@@ -134,6 +150,12 @@ impl From<CoreUnicodeScalarIndex> for UnicodeScalarIndex {
 impl From<CoreEmoji> for Emoji {
     fn from(value: CoreEmoji) -> Self {
         Emoji(value.into_inner())
+    }
+}
+
+impl From<Emoji> for CoreEmoji {
+    fn from(value: Emoji) -> Self {
+        value.0.into()
     }
 }
 
