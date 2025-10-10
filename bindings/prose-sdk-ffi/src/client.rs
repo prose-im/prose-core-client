@@ -66,7 +66,7 @@ pub struct Client {
 
 #[uniffi::export]
 impl Client {
-    #[uniffi::constructor]
+    #[uniffi::constructor(async_runtime = "tokio")]
     pub async fn new(
         cache_dir: PathBuf,
         delegate: Option<Arc<dyn ClientDelegate>>,
@@ -106,7 +106,7 @@ impl Client {
     }
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl Client {
     pub async fn connect(&self, user_id: UserId, password: String) -> Result<(), ConnectionError> {
         self.client

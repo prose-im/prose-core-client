@@ -25,7 +25,7 @@ pub enum RoomEnvelope {
     Generic(Arc<RoomGeneric>),
 }
 
-#[derive(uniffi::Enum, Clone, Copy)]
+#[derive(uniffi::Enum)]
 pub enum RoomType {
     DirectMessage,
     Group,
@@ -71,7 +71,7 @@ pub struct RoomGeneric {
 
 macro_rules! base_room_impl {
     ($t:ident) => {
-        #[uniffi::export]
+        #[uniffi::export(async_runtime = "tokio")]
         #[async_trait::async_trait]
         impl RoomBase for $t {
             fn state(&self) -> RoomState {
@@ -207,7 +207,7 @@ macro_rules! base_room_impl {
 
 macro_rules! muc_room_impl {
     ($t:ident) => {
-        #[uniffi::export]
+        #[uniffi::export(async_runtime = "tokio")]
         #[async_trait::async_trait]
         impl MucRoom for $t {
             fn subject(&self) -> Option<String> {
@@ -224,7 +224,7 @@ macro_rules! muc_room_impl {
 
 macro_rules! mut_name_impl {
     ($t:ident) => {
-        #[uniffi::export]
+        #[uniffi::export(async_runtime = "tokio")]
         #[async_trait::async_trait]
         impl HasMutableName for $t {
             async fn set_name(&self, name: &str) -> ClientResult<()> {
@@ -243,7 +243,7 @@ pub trait Channel: Send + Sync {
 
 macro_rules! channel_room_impl {
     ($t:ident) => {
-        #[uniffi::export]
+        #[uniffi::export(async_runtime = "tokio")]
         #[async_trait::async_trait]
         impl Channel for $t {
             async fn invite_users(&self, users: Vec<UserId>) -> ClientResult<()> {
@@ -258,7 +258,7 @@ macro_rules! channel_room_impl {
     };
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl RoomDirectMessage {
     pub fn is_encryption_enabled(&self) -> bool {
         self.room.encryption_enabled()
@@ -269,7 +269,7 @@ impl RoomDirectMessage {
     }
 }
 
-#[uniffi::export]
+#[uniffi::export(async_runtime = "tokio")]
 impl RoomGroup {
     pub async fn resend_invites_to_members(&self) -> ClientResult<()> {
         self.room.resend_invites_to_members().await?;
