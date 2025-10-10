@@ -80,7 +80,7 @@ impl Client {
         let delegate =
             delegate.map(|d| Box::new(DelegateWrapper(d)) as Box<dyn CoreClientDelegate>);
 
-        let store = open_store(PlatformDriver::new("ProseDB")).await?;
+        let store = open_store(PlatformDriver::new(cache_dir.join("ProseDB.sqlite"))).await?;
         let config = config.unwrap_or_default();
 
         let software_version = SoftwareVersion {
