@@ -24,7 +24,7 @@ impl Args {
             Some(vec![Platform::Ios]),
             None,
             Some("ProseSDK".to_string()),
-            "ProseSDK".to_string(),
+            "ProseCore".to_string(),
             false,
             Config {
                 silent: false,
