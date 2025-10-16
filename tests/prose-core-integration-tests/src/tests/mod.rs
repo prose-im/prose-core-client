@@ -34,9 +34,22 @@ pub fn platform_driver(name: impl AsRef<str>) -> IndexedDBDriver {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub fn platform_driver(_name: impl AsRef<str>) -> SqliteDriver {
-    let path = tempfile::tempdir().unwrap().path().join("test.sqlite");
-    let parent = path.parent().unwrap();
-    std::fs::create_dir_all(parent).unwrap();
+    /// Generates a “random” string that’s just the current Unix timestamp in
+    /// nanos which is good enough to generate unique in-memory database names.
+    fn randomish_string() -> String {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+            .to_string()
+    }
+
+    let path = format!(
+        "file:{name}?mode=memory&cache=shared",
+        name = randomish_string()
+    );
     println!("Opening DB at {:?}", path);
     SqliteDriver::new(path)
 }
