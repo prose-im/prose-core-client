@@ -16,13 +16,16 @@ crate-type = ["staticlib", "lib"]
 
 [dependencies]
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 chrono = { workspace = true }
 jid = { workspace = true }
+mime = { workspace = true }
 parking_lot = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-oslog = "0.3.0"
 tracing-subscriber = { workspace = true }
 uniffi = { workspace = true, features = ["tokio"] }
 

@@ -16,6 +16,7 @@ pub(crate) mod paths {
 
     pub mod bindings {
         pub const WASM: &str = "prose-sdk-js";
+        pub const SWIFT: &str = "prose-sdk-ffi";
     }
     pub mod tests {
         pub const INTEGRATION: &str = "prose-core-integration-tests";

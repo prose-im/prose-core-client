@@ -24,7 +24,7 @@ impl From<UserId> for PresenceSubRequestId {
 }
 
 impl PresenceSubRequestId {
-    pub(crate) fn to_user_id(&self) -> UserId {
+    pub fn to_user_id(&self) -> UserId {
         self.0.clone()
     }
 }

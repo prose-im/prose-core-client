@@ -182,13 +182,13 @@ impl AccountService {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    pub async fn set_avatar_from_url(&self, image_path: &std::path::Path) -> Result<()> {
+    pub async fn set_avatar_from_url(&self, image_path: impl AsRef<std::path::Path>) -> Result<()> {
         use crate::infra::constants::MAX_IMAGE_DIMENSIONS;
         use image::{codecs::jpeg::JpegEncoder, GenericImageView};
         use std::time::Instant;
 
         let now = Instant::now();
-        debug!("Opening & resizing image at {:?}…", image_path);
+        debug!("Opening & resizing image at {:?}…", image_path.as_ref());
 
         let img =
             image::open(image_path)?.thumbnail(MAX_IMAGE_DIMENSIONS.0, MAX_IMAGE_DIMENSIONS.1);

@@ -1,8 +1,9 @@
-use std::env;
-
+use crate::paths;
 use anyhow::Result;
-// use cargo_swift::package::{run, LibTypeArg, Platform};
-// use cargo_swift::{Config, Mode};
+use cargo_swift::package::{run, FeatureOptions, LibTypeArg, Platform};
+use cargo_swift::{Config, Mode};
+use std::env;
+use std::path::Path;
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -17,22 +18,28 @@ enum Command {
 
 impl Args {
     pub async fn run(self) -> Result<()> {
-        todo!("FIXME")
-        // env::set_current_dir("bindings/prose-sdk-ffi")?;
-        //
-        // run(
-        //     Some(vec![Platform::Macos]),
-        //     Some("ProseSDK".to_string()),
-        //     false,
-        //     Config {
-        //         silent: false,
-        //         accept_all: false,
-        //     },
-        //     Mode::Debug,
-        //     LibTypeArg::Static,
-        //     false,
-        // )?;
-        //
-        // Ok(())
+        env::set_current_dir(Path::new(paths::BINDINGS).join(paths::bindings::SWIFT))?;
+
+        run(
+            Some(vec![Platform::Ios]),
+            None,
+            Some("ProseSDK".to_string()),
+            "ProseCore".to_string(),
+            false,
+            Config {
+                silent: false,
+                accept_all: false,
+            },
+            Mode::Debug,
+            LibTypeArg::Static,
+            FeatureOptions {
+                features: None,
+                all_features: false,
+                no_default_features: false,
+            },
+            false,
+        )?;
+
+        Ok(())
     }
 }

@@ -6,6 +6,7 @@
 use crate::types::JID;
 use prose_core_client::AccountBookmark as ProseAccountBookmark;
 
+#[derive(uniffi::Record)]
 pub struct AccountBookmark {
     pub jid: JID,
     pub is_selected: bool,
