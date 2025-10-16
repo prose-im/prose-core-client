@@ -7,8 +7,12 @@ use std::fs;
 use std::path::Path;
 use std::sync::Arc;
 
-use tracing::info;
-
+use crate::types::{
+    AccountInfo, Availability, Avatar, ClientResult, ConnectionError, PresenceSubRequest,
+    PublicRoomInfo, SidebarItem, UploadSlot, UserBasicInfo, UserMetadata, UserProfile, UserStatus,
+    WorkspaceIcon, WorkspaceInfo,
+};
+use crate::{ClientEvent, Contact, Mime, MucId, PathBuf, PresenceSubRequestId, RoomId, UserId};
 use prose_core_client::dtos::{SoftwareVersion, UserId as CoreUserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
@@ -17,13 +21,13 @@ use prose_core_client::{
     ClientEvent as CoreClientEvent, FsAvatarRepository, PlatformDriver, SignalServiceHandle,
 };
 use prose_xmpp::connector;
-
-use crate::types::{
-    AccountInfo, Availability, Avatar, ClientResult, ConnectionError, PresenceSubRequest,
-    PublicRoomInfo, SidebarItem, UploadSlot, UserBasicInfo, UserMetadata, UserProfile, UserStatus,
-    WorkspaceIcon, WorkspaceInfo,
-};
-use crate::{ClientEvent, Contact, Mime, MucId, PathBuf, PresenceSubRequestId, RoomId, UserId};
+use tracing::info;
+use tracing::metadata::LevelFilter;
+use tracing::Level;
+use tracing_oslog::OsLogger;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{Layer, Registry};
 
 #[uniffi::export(with_foreign)]
 pub trait ClientDelegate: Send + Sync {
@@ -72,6 +76,11 @@ impl Client {
         delegate: Option<Arc<dyn ClientDelegate>>,
         config: Option<ClientConfig>,
     ) -> ClientResult<Self> {
+        let oslog_layer = OsLogger::new("org.prose", "default")
+            .with_filter(LevelFilter::from_level(Level::TRACE));
+
+        Registry::default().with(oslog_layer).init();
+
         let cache_path = cache_dir.into_inner();
         let cache_dir = Path::new(&cache_path);
         info!("Caching data at {:?}", cache_dir);
