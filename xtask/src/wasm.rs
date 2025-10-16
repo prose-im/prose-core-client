@@ -226,8 +226,6 @@ fn run_release_npm(sh: &Shell, npm_token: Option<String>, file_path: &PathBuf) -
     println!("Publishing release to NPM…");
 
     // Run command (using token if provided)
-    let npm_publish_command = "npm publish --provenance";
-
     let npm_command_result = if let Some(ref npm_token) = npm_token {
         // Prepare '.npmrc' configuration
         let npmrc_path = env::current_dir()?.join(".npmrc");
@@ -241,7 +239,7 @@ fn run_release_npm(sh: &Shell, npm_token: Option<String>, file_path: &PathBuf) -
         // Publish release to NPM (using token)
         let npm_command = cmd!(
             sh,
-            "{npm_publish_command} --userconfig={npmrc_path} {file_path}"
+            "npm publish --provenance --userconfig={npmrc_path} {file_path}"
         )
         .run();
 
@@ -251,7 +249,7 @@ fn run_release_npm(sh: &Shell, npm_token: Option<String>, file_path: &PathBuf) -
         npm_command
     } else {
         // Publish release to NPM (no token)
-        cmd!(sh, "{npm_publish_command} {file_path}").run()
+        cmd!(sh, "npm publish --provenance {file_path}").run()
     };
 
     match npm_command_result {
