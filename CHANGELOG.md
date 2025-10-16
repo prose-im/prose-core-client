@@ -1,4 +1,13 @@
 
+## What's Changed in 0.1.107
+
+* Add windows support to doap file by @valeriansaliou
+* Fix “Too many open files” error in `prose-core-integration-tests` by @RemiBardon
+* Fix unnecessary scheduling of microtasks by @nesium
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.106...0.1.107)
+
+
 ## What's Changed in 0.1.106
 
 * Prepend workspace node when loading workspace icon by @nesium
