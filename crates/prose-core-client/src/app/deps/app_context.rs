@@ -104,7 +104,7 @@ impl AppContext {
             .cloned()
     }
 
-    pub fn server_features(&self) -> Result<MappedRwLockReadGuard<ServerFeatures>> {
+    pub fn server_features<'a>(&'a self) -> Result<MappedRwLockReadGuard<'a, ServerFeatures>> {
         let read_guard = self.connection_properties.read();
         if read_guard.is_none() {
             return Err(anyhow::anyhow!(

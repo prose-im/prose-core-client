@@ -68,7 +68,7 @@ pub enum AvatarData {
 }
 
 impl AvatarData {
-    pub fn data(&self) -> std::result::Result<Cow<Box<[u8]>>, DecodeError> {
+    pub fn data<'a>(&'a self) -> std::result::Result<Cow<'a, Box<[u8]>>, DecodeError> {
         match self {
             AvatarData::Base64(base64) => Ok(Cow::Owned(
                 general_purpose::STANDARD.decode(base64)?.into_boxed_slice(),
@@ -77,7 +77,7 @@ impl AvatarData {
         }
     }
 
-    pub fn base64(&self) -> Cow<str> {
+    pub fn base64<'a>(&'a self) -> Cow<'a, str> {
         match self {
             AvatarData::Base64(base64) => Cow::Borrowed(base64),
             AvatarData::Data(data) => Cow::Owned(general_purpose::STANDARD.encode(data)),

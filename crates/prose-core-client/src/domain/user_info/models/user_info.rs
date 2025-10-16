@@ -40,7 +40,7 @@ pub struct UserInfo {
 }
 
 impl UserInfo {
-    pub fn display_name(&self) -> ContactNameBuilder {
+    pub fn display_name<'a>(&'a self) -> ContactNameBuilder<'a> {
         self.name.display_name()
     }
 
@@ -73,7 +73,7 @@ impl UserInfo {
 }
 
 impl UserName {
-    pub fn display_name(&self) -> ContactNameBuilder {
+    pub fn display_name<'a>(&'a self) -> ContactNameBuilder<'a> {
         ContactNameBuilder::new()
             .or_nickname(self.nickname.as_ref())
             .or_nickname(self.presence.as_ref())
@@ -118,13 +118,13 @@ impl UserName {
 }
 
 pub trait UserInfoOptExt {
-    fn display_name(&self) -> ContactNameBuilder;
+    fn display_name<'a>(&'a self) -> ContactNameBuilder<'a>;
     fn into_user_basic_info_or_fallback(self, user_id: UserId) -> UserBasicInfo;
     fn into_user_presence_info_or_fallback(self, user_id: UserId) -> UserPresenceInfo;
 }
 
 impl UserInfoOptExt for Option<UserInfo> {
-    fn display_name(&self) -> ContactNameBuilder {
+    fn display_name<'a>(&'a self) -> ContactNameBuilder<'a> {
         self.as_ref()
             .map(|info| info.display_name())
             .unwrap_or_else(|| ContactNameBuilder::new())
