@@ -40,7 +40,7 @@ impl Avatar {
 }
 
 impl Avatar {
-    pub fn owner(&self) -> ParticipantIdRef {
+    pub fn owner<'a>(&'a self) -> ParticipantIdRef<'a> {
         match &self.source {
             AvatarSource::Pep { owner, .. } => owner.into(),
             AvatarSource::Vcard { owner, .. } => owner.to_ref(),

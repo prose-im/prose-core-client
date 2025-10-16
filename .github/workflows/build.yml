@@ -20,12 +20,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
-          target: wasm32-unknown-unknown
-          components: rustfmt
-          override: true
+        run: rustup toolchain install
 
       - name: Install NodeJS
         uses: actions/setup-node@v4

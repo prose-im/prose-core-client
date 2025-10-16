@@ -58,7 +58,7 @@ pub struct Participant {
 }
 
 impl Participant {
-    pub fn name(&self) -> ContactNameBuilder {
+    pub fn name<'a>(&'a self) -> ContactNameBuilder<'a> {
         ContactNameBuilder::new()
             .or_nickname(self.name.presence.as_ref())
             .or_nickname(self.name.vcard.as_ref())
