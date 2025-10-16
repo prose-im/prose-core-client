@@ -5,10 +5,18 @@
 
 use std::time::Duration;
 
+use crate::{spawn, ReceiverStream, SendUnlessWasm};
 use futures::{Stream, StreamExt};
 use tokio::sync::mpsc::channel;
 
-use crate::{spawn, ReceiverStream, SendUnlessWasm};
+#[cfg(not(target_arch = "wasm32"))]
+use tokio::time::{sleep, Instant};
+
+#[cfg(target_arch = "wasm32")]
+use gloo_timers::future::sleep;
+
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 pub trait ProseStreamExt: Stream {
     fn throttled(self, interval: Duration) -> impl Stream<Item = Vec<Self::Item>>;
@@ -22,28 +30,48 @@ where
         let (tx, rx) = channel(1);
 
         spawn(async move {
-            let mut interval = interval_stream(interval);
             let mut buf = Vec::new();
             let mut stream = Box::pin(self);
+            let mut last_emit = Instant::now();
 
-            _ = interval.next().await;
+            enum State {
+                Idle,
+                Buffering,
+            }
+
+            let mut state = State::Idle;
 
             loop {
-                tokio::select! {
-                    event = stream.next() => {
-                        if let Some(event) = event {
-                            buf.push(event);
-                        } else {
-                            if !buf.is_empty() {
-                               _ = tx.send(buf).await;
-                            }
+                match state {
+                    State::Idle => {
+                        let Some(event) = stream.next().await else {
                             break;
-                        }
+                        };
+                        buf.push(event);
+                        state = State::Buffering;
+                        last_emit = Instant::now();
                     }
-                    _ = interval.next() => {
-                        if !buf.is_empty() {
-                            let _ = tx.send(buf).await;
-                            buf = Vec::new();
+                    State::Buffering => {
+                        let deadline = last_emit + interval;
+
+                        tokio::select! {
+                            event = stream.next() => {
+                                if let Some(event) = event {
+                                    buf.push(event);
+                                } else {
+                                    if !buf.is_empty() {
+                                        let _ = tx.send(buf).await;
+                                    }
+                                    break;
+                                }
+                            }
+                            _ = sleep(deadline.saturating_duration_since(Instant::now())) => {
+                                if !buf.is_empty() {
+                                    let _ = tx.send(buf).await;
+                                    buf = Vec::new();
+                                }
+                                state = State::Idle;
+                            }
                         }
                     }
                 }
@@ -52,15 +80,6 @@ where
 
         ReceiverStream::new(rx)
     }
-}
-
-fn interval_stream(interval: Duration) -> impl Stream<Item = ()> + SendUnlessWasm {
-    #[cfg(all(not(target_arch = "wasm32")))]
-    return tokio_stream::wrappers::IntervalStream::new(tokio::time::interval(interval))
-        .map(|_| ());
-
-    #[cfg(target_arch = "wasm32")]
-    return gloo_timers::future::IntervalStream::new(interval.subsec_millis());
 }
 
 #[cfg(test)]
