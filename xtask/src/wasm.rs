@@ -222,29 +222,39 @@ async fn run_release_github(
     }
 }
 
-fn run_release_npm(sh: &Shell, npm_token: &str, file_path: &PathBuf) -> Result<()> {
+fn run_release_npm(sh: &Shell, npm_token: Option<String>, file_path: &PathBuf) -> Result<()> {
     println!("Publishing release to NPM…");
 
-    // Prepare '.npmrc' configuration
-    let npmrc_path = env::current_dir()?.join(".npmrc");
+    // Run command (using token if provided)
+    let npm_publish_command = "npm publish --provenance";
 
-    let mut npmrc_file = std::fs::File::create(&npmrc_path).expect("npmrc file create failed");
+    let npm_command_result = if let Some(ref npm_token) = npm_token {
+        // Prepare '.npmrc' configuration
+        let npmrc_path = env::current_dir()?.join(".npmrc");
 
-    npmrc_file
-        .write_all(format!("//registry.npmjs.org/:_authToken={}", npm_token).as_bytes())
-        .expect("write failed");
+        let mut npmrc_file = std::fs::File::create(&npmrc_path).expect("npmrc file create failed");
 
-    // Publish release to NPM
-    let npm_command = cmd!(
-        sh,
-        "npm publish --provenance --userconfig={npmrc_path} {file_path}"
-    )
-    .run();
+        npmrc_file
+            .write_all(format!("//registry.npmjs.org/:_authToken={}", npm_token).as_bytes())
+            .expect("write failed");
 
-    // Cleanup '.npmrc' configuration
-    std::fs::remove_file(&npmrc_path).expect("could not remove file");
+        // Publish release to NPM (using token)
+        let npm_command = cmd!(
+            sh,
+            "{npm_publish_command} --userconfig={npmrc_path} {file_path}"
+        )
+        .run();
 
-    match npm_command {
+        // Cleanup '.npmrc' configuration
+        std::fs::remove_file(&npmrc_path).expect("could not remove file");
+
+        npm_command
+    } else {
+        // Publish release to NPM (no token)
+        cmd!(sh, "{npm_publish_command} {file_path}").run()
+    };
+
+    match npm_command_result {
         Ok(_) => {
             println!("Release to NPM complete");
 
@@ -263,7 +273,7 @@ async fn publish(sh: &Shell) -> Result<()> {
 
     // Read tokens from environment
     let github_token = env::var("GITHUB_TOKEN").expect("GITHUB_TOKEN env variable is required");
-    let npm_token = std::env::var("NPM_TOKEN").expect("NPM_TOKEN env variable is required");
+    let npm_token = std::env::var("NPM_TOKEN").ok();
 
     // Build & pack archive contents
     sh.remove_path("pkg")?;
@@ -301,7 +311,7 @@ async fn publish(sh: &Shell) -> Result<()> {
     run_release_github(sh, &github_token, &version, &filename, &file_path).await?;
 
     // Upload release archive to NPM
-    run_release_npm(sh, &npm_token, &file_path)?;
+    run_release_npm(sh, npm_token, &file_path)?;
 
     Ok(())
 }
@@ -369,7 +379,7 @@ fn ensure_git_cliff_installed(sh: &Shell) -> Result<()> {
     if !git_cliff_installed {
         bail!(
             r#"git-cliff is not installed.
-        
+
             Install by running `cargo install git-cliff or see other options at https://git-cliff.org/docs/installation/crates-io.
             "#
         )
