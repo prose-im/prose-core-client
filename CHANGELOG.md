@@ -1,4 +1,18 @@
 
+## What's Changed in 0.1.109
+
+* Attempt to fix publishing issue by @valeriansaliou
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.108...0.1.109)
+
+
+## What's Changed in 0.1.108
+
+* Attempt to fix publishing issue by @valeriansaliou
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.107...0.1.108)
+
+
 ## What's Changed in 0.1.107
 
 * Add windows support to doap file by @valeriansaliou
