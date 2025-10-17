@@ -1,23 +1,30 @@
 
+## What's Changed in 0.1.110
+
+* Add methods that return Blobs for loading images by @nesium in [#127](https://github.com/prose-im/prose-core-client/pull/127)
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.109...0.1.110)
+
+
 ## What's Changed in 0.1.109
 
-* Attempt to fix publishing issue by @valeriansaliou
+* attempt to fix publishing issue by @valeriansaliou
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.108...0.1.109)
 
 
 ## What's Changed in 0.1.108
 
-* Attempt to fix publishing issue by @valeriansaliou
+* attempt to fix publishing issue by @valeriansaliou
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.107...0.1.108)
 
 
 ## What's Changed in 0.1.107
 
-* Add windows support to doap file by @valeriansaliou
+* Fix unnecessary scheduling of microtasks by @nesium in [#126](https://github.com/prose-im/prose-core-client/pull/126)
 * Fix “Too many open files” error in `prose-core-integration-tests` by @RemiBardon
-* Fix unnecessary scheduling of microtasks by @nesium
+* add windows support to doap file by @valeriansaliou
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.106...0.1.107)
 
@@ -75,6 +82,9 @@
 * Specify transient dependency explicity and enable js feature to fix wasm build by @nesium
 * Support changing password by @nesium
 * Issue when joining room by @nesium
+
+## New Contributors
+* @RemiBardon made their first contribution in [#101](https://github.com/prose-im/prose-core-client/pull/101)
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.99...0.1.100)
 
@@ -977,5 +987,9 @@
 
 * Add basic FFI interface using UniFFI by @nesium
 * declare lifetimes when passing client reference around by @valeriansaliou
+
+## New Contributors
+* @valeriansaliou made their first contribution
+* @nesium made their first contribution
 
 
