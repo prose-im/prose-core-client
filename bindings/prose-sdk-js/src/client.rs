@@ -6,18 +6,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use anyhow::anyhow;
-use base64::{engine::general_purpose, Engine as _};
-use cfg_if::cfg_if;
-use js_sys::Array;
-use tracing::{info, Level};
-use tracing_subscriber::prelude::*;
-use wasm_bindgen::prelude::*;
-
-use prose_core_client::dtos::{MucId, SoftwareVersion, UserStatus};
-use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
-use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarRepository};
-
 use crate::connector::{Connector, ProseConnectionProvider};
 use crate::delegate::{Delegate, JSDelegate};
 use crate::encryption::{EncryptionService, JsEncryptionService};
@@ -29,6 +17,17 @@ use crate::types::{
     PresenceSubRequestArray, PresenceSubRequestId, SidebarItem, SidebarItemsArray, UploadSlot,
     UserBasicInfo, UserBasicInfoArray, UserMetadata, UserProfile, WorkspaceIcon, WorkspaceInfo,
 };
+use anyhow::anyhow;
+use base64::{engine::general_purpose, Engine as _};
+use cfg_if::cfg_if;
+use js_sys::{Array, Uint8Array};
+use prose_core_client::dtos::{MucId, PlatformImage, SoftwareVersion, UserStatus};
+use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
+use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarRepository};
+use tracing::{error, info, Level};
+use tracing_subscriber::prelude::*;
+use wasm_bindgen::prelude::*;
+use web_sys::{Blob, BlobPropertyBag};
 
 #[derive(Debug, PartialEq, Clone)]
 #[wasm_bindgen(js_name = "ProseClientConfig")]
@@ -483,6 +482,7 @@ impl Client {
         Ok(())
     }
 
+    /// This method is deprecated. Use `loadWorkspaceIconBlob` instead.
     #[wasm_bindgen(js_name = "loadWorkspaceIcon")]
     pub async fn load_workspace_icon(&self, icon: &WorkspaceIcon) -> Result<Option<String>> {
         let icon = self
@@ -491,7 +491,18 @@ impl Client {
             .load_workspace_icon(&icon.clone().into())
             .await
             .map_err(WasmError::from)?;
-        Ok(icon)
+        Ok(icon.map(|img| img.base64()))
+    }
+
+    #[wasm_bindgen(js_name = "loadWorkspaceIconBlob")]
+    pub async fn load_workspace_icon_blob(&self, icon: &WorkspaceIcon) -> Result<Option<Blob>> {
+        let icon = self
+            .client
+            .workspace
+            .load_workspace_icon(&icon.clone().into())
+            .await
+            .map_err(WasmError::from)?;
+        Ok(icon.map(|img| img.to_blob()).transpose()?)
     }
 
     #[wasm_bindgen(js_name = "loadWorkspaceInfo")]
@@ -505,8 +516,7 @@ impl Client {
         Ok(info.into())
     }
 
-    /// XEP-0084: User Avatar
-    /// https://xmpp.org/extensions/xep-0084.html
+    /// This method is deprecated. Use `loadAvatarBlob` instead.
     #[wasm_bindgen(js_name = "loadAvatarDataURL")]
     pub async fn load_avatar_data_url(&self, avatar: &Avatar) -> Result<Option<String>> {
         let avatar = self
@@ -515,7 +525,24 @@ impl Client {
             .load_avatar(&avatar.clone().into())
             .await
             .map_err(WasmError::from)?;
-        Ok(avatar)
+        Ok(avatar.map(|avatar| avatar.base64()))
+    }
+
+    /// XEP-0084: User Avatar
+    /// https://xmpp.org/extensions/xep-0084.html
+    #[wasm_bindgen(js_name = "loadAvatarBlob")]
+    pub async fn load_avatar_blob(&self, avatar: &Avatar) -> Result<Option<Blob>> {
+        let Some(img) = self
+            .client
+            .user_data
+            .load_avatar(&avatar.clone().into())
+            .await
+            .map_err(WasmError::from)?
+        else {
+            return Ok(None);
+        };
+
+        img.to_blob().map(Some)
     }
 
     /// XEP-0084: User Avatar
@@ -676,5 +703,24 @@ impl Client {
 impl From<ProseClient> for Client {
     fn from(client: ProseClient) -> Self {
         Client { client }
+    }
+}
+
+trait PlatformImageExt {
+    fn to_blob(&self) -> Result<Blob>;
+}
+
+impl PlatformImageExt for PlatformImage {
+    fn to_blob(&self) -> Result<Blob> {
+        let props = BlobPropertyBag::new();
+        props.set_type(&self.mime_type);
+
+        // SAFETY: The slice will live for the duration of this function call,
+        // and `new Blob()` will not modify the bytes or keep a reference to them past the end of the call.
+        let uint8_array = unsafe { js_sys::Uint8Array::view(&self.data[..]) };
+        let parts = Array::of1(&uint8_array);
+
+        Blob::new_with_u8_array_sequence_and_options(&parts, &props)
+            .map_err(|_| JsError::new("Could not initialize blob."))
     }
 }

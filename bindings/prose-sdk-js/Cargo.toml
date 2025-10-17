@@ -39,7 +39,7 @@ url = { workspace = true }
 wasm-bindgen = { workspace = true }
 wasm-bindgen-derive = "0.3.0"
 wasm-bindgen-futures = { workspace = true }
-web-sys = { version = "0.3", features = ["DomException"] }
+web-sys = { version = "0.3", features = ["DomException", "Blob", "BlobPropertyBag"] }
 
 [features]
 delay-requests = ["prose-core-client/debug"]
