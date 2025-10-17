@@ -75,7 +75,7 @@ pub(crate) struct PlatformDependencies {
     pub xmpp: Arc<XMPPClient>,
 }
 
-const DB_VERSION: u32 = 33;
+const DB_VERSION: u32 = 34;
 
 pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
     let versions_changed = Arc::new(AtomicBool::new(false));
@@ -218,6 +218,14 @@ pub async fn open_store<D: Driver>(driver: D) -> Result<Store<D>, D::Error> {
         }
 
         if event.old_version < 33 {
+            #[cfg(target_arch = "wasm32")]
+            {
+                tx.delete_collection(crate::infra::user_info::AvatarRecord::collection())?;
+                create_collection::<D, crate::infra::user_info::AvatarRecord>(&tx)?;
+            }
+        }
+
+        if event.old_version < 34 {
             #[cfg(target_arch = "wasm32")]
             {
                 tx.delete_collection(crate::infra::user_info::AvatarRecord::collection())?;

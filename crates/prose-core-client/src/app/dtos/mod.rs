@@ -39,7 +39,9 @@ pub use crate::domain::{
         UserResourceId, Utf16Index, Utf8Index, HTML,
     },
     uploads::models::UploadHeader,
-    user_info::models::{JabberClient, LastActivity, UserInfo, UserMetadata, UserStatus},
+    user_info::models::{
+        JabberClient, LastActivity, PlatformImage, UserInfo, UserMetadata, UserStatus,
+    },
     workspace::models::WorkspaceIcon,
 };
 

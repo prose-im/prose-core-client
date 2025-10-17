@@ -32,7 +32,7 @@ pub struct AvatarRecord {
     entity_id: EntityId,
     avatar_id: AvatarId,
     mime_type: String,
-    base64_data: String,
+    data: Box<[u8]>,
 }
 
 impl AvatarRecord {
@@ -41,14 +41,23 @@ impl AvatarRecord {
         entity_id: EntityId,
         image: &AvatarData,
         metadata: &AvatarInfo,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             id: format!("{account}.{}", entity_id.to_ref().to_raw_key_string()),
             account: account.clone(),
-            entity_id: entity_id,
+            entity_id,
             avatar_id: metadata.checksum.clone(),
             mime_type: metadata.mime_type.clone(),
-            base64_data: image.base64().to_string(),
+            data: image.data()?.into_owned(),
+        })
+    }
+}
+
+impl From<AvatarRecord> for PlatformImage {
+    fn from(record: AvatarRecord) -> Self {
+        Self {
+            mime_type: record.mime_type,
+            data: record.data,
         }
     }
 }
@@ -80,7 +89,7 @@ impl AvatarRepository for StoreAvatarRepository {
         account: &AccountId,
         entity_id: EntityIdRef<'_>,
         avatar_id: &AvatarId,
-    ) -> anyhow::Result<Option<PlatformImage>> {
+    ) -> Result<Option<PlatformImage>> {
         let tx = self
             .store
             .transaction_for_reading(&[AvatarRecord::collection()])
@@ -88,10 +97,10 @@ impl AvatarRepository for StoreAvatarRepository {
         let collection = tx.readable_collection(AvatarRecord::collection())?;
         let idx = collection.index(&AvatarRecord::avatar_idx())?;
 
-        return Ok(idx
+        Ok(idx
             .get::<_, AvatarRecord>(&(account, entity_id, &avatar_id))
             .await?
-            .map(|record| format!("data:{};base64,{}", record.mime_type, record.base64_data)));
+            .map(Into::into))
     }
 
     async fn set(
@@ -111,7 +120,7 @@ impl AvatarRepository for StoreAvatarRepository {
             entity_id.to_owned(),
             image,
             metadata,
-        ))?;
+        )?)?;
         tx.commit().await?;
         Ok(())
     }
