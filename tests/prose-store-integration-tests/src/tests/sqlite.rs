@@ -3,81 +3,109 @@ use anyhow::Result;
 use chrono::NaiveDate;
 use insta::assert_snapshot;
 use prose_store::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Semaphore;
+use tokio::sync::Barrier;
 
+/// Tests that multiple tasks attempting write transactions are serialized without deadlocking.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn test_concurrent_write_transactions_succeed() -> Result<()> {
+async fn test_competing_write_transactions_dont_deadlock() -> Result<()> {
     let store = store().await?;
     let store1 = store.clone();
-    let store2 = store1.clone();
+    let store2 = store.clone();
 
-    let semaphore = Arc::new(Semaphore::new(2));
-    let semaphore1 = semaphore.clone();
-    let semaphore2 = semaphore.clone();
+    let barrier = Arc::new(Barrier::new(2));
+    let barrier1 = barrier.clone();
+    let barrier2 = barrier.clone();
 
-    let transactions_complete = Arc::new(Mutex::new(0));
-    let transactions_complete1 = transactions_complete.clone();
-    let transactions_complete2 = transactions_complete.clone();
-
-    tokio::spawn(async move {
-        let permit = semaphore1.acquire().await.unwrap();
-        assert_eq!(semaphore1.available_permits(), 1);
-
-        let tx1 = store1
+    let tx1 = tokio::spawn(async move {
+        let tx = store1
             .transaction_for_reading_and_writing(&[collections::PERSON])
-            .await
-            .unwrap();
-        let people = tx1.writeable_collection(collections::PERSON).unwrap();
-        people.set("id-1", &Person::jane_doe()).await.unwrap();
+            .await?;
+        let people = tx.writeable_collection(collections::PERSON)?;
 
+        barrier1.wait().await;
+
+        // Wait for tx2 trying to start the transaction…
         tokio::time::sleep(Duration::from_millis(200)).await;
 
-        assert_eq!(semaphore1.available_permits(), 0);
-        assert_eq!(*transactions_complete1.lock().unwrap(), 0);
-
-        tx1.commit().await.unwrap();
-
-        *transactions_complete1.lock().unwrap() += 1;
-
-        drop(permit)
+        people.set("id-1", &Person::jane_doe()).await?;
+        tx.commit().await
     });
 
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_millis(50)).await;
+    let tx2 = tokio::spawn(async move {
+        // Wait for tx1 to start a transaction…
+        barrier2.wait().await;
 
-        let permit = semaphore2.acquire().await.unwrap();
-        assert_eq!(semaphore2.available_permits(), 0);
-
-        let tx2 = store2
+        let tx = store2
             .transaction_for_reading_and_writing(&[collections::PERSON])
-            .await
-            .unwrap();
-        let collection2 = tx2.writeable_collection(collections::PERSON).unwrap();
-        collection2.set("id-2", &Person::john_doe()).await.unwrap();
-        tx2.commit().await.unwrap();
-
-        *transactions_complete2.lock().unwrap() += 1;
-
-        drop(permit)
+            .await?;
+        let people = tx.writeable_collection(collections::PERSON)?;
+        people.set("id-2", &Person::john_doe()).await?;
+        tx.commit().await
     });
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let permit = semaphore.acquire_many(2).await?;
-    assert_eq!(*transactions_complete.lock().unwrap(), 2);
+    tx1.await??;
+    tx2.await??;
 
     let tx = store
         .transaction_for_reading(&[collections::PERSON])
         .await?;
-
     let collection = tx.readable_collection(collections::PERSON)?;
-
     assert_eq!(collection.get("id-1").await?, Some(Person::jane_doe()));
     assert_eq!(collection.get("id-2").await?, Some(Person::john_doe()));
 
-    drop(permit);
+    Ok(())
+}
+
+/// Stress test to verify that the write lock prevents SQLITE_BUSY errors under heavy concurrent
+/// write load.
+#[tokio::test(flavor = "multi_thread", worker_threads = 8)]
+async fn test_concurrent_writes_never_get_sqlite_busy() -> Result<()> {
+    let store = store().await?;
+
+    let num_tasks = 8;
+    let writes_per_task = 100;
+
+    let mut handles = vec![];
+
+    for task_idx in 0..num_tasks {
+        let store = store.clone();
+        let handle = tokio::spawn(async move {
+            for write_idx in 0..writes_per_task {
+                let tx = store
+                    .transaction_for_reading_and_writing(&[collections::PERSON])
+                    .await?;
+                let people = tx.writeable_collection(collections::PERSON)?;
+                people
+                    .set(&format!("{task_idx}-{write_idx}"), &Person::jane_doe())
+                    .await?;
+                // Increase likelihood of overlap…
+                tokio::time::sleep(Duration::from_millis(10)).await;
+                tx.commit().await?;
+            }
+            Ok::<_, anyhow::Error>(())
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.await??;
+    }
+
+    let tx = store
+        .transaction_for_reading(&[collections::PERSON])
+        .await?;
+    let collection = tx.readable_collection(collections::PERSON)?;
+
+    for task_idx in 0..num_tasks {
+        for write_idx in 0..writes_per_task {
+            assert!(collection
+                .get::<_, Person>(&format!("{task_idx}-{write_idx}"))
+                .await?
+                .is_some());
+        }
+    }
 
     Ok(())
 }

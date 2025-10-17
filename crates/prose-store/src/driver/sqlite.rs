@@ -10,11 +10,13 @@ use deadpool_sqlite::{
     Config, CreatePoolError, Hook, InteractError, Manager, Pool, PoolError, Runtime,
 };
 use parking_lot::RwLock;
+use rusqlite::trace::{TraceEvent, TraceEventCodes};
 use rusqlite::{
     params, params_from_iter, DropBehavior, OptionalExtension, ToSql, TransactionBehavior,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use tokio::sync::{Semaphore, SemaphorePermit};
 use tracing::debug;
 
 use prose_wasm_utils::SendUnlessWasm;
@@ -64,6 +66,9 @@ pub enum Error {
     #[error(transparent)]
     JSON(#[from] serde_json::Error),
 
+    #[error(transparent)]
+    Acquire(#[from] tokio::sync::AcquireError),
+
     #[error("{0}")]
     Poison(String),
 }
@@ -105,11 +110,16 @@ impl Driver for SqliteDriver {
             .builder(Runtime::Tokio1)
             .map_err(CreatePoolError::Config)?
             .post_create(Hook::sync_fn(|obj, _| {
-                let mut conn = obj.lock().unwrap();
+                let conn = obj.lock().unwrap();
 
-                conn.trace(Some(|query| {
-                    debug!("{}", query);
-                }));
+                conn.trace_v2(
+                    TraceEventCodes::all(),
+                    Some(|event| {
+                        if let TraceEvent::Stmt(s, _) = event {
+                            debug!("{}", s.sql());
+                        }
+                    }),
+                );
 
                 conn.execute_batch(
                     r#"
@@ -155,6 +165,7 @@ impl Driver for SqliteDriver {
 
         let db = SqliteDB {
             pool,
+            write_lock: Semaphore::new(1),
             description: description.clone(),
         };
 
@@ -165,6 +176,7 @@ impl Driver for SqliteDriver {
                 description,
                 Some(TransactionBehavior::Immediate),
                 DropBehavior::Commit,
+                None,
             )?;
 
             let tx = {
@@ -197,6 +209,7 @@ impl Driver for SqliteDriver {
 
 pub struct SqliteDB {
     pool: Pool,
+    write_lock: Semaphore,
     description: DatabaseDescription,
 }
 
@@ -229,6 +242,7 @@ impl Database for SqliteDB {
             self.description.clone(),
             None,
             DropBehavior::Ignore,
+            None,
         )
     }
 
@@ -250,6 +264,7 @@ impl Database for SqliteDB {
             self.description.clone(),
             Some(TransactionBehavior::Immediate),
             DropBehavior::Commit,
+            Some(self.write_lock.acquire().await?),
         )
     }
 }
@@ -275,6 +290,7 @@ pub struct SqliteTransaction<'db, Mode> {
     obj: Arc<deadpool::managed::Object<Manager>>,
     drop_behavior: DropBehavior,
     description: DatabaseDescription,
+    _write_permit: Option<SemaphorePermit<'db>>,
     phantom: PhantomData<&'db Mode>,
 }
 
@@ -334,6 +350,7 @@ impl<'db, Mode> SqliteTransaction<'db, Mode> {
         description: DatabaseDescription,
         behavior: Option<TransactionBehavior>,
         drop_behavior: DropBehavior,
+        write_permit: Option<SemaphorePermit<'db>>,
     ) -> Result<Self, Error> {
         if let Some(behavior) = behavior {
             let conn = obj.lock()?;
@@ -352,6 +369,7 @@ impl<'db, Mode> SqliteTransaction<'db, Mode> {
             obj: Arc::new(obj),
             drop_behavior,
             description,
+            _write_permit: write_permit,
             phantom: Default::default(),
         })
     }

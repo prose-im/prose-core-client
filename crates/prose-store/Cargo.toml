@@ -24,10 +24,10 @@ uuid = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 deadpool = "0.12"
-deadpool-sqlite = { version = "0.8.0" }
+deadpool-sqlite = { version = "0.12.1" }
 parking_lot = { workspace = true }
-rusqlite = { version = "0.31", features = ["chrono", "url", "trace"] }
-tokio = { workspace = true, features = ["full"], optional = true }
+rusqlite = { version = "0.37.0", features = ["chrono", "url", "trace"] }
+tokio = { workspace = true, features = ["sync"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 gloo-utils = { version = "0.2.0", features = ["serde"] }
@@ -40,7 +40,7 @@ tempfile = { workspace = true }
 
 [features]
 default = []
-test = ["dep:tokio"]
+test = ["tokio/full"]
 chrono = ["dep:chrono"]
 jid = ["dep:jid"]
 uuid = ["dep:uuid"]
