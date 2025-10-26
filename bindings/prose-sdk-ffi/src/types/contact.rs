@@ -3,19 +3,19 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::types::JID;
+use crate::UserId;
 use prose_core_client::dtos::{
     Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
     UserStatus as CoreUserStatus,
 };
 
-#[derive(uniffi::Enum, Debug, PartialEq, Clone)]
+#[derive(uniffi::Enum)]
 pub enum Group {
     Team,
     Other,
 }
 
-#[derive(uniffi::Enum, Debug, PartialEq, Clone)]
+#[derive(uniffi::Enum)]
 pub enum Availability {
     Available,
     Unavailable,
@@ -24,15 +24,15 @@ pub enum Availability {
     Invisible,
 }
 
-#[derive(uniffi::Record, Debug, PartialEq, Clone)]
+#[derive(uniffi::Record)]
 pub struct UserStatus {
     pub emoji: String,
     pub status: Option<String>,
 }
 
-#[derive(uniffi::Record, Debug, PartialEq, Clone)]
+#[derive(uniffi::Record)]
 pub struct Contact {
-    pub jid: JID,
+    pub id: UserId,
     pub name: String,
     pub availability: Availability,
     pub status: Option<UserStatus>,
@@ -42,7 +42,7 @@ pub struct Contact {
 impl From<CoreContact> for Contact {
     fn from(value: CoreContact) -> Self {
         Contact {
-            jid: value.id.into_inner().into(),
+            id: value.id.into(),
             name: value.name,
             availability: value.availability.into(),
             status: value.status.map(Into::into),

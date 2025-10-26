@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::{types::ClientResult, AccountBookmark, PathBuf, JID};
+use crate::{types::ClientResult, AccountBookmark, PathBuf, UserId};
 
 #[derive(uniffi::Object)]
 pub struct AccountBookmarksClient {
@@ -28,19 +28,19 @@ impl AccountBookmarksClient {
             .collect())
     }
 
-    pub fn add_bookmark(&self, jid: &JID, select_bookmark: bool) -> ClientResult<()> {
+    pub fn add_bookmark(&self, user_id: UserId, select_bookmark: bool) -> ClientResult<()> {
         self.client
-            .add_bookmark(&jid.clone().into(), select_bookmark)?;
+            .add_bookmark(&(user_id.into()), select_bookmark)?;
         Ok(())
     }
 
-    pub fn remove_bookmark(&self, jid: &JID) -> ClientResult<()> {
-        self.client.remove_bookmark(&jid.clone().into())?;
+    pub fn remove_bookmark(&self, user_id: UserId) -> ClientResult<()> {
+        self.client.remove_bookmark(&(user_id.into()))?;
         Ok(())
     }
 
-    pub fn select_bookmark(&self, jid: &JID) -> ClientResult<()> {
-        self.client.select_bookmark(&jid.clone().into())?;
+    pub fn select_bookmark(&self, user_id: UserId) -> ClientResult<()> {
+        self.client.select_bookmark(&(user_id.into()))?;
         Ok(())
     }
 
