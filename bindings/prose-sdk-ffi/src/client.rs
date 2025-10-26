@@ -37,10 +37,6 @@ pub trait ClientDelegate: Send + Sync {
 #[derive(uniffi::Record)]
 pub struct ClientConfig {
     #[uniffi(default = false)]
-    pub log_received_stanzas: bool,
-    #[uniffi(default = false)]
-    pub log_sent_stanzas: bool,
-    #[uniffi(default = false)]
     pub logging_enabled: bool,
     #[uniffi(default = "trace")]
     pub logging_min_level: String,
@@ -52,10 +48,8 @@ pub struct ClientConfig {
 impl Default for ClientConfig {
     fn default() -> Self {
         ClientConfig {
-            log_received_stanzas: false,
-            log_sent_stanzas: false,
             logging_enabled: true,
-            logging_min_level: "trace".to_string(),
+            logging_min_level: "warn".to_string(),
             client_name: env!("CARGO_PKG_NAME").to_string(),
             client_version: env!("CARGO_PKG_VERSION").to_string(),
             client_os: None,
@@ -76,10 +70,19 @@ impl Client {
         delegate: Option<Arc<dyn ClientDelegate>>,
         config: Option<ClientConfig>,
     ) -> ClientResult<Self> {
-        let oslog_layer = OsLogger::new("org.prose", "default")
-            .with_filter(LevelFilter::from_level(Level::TRACE));
+        let config = config.unwrap_or_default();
 
-        Registry::default().with(oslog_layer).init();
+        if config.logging_enabled {
+            let min_level = config.logging_min_level.parse::<Level>();
+            match min_level {
+                Ok(level) => {
+                    let oslog_layer = OsLogger::new("org.prose", "default")
+                        .with_filter(LevelFilter::from_level(level));
+                    Registry::default().with(oslog_layer).init()
+                }
+                Err(_) => println!("Invalid logging level {}.", config.logging_min_level),
+            }
+        }
 
         let cache_path = cache_dir.into_inner();
         let cache_dir = Path::new(&cache_path);
@@ -90,7 +93,6 @@ impl Client {
             delegate.map(|d| Box::new(DelegateWrapper(d)) as Box<dyn CoreClientDelegate>);
 
         let store = open_store(PlatformDriver::new(cache_dir.join("ProseDB.sqlite"))).await?;
-        let config = config.unwrap_or_default();
 
         let software_version = SoftwareVersion {
             name: config.client_name.clone(),
