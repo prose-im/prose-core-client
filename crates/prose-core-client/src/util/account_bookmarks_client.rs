@@ -7,21 +7,24 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
+use crate::domain::shared::models::UserId;
 use anyhow::Result;
-use jid::BareJid;
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct AccountBookmark {
-    pub jid: BareJid,
+    pub user_id: UserId,
     #[serde(rename = "selected")]
     pub is_selected: bool,
 }
 
 impl AccountBookmark {
-    pub fn new(jid: BareJid, is_selected: bool) -> Self {
-        AccountBookmark { jid, is_selected }
+    pub fn new(user_id: UserId, is_selected: bool) -> Self {
+        AccountBookmark {
+            user_id,
+            is_selected,
+        }
     }
 }
 
@@ -52,27 +55,30 @@ impl AccountBookmarksClient {
         Ok(contents.accounts)
     }
 
-    pub fn add_bookmark(&self, jid: &BareJid, select_bookmark: bool) -> Result<()> {
+    pub fn add_bookmark(&self, user_id: &UserId, select_bookmark: bool) -> Result<()> {
         let mut bookmarks = self.load_bookmarks()?;
 
-        if !bookmarks.iter().any(|bookmark| &bookmark.jid == jid) {
+        if !bookmarks
+            .iter()
+            .any(|bookmark| &bookmark.user_id == user_id)
+        {
             bookmarks.push(AccountBookmark {
-                jid: jid.clone(),
+                user_id: user_id.clone(),
                 is_selected: false,
             });
         }
 
         if select_bookmark || bookmarks.len() == 1 {
             for bookmark in bookmarks.iter_mut() {
-                bookmark.is_selected = &bookmark.jid == jid;
+                bookmark.is_selected = &bookmark.user_id == user_id;
             }
         }
         self.save_bookmarks(bookmarks)
     }
 
-    pub fn remove_bookmark(&self, jid: &BareJid) -> Result<()> {
+    pub fn remove_bookmark(&self, user_id: &UserId) -> Result<()> {
         let mut bookmarks = self.load_bookmarks()?;
-        bookmarks.retain(|bookmark| &bookmark.jid != jid);
+        bookmarks.retain(|bookmark| &bookmark.user_id != user_id);
         if !bookmarks.iter().any(|bookmark| bookmark.is_selected) {
             if let Some(bookmark) = bookmarks.get_mut(0) {
                 bookmark.is_selected = true;
@@ -81,10 +87,10 @@ impl AccountBookmarksClient {
         self.save_bookmarks(bookmarks)
     }
 
-    pub fn select_bookmark(&self, jid: &BareJid) -> Result<()> {
+    pub fn select_bookmark(&self, user_id: &UserId) -> Result<()> {
         let mut bookmarks = self.load_bookmarks()?;
         for bookmark in bookmarks.iter_mut() {
-            bookmark.is_selected = &bookmark.jid == jid;
+            bookmark.is_selected = &bookmark.user_id == user_id;
         }
         self.save_bookmarks(bookmarks)?;
         Ok(())
@@ -127,9 +133,9 @@ mod tests {
 
         println!("{:?}", path);
 
-        let a = BareJid::from_str("a@prose.org").unwrap();
-        let b = BareJid::from_str("b@prose.org").unwrap();
-        let c = BareJid::from_str("c@prose.org").unwrap();
+        let a = UserId::from_str("a@prose.org")?;
+        let b = UserId::from_str("b@prose.org")?;
+        let c = UserId::from_str("c@prose.org")?;
 
         let client = AccountBookmarksClient::new(path.clone());
         client.add_bookmark(&a, false)?;

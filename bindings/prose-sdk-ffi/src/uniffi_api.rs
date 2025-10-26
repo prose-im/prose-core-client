@@ -3,7 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-pub use crate::types::{AccountBookmark, ClientError, ClientEvent, Contact, Group, Message, JID};
+pub use crate::types::{AccountBookmark, ClientError, ClientEvent, Contact, Group, Message};
 pub use crate::{account_bookmarks_client::AccountBookmarksClient, client::*, logger::*};
 use jid::BareJid as CoreBareJid;
 use mime::Mime as CoreMime;
@@ -247,7 +247,7 @@ impl From<CorePathBuf> for PathBuf {
 pub mod uniffi_types {
     pub use crate::{
         client::Client,
-        types::{parse_jid, AccountBookmark, Message, Reaction, UserProfile, JID},
+        types::{AccountBookmark, Message, Reaction, UserProfile},
         AvatarId, ClientError, Contact, DateTimeFixed, Emoji, MessageId, MucId, ParticipantId,
         PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url, UserId,
     };
