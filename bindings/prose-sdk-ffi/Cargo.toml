@@ -1,6 +1,6 @@
 [package]
 name = "prose-sdk-ffi"
-version = "0.1.0"
+version = "0.14.0"
 description = "Prose core XMPP client FFIs."
 license = "MPL-2.0"
 edition = "2021"
