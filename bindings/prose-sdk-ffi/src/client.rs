@@ -76,7 +76,7 @@ impl Client {
             let min_level = config.logging_min_level.parse::<Level>();
             match min_level {
                 Ok(level) => {
-                    let oslog_layer = OsLogger::new("org.prose", "default")
+                    let oslog_layer = OsLogger::new("org.prose.core", "default")
                         .with_filter(LevelFilter::from_level(level));
                     Registry::default().with(oslog_layer).init()
                 }
