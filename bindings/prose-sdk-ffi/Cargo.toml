@@ -20,7 +20,6 @@ async-trait = { workspace = true }
 chrono = { workspace = true }
 jid = { workspace = true }
 mime = { workspace = true }
-parking_lot = { workspace = true }
 prose-core-client = { path = "../../crates/prose-core-client" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 thiserror = { workspace = true }
