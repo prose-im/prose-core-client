@@ -35,7 +35,7 @@ strum_macros = "0.26"
 tempfile = "3.5"
 thiserror = "1.0"
 tokio = "1.26"
-tokio-xmpp = "4.0"
+tokio-xmpp = { git = "https://github.com/prose-im/xmpp-rs.git", branch = "main" }
 tracing = { version = "0.1" }
 tracing-log = "0.2.0"
 tracing-subscriber = "0.3"
