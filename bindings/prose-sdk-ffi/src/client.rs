@@ -5,7 +5,7 @@
 
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, Once};
 
 use crate::types::{
     AccountInfo, Availability, Avatar, ClientResult, ConnectionError, PresenceSubRequest,
@@ -36,10 +36,6 @@ pub trait ClientDelegate: Send + Sync {
 
 #[derive(uniffi::Record)]
 pub struct ClientConfig {
-    #[uniffi(default = false)]
-    pub logging_enabled: bool,
-    #[uniffi(default = "trace")]
-    pub logging_min_level: String,
     pub client_name: String,
     pub client_version: String,
     pub client_os: Option<String>,
@@ -48,14 +44,14 @@ pub struct ClientConfig {
 impl Default for ClientConfig {
     fn default() -> Self {
         ClientConfig {
-            logging_enabled: true,
-            logging_min_level: "warn".to_string(),
             client_name: env!("CARGO_PKG_NAME").to_string(),
             client_version: env!("CARGO_PKG_VERSION").to_string(),
             client_os: None,
         }
     }
 }
+
+static INIT_LOGGER: Once = Once::new();
 
 #[derive(uniffi::Object)]
 pub struct Client {
@@ -71,18 +67,6 @@ impl Client {
         config: Option<ClientConfig>,
     ) -> ClientResult<Self> {
         let config = config.unwrap_or_default();
-
-        if config.logging_enabled {
-            let min_level = config.logging_min_level.parse::<Level>();
-            match min_level {
-                Ok(level) => {
-                    let oslog_layer = OsLogger::new("org.prose.core", "default")
-                        .with_filter(LevelFilter::from_level(level));
-                    Registry::default().with(oslog_layer).init()
-                }
-                Err(_) => println!("Invalid logging level {}.", config.logging_min_level),
-            }
-        }
 
         let cache_path = cache_dir.into_inner();
         let cache_dir = Path::new(&cache_path);
@@ -114,6 +98,20 @@ impl Client {
             .build();
 
         Ok(Client { client })
+    }
+
+    pub fn enable_logging(&self, min_level: &str) {
+        INIT_LOGGER.call_once(|| {
+            let parsed_min_level = min_level.parse::<Level>();
+            match parsed_min_level {
+                Ok(level) => {
+                    let oslog_layer = OsLogger::new("org.prose.core", "default")
+                        .with_filter(LevelFilter::from_level(level));
+                    Registry::default().with(oslog_layer).init()
+                }
+                Err(_) => println!("Invalid logging level {}.", min_level),
+            }
+        })
     }
 }
 
