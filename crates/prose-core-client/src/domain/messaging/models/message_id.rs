@@ -42,6 +42,12 @@ impl From<MessageRemoteId> for MessageTargetId {
     }
 }
 
+impl From<xmpp_parsers::message::Id> for MessageRemoteId {
+    fn from(value: xmpp_parsers::message::Id) -> Self {
+        Self(value.0)
+    }
+}
+
 impl From<MessageServerId> for MessageTargetId {
     fn from(value: MessageServerId) -> Self {
         Self::ServerId(value)

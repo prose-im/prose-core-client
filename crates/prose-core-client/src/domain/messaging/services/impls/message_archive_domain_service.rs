@@ -146,20 +146,15 @@ impl MessageArchiveDomainService {
         context: &DecryptionContext,
     ) {
         for archive_message in page.messages {
-            let inner_message = archive_message.forwarded.stanza.as_ref();
+            let inner_message = archive_message.forwarded.message.as_ref();
 
             let is_our_message = inner_message
-                .and_then(|m| m.sender())
+                .sender()
                 .map(|s| room.is_current_user(&account, &s.to_participant_id()))
                 .unwrap_or_default();
 
             let message_id = if is_our_message {
-                if let Some(remote_id) = archive_message
-                    .forwarded
-                    .stanza
-                    .as_ref()
-                    .and_then(|m| m.id.clone())
-                {
+                if let Some(remote_id) = archive_message.forwarded.message.id {
                     self.message_repo
                         .resolve_remote_id(
                             &account,

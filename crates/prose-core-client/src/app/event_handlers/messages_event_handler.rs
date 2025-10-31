@@ -81,12 +81,12 @@ impl ServerEventHandler for MessagesEventHandler {
 }
 
 impl MessageEventType {
-    fn message(&self) -> Option<&Message> {
+    fn message(&self) -> &Message {
         match self {
-            MessageEventType::Received(message) => Some(message),
-            MessageEventType::Sent(message) => Some(message),
-            MessageEventType::Sync(Carbon::Received(carbon)) => carbon.stanza.as_deref(),
-            MessageEventType::Sync(Carbon::Sent(carbon)) => carbon.stanza.as_deref(),
+            MessageEventType::Received(message) => message,
+            MessageEventType::Sent(message) => message,
+            MessageEventType::Sync(Carbon::Received(carbon)) => carbon.message.as_ref(),
+            MessageEventType::Sync(Carbon::Sent(carbon)) => carbon.message.as_ref(),
         }
     }
 }
@@ -97,25 +97,23 @@ enum MessageOrCarbon {
 }
 
 impl MessageOrCarbon {
-    fn message(&self) -> Option<&Message> {
+    fn message(&self) -> &Message {
         match self {
-            Self::Message(message) => Some(message),
-            Self::Carbon(carbon) => carbon.stanza.as_deref(),
+            Self::Message(message) => message,
+            Self::Carbon(carbon) => carbon.message.as_ref(),
         }
     }
 
     pub fn from(&self) -> Option<UserEndpointId> {
-        self.message().and_then(|m| m.sender())
+        self.message().sender()
     }
 
     pub fn room_id(&self) -> Option<RoomId> {
-        self.message().and_then(|m| m.room_id())
+        self.message().room_id()
     }
 
     pub fn remote_id(&self) -> Option<MessageRemoteId> {
-        self.message()
-            .and_then(|m| m.id.clone())
-            .map(MessageRemoteId::from)
+        self.message().id.clone().map(MessageRemoteId::from)
     }
 }
 
@@ -124,18 +122,17 @@ impl MessagesEventHandler {
         let account = self.ctx.connected_account()?;
 
         // Skip known messages…
-        if let Some((Some(room_id), Some(server_id))) = event
-            .r#type
-            .message()
-            .map(|msg| (msg.room_id(), msg.server_id()))
         {
-            if self
-                .messages_repo
-                .contains(&account, &room_id, &server_id)
-                .await?
-            {
-                // We've seen this message already…
-                return Ok(());
+            let msg = event.r#type.message();
+            if let (Some(room_id), Some(server_id)) = (msg.room_id(), msg.server_id()) {
+                if self
+                    .messages_repo
+                    .contains(&account, &room_id, &server_id)
+                    .await?
+                {
+                    // We've seen this message already…
+                    return Ok(());
+                }
             }
         }
 

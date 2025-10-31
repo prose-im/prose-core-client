@@ -30,8 +30,8 @@ async fn test_resolves_replies() -> Result<()> {
         .set_payload("Corrected Message 1")
         .set_from(user_id!("user@prose.org"))
         .build_archived_message("", None);
-    mam_msg2.forwarded.stanza =
-        Some(Box::new(mam_msg2.forwarded.stanza.unwrap().set_replace(
+    mam_msg2.forwarded.message =
+        Some(Box::new(mam_msg2.forwarded.message.unwrap().set_replace(
             MessageBuilder::remote_id_for_index(1).into_inner().into(),
         )));
 

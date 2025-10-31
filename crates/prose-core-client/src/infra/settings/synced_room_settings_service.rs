@@ -7,8 +7,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use minidom::Element;
 use xmpp_parsers::data_forms::{Field, FieldType};
-use xmpp_parsers::pubsub::pubsub::PublishOptions;
-use xmpp_parsers::pubsub::{Item, ItemId};
+use xmpp_parsers::pubsub::pubsub::{Item, PublishOptions};
+use xmpp_parsers::pubsub::ItemId;
 
 use prose_xmpp::{mods, PublishOptionsExt};
 

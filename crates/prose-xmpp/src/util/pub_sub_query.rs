@@ -6,8 +6,8 @@
 use jid::BareJid;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub;
-use xmpp_parsers::pubsub::pubsub::Items;
-use xmpp_parsers::pubsub::{Item, ItemId, NodeName, SubscriptionId};
+use xmpp_parsers::pubsub::pubsub::{Item, Items};
+use xmpp_parsers::pubsub::{ItemId, NodeName, SubscriptionId};
 
 pub struct PubSubQuery {
     id: String,
@@ -43,12 +43,10 @@ impl PubSubQuery {
     pub fn set_item_ids<Id: Into<String>>(mut self, ids: impl IntoIterator<Item = Id>) -> Self {
         self.items.items = ids
             .into_iter()
-            .map(|id| {
-                pubsub::pubsub::Item(Item {
-                    id: Some(ItemId(id.into())),
-                    publisher: None,
-                    payload: None,
-                })
+            .map(|id| Item {
+                id: Some(ItemId(id.into())),
+                publisher: None,
+                payload: None,
             })
             .collect();
         self

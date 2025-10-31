@@ -147,7 +147,7 @@ impl Message {
 
     pub fn replace(&self) -> Option<Id> {
         self.typed_payload::<Replace>("replace", ns::MESSAGE_CORRECT)
-            .map(|r| r.id.into())
+            .map(|r| r.id.0.into())
     }
 
     pub fn received_marker(&self) -> Option<chat_marker::Received> {
@@ -392,7 +392,7 @@ mod tests {
             query_id: Some(QueryId("query-id".to_string())),
             forwarded: Forwarded {
                 delay: None,
-                stanza: None,
+                message: Box::new(Message::new().set_id("id-100".into())),
             },
         };
 
@@ -408,7 +408,7 @@ mod tests {
         let received_carbon = carbons::Received {
             forwarded: Forwarded {
                 delay: None,
-                stanza: Some(Box::new(Message::new().set_id("id-100".into()))),
+                message: Box::new(Message::new().set_id("id-100".into())),
             },
         };
 
@@ -424,7 +424,7 @@ mod tests {
         let sent_carbon = carbons::Sent {
             forwarded: Forwarded {
                 delay: None,
-                stanza: Some(Box::new(Message::new().set_id("id-100".into()))),
+                message: Box::new(Message::new().set_id("id-100".into())),
             },
         };
 

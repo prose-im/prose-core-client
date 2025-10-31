@@ -7,7 +7,7 @@ use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::bookmarks::Storage;
 use xmpp_parsers::iq::Iq;
-use xmpp_parsers::pubsub::{NodeName, PubSubEvent};
+use xmpp_parsers::pubsub::NodeName;
 use xmpp_parsers::{bookmarks, pubsub};
 
 use crate::client::ModuleContext;
@@ -34,16 +34,15 @@ impl Module for Bookmark {
         self.ctx = context
     }
 
-    fn handle_pubsub_event(&self, _from: &Jid, event: &PubSubEvent) -> Result<()> {
+    fn handle_pubsub_event(&self, _from: &Jid, event: &pubsub::event::Payload) -> Result<()> {
         match event {
-            PubSubEvent::PublishedItems { node, items } => {
-                if node.0 == ns::BOOKMARKS {
-                    return self.handle_changed_bookmarks(items);
-                }
+            pubsub::event::Payload::Items {
+                node, published, ..
+            } if node.0 == ns::BOOKMARKS && !published.is_empty() => {
+                self.handle_changed_bookmarks(published)
             }
-            _ => (),
+            _ => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -80,11 +79,11 @@ impl Bookmark {
             pubsub::PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::BOOKMARKS.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: None,
                         publisher: None,
                         payload: Some(storage.into()),
-                    })],
+                    }],
                 },
                 publish_options: Some(pubsub::pubsub::PublishOptions::for_private_data(None)),
             },

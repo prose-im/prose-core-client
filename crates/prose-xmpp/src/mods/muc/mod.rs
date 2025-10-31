@@ -117,7 +117,7 @@ impl MUC {
         self.ctx
             .send_stanza_with_future(
                 message,
-                RequestFuture::new_send_muc_message(room_jid, message_id),
+                RequestFuture::new_send_muc_message(room_jid, message_id.0),
             )
             .await
     }

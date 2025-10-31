@@ -619,15 +619,15 @@ impl<Kind> Room<Kind> {
             // and we want to push them into `messages` in the order 6, 5, 4, 3, 2, 1 which is
             // why we need to iterate over each page in reverse…
             for archive_message in page.messages.into_iter().rev() {
-                let inner_message = archive_message.forwarded.stanza.as_ref();
+                let inner_message = archive_message.forwarded.message.as_ref();
 
                 let is_our_message = inner_message
-                    .and_then(|m| m.sender())
+                    .sender()
                     .map(|s| self.data.is_current_user(&account, &s.to_participant_id()))
                     .unwrap_or_default();
 
                 let message_id = if is_our_message {
-                    if let Some(remote_id) = inner_message.and_then(|m| m.id.clone()) {
+                    if let Some(remote_id) = inner_message.id {
                         self.message_repo
                             .resolve_remote_id(
                                 &account,

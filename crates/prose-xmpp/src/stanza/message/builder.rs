@@ -33,7 +33,7 @@ impl Message {
     }
 
     pub fn set_id(mut self, id: Id) -> Self {
-        self.id = Some(id.into_inner());
+        self.id = Some(xmpp_parsers::message::Id(id.into_inner()));
         self
     }
 
@@ -93,7 +93,7 @@ impl Message {
     pub fn set_replace(mut self, id: Id) -> Self {
         self.payloads.push(
             Replace {
-                id: id.into_inner(),
+                id: xmpp_parsers::message::Id(id.into_inner()),
             }
             .into(),
         );

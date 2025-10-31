@@ -11,7 +11,7 @@ use crate::stanza::message::Message;
 #[derive(Debug, PartialEq, Clone)]
 pub struct Forwarded {
     pub delay: Option<Delay>,
-    pub stanza: Option<Box<Message>>,
+    pub message: Box<Message>,
 }
 
 impl TryFrom<Element> for Forwarded {
@@ -26,13 +26,10 @@ impl TryFrom<xmpp_parsers::forwarding::Forwarded> for Forwarded {
     type Error = anyhow::Error;
 
     fn try_from(value: xmpp_parsers::forwarding::Forwarded) -> Result<Self, Self::Error> {
+        let message = Message::try_from(value.message)?;
         Ok(Forwarded {
             delay: value.delay,
-            stanza: value
-                .stanza
-                .map(TryInto::try_into)
-                .transpose()?
-                .map(Box::new),
+            message: Box::new(message),
         })
     }
 }
@@ -47,7 +44,7 @@ impl From<Forwarded> for xmpp_parsers::forwarding::Forwarded {
     fn from(value: Forwarded) -> Self {
         xmpp_parsers::forwarding::Forwarded {
             delay: value.delay,
-            stanza: value.stanza.map(|s| *s).map(Into::into),
+            message: (*value.message).into(),
         }
     }
 }

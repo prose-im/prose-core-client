@@ -142,7 +142,6 @@ impl RoomManagementService for XMPPClient {
                     defined_condition: DefinedCondition::ItemNotFound,
                     texts: Default::default(),
                     other: None,
-                    alternate_address: None,
                 },
             }
             .into());

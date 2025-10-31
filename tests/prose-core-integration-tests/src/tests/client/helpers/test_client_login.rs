@@ -456,11 +456,11 @@ impl TestClient {
         let bookmarks = bookmarks
             .into_iter()
             .map(|bookmark| {
-                String::from(&Element::from(pubsub::pubsub::Item(pubsub::Item {
+                String::from(&Element::from(pubsub::Item {
                     id: Some(pubsub::ItemId(bookmark.jid.to_string())),
                     publisher: None,
                     payload: Some(Element::from(bookmark.clone())),
-                })))
+                }))
             })
             .collect::<Vec<_>>()
             .join("\n");

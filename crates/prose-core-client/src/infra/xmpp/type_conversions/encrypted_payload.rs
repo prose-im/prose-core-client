@@ -82,10 +82,7 @@ impl From<EncryptionKey> for legacy_omemo::Key {
     fn from(value: EncryptionKey) -> Self {
         Self {
             rid: value.device_id.into(),
-            prekey: value
-                .is_pre_key
-                .then_some(legacy_omemo::IsPreKey::True)
-                .unwrap_or(legacy_omemo::IsPreKey::False),
+            prekey: value.is_pre_key,
             data: value.data.into_vec(),
         }
     }
@@ -95,7 +92,7 @@ impl From<legacy_omemo::Key> for EncryptionKey {
     fn from(value: legacy_omemo::Key) -> Self {
         Self {
             device_id: value.rid.into(),
-            is_pre_key: value.prekey == legacy_omemo::IsPreKey::True,
+            is_pre_key: value.prekey,
             data: value.data.into(),
         }
     }

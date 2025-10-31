@@ -39,7 +39,7 @@ impl MessageMigrationDomainServiceTrait for MessageMigrationDomainService {
 
             first_message_id = messages
                 .first()
-                .and_then(|m| m.forwarded.stanza.as_ref())
+                .map(|m| m.forwarded.message.as_ref())
                 .and_then(|m| m.stanza_id().clone())
                 .map(|id| MessageServerId::from(id.id.into_inner()));
 

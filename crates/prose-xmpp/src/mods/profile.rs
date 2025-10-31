@@ -15,7 +15,7 @@ use xmpp_parsers::hashes::Sha1HexAttribute;
 use xmpp_parsers::iq::{Iq, IqType};
 use xmpp_parsers::pubsub;
 use xmpp_parsers::pubsub::pubsub::{Items, PublishOptions};
-use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
+use xmpp_parsers::pubsub::{NodeName, PubSub};
 use xmpp_parsers::time::{TimeQuery, TimeResult};
 use xmpp_parsers::version::{VersionQuery, VersionResult};
 
@@ -134,10 +134,18 @@ impl Module for Profile {
         Ok(())
     }
 
-    fn handle_pubsub_event(&self, from: &Jid, event: &PubSubEvent) -> Result<()> {
-        let PubSubEvent::PublishedItems { node, items } = event else {
+    fn handle_pubsub_event(&self, from: &Jid, event: &pubsub::event::Payload) -> Result<()> {
+        let pubsub::event::Payload::Items {
+            node,
+            published: items,
+            ..
+        } = event
+        else {
             return Ok(());
         };
+        if items.is_empty() {
+            return Ok(());
+        }
 
         match node.0.as_ref() {
             ns::VCARD4 => {
@@ -253,11 +261,11 @@ impl Profile {
             PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::VCARD4.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(pubsub::ItemId(self.ctx.bare_jid().to_string())),
                         publisher: None,
                         payload: Some(vcard.into()),
-                    })],
+                    }],
                 },
                 publish_options,
             },
@@ -272,7 +280,7 @@ impl Profile {
             PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::NICK.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: None,
                         publisher: None,
                         payload: Some(
@@ -280,7 +288,7 @@ impl Profile {
                                 .append_all(nickname)
                                 .build(),
                         ),
-                    })],
+                    }],
                 },
                 publish_options: None,
             },
@@ -302,11 +310,11 @@ impl Profile {
             pubsub::PubSub::Retract(pubsub::pubsub::Retract {
                 node: NodeName(ns::VCARD4.to_string()),
                 notify: Default::default(),
-                items: vec![pubsub::pubsub::Item(pubsub::Item {
+                items: vec![pubsub::pubsub::Item {
                     id: Some(pubsub::ItemId(self.ctx.bare_jid().to_string())),
                     publisher: None,
                     payload: None,
-                })],
+                }],
             }),
         );
         self.ctx.send_iq(iq).await?;
@@ -352,7 +360,7 @@ impl Profile {
             pubsub::PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::AVATAR_METADATA.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(pubsub::ItemId(checksum.to_string())),
                         publisher: None,
                         payload: Some(
@@ -368,7 +376,7 @@ impl Profile {
                             }
                             .into(),
                         ),
-                    })],
+                    }],
                 },
                 publish_options: None,
             },
@@ -391,11 +399,11 @@ impl Profile {
                     max_items: Some(1),
                     node: NodeName(ns::AVATAR_DATA.to_string()),
                     subid: None,
-                    items: vec![pubsub::pubsub::Item(xmpp_parsers::pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(pubsub::ItemId(image_id.to_hex())),
                         publisher: None,
                         payload: None,
-                    })],
+                    }],
                 })
                 .into(),
             ),
@@ -432,7 +440,7 @@ impl Profile {
             pubsub::PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::AVATAR_DATA.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(pubsub::ItemId(checksum.to_string())),
                         publisher: None,
                         payload: Some(
@@ -440,7 +448,7 @@ impl Profile {
                                 .append(base64_image_data.into())
                                 .build(),
                         ),
-                    })],
+                    }],
                 },
                 publish_options: None,
             },

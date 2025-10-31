@@ -51,8 +51,7 @@ impl RoomError {
         let RequestError::XMPP {
             err:
                 StanzaError {
-                    defined_condition,
-                    alternate_address,
+                    defined_condition: DefinedCondition::Gone { new_address },
                     ..
                 },
         } = error
@@ -60,14 +59,8 @@ impl RoomError {
             return None;
         };
 
-        if defined_condition != &DefinedCondition::Gone {
-            return None;
-        }
-
         Some(GoneError {
-            new_location: alternate_address
-                .as_ref()
-                .and_then(|l| MucId::from_iri(l).ok()),
+            new_location: new_address.as_ref().and_then(|l| MucId::from_iri(l).ok()),
         })
     }
 

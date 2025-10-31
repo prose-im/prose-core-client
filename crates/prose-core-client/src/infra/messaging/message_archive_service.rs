@@ -6,7 +6,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use xmpp_parsers::mam::Complete;
 
 use prose_xmpp::mods;
 use prose_xmpp::stanza::mam::query;
@@ -56,7 +55,7 @@ impl MessageArchiveService for XMPPClient {
 
         Ok(MessagePage {
             messages,
-            is_last: fin.complete == Complete::True,
+            is_last: fin.complete,
         })
     }
 
@@ -95,7 +94,7 @@ impl MessageArchiveService for XMPPClient {
 
         Ok(MessagePage {
             messages,
-            is_last: fin.complete == Complete::True,
+            is_last: fin.complete,
         })
     }
 
@@ -137,7 +136,7 @@ impl MessageArchiveService for XMPPClient {
 
         Ok(MessagePage {
             messages,
-            is_last: fin.complete == Complete::True,
+            is_last: fin.complete,
         })
     }
 }

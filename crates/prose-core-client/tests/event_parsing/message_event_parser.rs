@@ -41,7 +41,7 @@ async fn test_carbon() -> Result<()> {
         vec![ServerEvent::Message(MessageEvent {
             r#type: MessageEventType::Sync(Carbon::Sent(Forwarded {
                 delay: None,
-                stanza: Some(Box::new(
+                message: Some(Box::new(
                     Message::new()
                         .set_id("message-id".into())
                         .set_type(MessageType::Chat)

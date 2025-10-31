@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use minidom::Element;
-pub use xmpp_parsers::mam::{Complete, Fin, Query, QueryId};
+pub use xmpp_parsers::mam::{Fin, Query, QueryId};
 use xmpp_parsers::message::MessagePayload;
 
 use crate::stanza::message::{stanza_id, Forwarded};

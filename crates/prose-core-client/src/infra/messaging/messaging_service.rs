@@ -175,10 +175,7 @@ impl MessagingService for XMPPClient {
             .ok_or(StanzaParseError::missing_child_node("delay"))?
             .stamp;
 
-        let mut message = *message
-            .forwarded
-            .stanza
-            .ok_or(StanzaParseError::missing_child_node("message"))?;
+        let mut message = *message.forwarded.message;
 
         let from = message
             .from

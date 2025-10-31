@@ -559,7 +559,7 @@ async fn test_dispatches_messages_appended_for_sent_carbon() -> Result<()> {
         .handle_event(ServerEvent::Message(MessageEvent {
             r#type: MessageEventType::Sync(Carbon::Sent(Forwarded {
                 delay: None,
-                stanza: Some(Box::new(
+                message: Some(Box::new(
                     Message::new()
                         .set_id("message-id".into())
                         .set_type(MessageType::Chat)

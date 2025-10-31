@@ -3,6 +3,7 @@
 // Copyright: 2024, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use xmpp_parsers::caps::Caps;
 
 use crate::domain::shared::models::CapabilitiesId;
@@ -19,6 +20,6 @@ impl CapsExt for Caps {
     }
 
     fn id(&self) -> CapabilitiesId {
-        CapabilitiesId::new(&self.node, self.hash.to_base64())
+        CapabilitiesId::new(&self.node, BASE64_STANDARD.encode(&self.ver))
     }
 }

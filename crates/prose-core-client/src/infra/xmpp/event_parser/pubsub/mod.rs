@@ -99,14 +99,7 @@ pub fn parse_pubsub_event(ctx: &mut Context, event: XMPPPubSubEvent) -> Result<(
                     .events
                     .into_iter()
                     .fold(HashMap::new(), |mut events, event| {
-                        let node = match &event {
-                            pubsub::PubSubEvent::Configuration { node, .. } => node,
-                            pubsub::PubSubEvent::Delete { node, .. } => node,
-                            pubsub::PubSubEvent::PublishedItems { node, .. } => node,
-                            pubsub::PubSubEvent::RetractedItems { node, .. } => node,
-                            pubsub::PubSubEvent::Purge { node, .. } => node,
-                            pubsub::PubSubEvent::Subscription { node, .. } => node,
-                        };
+                        let node = event.node_name();
                         events
                             .entry(node.0.clone())
                             .or_insert_with(Vec::new)
@@ -132,7 +125,7 @@ fn parse_pubsub_events(
     ctx: &mut Context,
     ns: &str,
     from: &UserId,
-    events: impl IntoIterator<Item = pubsub::PubSubEvent>,
+    events: impl IntoIterator<Item = pubsub::event::Payload>,
 ) -> Result<()> {
     let Some(parser) = get_parser(&ns) else {
         warn!("No PubSub parser for node '{ns}'.");
@@ -141,17 +134,18 @@ fn parse_pubsub_events(
 
     for event in events {
         match event {
-            pubsub::PubSubEvent::PublishedItems { items, .. } => {
-                parser.handle_added_or_updated_items(ctx, from, items)?
+            pubsub::event::Payload::Items { published, .. } if !published.is_empty() => {
+                parser.handle_added_or_updated_items(ctx, from, published)?
             }
-            pubsub::PubSubEvent::RetractedItems { items, .. } => {
-                parser.handle_retracted_items(ctx, from, items)?
+            pubsub::event::Payload::Items { retracted, .. } if !retracted.is_empty() => {
+                parser.handle_retracted_items(ctx, from, retracted)?
             }
-            pubsub::PubSubEvent::Purge { .. } | pubsub::PubSubEvent::Delete { .. } => {
+            pubsub::event::Payload::Items { .. } => {}
+            pubsub::event::Payload::Purge { .. } | pubsub::event::Payload::Delete { .. } => {
                 parser.handle_purge(ctx, from)?
             }
-            pubsub::PubSubEvent::Configuration { .. } => {}
-            pubsub::PubSubEvent::Subscription { .. } => {}
+            pubsub::event::Payload::Configuration { .. } => {}
+            pubsub::event::Payload::Subscription { .. } => {}
         }
     }
 

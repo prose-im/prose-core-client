@@ -14,7 +14,7 @@ pub trait PubSubItemsExt {
     ) -> Result<Option<T>, T::Error>;
 }
 
-impl PubSubItemsExt for Vec<pubsub::Item> {
+impl PubSubItemsExt for Vec<pubsub::pubsub::Item> {
     fn find_first_payload<T: TryFrom<Element>>(
         self,
         name: &str,

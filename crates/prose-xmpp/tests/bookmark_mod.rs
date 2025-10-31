@@ -7,12 +7,14 @@ use std::str::FromStr;
 
 use anyhow::Result;
 use insta::assert_snapshot;
+use jid::ResourcePart;
 use minidom::Element;
-use xmpp_parsers::bookmarks2::{Autojoin, Conference};
+use tokio_xmpp::Stanza;
+use xmpp_parsers::bookmarks2::{Conference, Extensions};
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub;
 
-use prose_xmpp::stanza::ConferenceBookmark;
+use prose_xmpp::stanza::{ConferenceBookmark, Message};
 use prose_xmpp::test::{ClientTestAdditions, ConnectedClient};
 use prose_xmpp::{jid, mods, Client, Event};
 
@@ -60,26 +62,28 @@ async fn test_loads_bookmarks() -> Result<()> {
             ConferenceBookmark {
                 jid: jid!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
-                    autojoin: Autojoin::True,
+                    autojoin: true,
                     name: Some("The Play's the Thing".to_string()),
-                    nick: Some("JC".to_string()),
+                    nick: Some("JC".try_into().unwrap()),
                     password: None,
-                    extensions: vec![],
+                    extensions: None,
                 }
             },
             ConferenceBookmark {
                 jid: jid!("orchard@conference.shakespeare.lit"),
                 conference: Conference {
-                    autojoin: Autojoin::True,
+                    autojoin: true,
                     name: Some("The Orcard".to_string()),
-                    nick: Some("JC".to_string()),
+                    nick: Some("JC".try_into().unwrap()),
                     password: None,
-                    extensions: vec![Element::builder(
-                        "state",
-                        "http://myclient.example/bookmark/state"
-                    )
-                    .attr("minimized", "true")
-                    .build()],
+                    extensions: Some(Extensions {
+                        payloads: vec![Element::builder(
+                            "state",
+                            "http://myclient.example/bookmark/state"
+                        )
+                        .attr("minimized", "true")
+                        .build()]
+                    }),
                 }
             }
         ]
@@ -125,11 +129,11 @@ async fn test_loads_legacy_bookmarks() -> Result<()> {
         vec![ConferenceBookmark {
             jid: jid!("theplay@conference.shakespeare.lit"),
             conference: Conference {
-                autojoin: Autojoin::True,
+                autojoin: true,
                 name: Some("The Play's the Thing".to_string()),
-                nick: Some("JC".to_string()),
+                nick: Some("JC".try_into().unwrap()),
                 password: None,
-                extensions: vec![],
+                extensions: None,
             }
         },]
     );
@@ -151,11 +155,11 @@ async fn test_publishes_bookmark() -> Result<()> {
         .publish_bookmark(
             jid!("room@prose.org"),
             Conference {
-                autojoin: Autojoin::True,
+                autojoin: true,
                 name: Some("Room Name".to_string()),
-                nick: Some("User Nick".to_string()),
+                nick: Some("User Nick".try_into().unwrap()),
                 password: Some("Room password".to_string()),
-                extensions: vec![],
+                extensions: None,
             },
         )
         .await?;
@@ -181,11 +185,11 @@ async fn test_publishes_legacy_bookmarks() -> Result<()> {
         .publish_bookmarks(vec![ConferenceBookmark {
             jid: jid!("room@prose.org"),
             conference: Conference {
-                autojoin: Autojoin::True,
+                autojoin: true,
                 name: Some("Room Name".to_string()),
-                nick: Some("User Nick".to_string()),
+                nick: Some("User Nick".try_into().unwrap()),
                 password: Some("Room password".to_string()),
-                extensions: vec![],
+                extensions: None,
             },
         }])
         .await?;
@@ -248,11 +252,11 @@ async fn test_bookmarks_published_event() -> Result<()> {
             bookmarks: vec![ConferenceBookmark {
                 jid: jid!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
-                    autojoin: Autojoin::True,
+                    autojoin: true,
                     name: Some("The Play's the Thing".to_string()),
-                    nick: Some("JC".to_string()),
+                    nick: Some("JC".try_into().unwrap()),
                     password: None,
-                    extensions: vec![],
+                    extensions: None,
                 }
             }]
         })
@@ -293,11 +297,11 @@ async fn test_legacy_bookmark_event() -> Result<()> {
             bookmarks: vec![ConferenceBookmark {
                 jid: jid!("theplay@conference.shakespeare.lit"),
                 conference: Conference {
-                    autojoin: Autojoin::True,
+                    autojoin: true,
                     name: Some("The Play's the Thing".to_string()),
-                    nick: Some("JC".to_string()),
+                    nick: Some("JC".try_into().unwrap()),
                     password: None,
-                    extensions: vec![],
+                    extensions: None,
                 }
             }]
         })

@@ -316,7 +316,7 @@ impl MessageBuilder {
                     stamp: timestamp,
                     data: None,
                 }),
-                stanza: Some(Box::new(message)),
+                message: Box::new(message),
             },
         }
     }

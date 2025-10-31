@@ -28,7 +28,7 @@ impl RequestFuture<SendMucMessageState, Message> {
                     Ok(ElementReducerPoll::Pending(Some(element)))
                 }
                 XMPPElement::Message(message) => {
-                    if message.id.as_ref() != Some(&state.sent_message_id)
+                    if message.id.as_ref().map(|id| &id.0) != Some(&state.sent_message_id)
                         || message.from.as_ref().map(|from| from.to_bare()).as_ref()
                             != Some(&state.room_jid)
                     {

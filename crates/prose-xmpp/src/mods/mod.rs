@@ -9,7 +9,7 @@ use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::Presence;
-use xmpp_parsers::pubsub::PubSubEvent;
+use xmpp_parsers::pubsub::event::Payload as PubSubEvent;
 
 pub use block_list::BlockList;
 pub use bookmark::Bookmark;

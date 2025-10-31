@@ -49,7 +49,7 @@ where
         let items = items
             .into_iter()
             .filter_map(|item| {
-                let Some(payload) = item.0.payload else {
+                let Some(payload) = item.payload else {
                     warn!("Encountered missing payload in PubSub item for bookmark");
                     return None;
                 };

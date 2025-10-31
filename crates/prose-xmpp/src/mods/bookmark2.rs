@@ -10,8 +10,7 @@ use jid::Jid;
 use xmpp_parsers::bookmarks2::Conference;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::pubsub;
-use xmpp_parsers::pubsub::pubsub::Notify;
-use xmpp_parsers::pubsub::{NodeName, PubSubEvent};
+use xmpp_parsers::pubsub::NodeName;
 
 use crate::client::ModuleContext;
 use crate::mods::Module;
@@ -38,21 +37,23 @@ impl Module for Bookmark {
         self.ctx = context
     }
 
-    fn handle_pubsub_event(&self, _from: &Jid, event: &PubSubEvent) -> Result<()> {
+    fn handle_pubsub_event(&self, _from: &Jid, event: &pubsub::event::Payload) -> Result<()> {
         match event {
-            PubSubEvent::PublishedItems { node, items } => {
-                if node.0 == ns::BOOKMARKS2 {
-                    return self.handle_published_bookmarks(items);
+            pubsub::event::Payload::Items {
+                node,
+                published,
+                retracted,
+            } if node.0 == ns::BOOKMARKS2 => {
+                if !published.is_empty() {
+                    self.handle_published_bookmarks(published)
+                } else if !retracted.is_empty() {
+                    self.handle_retracted_bookmarks(retracted)
+                } else {
+                    Ok(())
                 }
             }
-            PubSubEvent::RetractedItems { node, items } => {
-                if node.0 == ns::BOOKMARKS2 {
-                    return self.handle_retracted_bookmarks(items);
-                }
-            }
-            _ => (),
+            _ => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -80,11 +81,11 @@ impl Bookmark {
             pubsub::PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::BOOKMARKS2.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(pubsub::ItemId(jid.to_string())),
                         publisher: None,
                         payload: Some(conference.into()),
-                    })],
+                    }],
                 },
                 publish_options: Some(pubsub::pubsub::PublishOptions::for_private_data(None)),
             },
@@ -99,12 +100,12 @@ impl Bookmark {
             self.ctx.generate_id(),
             pubsub::PubSub::Retract(pubsub::pubsub::Retract {
                 node: NodeName(ns::BOOKMARKS2.to_string()),
-                notify: Notify::True,
-                items: vec![pubsub::pubsub::Item(pubsub::Item {
+                notify: true,
+                items: vec![pubsub::pubsub::Item {
                     id: Some(pubsub::ItemId(jid.to_string())),
                     publisher: None,
                     payload: None,
-                })],
+                }],
             }),
         );
         self.ctx.send_iq(iq).await?;
@@ -116,7 +117,7 @@ impl Bookmark {
     fn handle_published_bookmarks(&self, items: &Vec<pubsub::event::Item>) -> Result<()> {
         let bookmarks = items
             .iter()
-            .map(|item| ConferenceBookmark::try_from(item.0.clone()))
+            .map(|item| ConferenceBookmark::try_from(item.to_owned()))
             .collect::<Result<Vec<ConferenceBookmark>>>()?;
 
         self.ctx

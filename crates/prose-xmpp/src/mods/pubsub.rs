@@ -13,9 +13,9 @@ use xmpp_parsers::data_forms::DataForm;
 use xmpp_parsers::disco::Item as DiscoItem;
 use xmpp_parsers::disco::{DiscoItemsQuery, DiscoItemsResult};
 use xmpp_parsers::iq::{Iq, IqType};
-use xmpp_parsers::pubsub::owner::Configure;
-use xmpp_parsers::pubsub::pubsub::{Item, Notify, PublishOptions, Retract};
-use xmpp_parsers::pubsub::{pubsub, Item as PubSubItem, ItemId, NodeName, PubSubEvent};
+use xmpp_parsers::pubsub::owner;
+use xmpp_parsers::pubsub::pubsub::{Item as PubSubItem, PublishOptions, Retract};
+use xmpp_parsers::pubsub::{pubsub, ItemId, NodeName};
 
 use crate::client::ModuleContext;
 use crate::event::Event as ClientEvent;
@@ -40,7 +40,7 @@ impl Module for PubSub {
     }
 
     fn handle_pubsub_message(&self, pubsub: &PubSubMessage) -> Result<()> {
-        let Some(node) = pubsub.events.first().map(|event| event.node()) else {
+        let Some(node) = pubsub.events.first().map(|event| event.node_name()) else {
             return Ok(());
         };
 
@@ -82,7 +82,7 @@ impl PubSub {
             pubsub::PubSub::Publish {
                 publish: pubsub::Publish {
                     node: NodeName(node.as_ref().to_string()),
-                    items: items.into_iter().map(|item| Item(item)).collect(),
+                    items: items.into_iter().collect(),
                 },
                 publish_options: options,
             },
@@ -191,15 +191,13 @@ impl PubSub {
             self.ctx.generate_id(),
             pubsub::PubSub::Retract(Retract {
                 node: NodeName(node.as_ref().to_string()),
-                notify: if notify { Notify::True } else { Notify::False },
+                notify,
                 items: item_ids
                     .into_iter()
-                    .map(|id| {
-                        Item(PubSubItem {
-                            id: Some(ItemId(id.as_ref().to_string())),
-                            publisher: None,
-                            payload: None,
-                        })
+                    .map(|id| PubSubItem {
+                        id: Some(ItemId(id.as_ref().to_string())),
+                        publisher: None,
+                        payload: None,
                     })
                     .collect(),
             }),
@@ -255,16 +253,15 @@ impl PubSub {
 
         response.expect_is("pubsub", ns::PUBSUB_OWNER)?;
 
-        let configure = response
-            .get_child("configure", ns::PUBSUB_OWNER)
-            .cloned()
-            .map(Configure::try_from)
-            .transpose()?
-            .ok_or(RequestError::UnexpectedResponse)?;
+        let payload = owner::Payload::try_from(response)?;
+        let owner::Payload::Configure {
+            form: Some(form), ..
+        } = payload
+        else {
+            return Err(RequestError::UnexpectedResponse);
+        };
 
-        Ok(Some(
-            configure.form.ok_or(RequestError::UnexpectedResponse)?,
-        ))
+        Ok(Some(form))
     }
 
     pub async fn subscribe_to_node(
@@ -295,22 +292,5 @@ impl PubSub {
         };
 
         Ok(sub)
-    }
-}
-
-trait PubSubEventExt {
-    fn node(&self) -> &NodeName;
-}
-
-impl PubSubEventExt for PubSubEvent {
-    fn node(&self) -> &NodeName {
-        match self {
-            PubSubEvent::Configuration { node, .. } => node,
-            PubSubEvent::Delete { node, .. } => node,
-            PubSubEvent::PublishedItems { node, .. } => node,
-            PubSubEvent::RetractedItems { node, .. } => node,
-            PubSubEvent::Purge { node, .. } => node,
-            PubSubEvent::Subscription { node, .. } => node,
-        }
     }
 }

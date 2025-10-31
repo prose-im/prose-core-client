@@ -7,7 +7,7 @@ use anyhow::Result;
 use jid::Jid;
 use xmpp_parsers::iq::Iq;
 use xmpp_parsers::presence::{Presence, Type};
-use xmpp_parsers::pubsub::{NodeName, PubSub, PubSubEvent};
+use xmpp_parsers::pubsub::{NodeName, PubSub};
 use xmpp_parsers::{presence, pubsub};
 
 use crate::client::ModuleContext;
@@ -50,10 +50,18 @@ impl Module for Status {
         Ok(())
     }
 
-    fn handle_pubsub_event(&self, from: &Jid, event: &PubSubEvent) -> Result<()> {
-        let PubSubEvent::PublishedItems { node, items } = event else {
+    fn handle_pubsub_event(&self, from: &Jid, event: &pubsub::event::Payload) -> Result<()> {
+        let pubsub::event::Payload::Items {
+            node,
+            published: items,
+            ..
+        } = event
+        else {
             return Ok(());
         };
+        if items.is_empty() {
+            return Ok(());
+        }
 
         if node.0 != ns::USER_ACTIVITY {
             return Ok(());
@@ -106,7 +114,7 @@ impl Status {
             presence.add_payload(caps)
         }
         if let Some(priority) = priority {
-            presence.priority = priority
+            presence = presence.with_priority(priority);
         }
 
         self.ctx.send_stanza(presence)?;
@@ -121,11 +129,11 @@ impl Status {
             PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::USER_ACTIVITY.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(pubsub::ItemId(self.ctx.bare_jid().to_string())),
                         publisher: None,
                         payload: Some(activity.into()),
-                    })],
+                    }],
                 },
                 publish_options: None,
             },

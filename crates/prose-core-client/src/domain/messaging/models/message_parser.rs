@@ -75,13 +75,7 @@ impl MessageParser {
         self,
         forwarded_message: Forwarded,
     ) -> Result<MessageLike> {
-        let mut parsed_message = self
-            .parse_message(
-                *forwarded_message
-                    .stanza
-                    .ok_or(StanzaParseError::missing_child_node("message"))?,
-            )
-            .await?;
+        let mut parsed_message = self.parse_message(*forwarded_message.message).await?;
 
         if let Some(delay) = forwarded_message.delay {
             parsed_message.timestamp = delay.stamp.0.into()

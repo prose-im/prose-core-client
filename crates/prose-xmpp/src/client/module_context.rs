@@ -47,7 +47,7 @@ impl ModuleContext {
     pub(crate) async fn query_pubsub_node(
         &self,
         query: PubSubQuery,
-    ) -> Result<Option<Vec<pubsub::Item>>, RequestError> {
+    ) -> Result<Option<Vec<pubsub::pubsub::Item>>, RequestError> {
         let response = match self.send_iq(query.build()).await {
             Ok(iq) => iq,
             Err(err) if err.is_item_not_found_err() => return Ok(None),
@@ -61,7 +61,7 @@ impl ModuleContext {
             return Err(RequestError::UnexpectedResponse.into());
         };
 
-        Ok(Some(items.items.into_iter().map(|item| item.0).collect()))
+        Ok(Some(items.items))
     }
 
     pub(crate) async fn delete_pubsub_node(

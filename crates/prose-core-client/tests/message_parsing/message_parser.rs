@@ -141,7 +141,7 @@ async fn test_parse_groupchat_message() -> Result<()> {
 async fn test_parse_sent_carbon_message() -> Result<()> {
     let message = Carbon::Sent(Forwarded {
         delay: None,
-        stanza: Some(Box::new(
+        message: Some(Box::new(
             Message::new()
                 .set_id("message-id-1".into())
                 .set_type(MessageType::Chat)
@@ -203,7 +203,7 @@ async fn test_parse_mam_groupchat_message() -> Result<()> {
                 stamp: XMPPDateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
                 data: None,
             }),
-            stanza: Some(Box::new(
+            message: Some(Box::new(
                 Message::new()
                     .set_id("message-id-1".into())
                     .set_type(MessageType::Groupchat)
@@ -261,7 +261,7 @@ async fn test_parse_mam_groupchat_message_with_real_jid() -> Result<()> {
                 stamp: XMPPDateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
                 data: None,
             }),
-            stanza: Some(Box::new(
+            message: Some(Box::new(
                 Message::new()
                     .set_id("message-id-1".into())
                     .set_type(MessageType::Groupchat)
@@ -324,7 +324,7 @@ async fn test_parse_mam_chat_message() -> Result<()> {
                 stamp: XMPPDateTime(Utc.with_ymd_and_hms(2024, 02, 23, 0, 0, 0).unwrap().into()),
                 data: None,
             }),
-            stanza: Some(Box::new(
+            message: Some(Box::new(
                 Message::new()
                     .set_id("message-id-1".into())
                     .set_type(MessageType::Chat)

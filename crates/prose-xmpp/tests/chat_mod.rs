@@ -52,7 +52,7 @@ async fn test_does_not_send_message_event_for_archived_message() -> Result<()> {
             query_id: None,
             forwarded: Forwarded {
                 delay: None,
-                stanza: None,
+                message: None,
             },
         });
 
@@ -73,7 +73,7 @@ async fn test_sends_received_carbon_event() -> Result<()> {
     let carbon = carbons::Received {
         forwarded: Forwarded {
             delay: None,
-            stanza: Some(Box::new(Message::new().set_id("nested-msg-id".into()))),
+            message: Box::new(Message::new().set_id("nested-msg-id".into())),
         },
     };
 
@@ -104,7 +104,7 @@ async fn test_does_not_send_received_carbon_event_for_different_user() -> Result
     let carbon = carbons::Received {
         forwarded: Forwarded {
             delay: None,
-            stanza: Some(Box::new(Message::new().set_id("nested-msg-id".into()))),
+            message: Box::new(Message::new().set_id("nested-msg-id".into())),
         },
     };
 
@@ -130,7 +130,7 @@ async fn test_sends_sent_carbon_event() -> Result<()> {
     let carbon = carbons::Sent {
         forwarded: Forwarded {
             delay: None,
-            stanza: Some(Box::new(Message::new().set_id("nested-msg-id".into()))),
+            message: Box::new(Message::new().set_id("nested-msg-id".into())),
         },
     };
 
@@ -161,7 +161,7 @@ async fn test_does_not_send_sent_carbon_event_for_different_user() -> Result<()>
     let carbon = carbons::Sent {
         forwarded: Forwarded {
             delay: None,
-            stanza: Some(Box::new(Message::new().set_id("nested-msg-id".into()))),
+            message: Box::new(Message::new().set_id("nested-msg-id".into())),
         },
     };
 

@@ -6,7 +6,7 @@
 use anyhow::{bail, Result};
 use jid::Jid;
 use std::str::FromStr;
-use xmpp_parsers::bookmarks2::{Autojoin, Conference};
+use xmpp_parsers::bookmarks2::Conference;
 use xmpp_parsers::{bookmarks, pubsub};
 
 #[derive(Debug, Clone)]
@@ -15,10 +15,28 @@ pub struct ConferenceBookmark {
     pub conference: Conference,
 }
 
-impl TryFrom<pubsub::Item> for ConferenceBookmark {
+impl TryFrom<pubsub::pubsub::Item> for ConferenceBookmark {
     type Error = anyhow::Error;
 
-    fn try_from(item: pubsub::Item) -> Result<Self> {
+    fn try_from(item: pubsub::pubsub::Item) -> Result<Self> {
+        let Some(id) = &item.id else {
+            bail!("Missing id in bookmark");
+        };
+        let Some(payload) = &item.payload else {
+            bail!("Missing payload in bookmark");
+        };
+
+        let jid = Jid::from_str(&id.0).map_err(anyhow::Error::new)?;
+        let conference = Conference::try_from(payload.clone()).map_err(anyhow::Error::new)?;
+
+        Ok(ConferenceBookmark { jid, conference })
+    }
+}
+
+impl TryFrom<pubsub::event::Item> for ConferenceBookmark {
+    type Error = anyhow::Error;
+
+    fn try_from(item: pubsub::event::Item) -> Result<Self> {
         let Some(id) = &item.id else {
             bail!("Missing id in bookmark");
         };
@@ -38,15 +56,11 @@ impl From<bookmarks::Conference> for ConferenceBookmark {
         ConferenceBookmark {
             jid: Jid::from(conference.jid),
             conference: Conference {
-                autojoin: if conference.autojoin == bookmarks::Autojoin::True {
-                    Autojoin::True
-                } else {
-                    Autojoin::False
-                },
+                autojoin: conference.autojoin,
                 name: conference.name,
                 nick: conference.nick,
                 password: conference.password,
-                extensions: vec![],
+                extensions: None,
             },
         }
     }
@@ -55,11 +69,7 @@ impl From<bookmarks::Conference> for ConferenceBookmark {
 impl From<ConferenceBookmark> for bookmarks::Conference {
     fn from(bookmark: ConferenceBookmark) -> Self {
         bookmarks::Conference {
-            autojoin: if bookmark.conference.autojoin == Autojoin::True {
-                bookmarks::Autojoin::True
-            } else {
-                bookmarks::Autojoin::False
-            },
+            autojoin: bookmark.conference.autojoin,
             jid: bookmark.jid.into_bare(),
             name: bookmark.conference.name,
             nick: bookmark.conference.nick,
@@ -70,11 +80,23 @@ impl From<ConferenceBookmark> for bookmarks::Conference {
 
 impl PartialEq for ConferenceBookmark {
     fn eq(&self, other: &Self) -> bool {
-        self.jid == other.jid
+        let eq = self.jid == other.jid
             && self.conference.autojoin == other.conference.autojoin
             && self.conference.name == other.conference.name
             && self.conference.nick == other.conference.nick
-            && self.conference.password == other.conference.password
-            && self.conference.extensions == other.conference.extensions
+            && self.conference.password == other.conference.password;
+        // Early abort
+        if !eq {
+            return false;
+        }
+
+        match (
+            self.conference.extensions.as_ref(),
+            other.conference.extensions.as_ref(),
+        ) {
+            (None, None) => true,
+            (Some(ext1), Some(ext2)) => ext1.payloads == ext2.payloads,
+            _ => false,
+        }
     }
 }

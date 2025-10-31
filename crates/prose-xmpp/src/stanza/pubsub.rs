@@ -7,12 +7,12 @@ use crate::ns;
 use jid::Jid;
 use minidom::Element;
 use xmpp_parsers::message::Message;
-use xmpp_parsers::pubsub::PubSubEvent;
+use xmpp_parsers::pubsub::event::Payload;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PubSubMessage {
     pub from: Jid,
-    pub events: Vec<PubSubEvent>,
+    pub events: Vec<Payload>,
 }
 
 impl TryFrom<Message> for PubSubMessage {
@@ -32,7 +32,7 @@ impl TryFrom<Message> for PubSubMessage {
                     if !child.is("event", ns::PUBSUB_EVENT) {
                         return None;
                     }
-                    Some(PubSubEvent::try_from(child))
+                    Some(Payload::try_from(child))
                 })
                 .collect::<Result<_, _>>()?,
         })

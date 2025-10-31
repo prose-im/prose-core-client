@@ -52,11 +52,11 @@ impl OMEMO {
             pubsub::PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(ns::LEGACY_OMEMO_DEVICELIST.to_string()),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(ItemId::current()),
                         publisher: None,
                         payload: Some(device_list.into()),
-                    })],
+                    }],
                 },
                 publish_options: Some(PublishOptions::for_public_data(None)),
             },
@@ -105,11 +105,11 @@ impl OMEMO {
             pubsub::PubSub::Publish {
                 publish: pubsub::pubsub::Publish {
                     node: NodeName(format!("{}:{device_id}", ns::LEGACY_OMEMO_BUNDLES)),
-                    items: vec![pubsub::pubsub::Item(pubsub::Item {
+                    items: vec![pubsub::pubsub::Item {
                         id: Some(ItemId::current()),
                         publisher: None,
                         payload: Some(bundle.into()),
-                    })],
+                    }],
                 },
                 publish_options: Some(PublishOptions::for_public_data(None)),
             },
