@@ -10,11 +10,14 @@ use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
     DynAppContext, DynConnectedRoomsReadOnlyRepository, DynDraftsRepository, DynMessagesRepository,
-    DynRoomFactory, DynSidebarDomainService,
+    DynRoomFactory, DynSidebarDomainService, DynUserInfoDomainService, DynUserInfoRepository,
 };
-use crate::domain::rooms::models::{Room, RoomSidebarState};
-use crate::domain::shared::models::{RoomId, RoomType};
-use crate::dtos::SidebarItem as SidebarItemDTO;
+use crate::domain::rooms::models::{Participant, Room, RoomSidebarState};
+use crate::domain::shared::models::{CachePolicy, RoomId, RoomType};
+use crate::dtos::{SidebarItem as SidebarItemDTO, SidebarItemType};
+use crate::util::textual_palette::{
+    generate_textual_initials, generate_textual_palette, normalize_textual_initials,
+};
 
 #[derive(InjectDependencies)]
 pub struct SidebarService {
@@ -30,6 +33,8 @@ pub struct SidebarService {
     sidebar_domain_service: DynSidebarDomainService,
     #[inject]
     messages_repo: DynMessagesRepository,
+    #[inject]
+    user_info_domain_service: DynUserInfoDomainService,
 }
 
 impl SidebarService {
@@ -46,6 +51,53 @@ impl SidebarService {
             if room.r#type == RoomType::Unknown || !room.sidebar_state().is_in_sidebar() {
                 continue;
             }
+
+            let item_type: SidebarItemType = match room.r#type {
+                RoomType::DirectMessage => {
+                    if let Some(
+                        ref participant @ Participant {
+                            real_id: Some(ref real_id),
+                            ..
+                        },
+                    ) = room.with_participants(|p| {
+                        for part in p.values() {
+                            return Some(part.clone());
+                        }
+                        return None;
+                    }) {
+                        let user_info = self
+                            .user_info_domain_service
+                            .get_user_info(real_id, CachePolicy::ReturnCacheDataDontLoad)
+                            .await
+                            .unwrap_or_default()
+                            .unwrap_or_default();
+
+                        let name = user_info.display_name().unwrap_or_username(real_id);
+
+                        SidebarItemType::DirectMessage {
+                            availability: participant.availability,
+                            initials: generate_textual_initials(&name)
+                                .map(normalize_textual_initials)
+                                .unwrap_or_default(),
+                            color: generate_textual_palette(&real_id.to_string()),
+                            avatar: participant.avatar.clone(),
+                            status: user_info.status,
+                        }
+                    } else {
+                        SidebarItemType::DirectMessage {
+                            availability: Default::default(),
+                            initials: "".to_string(),
+                            color: "".to_string(),
+                            avatar: None,
+                            status: None,
+                        }
+                    }
+                }
+                RoomType::Group => SidebarItemType::Group,
+                RoomType::PrivateChannel => SidebarItemType::PrivateChannel,
+                RoomType::PublicChannel => SidebarItemType::PublicChannel,
+                RoomType::Generic | RoomType::Unknown => SidebarItemType::Generic,
+            };
 
             let stats = room
                 .update_statistics_if_needed(&account, &self.messages_repo)
@@ -65,6 +117,7 @@ impl SidebarService {
             let item_dto = SidebarItemDTO {
                 name: room.name().unwrap_or_else(|| id.to_string()),
                 room: self.room_factory.build(room),
+                r#type: item_type,
                 is_favorite,
                 has_draft: self
                     .drafts_repo

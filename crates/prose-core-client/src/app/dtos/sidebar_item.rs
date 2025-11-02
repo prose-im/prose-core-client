@@ -5,12 +5,28 @@
 
 use std::fmt::{Debug, Formatter};
 
-use crate::dtos::RoomEnvelope;
+use crate::dtos::{Availability, Avatar, RoomEnvelope, UserStatus};
+
+#[derive(Clone, PartialEq)]
+pub enum SidebarItemType {
+    DirectMessage {
+        availability: Availability,
+        initials: String,
+        color: String,
+        avatar: Option<Avatar>,
+        status: Option<UserStatus>,
+    },
+    Group,
+    PrivateChannel,
+    PublicChannel,
+    Generic,
+}
 
 #[derive(Clone, PartialEq)]
 pub struct SidebarItem {
     pub name: String,
     pub room: RoomEnvelope,
+    pub r#type: SidebarItemType,
     pub is_favorite: bool,
     pub has_draft: bool,
     pub unread_count: u32,

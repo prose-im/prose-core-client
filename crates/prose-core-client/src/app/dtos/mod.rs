@@ -12,7 +12,7 @@ pub use message_result_set::MessageResultSet;
 pub use presence_sub_request::{PresenceSubRequest, PresenceSubRequestId};
 pub use room_envelope::RoomEnvelope;
 pub use send_message_request::{Body as SendMessageRequestBody, SendMessageRequest};
-pub use sidebar_item::SidebarItem;
+pub use sidebar_item::{SidebarItem, SidebarItemType};
 pub use upload_slot::UploadSlot;
 pub use user_profile::{Address, UserProfile};
 pub use workspace_info::WorkspaceInfo;
@@ -34,8 +34,8 @@ pub use crate::domain::{
     rooms::models::{Participant, PublicRoomInfo, RoomAffiliation, RoomState},
     shared::models::{
         AccountId, Availability, Avatar, AvatarId, AvatarSource, Markdown, MucId, OccupantId,
-        ParticipantBasicInfo, ParticipantId, ParticipantInfo, RoomId, ScalarRangeExt, ServerId,
-        StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId, UserPresenceInfo,
+        ParticipantBasicInfo, ParticipantId, ParticipantInfo, RoomId, RoomType, ScalarRangeExt,
+        ServerId, StringIndexRangeExt, UnicodeScalarIndex, UserBasicInfo, UserId, UserPresenceInfo,
         UserResourceId, Utf16Index, Utf8Index, HTML,
     },
     uploads::models::UploadHeader,
