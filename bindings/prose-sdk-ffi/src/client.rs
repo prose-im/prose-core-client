@@ -9,8 +9,8 @@ use std::sync::{Arc, Once};
 
 use crate::types::{
     AccountInfo, Availability, Avatar, ClientResult, ConnectionError, PresenceSubRequest,
-    PublicRoomInfo, SidebarItem, UploadSlot, UserBasicInfo, UserMetadata, UserProfile, UserStatus,
-    WorkspaceIcon, WorkspaceInfo,
+    PublicRoomInfo, RoomEnvelope, SidebarItem, UploadSlot, UserBasicInfo, UserMetadata,
+    UserProfile, UserStatus, WorkspaceIcon, WorkspaceInfo,
 };
 use crate::{ClientEvent, Contact, Mime, MucId, PathBuf, PresenceSubRequestId, RoomId, UserId};
 use prose_core_client::dtos::{SoftwareVersion, UserId as CoreUserId};
@@ -450,6 +450,14 @@ impl Client {
 
     pub fn preview_markdown(&self, markdown: &str) -> String {
         self.client.preview.preview_markdown(markdown)
+    }
+
+    pub fn get_connected_room(&self, room_id: RoomId) -> ClientResult<Option<RoomEnvelope>> {
+        Ok(self
+            .client
+            .rooms
+            .get_connected_room(&(room_id.into()))
+            .map(|r| r.map(Into::into))?)
     }
 
     pub async fn toggle_sidebar_favorite(&self, room_id: RoomId) -> ClientResult<()> {
