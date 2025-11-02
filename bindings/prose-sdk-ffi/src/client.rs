@@ -451,6 +451,22 @@ impl Client {
     pub fn preview_markdown(&self, markdown: &str) -> String {
         self.client.preview.preview_markdown(markdown)
     }
+
+    pub async fn toggle_sidebar_favorite(&self, room_id: RoomId) -> ClientResult<()> {
+        Ok(self
+            .client
+            .sidebar
+            .toggle_favorite(&(room_id.into()))
+            .await?)
+    }
+
+    pub async fn remove_item_from_sidebar(&self, room_id: RoomId) -> ClientResult<()> {
+        Ok(self
+            .client
+            .sidebar
+            .remove_from_sidebar(&(room_id.into()))
+            .await?)
+    }
 }
 
 struct DelegateWrapper(Arc<dyn ClientDelegate>);
