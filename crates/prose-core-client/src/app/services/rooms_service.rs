@@ -9,7 +9,8 @@ use tracing::info;
 use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
-    DynAppContext, DynEncryptionDomainService, DynRoomManagementService, DynSidebarDomainService,
+    DynAppContext, DynConnectedRoomsReadOnlyRepository, DynEncryptionDomainService, DynRoomFactory,
+    DynRoomManagementService, DynSidebarDomainService,
 };
 use crate::domain::rooms::models::constants::MAX_PARTICIPANTS_PER_GROUP;
 use crate::domain::rooms::models::PublicRoomInfo;
@@ -17,13 +18,18 @@ use crate::domain::rooms::services::{
     CreateOrEnterRoomRequest, CreateRoomBehavior, CreateRoomType, JoinRoomBehavior,
 };
 use crate::domain::shared::models::{MucId, RoomId, UserId};
+use crate::dtos::RoomEnvelope;
 
 #[derive(InjectDependencies)]
 pub struct RoomsService {
     #[inject]
     ctx: DynAppContext,
     #[inject]
+    connected_rooms_repo: DynConnectedRoomsReadOnlyRepository,
+    #[inject]
     encryption_domain_service: DynEncryptionDomainService,
+    #[inject]
+    room_factory: DynRoomFactory,
     #[inject]
     room_management_service: DynRoomManagementService,
     #[inject]
@@ -153,5 +159,15 @@ impl RoomsService {
     pub async fn destroy_room(&self, room_id: &MucId) -> Result<()> {
         self.sidebar_domain_service.destroy_room(room_id).await?;
         Ok(())
+    }
+
+    pub fn get_connected_room(&self, room_id: &RoomId) -> Result<Option<RoomEnvelope>> {
+        let account = self.ctx.connected_account()?;
+
+        let Some(room) = self.connected_rooms_repo.get(&account, room_id.as_ref()) else {
+            return Ok(None);
+        };
+
+        Ok(Some(self.room_factory.build(room)))
     }
 }
