@@ -15,7 +15,7 @@ pub use message_result_set::MessageResultSet;
 pub use participant_info::{ParticipantBasicInfo, ParticipantInfo};
 pub use presence_sub_request::PresenceSubRequest;
 pub use public_room_info::PublicRoomInfo;
-pub use room::RoomEnvelope;
+pub use room::{RoomEnvelope, RoomState};
 pub use send_message_request::SendMessageRequest;
 pub use sidebar_item::SidebarItem;
 pub use upload_slot::UploadSlot;

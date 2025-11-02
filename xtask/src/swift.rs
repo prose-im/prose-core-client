@@ -3,7 +3,7 @@ use anyhow::Result;
 use cargo_swift::package::{run, FeatureOptions, LibTypeArg, Platform};
 use cargo_swift::{Config, Mode};
 use std::env;
-use std::path::Path;
+use xshell::Shell;
 
 #[derive(clap::Args)]
 pub struct Args {
@@ -18,7 +18,10 @@ enum Command {
 
 impl Args {
     pub async fn run(self) -> Result<()> {
-        env::set_current_dir(Path::new(paths::BINDINGS).join(paths::bindings::SWIFT))?;
+        let crate_dir = env::current_dir()?
+            .join(paths::BINDINGS)
+            .join(paths::bindings::SWIFT);
+        env::set_current_dir(&crate_dir)?;
 
         run(
             Some(vec![Platform::Ios]),
@@ -39,6 +42,21 @@ impl Args {
             },
             false,
         )?;
+
+        // Copy Swift files
+        let sh = Shell::new()?;
+        sh.change_dir(&crate_dir);
+
+        let source_dir = "./Swift";
+        let dest_dir = "./ProseSDK/Sources/ProseSDK";
+
+        for entry in sh.read_dir(source_dir)? {
+            if entry.extension().and_then(|s| s.to_str()) == Some("swift") {
+                let filename = entry.file_name().unwrap();
+                let dest_path = format!("{}/{}", dest_dir, filename.to_string_lossy());
+                sh.copy_file(&entry, dest_path)?;
+            }
+        }
 
         Ok(())
     }

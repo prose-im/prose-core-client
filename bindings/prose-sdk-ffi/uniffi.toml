@@ -4,18 +4,24 @@ module_name = "prose_sdk_ffi"
 
 [bindings.swift.custom_types.PathBuf]
 type_name = "URL"
-imports = [ "Foundation" ]
+imports = ["Foundation"]
 into_custom = "URL(fileURLWithPath: {})"
 from_custom = "{}.path"
 
 [bindings.swift.custom_types.Url]
 type_name = "URL"
-imports = [ "Foundation" ]
+imports = ["Foundation"]
 into_custom = "URL(string: {})!"
 from_custom = "{}.absoluteString"
 
 [bindings.swift.custom_types.DateTime]
 type_name = "Date"
-imports = [ "Foundation" ]
+imports = ["Foundation"]
 into_custom = "Date(timeIntervalSince1970: TimeInterval({}) / 1_000)"
 from_custom = "Int64({}.timeIntervalSince1970 * 1_000)"
+
+[bindings.swift.custom_types.HexColor]
+type_name = "UIColor"
+imports = ["UIKit"]
+into_custom = "UIColor(prose_hex: {})!"
+from_custom = "\"unimplemented\""

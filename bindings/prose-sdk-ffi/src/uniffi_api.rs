@@ -31,6 +31,7 @@ pub struct UnicodeScalarIndex(u64);
 pub struct PresenceSubRequestId(UserId);
 pub struct AvatarId(String);
 pub struct ServerId(BareJid);
+pub struct HexColor(String);
 
 uniffi::custom_newtype!(PathBuf, String);
 uniffi::custom_newtype!(Url, String);
@@ -47,6 +48,7 @@ uniffi::custom_newtype!(UnicodeScalarIndex, u64);
 uniffi::custom_newtype!(PresenceSubRequestId, UserId);
 uniffi::custom_newtype!(AvatarId, String);
 uniffi::custom_newtype!(ServerId, BareJid);
+uniffi::custom_newtype!(HexColor, String);
 
 #[derive(uniffi::Enum)]
 pub enum RoomId {
@@ -111,6 +113,15 @@ impl From<CoreRoomId> for RoomId {
         match value {
             CoreRoomId::User(id) => RoomId::User(id.into()),
             CoreRoomId::Muc(id) => RoomId::Muc(id.into()),
+        }
+    }
+}
+
+impl From<RoomId> for CoreRoomId {
+    fn from(value: RoomId) -> Self {
+        match value {
+            RoomId::User(id) => CoreRoomId::User(id.into()),
+            RoomId::Muc(id) => CoreRoomId::Muc(id.into()),
         }
     }
 }
@@ -221,6 +232,12 @@ impl From<ServerId> for CoreServerId {
     }
 }
 
+impl From<String> for HexColor {
+    fn from(value: String) -> Self {
+        HexColor(value)
+    }
+}
+
 impl From<CoreAvatarId> for AvatarId {
     fn from(value: CoreAvatarId) -> Self {
         AvatarId(value.to_string())
@@ -248,8 +265,9 @@ pub mod uniffi_types {
     pub use crate::{
         client::Client,
         types::{AccountBookmark, Message, Reaction, UserProfile},
-        AvatarId, ClientError, Contact, DateTimeFixed, Emoji, MessageId, MucId, ParticipantId,
-        PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url, UserId,
+        AvatarId, ClientError, Contact, DateTimeFixed, Emoji, HexColor, MessageId, MucId,
+        ParticipantId, PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url,
+        UserId,
     };
 }
 
