@@ -44,6 +44,7 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["sync"] }
 tracing = { workspace = true }
+unicode-normalization = "0.1"
 url = { workspace = true, features = ["serde"] }
 uuid = { workspace = true, features = ["serde"] }
 xmpp-parsers = { workspace = true }

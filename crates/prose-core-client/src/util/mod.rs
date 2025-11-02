@@ -22,3 +22,4 @@ pub mod mime_serde_shim;
 mod path_ext;
 mod proxy_transformer;
 pub mod string_ext;
+pub mod textual_palette;
