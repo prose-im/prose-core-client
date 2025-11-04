@@ -55,35 +55,30 @@ impl SidebarService {
 
             let item_type: SidebarItemType = match room.r#type {
                 RoomType::DirectMessage => {
-                    if let Some(
-                        ref participant @ Participant {
-                            real_id: Some(ref real_id),
-                            ..
-                        },
-                    ) = room.with_participants(|p| {
+                    let participant = room.with_participants(|p| {
                         for part in p.values() {
-                            return Some(part.clone());
+                            return part.clone();
                         }
-                        return None;
-                    }) {
-                        let user_info = self
-                            .user_info_domain_service
-                            .get_user_info(real_id, CachePolicy::ReturnCacheDataDontLoad)
-                            .await
-                            .unwrap_or_default()
-                            .into_user_presence_info_or_fallback(real_id.clone());
+                        unreachable!(
+                            "Room of type DirectMessage must have at least one participant"
+                        );
+                    });
+                    let user_id = participant
+                        .real_id
+                        .expect("Participant in DirectMessage must have a user id");
 
-                        SidebarItemType::DirectMessage {
-                            availability: participant.availability,
-                            avatar_bundle: user_info.avatar_bundle(),
-                            status: user_info.status,
-                        }
-                    } else {
-                        SidebarItemType::DirectMessage {
-                            availability: Default::default(),
-                            avatar_bundle: Default::default(),
-                            status: None,
-                        }
+                    let user_info = self
+                        .user_info_domain_service
+                        .get_user_info(&user_id, CachePolicy::ReturnCacheDataDontLoad)
+                        .await
+                        .unwrap_or_default()
+                        .into_user_presence_info_or_fallback(user_id.clone());
+
+                    SidebarItemType::DirectMessage {
+                        user_id,
+                        availability: participant.availability,
+                        avatar_bundle: user_info.avatar_bundle(),
+                        status: user_info.status,
                     }
                 }
                 RoomType::Group => SidebarItemType::Group,
