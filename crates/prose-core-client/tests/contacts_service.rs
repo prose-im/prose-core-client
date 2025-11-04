@@ -11,7 +11,7 @@ use prose_core_client::app::services::ContactListService;
 use prose_core_client::domain::contacts::models::{Contact, PresenceSubscription};
 use prose_core_client::domain::shared::models::{Availability, UserId};
 use prose_core_client::domain::user_info::models::{ProfileName, UserInfo, UserName};
-use prose_core_client::dtos::Group;
+use prose_core_client::dtos::{AvatarBundle, Group};
 use prose_core_client::test::MockAppDependencies;
 use prose_core_client::user_id;
 
@@ -86,7 +86,11 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 id: user_id!("a@prose.org"),
                 name: "First Last".to_string(),
                 full_name: Some("First Last".to_string()),
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "FL".to_string(),
+                    color: "#b258ec".to_string(),
+                },
                 availability: Availability::Available,
                 status: None,
                 group: Group::Team,
@@ -96,7 +100,11 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 id: user_id!("b@prose.org"),
                 name: "Nickname".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "NI".to_string(),
+                    color: "#f15e5e".to_string(),
+                },
                 availability: Availability::Available,
                 status: None,
                 group: Group::Team,
@@ -106,7 +114,11 @@ async fn test_assembles_contact_dto() -> Result<()> {
                 id: user_id!("john.doe@prose.org"),
                 name: "John Doe".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "JD".to_string(),
+                    color: "#df74c9".to_string(),
+                },
                 availability: Availability::Unavailable,
                 status: None,
                 group: Group::Team,

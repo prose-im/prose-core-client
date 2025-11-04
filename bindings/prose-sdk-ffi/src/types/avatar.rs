@@ -3,7 +3,9 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use prose_core_client::dtos::Avatar as CoreAvatar;
+use crate::HexColor;
+use prose_core_client::dtos::{Avatar as CoreAvatar, AvatarBundle as CoreAvatarBundle};
+use std::sync::Arc;
 
 #[derive(uniffi::Object)]
 pub struct Avatar(CoreAvatar);
@@ -27,5 +29,22 @@ impl From<CoreAvatar> for Avatar {
 impl AsRef<CoreAvatar> for Avatar {
     fn as_ref(&self) -> &CoreAvatar {
         &self.0
+    }
+}
+
+#[derive(uniffi::Record)]
+pub struct AvatarBundle {
+    pub avatar: Option<Arc<Avatar>>,
+    pub initials: String,
+    pub color: HexColor,
+}
+
+impl From<CoreAvatarBundle> for AvatarBundle {
+    fn from(value: CoreAvatarBundle) -> Self {
+        Self {
+            avatar: value.avatar.map(|avatar| Arc::new(avatar.into())),
+            initials: value.initials,
+            color: value.color.into(),
+        }
     }
 }

@@ -3,20 +3,18 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::types::{Availability, Avatar, RoomState, UserStatus};
-use crate::{HexColor, RoomId};
+use crate::types::avatar::AvatarBundle;
+use crate::types::{Availability, RoomState, UserStatus};
+use crate::RoomId;
 use prose_core_client::dtos::{
     SidebarItem as CoreSidebarItem, SidebarItemType as CoreSidebarItemType,
 };
-use std::sync::Arc;
 
 #[derive(uniffi::Enum)]
 pub enum SidebarItemType {
     DirectMessage {
         availability: Availability,
-        initials: String,
-        color: HexColor,
-        avatar: Option<Arc<Avatar>>,
+        avatar_bundle: AvatarBundle,
         status: Option<UserStatus>,
     },
     Group,
@@ -59,15 +57,11 @@ impl From<CoreSidebarItemType> for SidebarItemType {
         match value {
             CoreSidebarItemType::DirectMessage {
                 availability,
-                initials,
-                color,
-                avatar,
+                avatar_bundle,
                 status,
             } => SidebarItemType::DirectMessage {
                 availability: availability.into(),
-                initials,
-                color: color.into(),
-                avatar: avatar.map(|a| Arc::new(a.into())),
+                avatar_bundle: avatar_bundle.into(),
                 status: status.map(Into::into),
             },
             CoreSidebarItemType::Group => SidebarItemType::Group,

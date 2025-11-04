@@ -105,11 +105,13 @@ impl ContactListService {
             .unwrap_or_default()
             .into_user_presence_info_or_fallback(contact.id);
 
+        let avatar_bundle = user_info.avatar_bundle();
+
         ContactDTO {
             id: user_info.id,
             name: user_info.name,
             full_name: user_info.full_name,
-            avatar: user_info.avatar,
+            avatar_bundle,
             availability: user_info.availability,
             status: user_info.status,
             group,

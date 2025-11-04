@@ -14,7 +14,8 @@ use crate::app::deps::{
 };
 use crate::domain::rooms::models::{Participant, Room, RoomSidebarState};
 use crate::domain::shared::models::{CachePolicy, RoomId, RoomType};
-use crate::dtos::{SidebarItem as SidebarItemDTO, SidebarItemType};
+use crate::domain::user_info::models::UserInfoOptExt;
+use crate::dtos::{AvatarBundle, SidebarItem as SidebarItemDTO, SidebarItemType};
 use crate::util::textual_palette::{
     generate_textual_initials, generate_textual_palette, normalize_textual_initials,
 };
@@ -70,25 +71,17 @@ impl SidebarService {
                             .get_user_info(real_id, CachePolicy::ReturnCacheDataDontLoad)
                             .await
                             .unwrap_or_default()
-                            .unwrap_or_default();
-
-                        let name = user_info.display_name().unwrap_or_username(real_id);
+                            .into_user_presence_info_or_fallback(real_id.clone());
 
                         SidebarItemType::DirectMessage {
                             availability: participant.availability,
-                            initials: generate_textual_initials(&name)
-                                .map(normalize_textual_initials)
-                                .unwrap_or_default(),
-                            color: generate_textual_palette(&real_id.to_string()),
-                            avatar: participant.avatar.clone(),
+                            avatar_bundle: user_info.avatar_bundle(),
                             status: user_info.status,
                         }
                     } else {
                         SidebarItemType::DirectMessage {
                             availability: Default::default(),
-                            initials: "".to_string(),
-                            color: "".to_string(),
-                            avatar: None,
+                            avatar_bundle: Default::default(),
                             status: None,
                         }
                     }

@@ -9,7 +9,7 @@ use xmpp_parsers::roster;
 use xmpp_parsers::roster::Item as RosterItem;
 
 use prose_core_client::dtos::{
-    Availability, Avatar, AvatarSource, Contact, Group, MucId, ParticipantInfo,
+    Availability, Avatar, AvatarBundle, AvatarSource, Contact, Group, MucId, ParticipantInfo,
     PresenceSubscription, RoomAffiliation, UserId,
 };
 use prose_core_client::{muc_id, user_id, ClientEvent, ClientRoomEventType};
@@ -60,7 +60,11 @@ async fn test_aggregates_user_data() -> Result<()> {
                 id: user_id!("friend@prose.org"),
                 name: "Jimmy".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "JI".to_string(),
+                    color: "#ee733d".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -70,7 +74,11 @@ async fn test_aggregates_user_data() -> Result<()> {
                 id: user_id!("unknown@prose.org"),
                 name: "Unknown".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "UN".to_string(),
+                    color: "#c32ea3".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -110,7 +118,11 @@ async fn test_aggregates_user_data() -> Result<()> {
                 id: user_id!("friend@prose.org"),
                 name: "Jim Shmoe".to_string(),
                 full_name: Some("Jim Shmoe".to_string()),
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "JS".to_string(),
+                    color: "#ee733d".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -120,7 +132,11 @@ async fn test_aggregates_user_data() -> Result<()> {
                 id: user_id!("unknown@prose.org"),
                 name: "Unknown".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "UN".to_string(),
+                    color: "#c32ea3".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -150,7 +166,11 @@ async fn test_aggregates_user_data() -> Result<()> {
                 id: user_id!("friend@prose.org"),
                 name: "Jimmy S.".to_string(),
                 full_name: Some("Jim Shmoe".to_string()),
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "JS".to_string(),
+                    color: "#ee733d".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -160,7 +180,11 @@ async fn test_aggregates_user_data() -> Result<()> {
                 id: user_id!("unknown@prose.org"),
                 name: "Unknown".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "UN".to_string(),
+                    color: "#c32ea3".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
