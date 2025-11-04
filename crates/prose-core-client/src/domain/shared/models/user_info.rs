@@ -5,9 +5,12 @@
 
 use super::{Availability, ParticipantId, UserId};
 use crate::domain::rooms::models::{Participant, RoomAffiliation};
-use crate::domain::shared::models::Avatar;
+use crate::domain::shared::models::{Avatar, AvatarBundle};
 use crate::domain::user_info::models::JabberClient;
 use crate::dtos::UserStatus;
+use crate::util::textual_palette::{
+    generate_textual_initials, generate_textual_palette, normalize_textual_initials,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct UserBasicInfo {
@@ -60,6 +63,18 @@ impl From<(&ParticipantId, &Participant)> for ParticipantInfo {
             avatar: participant.avatar.clone(),
             client: participant.client.clone(),
             status: participant.status.clone(),
+        }
+    }
+}
+
+impl UserPresenceInfo {
+    pub fn avatar_bundle(&self) -> AvatarBundle {
+        AvatarBundle {
+            avatar: self.avatar.clone(),
+            initials: generate_textual_initials(&self.name)
+                .map(normalize_textual_initials)
+                .unwrap_or_default(),
+            color: generate_textual_palette(&self.id.to_string()),
         }
     }
 }

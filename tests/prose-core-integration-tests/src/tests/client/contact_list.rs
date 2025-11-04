@@ -7,7 +7,9 @@ use anyhow::Result;
 use pretty_assertions::assert_eq;
 use xmpp_parsers::roster::{Item as RosterItem, Subscription};
 
-use prose_core_client::dtos::{Contact, Group, PresenceSubRequest, PresenceSubscription, UserId};
+use prose_core_client::dtos::{
+    AvatarBundle, Contact, Group, PresenceSubRequest, PresenceSubscription, UserId,
+};
 use prose_core_client::{user_id, ClientEvent};
 use prose_proc_macros::mt_test;
 use prose_xmpp::bare;
@@ -173,7 +175,11 @@ async fn test_contact_list_name_cascade() -> Result<()> {
                 id: user_id!("user_a@prose.org"),
                 name: "User A".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "UA".to_string(),
+                    color: "#3159ea".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -183,7 +189,11 @@ async fn test_contact_list_name_cascade() -> Result<()> {
                 id: user_id!("b@prose.org"),
                 name: "Susan Doe".to_string(),
                 full_name: None,
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "SD".to_string(),
+                    color: "#f15e5e".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Team,
@@ -193,7 +203,11 @@ async fn test_contact_list_name_cascade() -> Result<()> {
                 id: user_id!("c@example.com"),
                 name: "Jimmy Shmoe".to_string(),
                 full_name: Some("Jimmy Shmoe".to_string()),
-                avatar: None,
+                avatar_bundle: AvatarBundle {
+                    avatar: None,
+                    initials: "JS".to_string(),
+                    color: "#415dae".to_string(),
+                },
                 availability: Default::default(),
                 status: None,
                 group: Group::Other,

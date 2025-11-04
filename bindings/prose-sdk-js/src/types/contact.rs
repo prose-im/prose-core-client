@@ -92,7 +92,11 @@ impl Contact {
 
     #[wasm_bindgen(getter)]
     pub fn avatar(&self) -> Option<Avatar> {
-        self.0.avatar.clone().map(|avatar| avatar.into())
+        self.0
+            .avatar_bundle
+            .avatar
+            .clone()
+            .map(|avatar| avatar.into())
     }
 
     #[wasm_bindgen(getter)]

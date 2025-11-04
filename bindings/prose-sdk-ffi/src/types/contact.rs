@@ -3,6 +3,7 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
+use crate::types::avatar::AvatarBundle;
 use crate::UserId;
 use prose_core_client::dtos::{
     Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
@@ -34,6 +35,7 @@ pub struct UserStatus {
 pub struct Contact {
     pub id: UserId,
     pub name: String,
+    pub avatar_bundle: AvatarBundle,
     pub availability: Availability,
     pub status: Option<UserStatus>,
     pub group: Group,
@@ -44,6 +46,7 @@ impl From<CoreContact> for Contact {
         Contact {
             id: value.id.into(),
             name: value.name,
+            avatar_bundle: value.avatar_bundle.into(),
             availability: value.availability.into(),
             status: value.status.map(Into::into),
             group: value.group.into(),

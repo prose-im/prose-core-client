@@ -5,15 +5,13 @@
 
 use std::fmt::{Debug, Formatter};
 
-use crate::dtos::{Availability, Avatar, RoomEnvelope, UserStatus};
+use crate::dtos::{Availability, AvatarBundle, RoomEnvelope, UserStatus};
 
 #[derive(Clone, PartialEq)]
 pub enum SidebarItemType {
     DirectMessage {
         availability: Availability,
-        initials: String,
-        color: String,
-        avatar: Option<Avatar>,
+        avatar_bundle: AvatarBundle,
         status: Option<UserStatus>,
     },
     Group,
