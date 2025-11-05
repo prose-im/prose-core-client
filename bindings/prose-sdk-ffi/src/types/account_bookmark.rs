@@ -3,12 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::UserId;
+use crate::FFIUserId;
 use prose_core_client::AccountBookmark as ProseAccountBookmark;
 
 #[derive(uniffi::Record)]
 pub struct AccountBookmark {
-    pub user_id: UserId,
+    pub user_id: FFIUserId,
     pub is_selected: bool,
 }
 

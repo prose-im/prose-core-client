@@ -5,7 +5,7 @@
 
 use crate::types::avatar::AvatarBundle;
 use crate::types::{Availability, RoomState, UserStatus};
-use crate::{RoomId, UserId};
+use crate::{FFIUserId, RoomId};
 use prose_core_client::dtos::{
     SidebarItem as CoreSidebarItem, SidebarItemType as CoreSidebarItemType,
 };
@@ -13,7 +13,7 @@ use prose_core_client::dtos::{
 #[derive(uniffi::Enum)]
 pub enum SidebarItemType {
     DirectMessage {
-        user_id: UserId,
+        user_id: FFIUserId,
         availability: Availability,
         avatar_bundle: AvatarBundle,
         status: Option<UserStatus>,

@@ -12,7 +12,9 @@ use crate::types::{
     PublicRoomInfo, RoomEnvelope, SidebarItem, UploadSlot, UserBasicInfo, UserMetadata,
     UserProfile, UserStatus, WorkspaceIcon, WorkspaceInfo,
 };
-use crate::{ClientEvent, Contact, Mime, MucId, PathBuf, PresenceSubRequestId, RoomId, UserId};
+use crate::{
+    ClientEvent, Contact, FFIMucId, FFIUserId, Mime, PathBuf, PresenceSubRequestId, RoomId,
+};
 use prose_core_client::dtos::{SoftwareVersion, UserId as CoreUserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
@@ -117,7 +119,11 @@ impl Client {
 
 #[uniffi::export(async_runtime = "tokio")]
 impl Client {
-    pub async fn connect(&self, user_id: UserId, password: String) -> Result<(), ConnectionError> {
+    pub async fn connect(
+        &self,
+        user_id: FFIUserId,
+        password: String,
+    ) -> Result<(), ConnectionError> {
         self.client
             .connect(&(user_id.into()), password.into())
             .await?;
@@ -170,7 +176,7 @@ impl Client {
 
     /// Creates the direct message or joins it if it already exists and returns the `BareJid`.
     /// Sends invites to all participants if the group was created.
-    pub async fn start_conversation(&self, participants: Vec<UserId>) -> ClientResult<RoomId> {
+    pub async fn start_conversation(&self, participants: Vec<FFIUserId>) -> ClientResult<RoomId> {
         let participants = participants
             .into_iter()
             .map(Into::into)
@@ -185,7 +191,7 @@ impl Client {
 
     /// Creates the group or joins it if it already exists and returns the `BareJid`.
     /// Sends invites to all participants if the group was created.
-    pub async fn create_group(&self, participants: Vec<UserId>) -> ClientResult<RoomId> {
+    pub async fn create_group(&self, participants: Vec<FFIUserId>) -> ClientResult<RoomId> {
         let participants = participants
             .into_iter()
             .map(Into::into)
@@ -222,7 +228,7 @@ impl Client {
     /// Joins the room identified by `room_jid` and returns its `BareJid`.
     pub async fn join_room(
         &self,
-        room_id: MucId,
+        room_id: FFIMucId,
         password: Option<String>,
     ) -> ClientResult<RoomId> {
         Ok(self
@@ -234,7 +240,7 @@ impl Client {
     }
 
     /// Destroys the room identified by `room_jid`.
-    pub async fn destroy_room(&self, room_id: MucId) -> ClientResult<()> {
+    pub async fn destroy_room(&self, room_id: FFIMucId) -> ClientResult<()> {
         self.client.rooms.destroy_room(&(room_id.into())).await?;
         Ok(())
     }
@@ -257,7 +263,7 @@ impl Client {
     }
 
     /// Adds a contact to the roster and sends a presence subscription request.
-    pub async fn add_contact(&self, user_id: UserId) -> ClientResult<()> {
+    pub async fn add_contact(&self, user_id: FFIUserId) -> ClientResult<()> {
         self.client
             .contact_list
             .add_contact(&(user_id.into()))
@@ -266,7 +272,7 @@ impl Client {
     }
 
     /// Removes a contact from the roster
-    pub async fn remove_contact(&self, user_id: UserId) -> ClientResult<()> {
+    pub async fn remove_contact(&self, user_id: FFIUserId) -> ClientResult<()> {
         self.client
             .contact_list
             .remove_contact(&(user_id.into()))
@@ -288,7 +294,7 @@ impl Client {
     /// Requests a presence subscription from `jid`. Note that happens automatically when you
     /// call `add_contact`. This method can be useful though when our user needs to re-request
     /// the presence subscription in case the contact hasn't reacted in a while.
-    pub async fn request_presence_sub(&self, user_id: UserId) -> ClientResult<()> {
+    pub async fn request_presence_sub(&self, user_id: FFIUserId) -> ClientResult<()> {
         self.client
             .contact_list
             .request_presence_sub(&(user_id.into()))
@@ -362,7 +368,7 @@ impl Client {
 
     /// XEP-0292: vCard4 Over XMPP
     /// https://xmpp.org/extensions/xep-0292.html
-    pub async fn load_profile(&self, from: UserId) -> ClientResult<Option<UserProfile>> {
+    pub async fn load_profile(&self, from: FFIUserId) -> ClientResult<Option<UserProfile>> {
         Ok(self
             .client
             .user_data
@@ -383,7 +389,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn load_user_metadata(&self, user_id: UserId) -> ClientResult<UserMetadata> {
+    pub async fn load_user_metadata(&self, user_id: FFIUserId) -> ClientResult<UserMetadata> {
         Ok(self
             .client
             .user_data
@@ -416,13 +422,13 @@ impl Client {
     }
 
     /// Blocks the user identified by `user_id`.
-    pub async fn block_user(&self, user_id: UserId) -> ClientResult<()> {
+    pub async fn block_user(&self, user_id: FFIUserId) -> ClientResult<()> {
         self.client.block_list.block_user(&user_id.into()).await?;
         Ok(())
     }
 
     /// Unblocks the user identified by `user_id`.
-    pub async fn unblock_user(&self, user_id: UserId) -> ClientResult<()> {
+    pub async fn unblock_user(&self, user_id: FFIUserId) -> ClientResult<()> {
         self.client.block_list.unblock_user(&user_id.into()).await?;
         Ok(())
     }

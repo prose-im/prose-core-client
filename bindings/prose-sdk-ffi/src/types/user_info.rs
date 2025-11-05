@@ -4,13 +4,13 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::Avatar;
-use crate::UserId;
+use crate::FFIUserId;
 use prose_core_client::dtos::UserBasicInfo as CoreUserBasicInfo;
 use std::sync::Arc;
 
 #[derive(uniffi::Record)]
 pub struct UserBasicInfo {
-    pub id: UserId,
+    pub id: FFIUserId,
     pub name: String,
     pub avatar: Option<Arc<Avatar>>,
 }
