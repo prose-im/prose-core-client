@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::{ConnectionError, RoomEnvelope};
-use crate::{MessageId, UserId};
+use crate::{FFIUserId, MessageId};
 use prose_core_client::{
     ClientEvent as CoreClientEvent, ClientRoomEventType as CoreClientRoomEventType,
     ConnectionEvent as CoreConnectionEvent,
@@ -25,7 +25,7 @@ pub enum ClientEvent {
     SidebarChanged,
 
     /// Infos about a contact have changed.
-    ContactChanged { ids: Vec<UserId> },
+    ContactChanged { ids: Vec<FFIUserId> },
 
     /// Contacts were added, removed or their subscription status changed.
     ContactListChanged,
@@ -37,7 +37,7 @@ pub enum ClientEvent {
     BlockListChanged,
 
     /// The avatar of a user changed.
-    AvatarChanged { ids: Vec<UserId> },
+    AvatarChanged { ids: Vec<FFIUserId> },
 
     /// Infos related to the logged-in user have changed.
     AccountInfoChanged,

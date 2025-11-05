@@ -3,12 +3,12 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::MucId;
+use crate::FFIMucId;
 use prose_core_client::dtos::PublicRoomInfo as CorePublicRoomInfo;
 
 #[derive(uniffi::Record)]
 pub struct PublicRoomInfo {
-    pub id: MucId,
+    pub id: FFIMucId,
     pub name: Option<String>,
 }
 

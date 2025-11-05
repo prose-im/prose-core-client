@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::avatar::AvatarBundle;
-use crate::UserId;
+use crate::FFIUserId;
 use prose_core_client::dtos::{
     Availability as CoreAvailability, Contact as CoreContact, Group as CoreGroup,
     UserStatus as CoreUserStatus,
@@ -33,7 +33,7 @@ pub struct UserStatus {
 
 #[derive(uniffi::Record)]
 pub struct Contact {
-    pub id: UserId,
+    pub id: FFIUserId,
     pub name: String,
     pub avatar_bundle: AvatarBundle,
     pub availability: Availability,

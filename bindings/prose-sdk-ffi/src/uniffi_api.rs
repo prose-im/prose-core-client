@@ -21,14 +21,14 @@ pub struct Url(String);
 pub struct Emoji(String);
 pub struct MessageId(String);
 pub struct BareJid(String);
-pub struct UserId(BareJid);
+pub struct FFIUserId(BareJid);
 pub struct OccupantId(String);
-pub struct MucId(BareJid);
+pub struct FFIMucId(BareJid);
 pub struct DateTime(i64);
 pub struct DateTimeFixed(i64);
 pub struct Mime(String);
 pub struct UnicodeScalarIndex(u64);
-pub struct PresenceSubRequestId(UserId);
+pub struct PresenceSubRequestId(FFIUserId);
 pub struct AvatarId(String);
 pub struct ServerId(BareJid);
 pub struct HexColor(String);
@@ -38,27 +38,27 @@ uniffi::custom_newtype!(Url, String);
 uniffi::custom_newtype!(Emoji, String);
 uniffi::custom_newtype!(MessageId, String);
 uniffi::custom_newtype!(BareJid, String);
-uniffi::custom_newtype!(UserId, BareJid);
+uniffi::custom_newtype!(FFIUserId, BareJid);
 uniffi::custom_newtype!(OccupantId, String);
-uniffi::custom_newtype!(MucId, BareJid);
+uniffi::custom_newtype!(FFIMucId, BareJid);
 uniffi::custom_newtype!(DateTime, i64);
 uniffi::custom_newtype!(DateTimeFixed, i64);
 uniffi::custom_newtype!(Mime, String);
 uniffi::custom_newtype!(UnicodeScalarIndex, u64);
-uniffi::custom_newtype!(PresenceSubRequestId, UserId);
+uniffi::custom_newtype!(PresenceSubRequestId, FFIUserId);
 uniffi::custom_newtype!(AvatarId, String);
 uniffi::custom_newtype!(ServerId, BareJid);
 uniffi::custom_newtype!(HexColor, String);
 
 #[derive(uniffi::Enum)]
 pub enum RoomId {
-    User(UserId),
-    Muc(MucId),
+    User(FFIUserId),
+    Muc(FFIMucId),
 }
 
 #[derive(uniffi::Enum)]
 pub enum ParticipantId {
-    User(UserId),
+    User(FFIUserId),
     Occupant(OccupantId),
 }
 
@@ -80,9 +80,9 @@ impl From<MessageId> for CoreMessageId {
     }
 }
 
-impl From<CoreMucId> for MucId {
+impl From<CoreMucId> for FFIMucId {
     fn from(value: CoreMucId) -> Self {
-        MucId(value.into_inner().into())
+        FFIMucId(value.into_inner().into())
     }
 }
 
@@ -102,8 +102,8 @@ impl From<BareJid> for CoreBareJid {
     }
 }
 
-impl From<MucId> for CoreMucId {
-    fn from(value: MucId) -> Self {
+impl From<FFIMucId> for CoreMucId {
+    fn from(value: FFIMucId) -> Self {
         CoreBareJid::from(value.0).into()
     }
 }
@@ -135,14 +135,14 @@ impl From<CoreParticipantId> for ParticipantId {
     }
 }
 
-impl From<CoreUserId> for UserId {
+impl From<CoreUserId> for FFIUserId {
     fn from(value: CoreUserId) -> Self {
-        UserId(value.into_inner().into())
+        FFIUserId(value.into_inner().into())
     }
 }
 
-impl From<UserId> for CoreUserId {
-    fn from(value: UserId) -> Self {
+impl From<FFIUserId> for CoreUserId {
+    fn from(value: FFIUserId) -> Self {
         CoreBareJid::from(value.0).into()
     }
 }
@@ -261,14 +261,47 @@ impl From<CorePathBuf> for PathBuf {
     }
 }
 
+#[uniffi::export]
+pub fn is_valid_user_id(user_id: &str) -> bool {
+    if !user_id.contains('@') {
+        return false;
+    }
+    if !user_id.contains('.') && !user_id.ends_with("@localhost") {
+        return false;
+    }
+    user_id.parse::<CoreBareJid>().is_ok()
+}
+
+#[uniffi::export]
+pub fn is_valid_muc_id(muc_id: &str) -> bool {
+    // same rules for now
+    is_valid_user_id(muc_id)
+}
+
 pub mod uniffi_types {
     pub use crate::{
         client::Client,
         types::{AccountBookmark, Message, Reaction, UserProfile},
-        AvatarId, ClientError, Contact, DateTimeFixed, Emoji, HexColor, MessageId, MucId,
-        ParticipantId, PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url,
-        UserId,
+        AvatarId, ClientError, Contact, DateTimeFixed, Emoji, FFIMucId, FFIUserId, HexColor,
+        MessageId, ParticipantId, PathBuf, PresenceSubRequestId, RoomId, ServerId,
+        UnicodeScalarIndex, Url,
     };
 }
 
 uniffi::setup_scaffolding!();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_valid_user_id() {
+        assert!(!is_valid_user_id(""));
+        assert!(!is_valid_user_id("test"));
+        assert!(!is_valid_user_id("localhost"));
+        assert!(!is_valid_user_id("test@prose"));
+
+        assert!(is_valid_user_id("test@localhost"));
+        assert!(is_valid_user_id("test@prose.org"));
+    }
+}

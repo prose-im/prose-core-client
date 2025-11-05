@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::{Attachment, Avatar};
-use crate::{DateTime, Emoji, MessageId, ParticipantId, UnicodeScalarIndex, UserId};
+use crate::{DateTime, Emoji, FFIUserId, MessageId, ParticipantId, UnicodeScalarIndex};
 use prose_core_client::dtos::{
     Body as CoreMessageBody, Mention as CoreMention, Message as CoreMessage,
     MessageFlags as CoreMessageFlags, MessageSender as CoreMessageSender, Reaction as CoreReaction,
@@ -33,7 +33,7 @@ pub struct MessageBody {
 
 #[derive(uniffi::Record)]
 pub struct Mention {
-    pub user: UserId,
+    pub user: FFIUserId,
     pub range: Option<UnicodeScalarRange>,
 }
 

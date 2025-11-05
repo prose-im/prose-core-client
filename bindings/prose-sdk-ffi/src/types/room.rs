@@ -6,7 +6,7 @@
 use crate::types::{
     ClientResult, MessageResultSet, ParticipantBasicInfo, ParticipantInfo, SendMessageRequest,
 };
-use crate::{Emoji, Message, MessageId, RoomId, UserId};
+use crate::{Emoji, FFIUserId, Message, MessageId, RoomId};
 use prose_core_client::dtos::{
     MessageId as CoreMessageId, RoomEnvelope as CoreRoomEnvelope, RoomState as CoreRoomState,
     UserId as CoreUserId,
@@ -238,7 +238,7 @@ macro_rules! mut_name_impl {
 #[uniffi::export]
 #[async_trait::async_trait]
 pub trait Channel: Send + Sync {
-    async fn invite_users(&self, users: Vec<UserId>) -> ClientResult<()>;
+    async fn invite_users(&self, users: Vec<FFIUserId>) -> ClientResult<()>;
 }
 
 macro_rules! channel_room_impl {
@@ -246,7 +246,7 @@ macro_rules! channel_room_impl {
         #[uniffi::export(async_runtime = "tokio")]
         #[async_trait::async_trait]
         impl Channel for $t {
-            async fn invite_users(&self, users: Vec<UserId>) -> ClientResult<()> {
+            async fn invite_users(&self, users: Vec<FFIUserId>) -> ClientResult<()> {
                 let user_ids = users
                     .into_iter()
                     .map(Into::into)

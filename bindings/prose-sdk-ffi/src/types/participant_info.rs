@@ -4,7 +4,7 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::{Availability, Avatar};
-use crate::{ParticipantId, UserId};
+use crate::{FFIUserId, ParticipantId};
 use prose_core_client::dtos::{
     JabberClient as CoreJabberClient, ParticipantBasicInfo as CoreParticipantBasicInfo,
     ParticipantInfo as CoreParticipantInfo, RoomAffiliation as CoreRoomAffiliation,
@@ -14,7 +14,7 @@ use std::sync::Arc;
 #[derive(uniffi::Record)]
 pub struct ParticipantInfo {
     pub id: ParticipantId,
-    pub user_id: Option<UserId>,
+    pub user_id: Option<FFIUserId>,
     pub name: String,
     pub is_self: bool,
     pub availability: Availability,

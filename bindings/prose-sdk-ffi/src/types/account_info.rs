@@ -4,13 +4,13 @@
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
 use crate::types::{Availability, Avatar, UserStatus};
-use crate::UserId;
+use crate::FFIUserId;
 use prose_core_client::dtos::AccountInfo as CoreAccountInfo;
 use std::sync::Arc;
 
 #[derive(uniffi::Record)]
 pub struct AccountInfo {
-    pub id: UserId,
+    pub id: FFIUserId,
     pub name: String,
     pub avatar: Option<Arc<Avatar>>,
     pub availability: Availability,

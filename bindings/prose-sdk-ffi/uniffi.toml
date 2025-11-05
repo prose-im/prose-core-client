@@ -25,3 +25,13 @@ type_name = "UIColor"
 imports = ["UIKit"]
 into_custom = "UIColor(prose_hex: {})!"
 from_custom = "\"unimplemented\""
+
+[bindings.swift.custom_types.FFIUserId]
+type_name = "UserId"
+into_custom = "UserId(unsafe: {})"
+from_custom = "{}.rawValue"
+
+[bindings.swift.custom_types.FFIMucId]
+type_name = "MucId"
+into_custom = "MucId(unsafe: {})"
+from_custom = "{}.rawValue"
