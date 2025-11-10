@@ -20,11 +20,11 @@ use crate::types::{
 use anyhow::anyhow;
 use base64::{engine::general_purpose, Engine as _};
 use cfg_if::cfg_if;
-use js_sys::{Array, Uint8Array};
+use js_sys::Array;
 use prose_core_client::dtos::{MucId, PlatformImage, SoftwareVersion, UserStatus};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarRepository};
-use tracing::{error, info, Level};
+use tracing::{info, Level};
 use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 use web_sys::{Blob, BlobPropertyBag};

@@ -74,7 +74,7 @@
 
 use cfg_if::cfg_if;
 use std::panic;
-use tracing::{error, event, Level};
+use tracing::{event, Level};
 
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
