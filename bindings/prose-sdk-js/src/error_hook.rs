@@ -95,7 +95,7 @@ cfg_if! {
             fn stack(error: &Error) -> String;
         }
 
-        fn hook_impl(info: &panic::PanicInfo) {
+        fn hook_impl(info: &panic::PanicHookInfo) {
             let mut msg = info.to_string();
 
             // Add the error stack to our message.
@@ -137,7 +137,7 @@ cfg_if! {
 /// [`console.error`](https://developer.mozilla.org/en-US/docs/Web/API/Console/error).
 ///
 /// On non-wasm targets, prints the panic to `stderr`.
-pub fn hook(info: &panic::PanicInfo) {
+pub fn hook(info: &panic::PanicHookInfo) {
     hook_impl(info);
 }
 
