@@ -406,12 +406,14 @@ impl<'tx, QuerySource: IdbQuerySource, Mode> IndexedDBCollection<'tx, QuerySourc
 impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'tx>, ReadWrite> {
     fn add_index(&self, idx: IndexSpec) -> Result<(), Self::Error> {
         let index_name = idx.keys.join("_");
+        let params = IdbIndexParameters::new();
+        params.set_unique(idx.unique);
 
         if idx.keys.len() == 1 {
             self.store.create_index_with_params(
                 &index_name,
                 &IdbKeyPath::str(&idx.keys[0]),
-                IdbIndexParameters::new().unique(idx.unique),
+                &params,
             )?;
         } else {
             let column_slices = idx
@@ -423,7 +425,7 @@ impl<'tx> WritableCollection<'tx> for IndexedDBCollection<'tx, IdbObjectStore<'t
             self.store.create_index_with_params(
                 &index_name,
                 &IdbKeyPath::str_sequence(&column_slices),
-                IdbIndexParameters::new().unique(idx.unique),
+                &params,
             )?;
         }
 
