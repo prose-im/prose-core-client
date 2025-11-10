@@ -24,17 +24,12 @@ jid = { workspace = true }
 js-sys = { workspace = true }
 mime = { workspace = true }
 minidom = { workspace = true }
-paste = "1.0"
 prose-core-client = { path = "../../crates/prose-core-client" }
 prose-xmpp = { path = "../../crates/prose-xmpp" }
 secrecy = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-serde-wasm-bindgen = "0.6"
-serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-tracing-web = "0.1"
 url = { workspace = true }
 wasm-bindgen = { workspace = true }
 wasm-bindgen-derive = "0.3.0"
