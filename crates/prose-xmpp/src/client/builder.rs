@@ -10,7 +10,6 @@ use std::sync::Arc;
 use anyhow::Result;
 use async_trait::async_trait;
 use jid::FullJid;
-use minidom::Element;
 use parking_lot::RwLock;
 use prose_wasm_utils::{PinnedFuture, SendUnlessWasm, SyncUnlessWasm};
 use secrecy::SecretString;
@@ -24,7 +23,6 @@ use crate::mods::AnyModule;
 use crate::{mods, Client, Event};
 
 pub struct UndefinedConnector {}
-pub struct UndefinedConnection {}
 
 pub struct ClientBuilder {
     connector_provider: ConnectorProvider,
@@ -151,15 +149,5 @@ impl Connector for UndefinedConnector {
         _event_handler: ConnectionEventHandler,
     ) -> Result<Box<dyn Connection>, ConnectionError> {
         panic!("Client doesn't have a connector. Provide one before calling connect()")
-    }
-}
-
-impl Connection for UndefinedConnection {
-    fn send_stanza(&self, _stanza: Element) -> Result<()> {
-        panic!("Calling send_stanza on PlaceholderConnection is illegal.")
-    }
-
-    fn disconnect(&self) {
-        panic!("Calling disconnect on PlaceholderConnection is illegal.")
     }
 }
