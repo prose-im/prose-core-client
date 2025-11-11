@@ -25,6 +25,7 @@ use prose_core_client::dtos::{MucId, PlatformImage, SoftwareVersion, UserStatus}
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarRepository};
 use tracing::{info, Level};
+use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::prelude::*;
 use wasm_bindgen::prelude::*;
 use web_sys::{Blob, BlobPropertyBag};
@@ -140,14 +141,12 @@ impl Client {
         static LOGGING_INITIALIZED: AtomicBool = AtomicBool::new(false);
         if !LOGGING_INITIALIZED.swap(true, Ordering::SeqCst) {
             if config.logging_enabled {
-                let fmt_layer =
-                    tracing_subscriber::fmt::layer()
-                        .with_ansi(false)
-                        .without_time()
-                        .with_writer(MakeJSLogWriter::new(logger).with_max_level(
-                            config.logging_min_level.parse().unwrap_or(Level::TRACE),
-                        ))
-                        .with_level(false);
+                let fmt_layer = tracing_subscriber::fmt::layer()
+                    .with_ansi(false)
+                    .without_time()
+                    .with_writer(MakeJSLogWriter::new(logger))
+                    .with_level(false)
+                    .with_filter(config.logging_min_level.parse().unwrap_or(LevelFilter::OFF));
 
                 tracing_subscriber::registry().with(fmt_layer).init();
 
