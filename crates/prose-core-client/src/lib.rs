@@ -13,7 +13,7 @@ pub use client::{Client, ClientDelegate};
 pub use client_event::{ClientEvent, ClientRoomEventType, ConnectionEvent};
 #[cfg(not(target_arch = "wasm32"))]
 pub use domain::encryption::services::impls::signal_native::SignalServiceHandle;
-pub use domain::encryption::services::EncryptionService;
+pub use domain::encryption::services::{impls::NoopEncryptionService, EncryptionService};
 pub use infra::platform_dependencies::open_store;
 #[cfg(feature = "test")]
 pub use infra::xmpp::event_parser::parse_xmpp_event;
