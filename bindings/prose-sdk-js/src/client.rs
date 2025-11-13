@@ -23,7 +23,9 @@ use cfg_if::cfg_if;
 use js_sys::Array;
 use prose_core_client::dtos::{MucId, PlatformImage, SoftwareVersion, UserStatus};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
-use prose_core_client::{open_store, Client as ProseClient, PlatformDriver, StoreAvatarRepository};
+use prose_core_client::{
+    open_store, Client as ProseClient, NoopEncryptionService, PlatformDriver, StoreAvatarRepository,
+};
 use tracing::{info, Level};
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::prelude::*;
@@ -131,7 +133,7 @@ impl Client {
     pub async fn init(
         connection_provider: ProseConnectionProvider,
         delegate: JSDelegate,
-        encryption_service: JsEncryptionService,
+        encryption_service: Option<JsEncryptionService>,
         logger: JSLogger,
         config: Option<ClientConfig>,
     ) -> Result<Client> {
@@ -181,16 +183,27 @@ impl Client {
             }
         }
 
+        let encryption_service = encryption_service
+            .map(|enc_service| {
+                let service: Arc<dyn prose_core_client::EncryptionService> =
+                    Arc::new(EncryptionService::new(
+                        enc_service,
+                        Arc::new(EncryptionKeysRepository::new(store.clone())),
+                        Arc::new(SessionRepository::new(store.clone())),
+                    ));
+                service
+            })
+            .unwrap_or_else(|| {
+                Arc::new(NoopEncryptionService::new())
+                    as Arc<dyn prose_core_client::EncryptionService>
+            });
+
         let client = Client {
             client: ProseClient::builder()
                 .set_connector_provider(provider)
                 .set_store(store.clone())
                 .set_avatar_repository(StoreAvatarRepository::new(store.clone()))
-                .set_encryption_service(Arc::new(EncryptionService::new(
-                    encryption_service,
-                    Arc::new(EncryptionKeysRepository::new(store.clone())),
-                    Arc::new(SessionRepository::new(store.clone())),
-                )))
+                .set_encryption_service(encryption_service)
                 .set_delegate(Some(Box::new(Delegate::new(delegate))))
                 .set_software_version(software_version)
                 .build(),
