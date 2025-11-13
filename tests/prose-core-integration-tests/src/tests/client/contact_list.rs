@@ -219,3 +219,51 @@ async fn test_contact_list_name_cascade() -> Result<()> {
 
     Ok(())
 }
+
+#[mt_test]
+async fn test_ignores_server_roster_items() -> Result<()> {
+    let client = TestClient::new().await;
+
+    let strategy = LoginStrategy::default().with_roster_items([
+        RosterItem {
+            jid: bare!("example.com"),
+            name: None,
+            subscription: Subscription::To,
+            ask: Default::default(),
+            groups: vec![],
+        },
+        RosterItem {
+            jid: bare!("a@prose.org"),
+            name: Some("Susan Doe".to_string()),
+            subscription: Subscription::Both,
+            ask: Default::default(),
+            groups: vec![],
+        },
+    ]);
+
+    client
+        .expect_login_with_strategy(user_id!("user@prose.org"), "secret", strategy)
+        .await?;
+
+    let contacts = client.contact_list.load_contacts().await?;
+
+    assert_eq!(
+        vec![Contact {
+            id: user_id!("a@prose.org"),
+            name: "Susan Doe".to_string(),
+            full_name: None,
+            avatar_bundle: AvatarBundle {
+                avatar: None,
+                initials: "SD".to_string(),
+                color: "#b258ec".to_string(),
+            },
+            availability: Default::default(),
+            status: None,
+            group: Group::Team,
+            presence_subscription: PresenceSubscription::Mutual,
+        },],
+        contacts
+    );
+
+    Ok(())
+}
