@@ -1,7 +1,29 @@
 
+## What's Changed in 0.1.111
+
+* Ignore roster items without a node
+* Introduce type-safe UserId and MucId to make sure that the core only receives valid JIDs
+* Add userId to SidebarItemType::DirectMessage
+* Introduce AvatarBundle to wrap avatar, initials and color
+* Remove room from SidebarItem, add user info for DM
+* Add method to return room model
+* Extend SidebarItem to contain user info and avatar fallback for DM
+* Add methods to manage sidebar items to client
+* Use tokio-xmpp fork to enable iPhone connectivity
+* Prevent trying to register logger multiple times
+* Respect logging settings in ClientConfig
+* Serialize writes to SQLite database to prevent SQLITE_BUSY errors
+
+[Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.110...0.1.111)
+
+
 ## What's Changed in 0.1.110
 
 * Add methods that return Blobs for loading images by @nesium in [#127](https://github.com/prose-im/prose-core-client/pull/127)
+
+## New Contributors
+* @nesium made their first contribution in [#127](https://github.com/prose-im/prose-core-client/pull/127)
+* @valeriansaliou made their first contribution
 
 [Full Changelog](https://github.com/prose-im/prose-core-client/compare/0.1.109...0.1.110)
 
