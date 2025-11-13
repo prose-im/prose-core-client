@@ -28,6 +28,14 @@ impl ContactListService for XMPPClient {
                 if item.jid.is_prose_workspace() {
                     return None;
                 };
+
+                // Ignore roster items without a node for now. Note that these are usually valid
+                // and could represent a gateway of some sorts. For more info see the discussion
+                // at https://github.com/prose-im/prose-app-web/issues/163#issuecomment-3449571747
+                if item.jid.node().is_none() {
+                    return None;
+                }
+
                 return Some(Contact::from(item));
             })
             .collect::<Vec<_>>();
