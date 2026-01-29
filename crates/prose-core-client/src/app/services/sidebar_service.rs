@@ -10,15 +10,12 @@ use prose_proc_macros::InjectDependencies;
 
 use crate::app::deps::{
     DynAppContext, DynConnectedRoomsReadOnlyRepository, DynDraftsRepository, DynMessagesRepository,
-    DynRoomFactory, DynSidebarDomainService, DynUserInfoDomainService, DynUserInfoRepository,
+    DynRoomFactory, DynSidebarDomainService, DynUserInfoDomainService,
 };
-use crate::domain::rooms::models::{Participant, Room, RoomSidebarState};
+use crate::domain::rooms::models::{Room, RoomSidebarState};
 use crate::domain::shared::models::{CachePolicy, RoomId, RoomType};
 use crate::domain::user_info::models::UserInfoOptExt;
-use crate::dtos::{AvatarBundle, SidebarItem as SidebarItemDTO, SidebarItemType};
-use crate::util::textual_palette::{
-    generate_textual_initials, generate_textual_palette, normalize_textual_initials,
-};
+use crate::dtos::{SidebarItem as SidebarItemDTO, SidebarItemType};
 
 #[derive(InjectDependencies)]
 pub struct SidebarService {

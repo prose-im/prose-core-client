@@ -3,13 +3,13 @@
 // Copyright: 2023, Marc Bauer <mb@nesium.com>
 // License: Mozilla Public License v2.0 (MPL v2.0)
 
-use crate::types::{Availability, Avatar};
+use crate::types::avatar::AvatarBundle;
+use crate::types::Availability;
 use crate::{FFIUserId, ParticipantId};
 use prose_core_client::dtos::{
     JabberClient as CoreJabberClient, ParticipantBasicInfo as CoreParticipantBasicInfo,
     ParticipantInfo as CoreParticipantInfo, RoomAffiliation as CoreRoomAffiliation,
 };
-use std::sync::Arc;
 
 #[derive(uniffi::Record)]
 pub struct ParticipantInfo {
@@ -19,7 +19,7 @@ pub struct ParticipantInfo {
     pub is_self: bool,
     pub availability: Availability,
     pub affiliation: RoomAffiliation,
-    pub avatar: Option<Arc<Avatar>>,
+    pub avatar_bundle: AvatarBundle,
     pub client: Option<JabberClient>,
     pub status: Option<String>,
 }
@@ -28,7 +28,7 @@ pub struct ParticipantInfo {
 pub struct ParticipantBasicInfo {
     pub id: ParticipantId,
     pub name: String,
-    pub avatar: Option<Arc<Avatar>>,
+    pub avatar_bundle: AvatarBundle,
 }
 
 #[derive(uniffi::Enum)]
@@ -57,6 +57,8 @@ impl From<CoreJabberClient> for JabberClient {
 
 impl From<CoreParticipantInfo> for ParticipantInfo {
     fn from(value: CoreParticipantInfo) -> Self {
+        let avatar_bundle = value.avatar_bundle();
+
         ParticipantInfo {
             id: value.id.into(),
             user_id: value.user_id.map(Into::into),
@@ -64,7 +66,7 @@ impl From<CoreParticipantInfo> for ParticipantInfo {
             is_self: value.is_self,
             availability: value.availability.into(),
             affiliation: value.affiliation.into(),
-            avatar: value.avatar.map(|a| Arc::new(a.into())),
+            avatar_bundle: avatar_bundle.into(),
             client: value.client.map(Into::into),
             status: value.status,
         }
@@ -85,10 +87,12 @@ impl From<CoreRoomAffiliation> for RoomAffiliation {
 
 impl From<CoreParticipantBasicInfo> for ParticipantBasicInfo {
     fn from(value: CoreParticipantBasicInfo) -> Self {
+        let avatar_bundle = value.avatar_bundle();
+
         ParticipantBasicInfo {
             id: value.id.into(),
             name: value.name,
-            avatar: value.avatar.map(|a| Arc::new(a.into())),
+            avatar_bundle: avatar_bundle.into(),
         }
     }
 }
