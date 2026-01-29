@@ -25,7 +25,6 @@ pub struct FFIUserId(BareJid);
 pub struct OccupantId(String);
 pub struct FFIMucId(BareJid);
 pub struct DateTime(i64);
-pub struct DateTimeFixed(i64);
 pub struct Mime(String);
 pub struct UnicodeScalarIndex(u64);
 pub struct PresenceSubRequestId(FFIUserId);
@@ -42,7 +41,6 @@ uniffi::custom_newtype!(FFIUserId, BareJid);
 uniffi::custom_newtype!(OccupantId, String);
 uniffi::custom_newtype!(FFIMucId, BareJid);
 uniffi::custom_newtype!(DateTime, i64);
-uniffi::custom_newtype!(DateTimeFixed, i64);
 uniffi::custom_newtype!(Mime, String);
 uniffi::custom_newtype!(UnicodeScalarIndex, u64);
 uniffi::custom_newtype!(PresenceSubRequestId, FFIUserId);
@@ -171,9 +169,9 @@ impl From<chrono::DateTime<chrono::Utc>> for DateTime {
     }
 }
 
-impl From<chrono::DateTime<chrono::FixedOffset>> for DateTimeFixed {
+impl From<chrono::DateTime<chrono::FixedOffset>> for DateTime {
     fn from(value: chrono::DateTime<chrono::FixedOffset>) -> Self {
-        DateTimeFixed(value.timestamp_millis())
+        DateTime(value.timestamp_millis())
     }
 }
 
@@ -282,9 +280,8 @@ pub mod uniffi_types {
     pub use crate::{
         client::Client,
         types::{AccountBookmark, Message, Reaction, UserProfile},
-        AvatarId, ClientError, Contact, DateTimeFixed, Emoji, FFIMucId, FFIUserId, HexColor,
-        MessageId, ParticipantId, PathBuf, PresenceSubRequestId, RoomId, ServerId,
-        UnicodeScalarIndex, Url,
+        AvatarId, ClientError, Contact, Emoji, FFIMucId, FFIUserId, HexColor, MessageId,
+        ParticipantId, PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url,
     };
 }
 
