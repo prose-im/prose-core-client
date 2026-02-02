@@ -279,7 +279,7 @@ pub fn is_valid_muc_id(muc_id: &str) -> bool {
 pub mod uniffi_types {
     pub use crate::{
         client::Client,
-        types::{AccountBookmark, Message, Reaction, UserProfile},
+        types::{AccountBookmark, Message, Reaction, UserPresenceInfo, UserProfile},
         AvatarId, ClientError, Contact, Emoji, FFIMucId, FFIUserId, HexColor, MessageId,
         ParticipantId, PathBuf, PresenceSubRequestId, RoomId, ServerId, UnicodeScalarIndex, Url,
     };

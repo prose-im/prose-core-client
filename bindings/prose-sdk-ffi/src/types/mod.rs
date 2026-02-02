@@ -19,7 +19,7 @@ pub use room::{RoomEnvelope, RoomState};
 pub use send_message_request::SendMessageRequest;
 pub use sidebar_item::SidebarItem;
 pub use upload_slot::UploadSlot;
-pub use user_info::UserBasicInfo;
+pub use user_info::{UserBasicInfo, UserPresenceInfo};
 pub use user_metadata::UserMetadata;
 pub use user_profile::UserProfile;
 pub use workspace_info::{WorkspaceIcon, WorkspaceInfo};
