@@ -10,12 +10,12 @@ use std::sync::{Arc, Once};
 use crate::types::{
     AccountInfo, Availability, Avatar, ClientResult, ConnectionError, PresenceSubRequest,
     PublicRoomInfo, RoomEnvelope, SidebarItem, UploadSlot, UserBasicInfo, UserMetadata,
-    UserProfile, UserStatus, WorkspaceIcon, WorkspaceInfo,
+    UserPresenceInfo, UserProfile, UserStatus, WorkspaceIcon, WorkspaceInfo,
 };
 use crate::{
     ClientEvent, Contact, FFIMucId, FFIUserId, Mime, PathBuf, PresenceSubRequestId, RoomId,
 };
-use prose_core_client::dtos::{SoftwareVersion, UserId as CoreUserId};
+use prose_core_client::dtos::{SoftwareVersion, UserId as CoreUserId, UserId};
 use prose_core_client::infra::encryption::{EncryptionKeysRepository, SessionRepository};
 use prose_core_client::infra::general::OsRngProvider;
 use prose_core_client::{
@@ -397,6 +397,20 @@ impl Client {
             .await?
             .unwrap_or_default()
             .into())
+    }
+
+    pub async fn load_user_presence_info(
+        &self,
+        user_id: FFIUserId,
+    ) -> ClientResult<Option<UserPresenceInfo>> {
+        let user_id = UserId::from(user_id);
+        let info = self
+            .client
+            .user_data
+            .load_user_info(&user_id)
+            .await?
+            .map(|info| info.into_user_presence_info(user_id));
+        Ok(info.map(Into::into))
     }
 
     /// XMPP: Instant Messaging and Presence

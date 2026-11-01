@@ -90,6 +90,10 @@ macro_rules! base_room_impl {
                     .to_string()
             }
 
+            fn description(&self) -> Option<String> {
+                self.room.description()
+            }
+
             fn participants(&self) -> Vec<ParticipantInfo> {
                 self.room
                     .participants()
@@ -210,7 +214,7 @@ macro_rules! muc_room_impl {
         #[uniffi::export(async_runtime = "tokio")]
         #[async_trait::async_trait]
         impl MucRoom for $t {
-            fn subject(&self) -> Option<String> {
+            fn topic(&self) -> Option<String> {
                 self.room.subject()
             }
 
@@ -233,12 +237,6 @@ macro_rules! mut_name_impl {
             }
         }
     };
-}
-
-#[uniffi::export]
-#[async_trait::async_trait]
-pub trait Channel: Send + Sync {
-    async fn invite_users(&self, users: Vec<FFIUserId>) -> ClientResult<()>;
 }
 
 macro_rules! channel_room_impl {
@@ -315,6 +313,7 @@ pub trait RoomBase: Send + Sync {
     fn state(&self) -> RoomState;
     fn id(&self) -> RoomId;
     fn name(&self) -> String;
+    fn description(&self) -> Option<String>;
     fn participants(&self) -> Vec<ParticipantInfo>;
 
     async fn send_message(&self, request: SendMessageRequest) -> ClientResult<()>;
@@ -347,15 +346,21 @@ pub trait RoomBase: Send + Sync {
 
 #[uniffi::export]
 #[async_trait::async_trait]
-pub trait MucRoom: Send + Sync {
-    fn subject(&self) -> Option<String>;
+pub trait MucRoom: RoomBase {
+    fn topic(&self) -> Option<String>;
     async fn set_topic(&self, topic: Option<String>) -> ClientResult<()>;
 }
 
 #[uniffi::export]
 #[async_trait::async_trait]
-pub trait HasMutableName: Send + Sync {
+pub trait HasMutableName: RoomBase {
     async fn set_name(&self, name: &str) -> ClientResult<()>;
+}
+
+#[uniffi::export]
+#[async_trait::async_trait]
+pub trait Channel: MucRoom + HasMutableName {
+    async fn invite_users(&self, users: Vec<FFIUserId>) -> ClientResult<()>;
 }
 
 base_room_impl!(RoomDirectMessage);

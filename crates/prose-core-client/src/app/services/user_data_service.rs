@@ -10,7 +10,7 @@ use prose_proc_macros::InjectDependencies;
 use crate::app::deps::{DynEncryptionDomainService, DynUserInfoDomainService};
 use crate::domain::shared::models::{CachePolicy, UserId};
 use crate::domain::user_info::models::PlatformImage;
-use crate::dtos::{Avatar, DeviceInfo, UserMetadata, UserProfile};
+use crate::dtos::{Avatar, DeviceInfo, UserInfo, UserMetadata, UserProfile};
 
 #[derive(InjectDependencies)]
 pub struct UserDataService {
@@ -24,6 +24,12 @@ impl UserDataService {
     pub async fn load_avatar(&self, avatar: &Avatar) -> Result<Option<PlatformImage>> {
         self.user_info_domain_service
             .load_avatar_image(avatar)
+            .await
+    }
+
+    pub async fn load_user_info(&self, user_id: &UserId) -> Result<Option<UserInfo>> {
+        self.user_info_domain_service
+            .get_user_info(user_id, CachePolicy::ReturnCacheDataElseLoad)
             .await
     }
 
